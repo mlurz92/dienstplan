@@ -11,16 +11,31 @@ function functionBody(name) {
   return source.slice(start, next < 0 ? source.length : next);
 }
 
-test('month navigation starts color feedback immediately but animates the new content only after rendering', () => {
+/**
+ * Grundfarbe und Monat wechseln gemeinsam – vor dem Serverabruf.
+ *
+ * Zuvor galt die umgekehrte Reihenfolge: Farbe sofort, Rendern erst nach dem
+ * Laden. Gegen eine antwortende API gemessen lagen dazwischen rund 800 ms, in
+ * denen die Farbe bereits vollständig durchgelaufen war, während in der
+ * Überschrift noch der alte Monat stand. Ohne Backend – wie in allen früheren
+ * Testläufen – scheiterte der Abruf sofort und der Versatz fiel nicht auf.
+ *
+ * Das Kalendergerüst steht ohne Serverdaten fest, deshalb darf und muss sofort
+ * gerendert werden. Der Serverstand zieht in einem zweiten Durchlauf nach.
+ */
+test('colour, heading and table switch together before the server round-trip', () => {
   const body = functionBody('openCurrentMonth');
   const theme = body.indexOf('applyMonthTheme(month)');
-  const load = body.indexOf('await loadMonth(');
-  const render = body.indexOf('render()');
-  const content = body.indexOf('animateMonthContent(direction)', render);
+  const ersterRender = body.indexOf('render();');
+  const inhalt = body.indexOf('animateMonthContent(direction)');
+  const laden = body.indexOf('await loadMonth(');
+  const zweiterRender = body.indexOf('render();', laden);
 
-  assert.ok(theme >= 0 && load > theme, 'die Monatsfarbe muss vor dem Laden reagieren');
-  assert.ok(render > load, 'erst geladene Monatsdaten dürfen gerendert werden');
-  assert.ok(content > render, 'die Einblendung muss den neu gerenderten Monat animieren');
+  assert.ok(theme >= 0, 'die Monatsfarbe muss gesetzt werden');
+  assert.ok(ersterRender > theme, 'der Monat wird unmittelbar nach der Farbe gerendert');
+  assert.ok(inhalt > ersterRender, 'die Einblendung folgt dem gerenderten Monat');
+  assert.ok(laden > inhalt, 'der Serverabruf darf den sichtbaren Wechsel nicht aufhalten');
+  assert.ok(zweiterRender > laden, 'der Serverstand zieht in einem zweiten Durchlauf nach');
 });
 
 test('arrow buttons and both dropdowns use the same month transition pipeline', () => {

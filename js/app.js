@@ -1,9 +1,9 @@
-import { ABSENCE_TYPES, MONTH_NAMES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, toIsoDate } from './defaults.js?v=20260729.3';
-import { state, bootstrapState, getMonthData, getMonthLabel, loadMonth, persistCurrentMonth, persistMonth, saveLocalBootstrap, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260729.3';
-import { api } from './api.js?v=20260729.3';
-import { applyMonthTheme, prefersReducedMotion } from './theme.js?v=20260729.3';
-import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260729.3';
-import { buildStats, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getPlanningStaff, getPreference, getStaffById, labelForAbsence, labelForPreference, setAbsence, setAssignment, setPreference, weekdayLabel } from './rules.js?v=20260729.3';
+import { ABSENCE_TYPES, MONTH_NAMES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, toIsoDate } from './defaults.js?v=20260729.4';
+import { state, bootstrapState, getMonthData, getMonthLabel, loadMonth, persistCurrentMonth, persistMonth, saveLocalBootstrap, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260729.4';
+import { api } from './api.js?v=20260729.4';
+import { applyMonthTheme, prefersReducedMotion } from './theme.js?v=20260729.4';
+import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260729.4';
+import { buildStats, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getPlanningStaff, getPreference, getStaffById, labelForAbsence, labelForPreference, setAbsence, setAssignment, setPreference, weekdayLabel } from './rules.js?v=20260729.4';
 
 const $ = selector => document.querySelector(selector);
 
@@ -134,33 +134,49 @@ async function openCurrentMonth(year, month, forceServer = false) {
   const targetChanged = month !== previousMonth || year !== previousYear;
   requestedYear = year;
   requestedMonth = month;
-  // Farbwechsel sofort auslösen – unabhängig von Ladezeit oder Datenquelle.
   const direction = Math.sign(monthOrdinal(year, month) - monthOrdinal(previousYear, previousMonth)) || 1;
-  if (targetChanged) {
-    applyMonthTheme(month);
-    // Einen Frame abwarten, damit der erste Schritt des Farbverlaufs gezeichnet
-    // ist, bevor Laden und Rendern den Main-Thread belegen. Der Verlauf selbst
-    // ist zeitbasiert und übersteht auch einen blockierten Frame.
-    await nextAnimationFrame();
-  }
+
+  // Offene Änderungen des bisherigen Monats sichern. Der Vorgang läuft parallel
+  // weiter und hält die Anzeige nicht auf.
+  let pendingSave = null;
   if (state.dirty) {
     clearTimeout(state.saveTimer);
     state.saveTimer = null;
-    await persistMonth(loadedYear, loadedMonth);
+    pendingSave = persistMonth(loadedYear, loadedMonth);
   }
+
+  // Grundfarbe, Titel, Tabelle und Statistik wechseln in EINEM Schritt.
+  //
+  // Zuvor wurde die Palette sofort gesetzt, der Monat aber erst nach dem
+  // Serverabruf gerendert. Gemessen an einer antwortenden API lagen dazwischen
+  // rund 800 ms: Die Farbe lief vollständig durch, während in der Überschrift
+  // noch der alte Monat stand. Ohne Backend – wie in allen früheren Testläufen –
+  // scheiterte der Abruf sofort und der Versatz fiel nicht auf.
+  //
+  // Das Kalendergerüst eines Monats steht ohne Serverdaten fest: Tage,
+  // Wochentage, Feiertage und damit die gesamte Farbhierarchie. Es wird deshalb
+  // sofort aus dem Zwischenspeicher gerendert; für Nachbarmonate liegen auch
+  // die Einteilungen bereits vor. Der Serverstand zieht anschließend nach.
+  state.currentYear = year;
+  state.currentMonth = month;
+  populateSelectors();
+  if (targetChanged) applyMonthTheme(month);
+  render();
+  if (targetChanged) animateMonthContent(direction);
+
+  if (pendingSave) await pendingSave;
+  if (requestId !== monthRequestId) return;
+
   setStatus('loading', forceServer ? 'Lädt Serverstand …' : 'Lädt …');
   await loadMonth(year, month, forceServer);
   if (requestId !== monthRequestId) return;
-  state.currentYear = year;
-  state.currentMonth = month;
   await warmAdjacentMonths(year, month);
   if (requestId !== monthRequestId) return;
+
   setStatus(state.serverReady ? 'saved' : 'offline', state.serverReady ? 'Gespeichert' : 'Offline – lokaler Stand');
-  populateSelectors();
+  // Zweiter Durchlauf mit dem Serverstand. Die Farbe bleibt dabei unangetastet,
+  // weil applyMonthTheme einen laufenden Übergang auf dasselbe Ziel nicht stört.
   render();
-  // Erst der vollständig gerenderte Zielmonat gleitet herein. So bleibt die
-  // Bewegung auch bei langsamer Netzwerkantwort inhaltlich korrekt.
-  if (targetChanged) animateMonthContent(direction);
 }
 
 function render() {
