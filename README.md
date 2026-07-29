@@ -107,7 +107,7 @@ Was die Anwendung für genau diesen Einsatzzweck auszeichnet:
 | Backend | Cloudflare Pages Functions (serverless, Edge) |
 | Datenhaltung | Cloudflare KV (Key-Value-Store), Binding `DIENSTPLAN_KV` |
 | Lokale Persistenz | `localStorage` (Bootstrap-Stammdaten und jeder geladene Monat) |
-| Offline-Fähigkeit | Service Worker (Cache-First für Assets, Network-First für Navigation) |
+| Offline-Fähigkeit | Service Worker (Network-First für Anwendungscode, Cache-First für Assets) |
 | Excel | SheetJS (`xlsx` 0.20.3) via CDN, `defer` geladen |
 | Tests | `node:test` aus der Node-Standardbibliothek, keine externen Test-Abhängigkeiten |
 
@@ -128,15 +128,17 @@ Genutzte moderne Web-Plattform-Features:
 * **ES-Module** (`<script type="module">`) mit statischen Imports.
 * **`<dialog>` mit `showModal()`** für alle vier Dialoge, inklusive nativem `::backdrop`, Fokusfalle und
   Escape-Handling.
-* **`@property`** zur Registrierung von Custom Properties als typisierte `<color>`-Werte – nur dadurch sind
-  weiche Farbübergänge zwischen den Monatspaletten überhaupt animierbar.
+* **`@property`** zur Typisierung der Monatsvariablen als `<color>`. Der Farbverlauf selbst hängt nicht
+  daran – er wird in JavaScript interpoliert (siehe 11.3) und funktioniert deshalb auch ohne diese
+  Unterstützung.
 * **`color-mix(in srgb, …)`** für die gesamte abgeleitete Farbhierarchie.
 * **`backdrop-filter`** für die Glas-Optik der Panels.
 * **`structuredClone`** für tiefe Kopien der Vorgabedaten.
 * **`localStorage`**, **`fetch`**, **Service Worker**, **Web App Manifest**.
 
-Zielbrowser sind aktuelle Chromium-, Firefox- und Safari-Versionen. Fehlt `@property`, bleiben die Farben
-funktional vollständig korrekt – sie springen dann lediglich ohne Übergang.
+Zielbrowser sind aktuelle Chromium-, Firefox- und Safari-Versionen. Da der Farbverlauf in JavaScript
+gerechnet und als fertige `rgb()`-Werte geschrieben wird, ist er von `@property`- und
+`color-mix`-Eigenheiten der jeweiligen Engine unabhängig.
 
 ---
 
@@ -153,7 +155,8 @@ funktional vollständig korrekt – sie springen dann lediglich ohne Übergang.
 ├── icons/
 │   └── icon.svg                   Skalierbares App-Icon (any + maskable)
 ├── js/
-│   ├── app.js                     Anwendungslogik: Rendering, Ereignisse, Dialoge, Import/Export, Theme
+│   ├── app.js                     Anwendungslogik: Rendering, Ereignisse, Dialoge, Import/Export
+│   ├── theme.js                   Monatsfarbsystem: Paletten, OKLCH-Farbmathematik, Übergangsschleife
 │   ├── state.js                   Zustandsobjekt, Lade-/Speicherpfade, localStorage, Monats-Cache
 │   ├── rules.js                   Regelwerk: Bewertung, Statistik, Selektoren, Datumsutilities
 │   ├── defaults.js                Vorgabedaten: Personal, Abwesenheits-/Wunschtypen, Monatsnamen
@@ -169,7 +172,8 @@ funktional vollständig korrekt – sie springen dann lediglich ohne Übergang.
 │       ├── import.js                 POST /api/import
 │       └── month/[year]/[month].js   GET/PUT /api/month/:year/:month
 └── tests/
-    └── rules.test.js              Regressionstests für Kernregeln und Statistik
+    ├── rules.test.js              Regressionstests für Kernregeln und Statistik
+    └── theme.test.js              Regressionstests für Farbmathematik, Kontrast und Zeitverlauf
 ```
 
 ### 3.1 Modulverantwortlichkeiten und Abhängigkeitsrichtung
@@ -181,11 +185,16 @@ defaults.js   (keine Abhängigkeiten – reine Daten und Datums-Helfer)
      ├── state.js    (Zustand, Persistenz, Netzwerk – kein DOM)
      ├── api.js      (Netzwerk – kein DOM)
      ▲
-     └── app.js      (einziges Modul mit DOM-Zugriff)
+theme.js         (Paletten und Farbmathematik rein; nur applyMonthTheme fasst das DOM an)
+     ▲
+     └── app.js      (Rendering, Ereignisse, Dialoge)
 ```
 
 Diese Trennung ist strikt: `rules.js` und `defaults.js` enthalten **keinerlei** DOM- oder
-Browser-API-Zugriff und sind deshalb direkt in Node testbar. `functions/_utils.js` importiert
+Browser-API-Zugriff und sind deshalb direkt in Node testbar. In `theme.js` ist der gesamte
+rechnende Teil – Farbraumkonversion, Mischung, Zeitkurve – ebenfalls seiteneffektfrei und
+exportiert; nur `applyMonthTheme` schreibt tatsächlich auf `<html>`. Dadurch sind Farbharmonie
+und Kontrast automatisiert prüfbar, statt nur im Browser beurteilbar. `functions/_utils.js` importiert
 `js/defaults.js` – Personalstamm und leeres Monatsschema sind damit auf Client und Server garantiert
 identisch, ohne Duplikat.
 
@@ -694,20 +703,45 @@ dichte Tabellenkalkulations-Anmutung.
 
 #### 8.5.1 Zeilenfarbgebung
 
-| Zeilentyp | Hintergrund | Zusätzliche Markierung |
-|---|---|---|
-| Werktag | Neutrales Weiß | Wochentagsspalte in leichter Monatsfarbe (14 %) |
-| Samstag | Monatsfarbe 38 % | 4 px farbige Kante links an der Tageszahl |
-| Sonntag | Monatsfarbe 50 % | 4 px kräftige Kante links |
-| Feiertag | Monatsfarbe 62 % | 5 px kräftige Kante links, 1 px an der Wochentagsspalte |
+Die Tabelle trägt die Monatsfarbe in zwei Richtungen: **senkrecht** als kräftiger Anker, **waagerecht**
+als helle Wäsche.
 
-Die Abstufung 38 % → 50 % → 62 % ist eine bewusste **Wertigkeitshierarchie**: Samstag ist besonders,
-Sonntag ist besonderer, ein Feiertag ist am besondersten. Da alle drei Werte über `color-mix` aus derselben
-Monatsfarbe entstehen, bleibt die Hierarchie in jedem der zwölf Monate identisch wahrnehmbar und wechselt
-beim Monatswechsel gemeinsam die Farbe.
+| Fläche | Anteil der Monatsfarbe | Wirkung |
+|---|---|---|
+| **Wochentagsspalte** (alle Zeilen) | **46 %** | Dunkle Nuance, durchgehender senkrechter Streifen |
+| Samstagszeile | 14 % | Hellste Wäsche, 4 px Kante links an der Tageszahl |
+| Sonntagszeile | 22 % | Kräftigere Wäsche, 4 px kräftige Kante links |
+| Feiertagszeile | 30 % | Stärkste Wäsche, 5 px Kante links, 3 px an der Wochentagsspalte |
+| Werktagszellen sonst | – | Neutrales Weiß |
+
+Zwei Gestaltungsentscheidungen stecken darin:
+
+* **Die Wochentagsspalte behält ihre dunkle Nuance in jeder Zeile** – auch in Wochenend- und
+  Feiertagszeilen. Dadurch entsteht ein ununterbrochener senkrechter Anker, an dem die waagerechten
+  Wäschen entlanglaufen, statt ihn zu zerschneiden.
+* **Unter den Zeilentypen bleibt die Wertigkeit erhalten:** Samstag ist besonders, Sonntag ist
+  besonderer, ein Feiertag ist am besondersten. Weil eine ganze Zeile über die volle Tabellenbreite
+  wirkt, tragen diese Flächen deutlich weniger Farbe als der schmale senkrechte Streifen – dieselbe
+  Farbmenge würde in der Breite erschlagend wirken.
+
+Alle vier Werte entstehen aus **einer** Grundfarbe, deshalb ist die Hierarchie in jedem der zwölf Monate
+identisch wahrnehmbar und wechselt geschlossen mit.
+
+**Schrift auf farbigen Flächen** verwendet einen eigenen Palettenton `--month-ink`: die Monatsfarbe auf
+eine feste Helligkeit abgedunkelt, Farbton und Buntheit bleiben erhalten. Die Schrift trägt damit sichtbar
+die Monatsfarbe und hält trotzdem in jeder Palette denselben Kontrast. Nachgemessen über alle zwölf
+Paletten und alle vier Flächen liegt der schlechteste Wert bei **5,63:1** und damit durchgehend über
+WCAG AA; ein Test hält das fest. Der zuvor verwendete Ton hätte auf der dunklen Wochentagsspalte in
+keiner einzigen Palette AA erreicht (schlechtester Wert 3,33:1).
 
 Zusätzlich liegt auf Wochenend- und Feiertagszeilen ein diagonaler, sehr schwacher Weißverlauf – dieselbe
 Lichtkante, die auch Panels und Schaltflächen tragen, damit die eingefärbten Zeilen nicht flach wirken.
+
+**Spezifitätsfalle:** Die Basisregel `.plan-table th, .plan-table td` hat die Spezifität (0,1,1). Ein
+reiner Klassenselektor wie `.weekday-cell` (0,1,0) verliert dagegen – die Einfärbung der Wochentagsspalte
+kam deshalb nie an, unabhängig von jedem Farbwechsel. Alle Zellregeln sind daher konsequent auf
+`.plan-table td.<klasse>` (0,2,1) hochgezogen und die Zeilentypen auf `.plan-table tr.<typ> td` (0,2,2).
+Damit ist die Rangfolge Zelle < Zeilentyp eindeutig und unabhängig von der Quellreihenfolge.
 
 #### 8.5.2 Einteilungsschaltflächen (BD/HG)
 
@@ -915,65 +949,92 @@ im Frühjahr, warme Koralle und Bernstein im Hochsommer, Kupfer und Pflaume im H
 Weihnachtszeit. Alle zwölf Töne haben eine vergleichbare Sättigung und Helligkeit, sodass Kontrast und
 Lesbarkeit über das ganze Jahr konstant bleiben und keine Palette „lauter" wirkt als eine andere.
 
-Jede Palette definiert vier aktiv genutzte Werte:
+Aus jeder Palette entsteht ein vollständiger Variablensatz:
 
-| Variable | Verwendung |
-|---|---|
-| `--month-accent` | Grundfarbe: Kanten, Fokusringe, Wochentagsspalte, Basis aller Ableitungen |
-| `--month-accent-strong` | Dunklere Variante: Text auf farbigen Zeilen, kräftige Kanten, Badge-Text |
-| `--month-glow` | Halbtransparenter Schein: Ambient-Orbs, Panel-Schatten, Badge-Leuchten |
-| `--month-panel-tint` | Sehr schwache Einfärbung der Glasflächen |
+| Variable | Herkunft | Verwendung |
+|---|---|---|
+| `--month-accent` | Palette | Grundfarbe: Kanten, Fokusringe, Basis aller Ableitungen |
+| `--month-accent-strong` | Palette | Dunklere Variante: kräftige Kanten, Badge-Text |
+| `--month-ink` | berechnet | Schriftton auf farbigen Tabellenflächen, kontrastgeprüft |
+| `--month-glow` | Palette | Halbtransparenter Schein: Ambient-Orbs, Panel-Schatten, Badge-Leuchten |
+| `--month-panel-tint` | Palette | Sehr schwache Einfärbung der Glasflächen |
+| `--weekday-field-bg` | berechnet | Wochentagsspalte, 46 % |
+| `--saturday-row-bg` | berechnet | Samstagszeilen, 14 % |
+| `--sunday-row-bg` | berechnet | Sonntagszeilen, 22 % |
+| `--holiday-row-bg` | berechnet | Feiertagszeilen, 30 % |
 
-Sämtliche weiteren Farben werden per `color-mix` daraus abgeleitet – Wochenendzeilen, Feiertagszeilen,
-Wochentagsspalte, Fokusringe, Chip-Hintergründe, Auswahlmarkierungen. **Eine** Farbe steuert das gesamte
+Die berechneten Werte entstehen in `js/theme.js` als **fertige, konkrete Farben** und werden als
+Inline-Style auf `<html>` geschrieben. Weitere Farben leitet das Stylesheet per `color-mix` ab –
+Fokusringe, Chip-Hintergründe, Auswahlmarkierungen, Panel-Schein. **Eine** Farbe steuert das gesamte
 Erscheinungsbild eines Monats.
+
+Gemischt wird nicht linear in sRGB, sondern in **OKLCH**: Beim Aufhellen bleibt der Farbton exakt
+erhalten, statt in Richtung Violett oder Grün zu kippen, wie es die naive sRGB-Mischung heller Töne tut.
 
 ### 11.3 Der Farbwechsel beim Monatswechsel
 
-Dieser Wechsel ist die auffälligste Interaktion der Anwendung, und er ist mehrfach abgesichert – gegen
-Ladezeiten, gegen Race Conditions und gegen den klassischen Fehler, dass eine CSS-Transition im
-Umschaltframe wirkungslos bleibt.
+Dieser Wechsel ist die auffälligste Interaktion der Anwendung. Er wird **nicht** über CSS-Transitions
+gefahren, sondern von `js/theme.js` selbst interpoliert – aus einem konkreten, gemessenen Grund.
 
-**Was passiert, wenn ein Monat gewechselt wird:**
+#### Warum keine CSS-Transition
 
-1. **Sofortige Reaktion.** `openCurrentMonth` setzt die neue Palette als **Erstes** – noch bevor
-   gespeichert, geladen oder gerendert wird. Der Farbwechsel ist damit unabhängig von Netzgeschwindigkeit
-   und Datenmenge; er startet in dem Moment, in dem geklickt wird. Das gilt gleichermaßen für die beiden
-   Pfeiltasten, das Monats-Dropdown, das Jahres-Dropdown und „Aktueller Monat".
-2. **Zwei Frames Vorlauf.** Nach dem Setzen der Farben wartet die Anwendung bewusst zwei
-   Animationsframes, bevor Laden und Rendern beginnen. Ohne diesen Vorlauf würde der potenziell
-   blockierende Aufbau der Tabelle den Start des Farbübergangs verschlucken und die Farbe erst am Ende
-   springen lassen.
-3. **Weicher Übergang.** Da alle vier Monatsvariablen per `@property` als `<color>` registriert sind, kann
-   CSS sie interpolieren. Der Übergang läuft über 620–680 ms mit `cubic-bezier(.22, 1, .36, 1)` – einer
-   Kurve, die schnell anläuft und weich ausschwingt. Der Farbwechsel ist damit gefühlt „da", bevor er zu
-   Ende ist.
-4. **Dauerhaft aktive Transition.** Die Übergangsklasse wird nach der ersten Anwendung nie wieder entfernt.
-   Das schließt den klassischen Fehler aus, dass eine im selben Frame hinzugefügte Transition-Klasse
-   wirkungslos bleibt, weil der Ausgangszustand sie noch nicht hatte.
-5. **Erstanwendung ohne Übergang.** Beim Programmstart wird die Palette hart gesetzt (Klasse
-   `month-theme-instant`, erzwungenes Reflow, Klasse wieder entfernt). Die Anwendung startet also in der
-   richtigen Farbe, statt aus dem Standardblau hineinzublenden.
-6. **Sicherheitsnetz.** `render()` wendet die Palette des tatsächlich gerenderten Monats erneut an. Selbst
-   wenn ein Monat auf einem ungewöhnlichen Weg dargestellt wird – Reload, Excel-Import,
-   JSON-Wiederherstellung –, können Farbe und Inhalt niemals auseinanderlaufen.
-7. **Richtungsabhängige Inhaltsanimation.** Monatstitel, Plantabelle und Statistik gleiten in Leserichtung
-   ein: beim Vorwärtsblättern von rechts, beim Rückwärtsblättern von links, über 520 ms mit derselben
-   Kurve. Bei einem Direktsprung im Dropdown bestimmt der Vorzeichenvergleich der Monatsordnungszahlen
-   (`Jahr × 12 + Monat`) die Richtung – ein Sprung von März auf Dezember läuft nach vorn, von Dezember auf
-   März zurück.
-8. **Sättigungspuls.** Parallel läuft über Tabelle, Statistik und Farb-Badge ein 680 ms langer, sehr
-   dezenter Sättigungs- und Helligkeitspuls (`month-content-breathe`, Spitze bei 45 % mit +8 % Sättigung).
-   Er verbindet die Farbänderung mit der Inhaltsänderung zu **einer** wahrgenommenen Bewegung statt zweier
-   getrennter Effekte.
-9. **Gestaffelter Wiedereinlauf.** Da die Tabelle neu aufgebaut wird, laufen anschließend die Tageszeilen
-   erneut gestaffelt ein. Die Gesamtwahrnehmung ist eine durchgehende Sequenz: Farbe fließt → Inhalt
-   gleitet ein → Zeilen füllen sich.
-10. **Mitziehende Umgebung.** Die drei Ambient-Orbs im Hintergrund, die Panel-Schatten, das Farb-Badge, die
-    Fokusringe und die Wochenendhierarchie leiten sich alle aus derselben Variable ab und wandern deshalb
-    im selben Übergang mit. Nichts bleibt in der alten Farbe zurück.
-11. **Robuste Monatsnormalisierung.** `applyMonthTheme` normalisiert die Monatszahl modulo 12, sodass auch
-    ein rechnerisch entstandener Wert außerhalb von 1–12 nie zu einer fehlenden Palette führt.
+Der naheliegende Weg wäre, die Monatsvariablen per `@property` als `<color>` zu registrieren und eine
+`transition` darauf zu legen. Das war die frühere Umsetzung, und sie war nicht reproduzierbar:
+
+* **Der Start hängt vom freien Main-Thread ab.** Eine Transition beginnt mit der Stilberechnung des
+  Frames, in dem der neue Wert erstmals berechnet wird. Genau in diesem Moment baut die Anwendung die
+  Monatstabelle neu auf. Messungen zeigten mal einen weichen Verlauf, mal überhaupt keine Bewegung bis
+  zum Ende – in einem Durchlauf stand die Farbe nach 1000 ms noch exakt auf dem Ausgangswert und sprang
+  dann.
+* **Abgeleitete Variablen lösen nicht überall neu auf.** Die Flächenfarben waren als nicht registrierte
+  Custom Properties über `color-mix(… var(--month-accent) …)` definiert. Ob eine solche Ableitung
+  während der Animation der Basisvariablen Frame für Frame neu aufgelöst wird, ist zwischen den Engines
+  nicht verlässlich gleich.
+
+#### Wie es jetzt läuft
+
+1. **Sofortige Reaktion.** `openCurrentMonth` startet den Farbwechsel als **Erstes** – vor Speichern,
+   Laden und Rendern. Er ist damit unabhängig von Netzgeschwindigkeit und Datenmenge und beginnt in dem
+   Moment, in dem geklickt wird. Das gilt gleichermaßen für beide Pfeiltasten, das Monats-Dropdown, das
+   Jahres-Dropdown und „Aktueller Monat".
+2. **Ein Frame Vorlauf.** Danach wartet die Anwendung einen Animationsframe, bevor Laden und Rendern
+   den Main-Thread belegen – der erste Schritt des Verlaufs ist damit gezeichnet, bevor Arbeit anfällt.
+3. **Zeitbasierte Interpolation.** Eine `requestAnimationFrame`-Schleife schreibt in jedem Frame fertige
+   Farbwerte. Der Fortschritt kommt aus `performance.now()`, nicht aus der Frame-Zählung: Blockiert ein
+   langer Frame die Schleife, springt sie auf den korrekten Fortschritt und läuft weich weiter, statt
+   stehenzubleiben. Genau diese Eigenschaft macht den Wechsel unempfindlich gegen Ladelast.
+4. **OKLCH statt sRGB, über den kürzeren Farbtonbogen.** Eine Gerade durch den Farbraum führt zwischen
+   gegenüberliegenden Tönen (Koralle → Tannengrün) nahe an der Neutralachse vorbei – gemessen fiel die
+   Buntheit in der Mitte von 59 auf 11, die Fläche wurde für einen Moment grau. Über den Farbtonwinkel
+   gedreht bleibt die Buntheit über den gesamten Weg erhalten: Die Fläche wandert sichtbar über Bernstein
+   und Oliv nach Salbeigrün, statt durch Grau zu tauchen.
+5. **Eine Kurve, die die volle Dauer nutzt.** Die sonst verwendete Kurve `cubic-bezier(.22, 1, .36, 1)`
+   legt rund 98 % des Weges im ersten Drittel zurück – die Zielfarbe war nach 245 von 640 ms erreicht,
+   der Rest der Dauer blieb wirkungslos. Für eine großflächige Farbfläche liest sich das als Schnappen.
+   Der Wechsel läuft daher über **720 ms** mit `cubic-bezier(0.40, 0, 0.22, 1)`: ruhiger Antritt,
+   getragene Mitte, weiches Auslaufen.
+6. **Zwei Geschwindigkeiten.** Der Inhalt gleitet in 520 ms mit der schnelleren Kurve herein, die Farbe
+   zieht in 720 ms darunter nach. Der Plan ist sofort lesbar, die Fläche kommt getragen hinterher – das
+   Gegenteil eines gleichzeitigen Umschaltens.
+7. **Weiche Verkettung.** Ein neuer Wechsel liest den **tatsächlich sichtbaren** Zustand als
+   Ausgangspunkt, auch mitten in einem laufenden Verlauf. Schnelles Blättern kettet dadurch weich, statt
+   zu springen.
+8. **Nicht zerstörendes Sicherheitsnetz.** `render()` wendet die Palette des gerenderten Monats erneut an,
+   damit Farbe und Inhalt auch bei Reload, Excel-Import oder JSON-Wiederherstellung nie auseinanderlaufen.
+   Läuft bereits ein Übergang auf genau dieses Ziel, bleibt er unangetastet. Ohne diese Sperre schoss der
+   Sicherheitsnetz-Aufruf den gerade gestarteten Verlauf ab und die Farbe sprang mitten in der Bewegung
+   ans Ziel – nach außen exakt das Bild, das wie „gar keine Animation" aussah.
+9. **Erstanwendung ohne Übergang.** Beim Programmstart werden die Farben direkt gesetzt. Die Anwendung
+   startet in der richtigen Farbe, statt aus dem Standardblau hineinzublenden.
+10. **Richtungsabhängige Inhaltsbewegung.** Monatstitel, Plantabelle und Statistik gleiten in Leserichtung
+    ein: beim Vorwärtsblättern von rechts, beim Rückwärtsblättern von links. Bei einem Direktsprung
+    bestimmt der Vorzeichenvergleich der Monatsordnungszahlen (`Jahr × 12 + Monat`) die Richtung – von
+    März auf Dezember läuft es nach vorn, von Dezember auf März zurück.
+11. **Mitziehende Umgebung.** Ambient-Orbs, Panel-Schatten, Farb-Badge, Fokusringe und die gesamte
+    Flächenhierarchie leiten sich aus demselben Satz ab und wandern im selben Verlauf mit. Nichts bleibt
+    in der alten Farbe zurück.
+12. **Robuste Monatsnormalisierung.** Die Monatszahl wird modulo 12 normalisiert, sodass auch ein
+    rechnerisch entstandener Wert außerhalb von 1–12 nie zu einer fehlenden Palette führt.
 
 Das Farb-Badge nennt zusätzlich den Namen der Palette („Monatskontrast · Bernstein") – die Farbe ist damit
 nicht nur Atmosphäre, sondern benannte, überprüfbare Information. Zur Diagnose spiegeln
@@ -992,13 +1053,25 @@ nicht nur Atmosphäre, sondern benannte, überprüfbare Information. Zur Diagnos
 | Tabellenrahmen bei Hover | Randfarbe wechselt zur Monatsfarbe, farbiger Außenschein | 260 ms |
 | Schaltflächen bei Hover | 1 px anheben, hellerer Verlauf, tieferer Schatten | 160 ms |
 | Statuspunkt | `status-breathe`: Skalierung 0,9 → 1,08 mit Leuchtstärke | 2,4 s, endlos |
-| Tageszeilen | `row-soft-arrive`, 7 ms Versatz je Zeile | 300 ms |
+| Tageszeilen (nur Erststart) | `row-soft-arrive`, 7 ms Versatz je Zeile | 300 ms |
+| Farb-Badge beim Wechsel | `month-content-breathe`, Sättigungspuls | 680 ms |
 | Dialoge | `dialog-glass-open` und Backdrop-Einblendung | 250 / 220 ms |
 | Karten und Kacheln | 1 px anheben mit weichem Schatten | 160 ms |
 
 Alle Bewegungen sind kurz, richtungsstabil und laufen über dieselbe Beschleunigungskurve. Nichts blinkt,
 nichts springt, nichts wiederholt sich aufdringlich – die einzigen Dauerbewegungen (Orbs, Reflex,
 Statuspunkt) sind so langsam, dass sie unterhalb der bewussten Wahrnehmungsschwelle bleiben.
+
+Zwei Entscheidungen sind messbasiert und betreffen ausdrücklich den Monatswechsel:
+
+* **Der Sättigungspuls liegt nur auf dem kleinen Farb-Badge.** Ein `filter` auf der gesamten Plantabelle
+  erzwingt in jedem Frame ein Neurastern der kompletten Fläche und hat genau die Frames gekostet, die der
+  Farbverlauf braucht. Tabelle und Statistik bewegen sich ausschließlich über `transform` und `opacity` –
+  beides läuft im Compositor.
+* **Die gestaffelte Zeilen-Einblendung ruht während des Monatswechsels.** Zusammen mit der
+  Containerbewegung erschien die Tabelle rund 300 ms lang leer: Die letzte Zeile startet erst nach
+  90 ms + 31 × 7 ms, der Plan fiel mitten im Wechsel in ein Loch. Jetzt gleitet eine bereits vollständig
+  gesetzte Tabelle herein; beim Erststart bleibt der gestaffelte Aufbau erhalten.
 
 ### 11.5 Bewegungsreduktion
 
@@ -1236,7 +1309,7 @@ in ein Klinikdokument um.
 | Feiertagsname | 5,5 px – vorhanden, aber untergeordnet |
 | Statistik | Auf 120 mm Breite begrenzt, 5 mm unter dem Plan |
 | Rahmen | Durchgehend reines Schwarz für maximalen Kopierkontrast |
-| Wochenend-/Feiertagsfarben | Auf drei **feste** Graublautöne umgestellt (`#c8dbe7`, `#a9c8dc`, `#8eb5cf`) |
+| Flächenfarben | Auf **feste** Graublautöne umgestellt: Wochentagsspalte `#9dbdd4`, Samstag `#eaf1f6`, Sonntag `#dae7f0`, Feiertag `#c8dbe7`, Schrift `#10314a` – jeweils mit `!important`, da `js/theme.js` die Werte als Inline-Style setzt |
 | Animationen | Vollständig neutralisiert |
 
 Die Umstellung auf feste Druckfarben ist eine bewusste Entscheidung: Der Ausdruck bleibt bei jedem Monat und
@@ -1265,9 +1338,9 @@ Ein einzelnes SVG deckt alle Größen ab – es gibt keine Bitmap-Icon-Matrix zu
 
 ### 16.2 Service Worker
 
-**Cache-Name:** `dienstplanrad-v8`. Eine Erhöhung dieser Zahl ist der Weg, alte Caches gezielt zu verwerfen.
+**Cache-Name:** `dienstplanrad-v9`.
 
-**Vorgeladene Kerndateien:** `/`, `/index.html`, `/styles.css`, alle fünf JS-Module,
+**Vorgeladene Kerndateien:** `/`, `/index.html`, `/styles.css`, alle sechs JS-Module,
 `/manifest.webmanifest`, `/icons/icon.svg`.
 
 **Lebenszyklus:**
@@ -1278,9 +1351,16 @@ Ein einzelnes SVG deckt alle Größen ab – es gibt keine Bitmap-Icon-Matrix zu
 * Nicht-`GET`-Anfragen (also alle `PUT`/`POST` an die API) werden **nicht** angefasst und gehen immer ans
   Netz. Schreibvorgänge können damit niemals aus einem Cache beantwortet werden.
 * Navigationsanfragen: **Network-First** mit Aktualisierung des gecachten `/index.html`; bei Netzfehler wird
-  die gecachte Fassung ausgeliefert. Die App startet damit auch offline, zeigt aber im Normalfall immer die
-  neueste Version.
-* Alle übrigen `GET`-Anfragen: **Cache-First** mit Nachladen und Cachen bei Fehltreffer.
+  die gecachte Fassung ausgeliefert.
+* **Eigener Anwendungscode** (`.html`, `.css`, `.js` gleicher Herkunft): ebenfalls **Network-First**.
+* Alle übrigen `GET`-Anfragen (Icons, Manifest, Fremdressourcen): **Cache-First**.
+
+Die Network-First-Regel für Anwendungscode ist eine bewusste Korrektur. Vorher galt Cache-First für alles
+außer der Navigation: Ein bereits installierter Client hat `styles.css` und die JS-Module dauerhaft aus dem
+alten Cache bedient, solange der Cache-Name unverändert blieb – **eine ausgerollte Korrektur konnte ihn nie
+erreichen**. Genau dadurch blieb eine bereits deployte Behebung des Monatsfarbwechsels beim Nutzer
+wirkungslos. Jetzt ist der Cache reine Offline-Rückfallebene, und eine Änderung am Anwendungscode kommt
+beim nächsten Aufruf an, auch ohne Versionswechsel.
 
 Die Registrierung schlägt bewusst still fehl (`.catch(() => {})`) – eine Umgebung ohne
 Service-Worker-Unterstützung soll keine sichtbaren Fehler erzeugen.
@@ -1376,9 +1456,13 @@ npm test               # Regressionstests des Regelwerks
 ```
 
 `npm run check` prüft `js/app.js`, `js/api.js`, `js/defaults.js`, `js/rules.js`, `js/state.js`,
-`functions/_utils.js` und `sw.js` mit `node --check`.
+`js/theme.js`, `functions/_utils.js` und `sw.js` mit `node --check`.
 
-### 19.3 Testabdeckung (`tests/rules.test.js`)
+### 19.3 Testabdeckung
+
+Insgesamt 13 Tests, alle ohne DOM, ohne Netzwerk und ohne externe Abhängigkeiten.
+
+**Regelwerk (`tests/rules.test.js`)**
 
 | Test | Prüft |
 |---|---|
@@ -1388,8 +1472,23 @@ npm test               # Regressionstests des Regelwerks
 | `weekend equivalent counts BD weekends once and HG-only weekends as half` | Ergebnis 1,5 für BD-Wochenende plus reines HG-Wochenende |
 | `statistics honor activation dates and calculate remaining targets` | Hellmann fehlt im September 2026, erscheint im Oktober; Restwert korrekt |
 
+**Farbsystem (`tests/theme.test.js`)**
+
+| Test | Prüft |
+|---|---|
+| Palettenzuordnung | Zwölf verschiedene Grundfarben; Monatswerte außerhalb 1–12 laufen sicher um |
+| `parseColor` | Hex, Kurz-Hex und `rgba()` |
+| Flächenhierarchie | Samstag < Sonntag < Feiertag, Wochentagsspalte am kräftigsten; 0 % ergibt Weiß |
+| **Kontrast** | `--month-ink` hält auf allen vier Flächen **aller zwölf Paletten** mindestens 4,5:1 |
+| `deepen` | Farbton bleibt erhalten (kürzerer Winkelbogen), Zielhelligkeit wird erreicht |
+| Interpolation | Endpunkte exakt getroffen; die Buntheit bricht auf dem gesamten Weg nicht ein |
+| Alphakanal | Der halbtransparente Schein bleibt über den ganzen Verlauf transparent |
+| Zeitkurve | Geklemmt, monoton, und die Bewegung verteilt sich über die volle Dauer statt zu schnappen |
+
 Die Tests kommen ohne DOM, ohne Netzwerk und ohne externe Abhängigkeiten aus – genau deshalb ist die
-DOM-Freiheit von `rules.js` und `defaults.js` eine harte Regel.
+DOM-Freiheit von `rules.js`, `defaults.js` und dem rechnenden Teil von `theme.js` eine harte Regel.
+Besonders die Kontrast- und Harmonieprüfungen wären im Browser nur per Augenmaß zu beurteilen; als Test
+sind sie eine harte Zusage über alle zwölf Paletten hinweg.
 
 ### 19.4 Deployment auf Cloudflare Pages
 
@@ -1416,7 +1515,9 @@ sicher verwerfen.
 | **Abwesenheits- oder Wunschtyp ergänzen** | `ABSENCE_TYPES` bzw. `PREFERENCE_TYPES` erweitern; die kurzen Tabellenkürzel in `shortAbsenceLabel` / `shortPreferenceLabel` in `js/app.js` ergänzen. |
 | **Regel hinzufügen oder ändern** | In `evaluateCandidate` (`js/rules.js`) über `push(level, reason)` ergänzen. Die Begründung erscheint automatisch in Tooltip, Auswahlliste und – bei roten Konflikten – im Protokoll. |
 | **Feiertagsregion wechseln** | Feste Termine und Buß-und-Bettag-Sonderfall in `getSaxonyHolidays` (`js/app.js`) anpassen; `holidayRegion` in `DEFAULT_SETTINGS` mitführen. |
-| **Monatsfarbe ändern** | Den betreffenden Eintrag in `MONTH_PALETTES` (`js/app.js`) anpassen. Die gesamte Ableitungskette – Wochenendhierarchie, Orbs, Fokusringe, Badge – folgt automatisch. |
+| **Monatsfarbe ändern** | Den betreffenden Eintrag in `MONTH_PALETTES` (`js/theme.js`) anpassen. Die gesamte Ableitungskette – Wochentagsspalte, Zeilenwäschen, Schriftton, Orbs, Fokusringe, Badge – folgt automatisch, und der Kontrasttest prüft die neue Farbe sofort mit. |
+| **Flächenstärken ändern** | `SURFACE_MIX` in `js/theme.js`. Die Startwerte in `:root` und die Druckfarben in `styles.css` mitziehen und `npm test` laufen lassen – der Kontrasttest schlägt an, wenn eine Fläche zu dunkel wird. |
+| **Dauer oder Kurve des Farbwechsels** | `THEME_DURATION_MS` und `EASE` in `js/theme.js`. |
 | **Bestehende Daten migrieren** | `schemaVersion` erhöhen und die Umwandlung in `ensureMonthShape` (`functions/_utils.js`) vornehmen, damit sie beim Lesen **und** Schreiben greift. |
 
 **Wichtig bei Personaländerungen:** Nach dem ersten Start ist die **KV-Kopie** maßgeblich, nicht mehr die
@@ -1437,7 +1538,8 @@ Datei. Änderungen an `DEFAULT_STAFF` wirken auf bestehende Installationen erst,
 | Import überschreibt keine Dienste | Beabsichtigt – die Zusammenführung ist rein additiv | Zielfelder gegebenenfalls vorher leeren |
 | „Excel-Bibliothek noch nicht geladen." | SheetJS-CDN noch nicht bereit oder nicht erreichbar | Kurz warten; bei dauerhaftem Fehler Netzzugang zum CDN prüfen |
 | Farbwechsel springt ohne Übergang | Betriebssystem meldet „Bewegung reduzieren" oder Browser kennt `@property` nicht | Beabsichtigtes Verhalten |
-| Alte Version nach Deployment | Service-Worker-Cache | Cache-Version in `sw.js` erhöhen, Seite hart neu laden |
+| Alte Version nach Deployment | Service-Worker-Cache | Seit v9 wird Anwendungscode Network-First geladen, das erledigt sich von selbst. Bei einem Client, der noch auf einer Fassung vor v9 steht: Seite hart neu laden oder den Service Worker in den Entwicklerwerkzeugen abmelden |
+| Farbwechsel bleibt trotz Deployment aus | Client läuft noch auf altem, Cache-First ausgeliefertem Code | Siehe Zeile darüber – das war die Ursache, warum eine bereits behobene Fassung beim Nutzer nicht ankam |
 | Änderung scheint verloren | Debounce von 1100 ms noch nicht abgelaufen | Kurz warten; Monatswechsel und Seitenverlassen erzwingen die Speicherung ohnehin |
 
 **Diagnosehilfen:** `document.documentElement.dataset.month` und `.dataset.palette` zeigen den aktuell
