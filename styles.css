@@ -1,35 +1,159 @@
 :root {
+  /* ------------------------------------------------------------------------
+     KSG-Markentoken (Designsystem §1, verbindlich)
+
+     Klinik für Radiologie und Nuklearmedizin, Klinikum St. Georg Leipzig.
+     Diese Werte sind gesetzt und werden nicht aus dem visuellen Eindruck
+     abgeleitet. KSG-Rot ist Wortmarke und belegter Status-/Akzentton, nie
+     beliebige Dekorfarbe und in der Fläche zurückhaltend.
+     ------------------------------------------------------------------------ */
+  --ksg-red: #E3000B;
+  --ksg-red-ink: #B80009;      /* dunklere Textvariante, 6,90:1 auf Weiß */
+  --ksg-gray: #555553;
+  --ksg-text-black: #000000;
+  --ksg-secondary-text: #595959;
+  --ksg-table-line: #BFBFBF;
+
+  /* ------------------------------------------------------------------------
+     App-Token (Designsystem §8)
+
+     Eigener Namensraum für Bildschirmoberflächen; bewusst getrennt von den
+     Dokument- und Web-Token, damit nichts davon je in eine Druckvorlage wandert.
+     ------------------------------------------------------------------------ */
+  --app-radius: 15px;
+  --app-radius-sm: 9px;
+  --app-elevation-1: 0 1px 2px rgba(9,14,20,.14), 0 7px 18px rgba(9,14,20,.08);
+  --app-elevation-2: 0 12px 34px rgba(0,0,0,.22), 0 2px 8px rgba(0,0,0,.12);
+  --app-focus-ring: 2px;
+  --app-focus-offset: 2px;
+
+  /* Weißraum-Leiter (§1b): zwischen Blöcken immer größer als innerhalb. */
+  --flow-tight: 4px;
+  --flow-inner: 6px;
+  --flow-block: 12px;
+  --flow-group: 20px;
+  --flow-section: 24px;
+  --flow-major: 32px;
+
+  /* Optische Laufweite je Größe (§1b) – Arial läuft groß zu weit, klein zu eng. */
+  --tracking-display: -.012em;
+  --tracking-title: -.006em;
+  --tracking-small: .012em;
+  --tracking-tabular: .02em;
+  --tracking-caps: .06em;
+
   --bg: #0d1117;
   --sheet: rgba(250,252,255,.84);
   --sheet-solid: #f8fafc;
   --line: rgba(17,24,39,.72);
   --line-soft: rgba(125,136,150,.42);
-  --text: #161b22;
-  --muted: #66717f;
+  --text: var(--ksg-text-black);
+  --muted: var(--ksg-secondary-text);
   --green: #24764a;
   --yellow: #986800;
   --orange: #a94d00;
-  --red: #b42318;
+  --red: var(--ksg-red-ink);
   --month-accent: #4f8fbd;
   --month-accent-strong: #1f5f8f;
   --month-glow: rgba(78,151,205,.34);
   --month-panel-tint: rgba(211,235,250,.24);
-  --saturday-bg: rgba(174,218,246,.42);
-  --saturday-edge: #5b9dcc;
-  --saturday-text: #16496f;
-  --sunday-bg: rgba(111,176,222,.42);
-  --sunday-edge: #2f78ad;
-  --sunday-text: #103d61;
-  --holiday-bg: rgba(103,126,190,.42);
-  --holiday-edge: #425aa5;
-  --holiday-text: #293c78;
-  --radius: 15px;
-  --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  /* Startwerte für die erste Anzeige, bevor das Theme-Modul greift. Im Betrieb
+     schreibt js/theme.js hier fertige Farben als Inline-Style auf <html>. */
+  --month-ink: #1b4a6d;
+  --weekday-field-bg: color-mix(in srgb, var(--month-accent) 46%, white);
+  --saturday-row-bg: color-mix(in srgb, var(--month-accent) 14%, white);
+  --sunday-row-bg: color-mix(in srgb, var(--month-accent) 22%, white);
+  --holiday-row-bg: color-mix(in srgb, var(--month-accent) 30%, white);
+  --radius: var(--app-radius);
+  /* §1: Bildschirmschrift der Marke ist Arial. */
+  --font: Arial, "Helvetica Neue", Helvetica, "Liberation Sans", sans-serif;
   color-scheme: light;
 }
 
+@property --month-accent { syntax: '<color>'; inherits: true; initial-value: #4f8fbd; }
+@property --month-accent-strong { syntax: '<color>'; inherits: true; initial-value: #1f5f8f; }
+@property --month-ink { syntax: '<color>'; inherits: true; initial-value: #1b4a6d; }
+@property --month-glow { syntax: '<color>'; inherits: true; initial-value: rgba(78,151,205,.34); }
+@property --month-panel-tint { syntax: '<color>'; inherits: true; initial-value: rgba(211,235,250,.24); }
+
+/* Der Monatsfarbverlauf wird von js/theme.js Frame für Frame geschrieben
+   (OKLab-Interpolation, zeitbasiert). Eine zusätzliche CSS-Transition auf
+   diesen Variablen würde gegen die Schleife arbeiten und den Verlauf
+   verschleppen – deshalb gibt es hier bewusst keine. */
+
+/* Der Sättigungspuls läuft bewusst nur auf dem kleinen Farb-Badge. Ein `filter`
+   auf der gesamten Plantabelle erzwingt in jedem Frame ein Neurastern der
+   kompletten Fläche und hat genau die Frames gekostet, die der Farbverlauf
+   braucht. Die Tabelle bewegt sich stattdessen ausschließlich über transform
+   und opacity – beides läuft im Compositor. */
+body.month-content-transition .month-palette-label {
+  animation: month-content-breathe 680ms cubic-bezier(.22, 1, .36, 1);
+}
+
+@keyframes month-content-breathe {
+  0% { filter: saturate(.92) brightness(.99); }
+  45% { filter: saturate(1.08) brightness(1.015); }
+  100% { filter: saturate(1) brightness(1); }
+}
+
+/* Richtungsabhängiger Monatswechsel: Inhalte gleiten sanft in Leserichtung ein. */
+.month-enter-next { animation: month-slide-in-next 520ms cubic-bezier(.22, 1, .36, 1) both; }
+.month-enter-prev { animation: month-slide-in-prev 520ms cubic-bezier(.22, 1, .36, 1) both; }
+
+@keyframes month-slide-in-next {
+  0% { opacity: 0; transform: translate3d(22px, 0, 0); }
+  100% { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes month-slide-in-prev {
+  0% { opacity: 0; transform: translate3d(-22px, 0, 0); }
+  100% { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+.month-enter-next, .month-enter-prev { will-change: transform, opacity; }
+
+/* Beim Monatswechsel übernimmt der Container die Bewegung – die gestaffelte
+   Zeilen-Einblendung wird dafür ausgesetzt. Beides gleichzeitig ließ die
+   Tabelle für rund 300 ms leer erscheinen (die letzte Zeile startet erst nach
+   90 ms + 31 × 7 ms), der Plan fiel mitten im Wechsel in ein Loch. Jetzt
+   gleitet eine bereits vollständig gesetzte Tabelle herein. Beim Erststart,
+   wo diese Klasse fehlt, bleibt der gestaffelte Aufbau erhalten. */
+body.month-content-transition .plan-table tbody tr { animation: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .month-enter-next, .month-enter-prev,
+  body.month-content-transition .month-palette-label { animation: none; }
+}
+
+/* Wer im Betriebssystem "Transparenz reduzieren" gesetzt hat, bekommt deckende
+   Flächen statt Milchglas. Das ist die von den Barrierefreiheits-Leitlinien
+   ausdrücklich geforderte Rücknahme des Effekts – dieselbe Einstellung, mit der
+   Apple die Liquid-Glass-Kritik beantwortet hat. Die Farbhierarchie und jede
+   Information bleiben dabei vollständig erhalten. */
+@media (prefers-reduced-transparency: reduce) {
+  .topbar, .toolbar, .glass-inset, .dialog-card, .month-palette-label {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+  .glass-panel, .dialog-card { background: #f4f7fa; }
+  .glass-inset { background: #eef2f6; }
+  .sheet-panel { background: #ffffff; }
+  .ambient-layer { display: none; }
+  .app-dialog::backdrop { background: rgba(6,10,15,.78); backdrop-filter: none; }
+}
+
+@media print {
+  .month-enter-next, .month-enter-prev { animation: none !important; opacity: 1 !important; transform: none !important; }
+}
+
 * { box-sizing: border-box; }
-html, body { margin: 0; min-height: 100%; font-family: var(--font); }
+html, body {
+  margin: 0; min-height: 100%; font-family: var(--font);
+  /* §1b verbindlich: Ziffern immer tabellarisch. Tages-, BD-, HG- und
+     Wochenendkolonnen fluchten dadurch exakt untereinander – bei
+     proportionalen Ziffern wandert die 1 aus der Spalte. */
+  font-variant-numeric: tabular-nums lining-nums;
+}
 html {
   background: #0b0f14;
 }
@@ -43,7 +167,6 @@ body {
     radial-gradient(circle at 88% 2%, rgba(255,255,255,.13), transparent 27%),
     linear-gradient(145deg, #0a0d12 0%, #151b23 48%, #0d1218 100%);
   background-attachment: fixed;
-  transition: background .35s ease;
 }
 body::before,
 body::after {
@@ -109,39 +232,84 @@ select, textarea, input[type="text"], input[list] {
   padding: .45rem .55rem;
   box-shadow: inset 0 1px 2px rgba(22,30,40,.08), 0 1px 0 rgba(255,255,255,.8);
 }
-select:focus, textarea:focus, input:focus { outline: 2px solid color-mix(in srgb, var(--month-accent) 72%, white); outline-offset: 1px; }
+/* §1b: sichtbarer Fokus 2 px mit 2 px Offset. */
+select:focus-visible, textarea:focus-visible, input:focus-visible, button:focus-visible, .file-btn:focus-within {
+  outline: var(--app-focus-ring) solid var(--month-accent-strong);
+  outline-offset: var(--app-focus-offset);
+}
 textarea { resize: vertical; }
 label { display: grid; gap: .3rem; color: var(--muted); font-size: .9rem; }
 
 .app-shell { max-width: 1720px; margin: 0 auto; padding: 12px; display: grid; gap: 9px; }
+
+/* --------------------------------------------------------------------------
+   Milchglas – bewusst dosiert
+
+   Echtes `backdrop-filter` kostet Fläche × Radius: Der Compositor liest in
+   jedem Frame die Pixel hinter dem Element, faltet sie mit dem Weichzeichner
+   und setzt das Ergebnis wieder zusammen. Gemessen an dieser Oberfläche:
+   Der Blur allein auf dem großen Plan-Panel hat 9 fps auf 16 fps gedrückt.
+
+   Deshalb tragen echtes Milchglas nur noch die kleinen, schwebenden Elemente,
+   hinter denen sich tatsächlich etwas bewegt – Kopfleiste, Werkzeugleiste,
+   Dialoge, Einfassungen. Die große Arbeitsfläche bekommt stattdessen eine
+   geschichtete Glasoptik ohne Weichzeichner: Sie wirkt dichter, ist hinter
+   einer engen Datentabelle deutlich besser lesbar und kostet nichts.
+   -------------------------------------------------------------------------- */
+
 .glass-panel,
 .glass-inset,
 .dialog-card {
-  backdrop-filter: blur(25px) saturate(1.36);
-  -webkit-backdrop-filter: blur(25px) saturate(1.36);
+  --glass-rim: color-mix(in srgb, var(--month-accent) 26%, rgba(255,255,255,.72));
 }
+
+@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
+  .topbar,
+  .toolbar,
+  .glass-inset,
+  .dialog-card,
+  .month-palette-label {
+    backdrop-filter: blur(22px) saturate(1.42);
+    -webkit-backdrop-filter: blur(22px) saturate(1.42);
+  }
+}
+
 .glass-panel {
   position: relative;
   overflow: hidden;
+  /* Paint-Containment isoliert das Neuzeichnen auf das Panel selbst. */
+  contain: paint;
   background:
-    linear-gradient(140deg, rgba(255,255,255,.76), rgba(232,238,246,.66)),
+    linear-gradient(140deg, rgba(255,255,255,.80), rgba(233,239,247,.70)),
     var(--month-panel-tint);
-  border: 1px solid rgba(255,255,255,.58);
+  border: 1px solid var(--glass-rim);
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.95),
+    inset 0 1px 0 rgba(255,255,255,.96),
     inset 0 -1px 0 rgba(83,96,110,.13),
     0 12px 34px rgba(0,0,0,.22),
     0 2px 8px rgba(0,0,0,.12);
 }
+
+/* Lichtkante oben plus feine Brechung an der Unterkante – zusammen ergibt das
+   die Anmutung einer Glasscheibe mit Dicke, ohne jeden Filter. */
 .glass-panel::after {
   content: "";
   position: absolute;
-  inset: 0 0 auto 0;
-  height: 42%;
-  background: linear-gradient(180deg, rgba(255,255,255,.27), transparent);
+  inset: 0;
   pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.30), transparent 42%),
+    linear-gradient(0deg, color-mix(in srgb, var(--month-accent) 9%, transparent), transparent 16%);
 }
 .glass-panel > * { position: relative; z-index: 1; }
+
+/* Die Arbeitsfläche ist dichter als die Leisten: Sie trägt Inhalt, keine
+   Bedienung, und muss auch nach Stunden ruhig lesbar bleiben. */
+.sheet-panel {
+  background:
+    linear-gradient(147deg, rgba(255,255,255,.90), rgba(236,241,248,.84)),
+    var(--month-panel-tint);
+}
 .glass-inset {
   background: linear-gradient(180deg, rgba(255,255,255,.54), rgba(226,233,241,.43));
   border: 1px solid rgba(255,255,255,.54);
@@ -153,17 +321,17 @@ label { display: grid; gap: .3rem; color: var(--muted); font-size: .9rem; }
 .brand-mark {
   width: 40px; height: 40px; display: grid; place-items: center; border-radius: 10px;
   background:
-    linear-gradient(145deg, rgba(255,255,255,.24), transparent 42%),
-    linear-gradient(145deg, #27313d, #0f151c);
-  color: #fff; font-weight: 760; font-size: 12px; letter-spacing: .08em;
+    linear-gradient(145deg, rgba(255,255,255,.26), transparent 44%),
+    linear-gradient(150deg, var(--ksg-red), #A80008);
+  color: #fff; font-weight: 760; font-size: 12px; letter-spacing: var(--tracking-caps);
   border: 1px solid rgba(255,255,255,.32);
   box-shadow: inset 0 1px 0 rgba(255,255,255,.28), 0 6px 18px rgba(0,0,0,.28);
 }
 h1, h2, h3 { margin: 0; }
-h1 { font-size: 1.22rem; letter-spacing: -.015em; }
-h2 { font-size: 1.32rem; letter-spacing: -.015em; }
+h1 { font-size: 1.22rem; letter-spacing: var(--tracking-title); }
+h2 { font-size: 1.32rem; letter-spacing: var(--tracking-title); }
 h3 { font-size: 1.05rem; }
-.eyebrow { text-transform: uppercase; letter-spacing: .12em; font-size: .65rem; color: #6c7682; margin-bottom: 2px; }
+.eyebrow { text-transform: uppercase; letter-spacing: var(--tracking-caps); font-size: .65rem; color: var(--ksg-secondary-text); margin-bottom: 2px; }
 .subline { color: #67717c; margin-top: 2px; font-size: .82rem; }
 .topbar-controls, .toolbar-group { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .month-selector { display: flex; align-items: center; gap: 4px; padding: 3px; border-radius: 10px; }
@@ -188,17 +356,19 @@ h3 { font-size: 1.05rem; }
   padding: 2px 7px;
 }
 .calendar-swatch, .legend-swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; margin-right: 3px; box-shadow: inset 0 1px 0 rgba(255,255,255,.55); }
-.calendar-swatch.saturday { background: var(--saturday-bg); border: 1px solid var(--saturday-edge); }
-.calendar-swatch.sunday { background: var(--sunday-bg); border: 1px solid var(--sunday-edge); }
-.calendar-swatch.holiday { background: var(--holiday-bg); border: 1px solid var(--holiday-edge); }
+.calendar-swatch.saturday { background: var(--saturday-row-bg); border: 1px solid var(--month-accent); }
+.calendar-swatch.sunday { background: var(--sunday-row-bg); border: 1px solid var(--month-accent); }
+.calendar-swatch.holiday { background: var(--holiday-row-bg); border: 1px solid var(--month-ink); }
 .legend-swatch.green { background: #b9dfc8; border: 1px solid var(--green); }
 .legend-swatch.yellow { background: #fff0b3; border: 1px solid var(--yellow); }
 .legend-swatch.orange { background: #ffd8b8; border: 1px solid var(--orange); }
 .legend-swatch.red { background: #ffd1cc; border: 1px solid var(--red); }
+.legend-swatch.gray { background: #e6e9ed; border: 1px solid #aab1ba; }
 
 .plan-table-wrap {
   overflow: auto;
-  border: 1px solid rgba(15,23,42,.78);
+  contain: paint;
+  border: 1px solid color-mix(in srgb, var(--month-accent) 30%, rgba(15,23,42,.78));
   border-radius: 7px;
   background: rgba(255,255,255,.72);
   box-shadow: inset 0 1px 0 rgba(255,255,255,.84), 0 4px 14px rgba(15,23,42,.12);
@@ -209,7 +379,9 @@ h3 { font-size: 1.05rem; }
   border-bottom: 1px solid rgba(28,35,44,.72);
   height: 30px; padding: 0; vertical-align: middle;
   background: rgba(255,255,255,.78);
-  transition: background .18s ease, box-shadow .18s ease;
+  /* Kein background-Übergang: die Monatsfarbe wird pro Frame geschrieben,
+     eine Transition würde jeden Frame neu starten und den Verlauf verschleifen. */
+  transition: box-shadow .18s ease;
 }
 .plan-table th:last-child, .plan-table td:last-child { border-right: none; }
 .plan-table tr:last-child td { border-bottom: none; }
@@ -218,7 +390,10 @@ h3 { font-size: 1.05rem; }
   background:
     linear-gradient(180deg, rgba(255,255,255,.97), rgba(224,231,239,.92));
   text-align: left; padding: 5px 6px; font-size: .86rem; font-weight: 680;
-  box-shadow: inset 0 1px 0 #fff, inset 0 -1px 0 rgba(76,88,101,.18);
+  color: var(--month-ink);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    inset 0 -2px 0 color-mix(in srgb, var(--month-accent) 55%, transparent);
 }
 .plan-table .day-number-col { width: 42px; text-align: center; }
 .plan-table .weekday-col { width: 154px; }
@@ -226,25 +401,34 @@ h3 { font-size: 1.05rem; }
 .plan-table th:nth-child(5), .plan-table th:nth-child(6) { width: 125px; }
 .plan-table .absence-col { width: 220px; }
 .plan-table .preference-col { width: 230px; }
-.date-cell { text-align: right; padding-right: 6px !important; font-weight: 700; background: rgba(255,255,255,.88); }
-.weekday-cell {
-  padding: 0 6px !important; font-weight: 700; color: var(--month-accent-strong);
-  background: color-mix(in srgb, var(--month-accent) 20%, rgba(255,255,255,.86));
-  box-shadow: inset 3px 0 0 var(--month-accent);
+/* Wichtig: Die Basisregel `.plan-table th, .plan-table td` hat die Spezifität
+   (0,1,1). Reine Klassenselektoren wie `.weekday-cell` (0,1,0) verlieren
+   dagegen – die Monatsfarbe der Wochentagsspalte kam deshalb nie an. Alle
+   Zellregeln sind daher konsequent auf `.plan-table td.<klasse>` (0,2,1)
+   hochgezogen, die Zeilentypen auf `.plan-table tr.<typ> td` (0,2,2). Damit
+   ist die Rangfolge Zelle < Zeilentyp eindeutig und unabhängig von der
+   Quellreihenfolge. */
+.plan-table td.date-cell { text-align: right; padding-right: 6px !important; font-weight: 700; color: var(--month-ink); background: rgba(255,255,255,.88); }
+
+/* Die Wochentagsspalte trägt die kräftige Nuance und behält sie in JEDER Zeile,
+   auch in Wochenend- und Feiertagszeilen. So entsteht ein durchgehender
+   senkrechter Anker, an dem die hellen waagerechten Wäschen entlanglaufen,
+   statt ihn zu unterbrechen. */
+.plan-table td.weekday-cell {
+  padding: 0 6px !important; font-weight: 700; color: var(--month-ink);
+  background: var(--weekday-field-bg);
+  box-shadow: inset 3px 0 0 var(--month-accent-strong);
 }
 .weekday-name { display: block; line-height: 1.05; }
 .holiday-name { display: block; margin-top: 1px; font-size: .61rem; font-weight: 700; color: inherit; opacity: .88; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .plan-table tbody tr:hover td { filter: brightness(.985); }
-.saturday-row td { background: var(--saturday-bg); }
-.saturday-row .date-cell, .saturday-row .weekday-cell { color: var(--saturday-text); background: color-mix(in srgb, var(--saturday-bg) 82%, white); }
-.saturday-row .date-cell { box-shadow: inset 4px 0 0 var(--saturday-edge); }
-.sunday-row td { background: var(--sunday-bg); }
-.sunday-row .date-cell, .sunday-row .weekday-cell { color: var(--sunday-text); background: color-mix(in srgb, var(--sunday-bg) 84%, white); }
-.sunday-row .date-cell { box-shadow: inset 4px 0 0 var(--sunday-edge); }
-.holiday-row td { background: var(--holiday-bg); }
-.holiday-row .date-cell, .holiday-row .weekday-cell { color: var(--holiday-text); background: color-mix(in srgb, var(--holiday-bg) 86%, white); }
-.holiday-row .date-cell { box-shadow: inset 5px 0 0 var(--holiday-edge); }
-.holiday-row .weekday-cell { box-shadow: inset 1px 0 0 var(--holiday-edge); }
+.plan-table tr.saturday-row td { background: var(--saturday-row-bg); }
+.plan-table tr.saturday-row td.date-cell { color: var(--month-ink); background: var(--saturday-row-bg); box-shadow: inset 4px 0 0 var(--month-accent); }
+.plan-table tr.sunday-row td { background: var(--sunday-row-bg); }
+.plan-table tr.sunday-row td.date-cell { color: var(--month-ink); background: var(--sunday-row-bg); box-shadow: inset 4px 0 0 var(--month-accent-strong); }
+.plan-table tr.holiday-row td { background: var(--holiday-row-bg); }
+.plan-table tr.holiday-row td.date-cell { color: var(--month-ink); background: var(--holiday-row-bg); box-shadow: inset 5px 0 0 var(--month-ink); }
+.plan-table tr.holiday-row td.weekday-cell { box-shadow: inset 3px 0 0 var(--month-ink); }
 
 .assignment-btn {
   width: 100%; min-height: 29px; border: none; border-radius: 0; background: transparent;
@@ -259,11 +443,12 @@ h3 { font-size: 1.05rem; }
 .small-chip.yellow { color: var(--yellow); border-color: #e0c35b; background: rgba(255,248,220,.90); }
 .small-chip.orange { color: var(--orange); border-color: #e8a46d; background: rgba(255,240,228,.90); }
 .small-chip.red { color: var(--red); border-color: #e08e88; background: rgba(255,240,239,.90); }
+.small-chip.gray { color: #6b7480; border-color: #c3c9d1; background: rgba(244,246,249,.90); }
 .rbn-input { width: 100%; height: 29px; border: none; border-radius: 0; background: transparent; padding: 3px 5px; box-shadow: none; }
 .rbn-input:focus { outline: 2px solid color-mix(in srgb, var(--month-accent) 75%, white); outline-offset: -2px; background: rgba(255,255,255,.88); }
 .cell-summary-button { width: 100%; min-height: 29px; border: none; border-radius: 0; background: transparent; padding: 3px 5px; text-align: left; color: #30363d; font-size: .8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; box-shadow: none; }
 
-.below-plan { margin-top: 12px; max-width: 820px; }
+.below-plan { margin-top: 12px; max-width: 920px; }
 .section-title-row { display: flex; justify-content: space-between; align-items: end; gap: 12px; margin-bottom: 5px; }
 .section-note { color: var(--muted); font-size: .76rem; }
 .excel-stats {
@@ -276,7 +461,9 @@ h3 { font-size: 1.05rem; }
 .distribution-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .distribution-table th, .distribution-table td { border-right: 1px solid rgba(31,39,49,.66); border-bottom: 1px solid rgba(31,39,49,.66); padding: 4px 6px; height: 26px; text-align: left; background: rgba(255,255,255,.75); }
 .distribution-table th { background: linear-gradient(180deg, rgba(255,255,255,.94), rgba(225,232,240,.88)); font-weight: 680; }
-.distribution-table th:not(:first-child), .distribution-table td:not(:first-child) { text-align: center; width: 90px; }
+.distribution-table th:not(:first-child), .distribution-table td:not(:first-child) { text-align: center; width: 104px; }
+.distribution-table th:nth-child(5), .distribution-table td:nth-child(5),
+.distribution-table th:nth-child(6), .distribution-table td:nth-child(6) { width: 88px; }
 .distribution-table tr:last-child td { border-bottom: none; }
 .distribution-table th:last-child, .distribution-table td:last-child { border-right: none; }
 .distribution-table .open-row { font-weight: 750; background: rgba(255,225,229,.86); }
@@ -308,6 +495,9 @@ h3 { font-size: 1.05rem; }
 .picker-item.yellow { border-left: 4px solid #d2a21a; }
 .picker-item.orange { border-left: 4px solid var(--orange); }
 .picker-item.red { border-left: 4px solid var(--red); }
+/* Ausgeschlossen: nicht im Dienstpool oder zum Termin nicht aktiv. */
+.picker-item.gray { border-left: 4px solid #aab1ba; opacity: .62; }
+.picker-item:disabled { cursor: not-allowed; transform: none !important; box-shadow: none !important; }
 .day-meta-list { display: grid; gap: 6px; max-height: 62vh; overflow: auto; }
 .day-meta-row { padding: 7px; border-radius: 9px; background: rgba(255,255,255,.58); border: 1px solid rgba(151,163,176,.45); display: grid; gap: 5px; box-shadow: inset 0 1px 0 rgba(255,255,255,.82); }
 .row-title { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
@@ -318,11 +508,11 @@ h3 { font-size: 1.05rem; }
 .batch-day-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
 .batch-day { padding: 6px; min-height: 66px; border-radius: 8px; background: rgba(255,255,255,.68); border: 1px solid rgba(151,163,176,.48); cursor: pointer; display: grid; align-content: start; gap: 2px; }
 .batch-day.selected { border-color: var(--month-accent-strong); background: color-mix(in srgb, var(--month-accent) 20%, white); box-shadow: inset 0 0 0 1px var(--month-accent); }
-.batch-day.saturday { background: var(--saturday-bg); border-color: var(--saturday-edge); }
-.batch-day.sunday { background: var(--sunday-bg); border-color: var(--sunday-edge); }
-.batch-day.holiday { background: var(--holiday-bg); border-color: var(--holiday-edge); }
+.batch-day.saturday { background: var(--saturday-row-bg); border-color: var(--month-accent); }
+.batch-day.sunday { background: var(--sunday-row-bg); border-color: var(--month-accent-strong); }
+.batch-day.holiday { background: var(--holiday-row-bg); border-color: var(--month-accent-strong); }
 .batch-day small { color: var(--muted); }
-.batch-holiday-name { color: var(--holiday-text) !important; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.batch-holiday-name { color: var(--month-accent-strong) !important; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .conflict-reasons { display: grid; gap: 4px; margin-bottom: 8px; }
 
 @media (max-width: 980px) {
@@ -339,9 +529,12 @@ h3 { font-size: 1.05rem; }
 
 @media print {
   :root {
-    --saturday-bg: #e8f2f8;
-    --sunday-bg: #d9e8f3;
-    --holiday-bg: #dcdff0;
+    /* !important, weil js/theme.js die Werte als Inline-Style auf <html> setzt. */
+    --saturday-row-bg: #eaf1f6 !important;
+    --sunday-row-bg: #dae7f0 !important;
+    --holiday-row-bg: #c8dbe7 !important;
+    --weekday-field-bg: #9dbdd4 !important;
+    --month-ink: #10314a !important;
   }
   body { background: #fff; color: #000; }
   body::before, body::after, .topbar, .toolbar, .legend-stack { display: none !important; }
@@ -356,4 +549,313 @@ h3 { font-size: 1.05rem; }
   .below-plan { margin-top: 5mm; max-width: 120mm; }
   .holiday-name { font-size: 5.5px; }
   @page { size: A4 portrait; margin: 6mm; }
+}
+
+/* --------------------------------------------------------------------------
+   Schwebende Aero-Peak-/Liquid-Glass-Verfeinerung
+   -------------------------------------------------------------------------- */
+
+.ambient-layer {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.ambient-orb {
+  position: absolute;
+  display: block;
+  border-radius: 50%;
+  /* Bewusst KEIN filter: blur(). Ein radialer Verlauf ist bereits weich; der
+     zusätzliche Weichzeichner kostete in der Messung 16 -> 22 fps, ohne
+     sichtbaren Gewinn. Die Verlaufsstopps übernehmen die Weichheit. */
+  opacity: .5;
+  mix-blend-mode: screen;
+  will-change: transform;
+  contain: strict;
+}
+
+.ambient-orb-one {
+  width: 34rem;
+  height: 34rem;
+  left: -12rem;
+  top: -15rem;
+  background: radial-gradient(circle at 38% 38%, color-mix(in srgb, var(--month-accent) 82%, white), color-mix(in srgb, var(--month-accent) 34%, transparent) 38%, transparent 72%);
+  animation: ambient-drift-one 18s ease-in-out infinite alternate;
+}
+
+.ambient-orb-two {
+  width: 26rem;
+  height: 26rem;
+  right: -7rem;
+  top: 6rem;
+  background: radial-gradient(circle at 50% 50%, var(--month-glow), color-mix(in srgb, var(--month-glow) 45%, transparent) 40%, transparent 74%);
+  animation: ambient-drift-two 22s ease-in-out infinite alternate;
+}
+
+.ambient-orb-three {
+  width: 30rem;
+  height: 30rem;
+  left: 38%;
+  bottom: -20rem;
+  background: radial-gradient(circle at 50% 50%, rgba(255,255,255,.16), rgba(255,255,255,.06) 42%, transparent 74%);
+  animation: ambient-drift-three 26s ease-in-out infinite alternate;
+}
+
+.app-shell {
+  position: relative;
+  perspective: 1400px;
+}
+
+.topbar,
+.toolbar,
+.sheet-panel {
+  transform-origin: 50% 0;
+  animation: glass-surface-enter .56s cubic-bezier(.22,.82,.34,1) both;
+}
+
+.toolbar { animation-delay: .055s; }
+.sheet-panel { animation-delay: .11s; }
+
+.topbar,
+.toolbar {
+  transition: transform .24s cubic-bezier(.22,.82,.34,1), box-shadow .24s ease, border-color .24s ease;
+}
+
+.topbar:hover,
+.toolbar:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255,255,255,.78);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.98),
+    inset 0 -1px 0 rgba(83,96,110,.11),
+    0 18px 44px rgba(0,0,0,.27),
+    0 4px 12px rgba(0,0,0,.15),
+    0 0 34px color-mix(in srgb, var(--month-glow) 38%, transparent);
+}
+
+.glass-panel::before {
+  content: "";
+  position: absolute;
+  inset: -45% -15% auto -15%;
+  height: 70%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(255,255,255,.34), transparent 69%);
+  pointer-events: none;
+  opacity: .75;
+  transform: translate3d(-8%, 0, 0);
+  animation: glass-reflection 12s ease-in-out infinite alternate;
+}
+
+.sheet-panel {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.97),
+    inset 0 -1px 0 rgba(83,96,110,.12),
+    0 22px 56px rgba(0,0,0,.25),
+    0 4px 14px rgba(0,0,0,.14),
+    0 0 46px color-mix(in srgb, var(--month-glow) 28%, transparent);
+}
+
+.month-palette-label {
+  display: inline-flex;
+  align-items: center;
+  min-height: 23px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  color: var(--month-accent-strong);
+  font-size: .69rem;
+  font-weight: 760;
+  letter-spacing: .045em;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.73), rgba(226,234,242,.48)),
+    var(--month-panel-tint);
+  border: 1px solid rgba(255,255,255,.66);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.95),
+    0 5px 14px rgba(8,13,19,.10),
+    0 0 14px color-mix(in srgb, var(--month-glow) 34%, transparent);
+}
+
+.plan-table-wrap {
+  transition: box-shadow .26s ease, border-color .26s ease;
+}
+
+.plan-table-wrap:hover {
+  border-color: color-mix(in srgb, var(--month-accent) 42%, rgba(20,28,38,.74));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.84),
+    0 13px 30px rgba(4,9,15,.17),
+    0 0 24px color-mix(in srgb, var(--month-glow) 23%, transparent);
+}
+
+.plan-table tbody tr {
+  animation: row-soft-arrive .30s cubic-bezier(.22,.82,.34,1) both;
+  animation-delay: calc(var(--row-index, 0) * 7ms + 90ms);
+  transition: filter .16s ease, transform .16s ease;
+}
+
+.plan-table tbody tr:hover {
+  position: relative;
+  z-index: 1;
+  transform: translateX(1px);
+  filter: saturate(1.025) brightness(1.012);
+}
+
+.saturday-row td,
+.sunday-row td,
+.holiday-row td {
+  background-image: linear-gradient(110deg, rgba(255,255,255,.14), transparent 46%, rgba(255,255,255,.07));
+  /* background-color folgt der Theme-Schleife direkt, ohne eigene Transition. */
+  transition: box-shadow .22s ease;
+}
+
+.assignment-btn,
+.cell-summary-button,
+.rbn-input {
+  transition: background .16s ease, box-shadow .16s ease, color .16s ease;
+}
+
+.assignment-btn:focus-visible,
+.cell-summary-button:focus-visible,
+.rbn-input:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--month-accent) 76%, white);
+  outline-offset: -2px;
+  background: rgba(255,255,255,.78);
+}
+
+.status-dot {
+  animation: status-breathe 2.4s ease-in-out infinite;
+}
+
+.app-dialog[open] .dialog-card {
+  animation: dialog-glass-open .25s cubic-bezier(.22,.82,.34,1) both;
+}
+
+.app-dialog[open]::backdrop {
+  animation: dialog-backdrop-open .22s ease both;
+}
+
+.picker-item,
+.day-meta-row,
+.batch-day,
+.meta-chip {
+  transition: transform .16s ease, box-shadow .16s ease, background .16s ease, border-color .16s ease;
+}
+
+.picker-item:hover,
+.day-meta-row:hover,
+.batch-day:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.94),
+    0 8px 18px rgba(9,14,20,.11);
+}
+
+.meta-chip:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--month-accent) 55%, rgba(141,153,166,.48));
+}
+
+@keyframes ambient-drift-one {
+  from { transform: translate3d(-2%, -1%, 0) scale(1); }
+  to { transform: translate3d(10%, 8%, 0) scale(1.08); }
+}
+
+@keyframes ambient-drift-two {
+  from { transform: translate3d(3%, -3%, 0) scale(.96); }
+  to { transform: translate3d(-11%, 10%, 0) scale(1.08); }
+}
+
+@keyframes ambient-drift-three {
+  from { transform: translate3d(-8%, 2%, 0) scale(1); }
+  to { transform: translate3d(12%, -7%, 0) scale(1.12); }
+}
+
+@keyframes glass-surface-enter {
+  from { opacity: 0; transform: translateY(10px) scale(.992); filter: blur(3px); }
+  to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+
+@keyframes glass-reflection {
+  from { transform: translate3d(-13%, -2%, 0) scale(.96); opacity: .48; }
+  to { transform: translate3d(10%, 5%, 0) scale(1.06); opacity: .82; }
+}
+
+@keyframes row-soft-arrive {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes status-breathe {
+  0%, 100% { transform: scale(.9); opacity: .72; box-shadow: 0 0 7px currentColor; }
+  50% { transform: scale(1.08); opacity: 1; box-shadow: 0 0 14px currentColor; }
+}
+
+@keyframes dialog-glass-open {
+  from { opacity: 0; transform: translateY(12px) scale(.975); filter: blur(3px); }
+  to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+
+@keyframes dialog-backdrop-open {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+}
+
+@media print {
+  .ambient-layer { display: none !important; }
+}
+
+/* --------------------------------------------------------------------------
+   Offene Punkte – sichtbare Sammelprüfung des Monats
+   -------------------------------------------------------------------------- */
+
+.issue-heading { margin-top: var(--flow-section); }
+.issue-list { margin-top: var(--flow-inner); }
+.issue-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--flow-tight);
+  max-height: 268px;
+  overflow: auto;
+  contain: paint;
+}
+.issue-item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--flow-inner);
+  padding: 5px 8px;
+  border-radius: 7px;
+  border: 1px solid rgba(15,23,42,.10);
+  background: rgba(255,255,255,.72);
+  border-left: 3px solid var(--ksg-table-line);
+  font-size: .78rem;
+}
+.issue-item.red { border-left-color: var(--ksg-red); background: rgba(255,244,243,.82); }
+.issue-item.orange { border-left-color: var(--orange); background: rgba(255,248,242,.82); }
+.issue-item.yellow { border-left-color: #d2a21a; }
+.issue-text { display: grid; gap: 1px; min-width: 0; }
+.issue-text strong { font-weight: 700; color: var(--text); }
+.issue-text span { color: var(--ksg-secondary-text); letter-spacing: var(--tracking-small); }
+.issue-empty {
+  margin: var(--flow-inner) 0 0;
+  color: var(--ksg-secondary-text);
+  font-size: .8rem;
+  letter-spacing: var(--tracking-small);
+}
+
+/* Im Druck steht der Plan selbst im Vordergrund. */
+@media print {
+  .issue-heading, .issue-list { display: none !important; }
 }

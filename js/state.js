@@ -1,5 +1,5 @@
-import { createEmptyMonth, DEFAULT_SETTINGS, DEFAULT_STAFF, MONTH_NAMES } from './defaults.js';
-import { api } from './api.js';
+import { createEmptyMonth, DEFAULT_SETTINGS, DEFAULT_STAFF, MONTH_NAMES } from './defaults.js?v=20260729.4';
+import { api } from './api.js?v=20260729.4';
 
 const LOCAL_KEY_PREFIX = 'dienstplanrad:';
 
@@ -71,21 +71,17 @@ export async function bootstrapState() {
 }
 
 export async function loadMonth(year, month, forceServer = false) {
-  state.currentYear = year;
-  state.currentMonth = month;
   try {
     const data = await api.getMonth(year, month);
     setMonthData(year, month, data.month || createEmptyMonth(year, month));
     state.serverReady = true;
     return getMonthData(year, month);
   } catch (error) {
-    if (!forceServer) {
-      const local = readLocalMonth(year, month);
-      if (local) {
-        setMonthData(year, month, local);
-        state.serverReady = false;
-        return local;
-      }
+    const local = readLocalMonth(year, month);
+    if (local) {
+      setMonthData(year, month, local);
+      state.serverReady = false;
+      return local;
     }
     const empty = createEmptyMonth(year, month);
     setMonthData(year, month, empty);
@@ -112,8 +108,6 @@ export async function warmAdjacentMonths(year, month) {
   });
   await Promise.allSettled(tasks);
   state.serverReady = previousReady;
-  state.currentYear = year;
-  state.currentMonth = month;
 }
 
 export function scheduleSave(saveFn) {
@@ -123,13 +117,17 @@ export function scheduleSave(saveFn) {
 }
 
 export async function persistCurrentMonth() {
-  const month = getMonthData(state.currentYear, state.currentMonth);
+  return persistMonth(state.currentYear, state.currentMonth);
+}
+
+export async function persistMonth(year, monthNumber) {
+  const month = getMonthData(year, monthNumber);
   month.updatedAt = new Date().toISOString();
   month.revision = (month.revision || 0) + 1;
-  setMonthData(state.currentYear, state.currentMonth, month);
+  setMonthData(year, monthNumber, month);
   state.saveStatus = 'saving';
   try {
-    await api.saveMonth(state.currentYear, state.currentMonth, month);
+    await api.saveMonth(year, monthNumber, month);
     state.saveStatus = 'saved';
     state.serverReady = true;
     state.dirty = false;

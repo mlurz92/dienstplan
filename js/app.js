@@ -1,121 +1,88 @@
-import { ABSENCE_TYPES, MONTH_NAMES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, toIsoDate } from './defaults.js';
-import { state, bootstrapState, getMonthData, getMonthLabel, loadMonth, persistCurrentMonth, saveLocalBootstrap, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js';
-import { api } from './api.js';
-import { buildStats, evaluateCandidate, fmtGermanDate, getAbsence, getAssignment, getPlanningStaff, getPreference, getStaffById, labelForAbsence, labelForPreference, setAbsence, setAssignment, setPreference, weekdayLabel } from './rules.js';
+import { ABSENCE_TYPES, MONTH_NAMES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, toIsoDate } from './defaults.js?v=20260729.4';
+import { state, bootstrapState, getMonthData, getMonthLabel, loadMonth, persistCurrentMonth, persistMonth, saveLocalBootstrap, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260729.4';
+import { api } from './api.js?v=20260729.4';
+import { applyMonthTheme, prefersReducedMotion } from './theme.js?v=20260729.4';
+import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260729.4';
+import { buildStats, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getPlanningStaff, getPreference, getStaffById, labelForAbsence, labelForPreference, setAbsence, setAssignment, setPreference, weekdayLabel } from './rules.js?v=20260729.4';
 
 const $ = selector => document.querySelector(selector);
+
+/**
+ * Text für die Einbettung in innerHTML entschärfen. Personalnamen und
+ * Funktionsbezeichnungen stammen aus dem KV-Store und sind damit von außen
+ * pflegbar; ein Name mit spitzer Klammer hätte das Markup zerlegt.
+ */
+const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
 const els = {};
 let pendingConflict = null;
+let monthRequestId = 0;
+let requestedYear = null;
+let requestedMonth = null;
 const monthNameBySheet = Object.fromEntries(SHEET_NAMES.map((name, idx) => [name, idx + 1]));
 
 
-const MONTH_PALETTES = [
-  { name: 'Eisblau', accent: '#4f8fbd', accentStrong: '#1f5f8f', glow: 'rgba(78, 151, 205, .34)', panelTint: 'rgba(211, 235, 250, .24)', saturdayBg: 'rgba(174, 218, 246, .42)', saturdayEdge: '#5b9dcc', saturdayText: '#16496f', sundayBg: 'rgba(111, 176, 222, .42)', sundayEdge: '#2f78ad', sundayText: '#103d61', holidayBg: 'rgba(103, 126, 190, .42)', holidayEdge: '#425aa5', holidayText: '#293c78' },
-  { name: 'Rubinrose', accent: '#b46483', accentStrong: '#8d365d', glow: 'rgba(190, 91, 132, .30)', panelTint: 'rgba(249, 219, 232, .24)', saturdayBg: 'rgba(244, 193, 214, .42)', saturdayEdge: '#c76f96', saturdayText: '#71304f', sundayBg: 'rgba(229, 143, 177, .42)', sundayEdge: '#aa4e77', sundayText: '#63213f', holidayBg: 'rgba(185, 99, 143, .42)', holidayEdge: '#8f3967', holidayText: '#54203d' },
-  { name: 'Salbeigrün', accent: '#5d9476', accentStrong: '#377057', glow: 'rgba(76, 151, 112, .30)', panelTint: 'rgba(218, 239, 226, .24)', saturdayBg: 'rgba(189, 226, 202, .44)', saturdayEdge: '#66a47c', saturdayText: '#285a3d', sundayBg: 'rgba(132, 195, 157, .42)', sundayEdge: '#4b8b65', sundayText: '#1f4d33', holidayBg: 'rgba(86, 158, 124, .42)', holidayEdge: '#337354', holidayText: '#183f2b' },
-  { name: 'Lavendel', accent: '#8273bd', accentStrong: '#5b4a9c', glow: 'rgba(129, 105, 196, .31)', panelTint: 'rgba(232, 226, 250, .25)', saturdayBg: 'rgba(213, 203, 244, .44)', saturdayEdge: '#8d7dcc', saturdayText: '#4c407f', sundayBg: 'rgba(171, 154, 222, .43)', sundayEdge: '#7160b1', sundayText: '#3e3178', holidayBg: 'rgba(132, 112, 190, .44)', holidayEdge: '#58469b', holidayText: '#33275f' },
-  { name: 'Frühlingsgrün', accent: '#4d9b62', accentStrong: '#2f743f', glow: 'rgba(73, 164, 95, .30)', panelTint: 'rgba(214, 242, 220, .24)', saturdayBg: 'rgba(184, 230, 194, .44)', saturdayEdge: '#5bad70', saturdayText: '#235d35', sundayBg: 'rgba(125, 203, 145, .43)', sundayEdge: '#3f9156', sundayText: '#174d29', holidayBg: 'rgba(78, 165, 103, .43)', holidayEdge: '#2e773f', holidayText: '#123b20' },
-  { name: 'Türkis', accent: '#3c9b9b', accentStrong: '#1f7476', glow: 'rgba(55, 171, 171, .30)', panelTint: 'rgba(207, 242, 241, .24)', saturdayBg: 'rgba(174, 228, 227, .44)', saturdayEdge: '#51a9a8', saturdayText: '#1e5b5c', sundayBg: 'rgba(113, 201, 201, .43)', sundayEdge: '#328e8f', sundayText: '#134d4f', holidayBg: 'rgba(54, 160, 164, .43)', holidayEdge: '#24767a', holidayText: '#0f3f42' },
-  { name: 'Koralle', accent: '#c66c5a', accentStrong: '#9b4437', glow: 'rgba(211, 99, 79, .31)', panelTint: 'rgba(252, 223, 215, .24)', saturdayBg: 'rgba(247, 199, 187, .44)', saturdayEdge: '#d47c68', saturdayText: '#7c362c', sundayBg: 'rgba(233, 150, 132, .43)', sundayEdge: '#b85e4c', sundayText: '#682b23', holidayBg: 'rgba(198, 103, 85, .44)', holidayEdge: '#9d4638', holidayText: '#54231d' },
-  { name: 'Bernstein', accent: '#bd812d', accentStrong: '#8c5b16', glow: 'rgba(213, 151, 49, .31)', panelTint: 'rgba(252, 236, 205, .24)', saturdayBg: 'rgba(246, 220, 166, .46)', saturdayEdge: '#cf963e', saturdayText: '#704814', sundayBg: 'rgba(231, 188, 108, .44)', sundayEdge: '#b97822', sundayText: '#5d3a0e', holidayBg: 'rgba(196, 135, 45, .44)', holidayEdge: '#8f5d18', holidayText: '#4b2f09' },
-  { name: 'Pflaume', accent: '#94618f', accentStrong: '#6f3d6b', glow: 'rgba(157, 87, 151, .30)', panelTint: 'rgba(239, 220, 238, .24)', saturdayBg: 'rgba(224, 193, 222, .44)', saturdayEdge: '#a76aa1', saturdayText: '#60375d', sundayBg: 'rgba(198, 143, 193, .43)', sundayEdge: '#884d82', sundayText: '#512a4e', holidayBg: 'rgba(156, 96, 151, .44)', holidayEdge: '#713c6d', holidayText: '#41223f' },
-  { name: 'Kupfer', accent: '#aa6f45', accentStrong: '#7d4c2b', glow: 'rgba(182, 111, 60, .31)', panelTint: 'rgba(244, 225, 211, .24)', saturdayBg: 'rgba(235, 205, 181, .44)', saturdayEdge: '#bd7f51', saturdayText: '#673d23', sundayBg: 'rgba(213, 165, 128, .43)', sundayEdge: '#985f38', sundayText: '#55301b', holidayBg: 'rgba(174, 111, 70, .44)', holidayEdge: '#7c4b2b', holidayText: '#422617' },
-  { name: 'Schieferblau', accent: '#657b9d', accentStrong: '#455b7c', glow: 'rgba(92, 118, 159, .31)', panelTint: 'rgba(222, 229, 240, .24)', saturdayBg: 'rgba(202, 214, 233, .44)', saturdayEdge: '#7188ac', saturdayText: '#3a4d6d', sundayBg: 'rgba(157, 177, 209, .43)', sundayEdge: '#566f98', sundayText: '#2b3f60', holidayBg: 'rgba(107, 132, 174, .44)', holidayEdge: '#405a84', holidayText: '#223653' },
-  { name: 'Tannengrün & Rubin', accent: '#416f62', accentStrong: '#285247', glow: 'rgba(43, 115, 92, .30)', panelTint: 'rgba(214, 234, 226, .24)', saturdayBg: 'rgba(188, 220, 208, .44)', saturdayEdge: '#568474', saturdayText: '#244f43', sundayBg: 'rgba(128, 183, 163, .43)', sundayEdge: '#3b6d5d', sundayText: '#193f35', holidayBg: 'rgba(164, 63, 72, .44)', holidayEdge: '#8d303a', holidayText: '#5f1e27' }
-];
 
-const holidayCache = new Map();
+let contentTransitionTimer = null;
 
-function formatUtcIso(date) {
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
+/**
+ * Richtungsabhängige Ein-/Ausblende-Animation der Planinhalte beim Monatswechsel.
+ */
+function animateMonthContent(direction) {
+  const wrap = document.getElementById('printArea');
+  const stats = document.getElementById('statsGrid');
+  const title = document.getElementById('monthTitle');
+  const targets = [wrap, stats, title].filter(Boolean);
+  if (!targets.length || prefersReducedMotion()) return;
+  const className = direction < 0 ? 'month-enter-prev' : 'month-enter-next';
+  clearTimeout(contentTransitionTimer);
+  targets.forEach(el => {
+    el.classList.remove('month-enter-prev', 'month-enter-next');
+    void el.offsetWidth;
+    el.classList.add(className);
+  });
+  // Sättigungspuls über die farbtragenden Flächen: verbindet Farb- und
+  // Inhaltswechsel zu einer einzigen wahrgenommenen Bewegung.
+  document.body?.classList.add('month-content-transition');
+  contentTransitionTimer = setTimeout(() => {
+    targets.forEach(el => el.classList.remove('month-enter-prev', 'month-enter-next'));
+    document.body?.classList.remove('month-content-transition');
+  }, 700);
 }
 
-function addUtcDays(date, days) {
-  const next = new Date(date.getTime());
-  next.setUTCDate(next.getUTCDate() + days);
-  return next;
+function nextAnimationFrame() {
+  if (typeof requestAnimationFrame !== 'function') return Promise.resolve();
+  return new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
 }
 
-function calculateEasterUtc(year) {
-  const a = year % 19;
-  const b = Math.floor(year / 100);
-  const c = year % 100;
-  const d = Math.floor(b / 4);
-  const e = b % 4;
-  const f = Math.floor((b + 8) / 25);
-  const g = Math.floor((b - f + 1) / 3);
-  const h = (19 * a + b - d - g + 15) % 30;
-  const i = Math.floor(c / 4);
-  const k = c % 4;
-  const l = (32 + 2 * e + 2 * i - h - k) % 7;
-  const m = Math.floor((a + 11 * h + 22 * l) / 451);
-  const month = Math.floor((h + l - 7 * m + 114) / 31);
-  const day = ((h + l - 7 * m + 114) % 31) + 1;
-  return new Date(Date.UTC(year, month - 1, day));
-}
-
-function getSaxonyHolidays(year) {
-  if (holidayCache.has(year)) return holidayCache.get(year);
-  const holidays = new Map([
-    [`${year}-01-01`, 'Neujahr'],
-    [`${year}-05-01`, 'Tag der Arbeit'],
-    [`${year}-10-03`, 'Tag der Deutschen Einheit'],
-    [`${year}-10-31`, 'Reformationstag'],
-    [`${year}-12-25`, '1. Weihnachtsfeiertag'],
-    [`${year}-12-26`, '2. Weihnachtsfeiertag']
-  ]);
-  const easter = calculateEasterUtc(year);
-  holidays.set(formatUtcIso(addUtcDays(easter, -2)), 'Karfreitag');
-  holidays.set(formatUtcIso(addUtcDays(easter, 1)), 'Ostermontag');
-  holidays.set(formatUtcIso(addUtcDays(easter, 39)), 'Christi Himmelfahrt');
-  holidays.set(formatUtcIso(addUtcDays(easter, 50)), 'Pfingstmontag');
-  const november23 = new Date(Date.UTC(year, 10, 23));
-  const weekdayOffset = (november23.getUTCDay() - 3 + 7) % 7 || 7;
-  holidays.set(formatUtcIso(addUtcDays(november23, -weekdayOffset)), 'Buß- und Bettag');
-  holidayCache.set(year, holidays);
-  return holidays;
-}
-
-function getSaxonyHolidayName(dateIso) {
-  return getSaxonyHolidays(Number(dateIso.slice(0, 4))).get(dateIso) || '';
-}
-
-function applyMonthTheme(month) {
-  const palette = MONTH_PALETTES[month - 1] || MONTH_PALETTES[0];
-  const root = document.documentElement;
-  const values = {
-    '--month-accent': palette.accent,
-    '--month-accent-strong': palette.accentStrong,
-    '--month-glow': palette.glow,
-    '--month-panel-tint': palette.panelTint,
-    '--saturday-bg': palette.saturdayBg,
-    '--saturday-edge': palette.saturdayEdge,
-    '--saturday-text': palette.saturdayText,
-    '--sunday-bg': palette.sundayBg,
-    '--sunday-edge': palette.sundayEdge,
-    '--sunday-text': palette.sundayText,
-    '--holiday-bg': palette.holidayBg,
-    '--holiday-edge': palette.holidayEdge,
-    '--holiday-text': palette.holidayText
-  };
-  Object.entries(values).forEach(([key, value]) => root.style.setProperty(key, value));
-  root.dataset.month = String(month);
-  const label = document.getElementById('monthPaletteLabel');
-  if (label) label.textContent = `Monatskontrast · ${palette.name}`;
-  const themeMeta = document.getElementById('themeColorMeta');
-  if (themeMeta) themeMeta.setAttribute('content', palette.accentStrong);
+function monthOrdinal(year, month) {
+  return year * 12 + (month - 1);
 }
 
 window.addEventListener('DOMContentLoaded', init);
 window.addEventListener('beforeunload', async () => { if (state.dirty) await persistCurrentMonth(); });
 
+/**
+ * Auslieferungsstempel aus dem Kopf der Seite in den DOM und die Konsole
+ * heben. `document.documentElement.dataset.build` beantwortet damit in den
+ * Entwicklerwerkzeugen sofort die Frage, welcher Stand gerade läuft.
+ */
+function markBuild() {
+  const build = document.querySelector('meta[name="dienstplanrad-build"]')?.content;
+  if (!build) return;
+  document.documentElement.dataset.build = build;
+  const status = document.getElementById('saveStatus')?.closest('.status-wrap');
+  if (status) status.title = `DienstplanRAD · Stand ${build}`;
+}
+
 async function init() {
+  markBuild();
   cacheElements();
   bindEvents();
   buildStaticSelectors();
-  registerServiceWorker();
+  releaseLegacyServiceWorker();
   setStatus('loading', 'Lädt …');
   await bootstrapState();
+  applyMonthTheme(state.currentMonth, { animate: false });
   populateSelectors();
   await openCurrentMonth(state.currentYear, state.currentMonth, true);
 }
@@ -158,7 +125,8 @@ function buildStaticSelectors() {
     option.textContent = MONTH_NAMES[i - 1];
     $('#monthSelect').append(option);
   }
-  for (let year = 2025; year <= 2030; year++) {
+  const currentYear = new Date().getFullYear();
+  for (let year = Math.min(2025, currentYear - 5); year <= Math.max(2030, currentYear + 5); year++) {
     const option = document.createElement('option');
     option.value = String(year);
     option.textContent = String(year);
@@ -172,27 +140,76 @@ function populateSelectors() {
 }
 
 async function openCurrentMonth(year, month, forceServer = false) {
+  const requestId = ++monthRequestId;
+  const loadedYear = state.currentYear;
+  const loadedMonth = state.currentMonth;
+  const previousYear = requestedYear ?? state.currentYear;
+  const previousMonth = requestedMonth ?? state.currentMonth;
+  const targetChanged = month !== previousMonth || year !== previousYear;
+  requestedYear = year;
+  requestedMonth = month;
+  const direction = Math.sign(monthOrdinal(year, month) - monthOrdinal(previousYear, previousMonth)) || 1;
+
+  // Offene Änderungen des bisherigen Monats sichern. Der Vorgang läuft parallel
+  // weiter und hält die Anzeige nicht auf.
+  let pendingSave = null;
+  if (state.dirty) {
+    clearTimeout(state.saveTimer);
+    state.saveTimer = null;
+    pendingSave = persistMonth(loadedYear, loadedMonth);
+  }
+
+  // Grundfarbe, Titel, Tabelle und Statistik wechseln in EINEM Schritt.
+  //
+  // Zuvor wurde die Palette sofort gesetzt, der Monat aber erst nach dem
+  // Serverabruf gerendert. Gemessen an einer antwortenden API lagen dazwischen
+  // rund 800 ms: Die Farbe lief vollständig durch, während in der Überschrift
+  // noch der alte Monat stand. Ohne Backend – wie in allen früheren Testläufen –
+  // scheiterte der Abruf sofort und der Versatz fiel nicht auf.
+  //
+  // Das Kalendergerüst eines Monats steht ohne Serverdaten fest: Tage,
+  // Wochentage, Feiertage und damit die gesamte Farbhierarchie. Es wird deshalb
+  // sofort aus dem Zwischenspeicher gerendert; für Nachbarmonate liegen auch
+  // die Einteilungen bereits vor. Der Serverstand zieht anschließend nach.
+  state.currentYear = year;
+  state.currentMonth = month;
+  populateSelectors();
+  if (targetChanged) applyMonthTheme(month);
+  render();
+  if (targetChanged) animateMonthContent(direction);
+
+  if (pendingSave) await pendingSave;
+  if (requestId !== monthRequestId) return;
+
   setStatus('loading', forceServer ? 'Lädt Serverstand …' : 'Lädt …');
   await loadMonth(year, month, forceServer);
+  if (requestId !== monthRequestId) return;
   await warmAdjacentMonths(year, month);
+  if (requestId !== monthRequestId) return;
+
   setStatus(state.serverReady ? 'saved' : 'offline', state.serverReady ? 'Gespeichert' : 'Offline – lokaler Stand');
-  populateSelectors();
-  applyMonthTheme(month);
+  // Zweiter Durchlauf mit dem Serverstand. Die Farbe bleibt dabei unangetastet,
+  // weil applyMonthTheme einen laufenden Übergang auf dasselbe Ziel nicht stört.
   render();
 }
 
 function render() {
+  // Sicherheitsnetz: Palette bleibt garantiert mit dem gerenderten Monat synchron.
+  applyMonthTheme(state.currentMonth);
   const monthData = getMonthData(state.currentYear, state.currentMonth);
   $('#monthTitle').textContent = getMonthLabel();
   renderPlanTable(monthData);
   renderStats(monthData);
+  renderIssues(monthData);
 }
 
 function renderPlanTable(monthData) {
   const tbody = $('#planTableBody');
   tbody.innerHTML = '';
+  let rowIndex = 0;
   for (const [iso, day] of Object.entries(monthData.days)) {
     const tr = document.createElement('tr');
+    tr.style.setProperty('--row-index', String(rowIndex));
     const weekday = weekdayLabel(iso);
     const holidayName = getSaxonyHolidayName(iso);
     if (weekday === 'Sa') tr.classList.add('saturday-row');
@@ -203,7 +220,7 @@ function renderPlanTable(monthData) {
       tr.title = holidayName;
     }
     const weekdayMarkup = holidayName
-      ? `<span class="weekday-name">${weekdayLabelLong(weekday)}</span><span class="holiday-name">${holidayName}</span>`
+      ? `<span class="weekday-name">${weekdayLabelLong(weekday)}</span><span class="holiday-name">${esc(holidayName)}</span>`
       : `<span class="weekday-name">${weekdayLabelLong(weekday)}</span>`;
     tr.innerHTML = `
       <td class="date-cell">${Number(iso.slice(-2))}</td>
@@ -221,6 +238,7 @@ function renderPlanTable(monthData) {
     tr.children[6].appendChild(buildAbsenceSummary(iso, monthData));
     tr.children[7].appendChild(buildPreferenceSummary(iso, monthData));
     tbody.appendChild(tr);
+    rowIndex += 1;
   }
 }
 
@@ -235,7 +253,7 @@ function buildAssignmentButton(dateIso, role, staffId, monthData) {
   const name = person?.name || '—';
   const evaluation = staffId ? evaluateCandidate({ state, monthData, dateIso, role, staffId }) : { level: 'green', reasons: [] };
   button.innerHTML = `
-    <span class="assignment-name">${name}</span>
+    <span class="assignment-name">${esc(name)}</span>
     <span class="assignment-badges">${staffId ? `<span class="small-chip ${evaluation.level}">${labelByLevel(evaluation.level)}</span>` : '<span class="small-chip">offen</span>'}</span>`;
   button.title = staffId ? evaluation.reasons.join('\n') : `${role.toUpperCase()} eintragen`;
   button.addEventListener('click', () => openPicker(dateIso, role));
@@ -277,12 +295,18 @@ function buildRbnInput(dateIso, field, value) {
   return wrapper;
 }
 
-function isImmediatePostBdFza(personId, dateIso, absence) {
-  if (absence !== 'fza') return false;
-  const date = new Date(`${dateIso}T00:00:00`);
-  date.setDate(date.getDate() - 1);
-  const previousIso = date.toISOString().slice(0, 10);
-  return getAssignment(state, previousIso, 'bd') === personId;
+/**
+ * Erster regulärer Werktag nach einem eigenen BD bzw. nach einem Samstags-BD
+ * von Dr. Becker. Beide Prüfungen teilen sich mit der Regelbewertung dieselbe
+ * Implementierung aus js/holidays.js – vorher lagen hier eigene Fassungen, die
+ * sich mit rules.js widersprachen.
+ */
+function isFirstRegularWorkdayAfterOwnBd(personId, dateIso) {
+  return isFirstRegularWorkdayAfter(dateIso, iso => getAssignment(state, iso, 'bd') === personId);
+}
+
+function isBeckerFzaAfterSaturdayBd(dateIso) {
+  return isFirstRegularWorkdayAfter(dateIso, iso => parseIsoLocal(iso).getDay() === 6 && getAssignment(state, iso, 'bd') === 'becker');
 }
 
 function buildAbsenceSummary(dateIso, monthData) {
@@ -290,13 +314,32 @@ function buildAbsenceSummary(dateIso, monthData) {
   wrapper.type = 'button';
   wrapper.className = 'cell-summary-button';
   const entries = [];
+  const details = [];
+
+  const beckerAbsence = getAbsence(monthData, 'becker', dateIso);
+  const derivedBeckerFza = isBeckerFzaAfterSaturdayBd(dateIso);
+  if (derivedBeckerFza && (!beckerAbsence || beckerAbsence === 'fza')) {
+    entries.push('Becker: FZA');
+    details.push('Becker: FZA – automatisch aus Samstags-BD für den nächsten regulären Werktag abgeleitet');
+  }
+
   for (const person of state.staff.filter(item => item.includeInAbsenceList)) {
     const absence = getAbsence(monthData, person.id, dateIso);
-    if (!absence || isImmediatePostBdFza(person.id, dateIso, absence)) continue;
-    entries.push(`${person.short}: ${shortAbsenceLabel(absence)}`);
+    if (!absence) continue;
+
+    const absenceSource = getAbsenceSource(monthData, person.id, dateIso);
+    if (absence === 'fza' && absenceSource !== 'manual' && isFirstRegularWorkdayAfterOwnBd(person.id, dateIso)) {
+      if (person.id === 'becker' && derivedBeckerFza) continue;
+      continue;
+    }
+
+    const label = `${person.short}: ${shortAbsenceLabel(absence)}`;
+    entries.push(label);
+    details.push(label);
   }
-  wrapper.textContent = entries.length ? entries.join(', ') : '';
-  wrapper.title = entries.length ? entries.join('\n') : 'Abwesenheiten bearbeiten';
+
+  wrapper.textContent = entries.join(', ');
+  wrapper.title = details.length ? details.join('\n') : 'Abwesenheiten bearbeiten';
   wrapper.addEventListener('click', () => openDayMetaDialog(dateIso));
   return wrapper;
 }
@@ -355,7 +398,7 @@ function renderStats(monthData) {
     const row = document.createElement('tr');
     const remaining = stat.bdRemaining ?? '';
     row.innerHTML = `
-      <td>${stat.name}</td>
+      <td>${esc(stat.name)}</td>
       <td>${stat.bd}</td>
       <td>${stat.hg}</td>
       <td>${stat.weekendEq}</td>
@@ -368,6 +411,60 @@ function renderStats(monthData) {
   openRow.innerHTML = `<td>Offen</td><td>${openBd}</td><td>${openHg}</td><td></td><td></td><td></td>`;
   tbody.appendChild(openRow);
   $('#statsGrid').replaceChildren(table);
+}
+
+/**
+ * Sammelprüfung des Monats als sichtbare Liste.
+ *
+ * `collectIssues` gab es samt Tests bereits, die Oberfläche hat das Ergebnis
+ * aber nie gezeigt – die Beschreibung in der Dokumentation lief also ins Leere.
+ * Die Liste beantwortet die letzte Frage des Planungsvorgangs: Was fehlt noch,
+ * und wo ist etwas fachlich auffällig?
+ */
+function renderIssues(monthData) {
+  const container = $('#issueList');
+  const summary = $('#issueSummary');
+  if (!container) return;
+
+  const issues = collectIssues(state, monthData);
+  const bySeverity = level => issues.filter(issue => issue.level === level).length;
+  const offen = issues.filter(issue => issue.title.includes('offen')).length;
+  const auffaellig = issues.length - offen;
+
+  if (summary) {
+    summary.textContent = issues.length === 0
+      ? 'Der Monat ist vollständig besetzt und ohne Auffälligkeiten.'
+      : `${offen} offene Einteilung${offen === 1 ? '' : 'en'} · ${auffaellig} Auffälligkeit${auffaellig === 1 ? '' : 'en'}`;
+  }
+
+  if (issues.length === 0) {
+    container.replaceChildren(Object.assign(document.createElement('p'), {
+      className: 'issue-empty',
+      textContent: 'Nichts zu tun – alle Tage sind besetzt, keine Regel meldet sich.'
+    }));
+    return;
+  }
+
+  // Rote und orange Punkte zuerst, danach die offenen Stellen. Lange Listen
+  // offener Tage würden die fachlich wichtigen Meldungen sonst verdecken.
+  const relevant = issues.filter(issue => issue.level !== 'yellow');
+  const list = document.createElement('ul');
+  list.className = 'issue-items';
+  for (const issue of [...relevant, ...issues.filter(issue => issue.level === 'yellow')].slice(0, 40)) {
+    const item = document.createElement('li');
+    item.className = `issue-item ${issue.level}`;
+    item.innerHTML = `<span class="small-chip ${issue.level}">${labelByLevel(issue.level)}</span>
+      <span class="issue-text"><strong>${esc(issue.title)}</strong><span>${esc(issue.details)}</span></span>`;
+    list.appendChild(item);
+  }
+  const rest = issues.length - Math.min(issues.length, 40);
+  container.replaceChildren(list);
+  if (rest > 0) {
+    container.appendChild(Object.assign(document.createElement('p'), {
+      className: 'issue-empty',
+      textContent: `… und ${rest} weitere.`
+    }));
+  }
 }
 
 function openPicker(dateIso, role) {
@@ -384,8 +481,13 @@ function openPicker(dateIso, role) {
     button.type = 'button';
     button.className = `picker-item ${evaluation.level}`;
     button.title = evaluation.reasons.join('\n');
-    button.innerHTML = `<div class="topline"><span class="name">${person.name}</span><span class="small-chip ${evaluation.level}">${labelByLevel(evaluation.level)}</span></div><div class="reasons">${evaluation.reasons.map(r => `<span>${r}</span>`).join('')}</div>`;
-    button.addEventListener('click', () => onPickStaff(person.id, evaluation));
+    button.innerHTML = `<div class="topline"><span class="name">${esc(person.name)}</span><span class="small-chip ${evaluation.level}">${labelByLevel(evaluation.level)}</span></div><div class="reasons">${evaluation.reasons.map(reason => `<span>${esc(reason)}</span>`).join('')}</div>`;
+    if (evaluation.canSelect === false) {
+      button.disabled = true;
+      button.setAttribute('aria-disabled', 'true');
+    } else {
+      button.addEventListener('click', () => onPickStaff(person.id, evaluation));
+    }
     $('#pickerList').appendChild(button);
   });
   $('#pickerDialog').showModal();
@@ -396,7 +498,7 @@ async function onPickStaff(staffId, evaluation) {
   if (evaluation.level === 'red') {
     pendingConflict = { staffId, evaluation, dateIso, role };
     $('#conflictDialogText').textContent = `${getStaffById(state.staff, staffId)?.name} wird für ${role.toUpperCase()} am ${fmtGermanDate(dateIso)} mit rotem Konflikt eingetragen.`;
-    $('#conflictReasons').innerHTML = evaluation.reasons.map(reason => `<div class="small-chip red">${reason}</div>`).join('');
+    $('#conflictReasons').innerHTML = evaluation.reasons.map(reason => `<div class="small-chip red">${esc(reason)}</div>`).join('');
     $('#conflictComment').value = '';
     $('#conflictDialog').showModal();
     return;
@@ -449,7 +551,7 @@ function openDayMetaDialog(dateIso) {
     row.className = 'day-meta-row';
     const absence = getAbsence(monthData, person.id, dateIso);
     const pref = getPreference(monthData, person.id, dateIso);
-    row.innerHTML = `<div class="row-title"><strong>${person.name}</strong><span class="small-chip">${person.roleLabel || ''}</span></div>`;
+    row.innerHTML = `<div class="row-title"><strong>${esc(person.name)}</strong><span class="small-chip">${esc(person.roleLabel || '')}</span></div>`;
     const absGroup = document.createElement('div');
     absGroup.className = 'meta-group';
     ABSENCE_TYPES.forEach(type => absGroup.appendChild(buildMetaChip({ kind:'absence', dateIso, staffId: person.id, typeId: type.id, active: absence === type.id, label: type.label })));
@@ -533,7 +635,7 @@ function buildBatchGrid() {
     if (current === currentType) button.classList.add('selected');
     button.dataset.dateIso = iso;
     button.title = holidayName || '';
-    button.innerHTML = `<strong>${String(date.getDate()).padStart(2,'0')}</strong><small>${weekdayLabel(iso)}</small>${holidayName ? `<small class="batch-holiday-name">${holidayName}</small>` : ''}<small>${current ? (state.currentBatchMode === 'absence' ? labelForAbsence(current) : labelForPreference(current)) : '—'}</small>`;
+    button.innerHTML = `<strong>${String(date.getDate()).padStart(2,'0')}</strong><small>${weekdayLabel(iso)}</small>${holidayName ? `<small class="batch-holiday-name">${esc(holidayName)}</small>` : ''}<small>${current ? (state.currentBatchMode === 'absence' ? labelForAbsence(current) : labelForPreference(current)) : '—'}</small>`;
     button.addEventListener('click', () => button.classList.toggle('selected'));
     $('#batchDayGrid').appendChild(button);
   });
@@ -556,16 +658,20 @@ function onApplyBatch() {
 }
 
 function shiftMonth(delta) {
-  const next = new Date(state.currentYear, state.currentMonth - 1 + delta, 1);
+  const selectedYear = Number($('#yearSelect').value) || state.currentYear;
+  const selectedMonth = Number($('#monthSelect').value) || state.currentMonth;
+  const next = new Date(selectedYear, selectedMonth - 1 + delta, 1);
   $('#yearSelect').value = String(next.getFullYear());
   $('#monthSelect').value = String(next.getMonth() + 1);
   openCurrentMonth(next.getFullYear(), next.getMonth() + 1);
 }
 
 function markDirty() {
+  const year = state.currentYear;
+  const month = state.currentMonth;
   scheduleSave(async () => {
     setStatus('saving', 'Speichert …');
-    await persistCurrentMonth();
+    await persistMonth(year, month);
     setStatus(state.serverReady ? 'saved' : 'offline', state.serverReady ? 'Gespeichert' : 'Offline gespeichert');
   });
 }
@@ -577,18 +683,56 @@ function setStatus(mode, text) {
 }
 
 function labelByLevel(level) {
-  return ({ green: 'geeignet', yellow: 'Hinweis', orange: 'Konflikt', red: 'rot', gray: 'inaktiv' })[level] || level;
+  // "rot" war als Beschriftung die Farbe selbst und passte nicht zur Legende.
+  return ({ green: 'geeignet', yellow: 'Hinweis', orange: 'Konflikt', red: 'Bestätigung', gray: 'inaktiv' })[level] || level;
 }
 
-function registerServiceWorker() {
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+/**
+ * Meldet einen früher installierten Service Worker ab und räumt seine Caches weg.
+ *
+ * Die Anwendung hatte einen Service Worker, der eigenen Code Cache-First
+ * auslieferte. Clients, die ihn einmal installiert hatten, bekamen dadurch
+ * dauerhaft alte Fassungen von styles.css und den JS-Modulen – ausgerollte
+ * Korrekturen erreichten sie nicht mehr. Der Worker ist entfernt; das bloße
+ * Löschen der Datei genügt aber nicht: Eine bestehende Registrierung bleibt im
+ * Browser aktiv und bedient weiter aus ihrem Cache. Deshalb wird hier aktiv
+ * abgemeldet und geleert. Der Aufruf ist dauerhaft nötig, nicht nur einmalig –
+ * es ist nicht absehbar, wann der letzte Client das nächste Mal vorbeikommt.
+ */
+async function releaseLegacyServiceWorker() {
+  try {
+    if ('serviceWorker' in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map(registration => registration.unregister()));
+    }
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.filter(key => key.startsWith('dienstplanrad')).map(key => caches.delete(key)));
+    }
+  } catch {
+    // Ohne Belang: Fehlt die Unterstützung oder verweigert der Browser den
+    // Zugriff, war auch nie ein Worker registriert, der stören könnte.
+  }
 }
+// Bewusst KEIN erzwungener Neustart nach dem Abmelden: Getestet bricht ein
+// location.reload() in dieser Situation die Seite: Nach dem Neuladen blieben
+// alle Anfragen hängen und die Anwendung stand dauerhaft bei "Lädt …" – sowohl
+// aus der laufenden Initialisierung heraus als auch nach dem load-Ereignis.
+// Die Abmeldung allein genügt: Sie wirkt dauerhaft, und spätestens der nächste
+// Aufruf lädt garantiert ungecachten Code.
 
 async function onExcelImport(event) {
   const file = event.target.files?.[0];
   if (!file) return;
   if (!window.XLSX) { alert('Excel-Bibliothek noch nicht geladen.'); return; }
-  const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+  let workbook;
+  try {
+    workbook = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+  } catch (error) {
+    alert(`Excel-Datei konnte nicht gelesen werden: ${error.message}`);
+    event.target.value = '';
+    return;
+  }
   const summary = [];
   const touchedMonths = [];
   for (const sheetName of workbook.SheetNames) {
@@ -626,7 +770,8 @@ function importMonthSheet(sheetName, sheet) {
   const dayCols = [];
   rows[dayRowIndex].forEach((cell, index) => {
     const n = Number(cell);
-    if (index >= 2 && Number.isFinite(n) && n >= 1 && n <= 31) dayCols.push({ col: index, day: n, iso: toIsoDate(year, month, n) });
+    const daysInMonth = new Date(year, month, 0).getDate();
+    if (index >= 2 && Number.isInteger(n) && n >= 1 && n <= daysInMonth) dayCols.push({ col: index, day: n, iso: toIsoDate(year, month, n) });
   });
 
   const normalizeName = name => String(name || '').replace(/\s+/g, ' ').trim().toLowerCase();
@@ -646,7 +791,7 @@ function importMonthSheet(sheetName, sheet) {
       const absenceMap = { 'U': 'urlaub', 'F': 'fza', 'FZA': 'fza', 'WB': 'weiterbildung', 'K': 'sonstige', 'KK': 'sonstige', 'ZU': 'sonstige', '§15C': 'sonstige', 'DR': 'sonstige' };
       if (workplaceValue) {
         const key = workplaceValue.toUpperCase();
-        if (absenceMap[key]) setAbsence(monthData, staffId, iso, absenceMap[key]);
+        if (absenceMap[key]) setAbsence(monthData, staffId, iso, absenceMap[key], 'import');
       }
       if (dutyValue === 'D') setAssignment(monthData, iso, 'bd', staffId);
       else if (dutyValue === 'HG') setAssignment(monthData, iso, 'hg', staffId);
@@ -663,7 +808,10 @@ function mergeMonthData(target, source) {
     if (!target.days[iso].hg && day.hg) target.days[iso].hg = day.hg;
   }
   for (const [staffId, absMap] of Object.entries(source.absences || {})) {
-    for (const [iso, type] of Object.entries(absMap)) setAbsence(target, staffId, iso, type);
+    for (const [iso, type] of Object.entries(absMap)) {
+      const sourceType = getAbsenceSource(source, staffId, iso) || 'import';
+      setAbsence(target, staffId, iso, type, sourceType);
+    }
   }
   for (const [staffId, prefMap] of Object.entries(source.preferences || {})) {
     for (const [iso, type] of Object.entries(prefMap)) setPreference(target, staffId, iso, type);
@@ -698,11 +846,23 @@ async function exportJsonBackup() {
 async function onJsonImport(event) {
   const file = event.target.files?.[0];
   if (!file) return;
-  const payload = JSON.parse(await file.text());
+  let payload;
+  try {
+    payload = JSON.parse(await file.text());
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('Die Wurzel muss ein JSON-Objekt sein.');
+  } catch (error) {
+    alert(`JSON-Sicherung konnte nicht gelesen werden: ${error.message}`);
+    event.target.value = '';
+    return;
+  }
   if (payload.settings) state.settings = payload.settings;
   if (payload.staff) state.staff = payload.staff;
   if (payload.rbnNames) state.rbnNames = payload.rbnNames;
-  if (Array.isArray(payload.months)) payload.months.forEach(([key, value]) => state.months.set(key, value));
+  if (Array.isArray(payload.months)) payload.months.forEach(entry => {
+    if (!Array.isArray(entry) || !/^\d{4}-(0[1-9]|1[0-2])$/.test(entry[0]) || !entry[1] || typeof entry[1] !== 'object') return;
+    const [year, month] = entry[0].split('-').map(Number);
+    setMonthData(year, month, entry[1]);
+  });
   saveLocalBootstrap();
   try { await api.importJson(payload); } catch {}
   render();

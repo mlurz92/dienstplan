@@ -65,6 +65,7 @@ export function createEmptyMonth(year, month) {
     updatedAt: null,
     days,
     absences: {},
+    absenceSources: {},
     preferences: {},
     overrideLog: [],
     importLog: []

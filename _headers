@@ -1,3 +1,15 @@
+/
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/index.html
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/styles.css
+  Cache-Control: no-cache, must-revalidate
+
+/js/*
+  Cache-Control: no-cache, must-revalidate
+
 /*
   X-Frame-Options: SAMEORIGIN
   X-Content-Type-Options: nosniff
