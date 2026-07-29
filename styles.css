@@ -14,10 +14,13 @@
   --month-accent-strong: #1f5f8f;
   --month-glow: rgba(78,151,205,.34);
   --month-panel-tint: rgba(211,235,250,.24);
-  --weekday-field-bg: color-mix(in srgb, var(--month-accent) 14%, white);
-  --saturday-row-bg: color-mix(in srgb, var(--month-accent) 38%, white);
-  --sunday-row-bg: color-mix(in srgb, var(--month-accent) 50%, white);
-  --holiday-row-bg: color-mix(in srgb, var(--month-accent) 62%, white);
+  /* Startwerte für die erste Anzeige, bevor das Theme-Modul greift. Im Betrieb
+     schreibt js/theme.js hier fertige Farben als Inline-Style auf <html>. */
+  --month-ink: #1b4a6d;
+  --weekday-field-bg: color-mix(in srgb, var(--month-accent) 46%, white);
+  --saturday-row-bg: color-mix(in srgb, var(--month-accent) 14%, white);
+  --sunday-row-bg: color-mix(in srgb, var(--month-accent) 22%, white);
+  --holiday-row-bg: color-mix(in srgb, var(--month-accent) 30%, white);
   --radius: 15px;
   --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color-scheme: light;
@@ -25,23 +28,21 @@
 
 @property --month-accent { syntax: '<color>'; inherits: true; initial-value: #4f8fbd; }
 @property --month-accent-strong { syntax: '<color>'; inherits: true; initial-value: #1f5f8f; }
+@property --month-ink { syntax: '<color>'; inherits: true; initial-value: #1b4a6d; }
 @property --month-glow { syntax: '<color>'; inherits: true; initial-value: rgba(78,151,205,.34); }
 @property --month-panel-tint { syntax: '<color>'; inherits: true; initial-value: rgba(211,235,250,.24); }
 
-html.month-theme-transition {
-  transition:
-    --month-accent 620ms cubic-bezier(.22, 1, .36, 1),
-    --month-accent-strong 620ms cubic-bezier(.22, 1, .36, 1),
-    --month-glow 680ms cubic-bezier(.22, 1, .36, 1),
-    --month-panel-tint 680ms cubic-bezier(.22, 1, .36, 1);
-}
+/* Der Monatsfarbverlauf wird von js/theme.js Frame für Frame geschrieben
+   (OKLab-Interpolation, zeitbasiert). Eine zusätzliche CSS-Transition auf
+   diesen Variablen würde gegen die Schleife arbeiten und den Verlauf
+   verschleppen – deshalb gibt es hier bewusst keine. */
 
-/* Erstanwendung bzw. reduzierte Bewegung: Farben ohne Interpolation setzen. */
-html.month-theme-instant, html.month-theme-instant * { transition: none !important; }
-
-body.month-content-transition .plan-table-wrap,
-body.month-content-transition .month-palette-label,
-body.month-content-transition .excel-stats {
+/* Der Sättigungspuls läuft bewusst nur auf dem kleinen Farb-Badge. Ein `filter`
+   auf der gesamten Plantabelle erzwingt in jedem Frame ein Neurastern der
+   kompletten Fläche und hat genau die Frames gekostet, die der Farbverlauf
+   braucht. Die Tabelle bewegt sich stattdessen ausschließlich über transform
+   und opacity – beides läuft im Compositor. */
+body.month-content-transition .month-palette-label {
   animation: month-content-breathe 680ms cubic-bezier(.22, 1, .36, 1);
 }
 
@@ -65,14 +66,19 @@ body.month-content-transition .excel-stats {
   100% { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 
-#monthTitle.month-enter-next, #monthTitle.month-enter-prev { will-change: transform, opacity; }
+.month-enter-next, .month-enter-prev { will-change: transform, opacity; }
+
+/* Beim Monatswechsel übernimmt der Container die Bewegung – die gestaffelte
+   Zeilen-Einblendung wird dafür ausgesetzt. Beides gleichzeitig ließ die
+   Tabelle für rund 300 ms leer erscheinen (die letzte Zeile startet erst nach
+   90 ms + 31 × 7 ms), der Plan fiel mitten im Wechsel in ein Loch. Jetzt
+   gleitet eine bereits vollständig gesetzte Tabelle herein. Beim Erststart,
+   wo diese Klasse fehlt, bleibt der gestaffelte Aufbau erhalten. */
+body.month-content-transition .plan-table tbody tr { animation: none; }
 
 @media (prefers-reduced-motion: reduce) {
-  html.month-theme-transition { transition: none; }
   .month-enter-next, .month-enter-prev,
-  body.month-content-transition .plan-table-wrap,
-  body.month-content-transition .month-palette-label,
-  body.month-content-transition .excel-stats { animation: none; }
+  body.month-content-transition .month-palette-label { animation: none; }
 }
 
 @media print {
@@ -94,7 +100,6 @@ body {
     radial-gradient(circle at 88% 2%, rgba(255,255,255,.13), transparent 27%),
     linear-gradient(145deg, #0a0d12 0%, #151b23 48%, #0d1218 100%);
   background-attachment: fixed;
-  transition: background .35s ease;
 }
 body::before,
 body::after {
@@ -241,7 +246,7 @@ h3 { font-size: 1.05rem; }
 .calendar-swatch, .legend-swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; margin-right: 3px; box-shadow: inset 0 1px 0 rgba(255,255,255,.55); }
 .calendar-swatch.saturday { background: var(--saturday-row-bg); border: 1px solid var(--month-accent); }
 .calendar-swatch.sunday { background: var(--sunday-row-bg); border: 1px solid var(--month-accent); }
-.calendar-swatch.holiday { background: var(--holiday-row-bg); border: 1px solid var(--month-accent-strong); }
+.calendar-swatch.holiday { background: var(--holiday-row-bg); border: 1px solid var(--month-ink); }
 .legend-swatch.green { background: #b9dfc8; border: 1px solid var(--green); }
 .legend-swatch.yellow { background: #fff0b3; border: 1px solid var(--yellow); }
 .legend-swatch.orange { background: #ffd8b8; border: 1px solid var(--orange); }
@@ -260,7 +265,9 @@ h3 { font-size: 1.05rem; }
   border-bottom: 1px solid rgba(28,35,44,.72);
   height: 30px; padding: 0; vertical-align: middle;
   background: rgba(255,255,255,.78);
-  transition: background .18s ease, box-shadow .18s ease;
+  /* Kein background-Übergang: die Monatsfarbe wird pro Frame geschrieben,
+     eine Transition würde jeden Frame neu starten und den Verlauf verschleifen. */
+  transition: box-shadow .18s ease;
 }
 .plan-table th:last-child, .plan-table td:last-child { border-right: none; }
 .plan-table tr:last-child td { border-bottom: none; }
@@ -277,25 +284,34 @@ h3 { font-size: 1.05rem; }
 .plan-table th:nth-child(5), .plan-table th:nth-child(6) { width: 125px; }
 .plan-table .absence-col { width: 220px; }
 .plan-table .preference-col { width: 230px; }
-.date-cell { text-align: right; padding-right: 6px !important; font-weight: 700; background: rgba(255,255,255,.88); }
-.weekday-cell {
-  padding: 0 6px !important; font-weight: 700; color: var(--month-accent-strong);
+/* Wichtig: Die Basisregel `.plan-table th, .plan-table td` hat die Spezifität
+   (0,1,1). Reine Klassenselektoren wie `.weekday-cell` (0,1,0) verlieren
+   dagegen – die Monatsfarbe der Wochentagsspalte kam deshalb nie an. Alle
+   Zellregeln sind daher konsequent auf `.plan-table td.<klasse>` (0,2,1)
+   hochgezogen, die Zeilentypen auf `.plan-table tr.<typ> td` (0,2,2). Damit
+   ist die Rangfolge Zelle < Zeilentyp eindeutig und unabhängig von der
+   Quellreihenfolge. */
+.plan-table td.date-cell { text-align: right; padding-right: 6px !important; font-weight: 700; color: var(--month-ink); background: rgba(255,255,255,.88); }
+
+/* Die Wochentagsspalte trägt die kräftige Nuance und behält sie in JEDER Zeile,
+   auch in Wochenend- und Feiertagszeilen. So entsteht ein durchgehender
+   senkrechter Anker, an dem die hellen waagerechten Wäschen entlanglaufen,
+   statt ihn zu unterbrechen. */
+.plan-table td.weekday-cell {
+  padding: 0 6px !important; font-weight: 700; color: var(--month-ink);
   background: var(--weekday-field-bg);
-  box-shadow: inset 3px 0 0 var(--month-accent);
+  box-shadow: inset 3px 0 0 var(--month-accent-strong);
 }
 .weekday-name { display: block; line-height: 1.05; }
 .holiday-name { display: block; margin-top: 1px; font-size: .61rem; font-weight: 700; color: inherit; opacity: .88; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .plan-table tbody tr:hover td { filter: brightness(.985); }
-.saturday-row td { background: var(--saturday-row-bg); }
-.saturday-row .date-cell, .saturday-row .weekday-cell { color: var(--month-accent-strong); background: var(--saturday-row-bg); }
-.saturday-row .date-cell { box-shadow: inset 4px 0 0 var(--month-accent); }
-.sunday-row td { background: var(--sunday-row-bg); }
-.sunday-row .date-cell, .sunday-row .weekday-cell { color: var(--month-accent-strong); background: var(--sunday-row-bg); }
-.sunday-row .date-cell { box-shadow: inset 4px 0 0 var(--month-accent-strong); }
-.holiday-row td { background: var(--holiday-row-bg); }
-.holiday-row .date-cell, .holiday-row .weekday-cell { color: var(--month-accent-strong); background: var(--holiday-row-bg); }
-.holiday-row .date-cell { box-shadow: inset 5px 0 0 var(--month-accent-strong); }
-.holiday-row .weekday-cell { box-shadow: inset 1px 0 0 var(--month-accent-strong); }
+.plan-table tr.saturday-row td { background: var(--saturday-row-bg); }
+.plan-table tr.saturday-row td.date-cell { color: var(--month-ink); background: var(--saturday-row-bg); box-shadow: inset 4px 0 0 var(--month-accent); }
+.plan-table tr.sunday-row td { background: var(--sunday-row-bg); }
+.plan-table tr.sunday-row td.date-cell { color: var(--month-ink); background: var(--sunday-row-bg); box-shadow: inset 4px 0 0 var(--month-accent-strong); }
+.plan-table tr.holiday-row td { background: var(--holiday-row-bg); }
+.plan-table tr.holiday-row td.date-cell { color: var(--month-ink); background: var(--holiday-row-bg); box-shadow: inset 5px 0 0 var(--month-ink); }
+.plan-table tr.holiday-row td.weekday-cell { box-shadow: inset 3px 0 0 var(--month-ink); }
 
 .assignment-btn {
   width: 100%; min-height: 29px; border: none; border-radius: 0; background: transparent;
@@ -392,9 +408,12 @@ h3 { font-size: 1.05rem; }
 
 @media print {
   :root {
-    --saturday-row-bg: #c8dbe7;
-    --sunday-row-bg: #a9c8dc;
-    --holiday-row-bg: #8eb5cf;
+    /* !important, weil js/theme.js die Werte als Inline-Style auf <html> setzt. */
+    --saturday-row-bg: #eaf1f6 !important;
+    --sunday-row-bg: #dae7f0 !important;
+    --holiday-row-bg: #c8dbe7 !important;
+    --weekday-field-bg: #9dbdd4 !important;
+    --month-ink: #10314a !important;
   }
   body { background: #fff; color: #000; }
   body::before, body::after, .topbar, .toolbar, .legend-stack { display: none !important; }
@@ -564,7 +583,8 @@ h3 { font-size: 1.05rem; }
 .sunday-row td,
 .holiday-row td {
   background-image: linear-gradient(110deg, rgba(255,255,255,.14), transparent 46%, rgba(255,255,255,.07));
-  transition: background-color .32s ease, color .32s ease, box-shadow .22s ease;
+  /* background-color folgt der Theme-Schleife direkt, ohne eigene Transition. */
+  transition: box-shadow .22s ease;
 }
 
 .assignment-btn,
