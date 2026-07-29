@@ -2,6 +2,7 @@ import { MONTH_NAMES, PREFERENCE_TYPES, STAFF_ORDER, toIsoDate, WEEKDAYS } from 
 
 function parseIso(date) { return new Date(`${date}T00:00:00`); }
 function addDays(date, days) { const d = new Date(date); d.setDate(d.getDate() + days); return d; }
+function fmtShort(date) { return `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth()+1).padStart(2, '0')}.${date.getFullYear()}`; }
 function isSameDay(a, b) { return a?.toISOString?.().slice(0,10) === b?.toISOString?.().slice(0,10); }
 
 const severityRank = { green: 0, yellow: 1, orange: 2, red: 3, gray: -1 };
@@ -38,6 +39,12 @@ export function getRoleProperties(person, dateIso) {
 }
 
 export function dayIso(year, month, day) { return toIsoDate(year, month, day); }
+
+export function getAdjacentMonthData(state, delta) {
+  const anchor = new Date(state.currentYear, state.currentMonth - 1 + delta, 1);
+  const key = `${anchor.getFullYear()}-${String(anchor.getMonth()+1).padStart(2,'0')}`;
+  return state.months.get(key);
+}
 
 export function getAssignment(state, dateIso, role) {
   const d = parseIso(dateIso);
@@ -167,7 +174,6 @@ export function evaluateCandidate({ state, monthData, dateIso, role, staffId }) 
   const prevDateIso = addDays(date, -1).toISOString().slice(0,10);
   const prev2DateIso = addDays(date, -2).toISOString().slice(0,10);
   const prev3DateIso = addDays(date, -3).toISOString().slice(0,10);
-
   if (role === 'bd') {
     if (getAssignment(state, prevDateIso, 'bd') === staffId) push('red', 'BD am Vortag – erneuter BD am Folgetag unzulässig');
     const ownBdDates = listOwnRoleDates(state, staffId, 'bd').concat(dateIso).sort();
@@ -175,11 +181,19 @@ export function evaluateCandidate({ state, monthData, dateIso, role, staffId }) 
     if (idx > 0) {
       const prevBd = parseIso(ownBdDates[idx - 1]);
       const diff = Math.round((date - prevBd) / 86400000);
-      if (diff > 1 && diff < 4) push('orange', 'Weniger als 3 dienstfreie Tage seit letztem BD');
+      const fzaDate = addDays(date, -1);
+      const fzaIso = fzaDate.toISOString().slice(0,10);
+      const fzaMonthKey = `${fzaDate.getFullYear()}-${String(fzaDate.getMonth()+1).padStart(2,'0')}`;
+      const fzaMonth = state.months.get(fzaMonthKey);
+      const isWeekdayPattern = [prevBd, fzaDate, date].every(item => item.getDay() >= 1 && item.getDay() <= 5);
+      const isBdFzaBd = diff === 2 && isWeekdayPattern && getAbsence(fzaMonth || monthData, staffId, fzaIso) === 'fza';
+      if (isBdFzaBd) push('yellow', 'BD–FZA–BD werktags');
+      else if (diff > 1 && diff < 4) push('orange', 'Weniger als 3 dienstfreie Tage seit letztem BD');
     }
     if (person.maxBd && currentBd >= person.maxBd) push('red', `Monatsmaximum von ${person.maxBd} BD bereits erreicht`);
     else if (person.bdTarget && currentBd >= person.bdTarget) push('yellow', `BD-Richtwert ${person.bdTarget} bereits erreicht`);
-    const nextIso = addDays(date, 1).toISOString().slice(0,10);
+    const nextDay = addDays(date, 1);
+    const nextIso = nextDay.toISOString().slice(0,10);
     const firstVacationDay = getAbsence(monthData, staffId, nextIso) === 'urlaub';
     if (firstVacationDay) push('orange', 'BD unmittelbar vor Urlaubsbeginn');
     if (person.id === 'becker') {
@@ -256,7 +270,7 @@ export function collectIssues(state, monthData) {
   }
   for (const [staffId, absMap] of Object.entries(monthData.absences || {})) {
     if (staffId !== 'becker' && staffId !== 'martin') continue;
-    for (const iso of Object.keys(absMap)) {
+    for (const [iso, type] of Object.entries(absMap)) {
       const other = staffId === 'becker' ? 'martin' : 'becker';
       const isWorkday = ![0,6].includes(parseIso(iso).getDay());
       if (isWorkday && getAbsence(monthData, other, iso)) issues.push({

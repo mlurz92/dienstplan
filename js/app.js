@@ -1,7 +1,7 @@
 import { ABSENCE_TYPES, MONTH_NAMES, PREFERENCE_TYPES, SHEET_NAMES, toIsoDate } from './defaults.js';
 import { state, bootstrapState, getMonthData, getMonthLabel, loadMonth, persistCurrentMonth, saveLocalBootstrap, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js';
 import { api } from './api.js';
-import { buildStats, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getPlanningStaff, getPreference, getStaffById, labelForAbsence, labelForPreference, setAbsence, setAssignment, setPreference, weekdayLabel } from './rules.js';
+import { buildStats, evaluateCandidate, fmtGermanDate, getAbsence, getAssignment, getPlanningStaff, getPreference, getStaffById, labelForAbsence, labelForPreference, setAbsence, setAssignment, setPreference, weekdayLabel } from './rules.js';
 
 const $ = selector => document.querySelector(selector);
 const els = {};
@@ -23,7 +23,7 @@ async function init() {
 }
 
 function cacheElements() {
-  ['monthSelect','yearSelect','prevMonthBtn','nextMonthBtn','saveStatus','statusDot','planTableBody','statsGrid','issuesList','monthTitle','pickerDialog','pickerList','pickerTitle','pickerEyebrow','pickerSubtitle','clearAssignmentBtn','dayMetaDialog','dayMetaTitle','dayMetaList','batchDialog','batchTitle','batchEyebrow','batchSubtitle','batchStaffSelect','batchTypeSelect','batchDayGrid','batchApplyBtn','batchClearSelectionBtn','conflictDialog','conflictDialogText','conflictReasons','conflictComment','confirmConflictBtn'].forEach(id => els[id] = document.getElementById(id));
+  ['monthSelect','yearSelect','prevMonthBtn','nextMonthBtn','saveStatus','statusDot','planTableBody','statsGrid','monthTitle','pickerDialog','pickerList','pickerTitle','pickerEyebrow','pickerSubtitle','clearAssignmentBtn','dayMetaDialog','dayMetaTitle','dayMetaList','batchDialog','batchTitle','batchEyebrow','batchSubtitle','batchStaffSelect','batchTypeSelect','batchDayGrid','batchApplyBtn','batchClearSelectionBtn','conflictDialog','conflictDialogText','conflictReasons','conflictComment','confirmConflictBtn'].forEach(id => els[id] = document.getElementById(id));
 }
 
 function bindEvents() {
@@ -87,7 +87,6 @@ function render() {
   $('#monthTitle').textContent = getMonthLabel();
   renderPlanTable(monthData);
   renderStats(monthData);
-  renderIssues(monthData);
 }
 
 function renderPlanTable(monthData) {
@@ -96,28 +95,29 @@ function renderPlanTable(monthData) {
   for (const [iso, day] of Object.entries(monthData.days)) {
     const tr = document.createElement('tr');
     const weekday = weekdayLabel(iso);
-    const isWeekend = ['Fr', 'Sa', 'So'].includes(weekday);
+    const isWeekend = ['Sa', 'So'].includes(weekday);
     if (isWeekend) tr.classList.add('weekend-row');
     tr.innerHTML = `
-      <td class="date-cell">${fmtGermanDate(iso).slice(0,5)}</td>
-      <td class="weekday-cell">${weekday}</td>
+      <td class="date-cell">${Number(iso.slice(-2))}</td>
+      <td class="weekday-cell">${weekdayLabelLong(weekday)}</td>
       <td></td>
       <td></td>
       <td></td>
       <td></td>
-      <td class="summary-cell"></td>`;
-    const tdBd = tr.children[2];
-    const tdHg = tr.children[3];
-    const tdRbn1 = tr.children[4];
-    const tdRbn2 = tr.children[5];
-    const tdSummary = tr.children[6];
-    tdBd.appendChild(buildAssignmentButton(iso, 'bd', day.bd, monthData));
-    tdHg.appendChild(buildAssignmentButton(iso, 'hg', day.hg, monthData));
-    tdRbn1.appendChild(buildRbnInput(iso, 'rbn1', day.rbn1 || ''));
-    tdRbn2.appendChild(buildRbnInput(iso, 'rbn2', day.rbn2 || ''));
-    tdSummary.appendChild(buildDaySummary(iso, monthData));
+      <td class="absence-summary-cell"></td>
+      <td class="preference-summary-cell"></td>`;
+    tr.children[2].appendChild(buildAssignmentButton(iso, 'bd', day.bd, monthData));
+    tr.children[3].appendChild(buildAssignmentButton(iso, 'hg', day.hg, monthData));
+    tr.children[4].appendChild(buildRbnInput(iso, 'rbn1', day.rbn1 || ''));
+    tr.children[5].appendChild(buildRbnInput(iso, 'rbn2', day.rbn2 || ''));
+    tr.children[6].appendChild(buildAbsenceSummary(iso, monthData));
+    tr.children[7].appendChild(buildPreferenceSummary(iso, monthData));
     tbody.appendChild(tr);
   }
+}
+
+function weekdayLabelLong(shortLabel) {
+  return ({ Mo: 'Montag', Di: 'Dienstag', Mi: 'Mittwoch', Do: 'Donnerstag', Fr: 'Freitag', Sa: 'Samstag', So: 'Sonntag' })[shortLabel] || shortLabel;
 }
 
 function buildAssignmentButton(dateIso, role, staffId, monthData) {
@@ -169,81 +169,97 @@ function buildRbnInput(dateIso, field, value) {
   return wrapper;
 }
 
-function buildDaySummary(dateIso, monthData) {
-  const div = document.createElement('div');
-  const parts = [];
+function isImmediatePostBdFza(personId, dateIso, absence) {
+  if (absence !== 'fza') return false;
+  const date = new Date(`${dateIso}T00:00:00`);
+  date.setDate(date.getDate() - 1);
+  const previousIso = date.toISOString().slice(0, 10);
+  return getAssignment(state, previousIso, 'bd') === personId;
+}
+
+function buildAbsenceSummary(dateIso, monthData) {
+  const wrapper = document.createElement('button');
+  wrapper.type = 'button';
+  wrapper.className = 'cell-summary-button';
+  const entries = [];
   for (const person of state.staff.filter(item => item.includeInAbsenceList)) {
     const absence = getAbsence(monthData, person.id, dateIso);
+    if (!absence || isImmediatePostBdFza(person.id, dateIso, absence)) continue;
+    entries.push(`${person.short}: ${shortAbsenceLabel(absence)}`);
+  }
+  wrapper.textContent = entries.length ? entries.join(', ') : '';
+  wrapper.title = entries.length ? entries.join('\n') : 'Abwesenheiten bearbeiten';
+  wrapper.addEventListener('click', () => openDayMetaDialog(dateIso));
+  return wrapper;
+}
+
+function buildPreferenceSummary(dateIso, monthData) {
+  const wrapper = document.createElement('button');
+  wrapper.type = 'button';
+  wrapper.className = 'cell-summary-button';
+  const entries = [];
+  for (const person of state.staff.filter(item => item.includeInAbsenceList)) {
     const pref = getPreference(monthData, person.id, dateIso);
-    if (absence) {
-      const chip = document.createElement('span');
-      chip.className = 'summary-chip';
-      chip.textContent = `${person.short}: ${labelForAbsence(absence)}`;
-      parts.push(chip);
-    }
-    if (pref) {
-      const chip = document.createElement('span');
-      chip.className = 'summary-chip';
-      chip.textContent = `${person.short}: ${labelForPreference(pref)}`;
-      parts.push(chip);
-    }
+    if (!pref) continue;
+    entries.push(`${person.short}: ${shortPreferenceLabel(pref)}`);
   }
-  if (!parts.length) {
-    const empty = document.createElement('span');
-    empty.className = 'summary-chip';
-    empty.textContent = 'keine';
-    parts.push(empty);
-  }
-  parts.forEach(p => div.appendChild(p));
-  const editBtn = document.createElement('button');
-  editBtn.className = 'link-btn';
-  editBtn.textContent = 'bearbeiten';
-  editBtn.addEventListener('click', () => openDayMetaDialog(dateIso));
-  div.appendChild(document.createElement('br'));
-  div.appendChild(editBtn);
-  return div;
+  wrapper.textContent = entries.length ? entries.join(', ') : '';
+  wrapper.title = entries.length ? entries.join('\n') : 'Dienstwünsche bearbeiten';
+  wrapper.addEventListener('click', () => openDayMetaDialog(dateIso));
+  return wrapper;
+}
+
+function shortAbsenceLabel(type) {
+  return ({ urlaub: 'U', fza: 'FZA', weiterbildung: 'WB', sonstige: 'abwesend' })[type] || labelForAbsence(type);
+}
+
+function shortPreferenceLabel(type) {
+  return ({
+    'kein-bd': 'kein BD',
+    'kein-hg': 'kein HG',
+    'kein-dienst': 'kein Dienst',
+    'bd-bevorzugt': '+BD',
+    'hg-bevorzugt': '+HG',
+    'dienst-bevorzugt': '+Dienst'
+  })[type] || labelForPreference(type);
 }
 
 function renderStats(monthData) {
   const stats = buildStats(state, monthData);
-  $('#statsGrid').innerHTML = '';
-  for (const stat of stats) {
-    const div = document.createElement('div');
-    div.className = 'stat-card';
-    div.innerHTML = `
-      <div class="stat-head">
-        <div>
-          <div class="stat-title">${stat.name}</div>
-          <div class="stat-meta">${stat.roleLabel}</div>
-        </div>
-        <span class="small-chip ${stat.bdTarget && stat.bd > stat.bdTarget ? 'yellow' : 'green'}">BD-Ziel ${stat.bdTarget ?? '—'}</span>
-      </div>
-      <div class="stat-grid">
-        <div class="stat-item"><strong>${stat.bd}</strong><span>BD</span></div>
-        <div class="stat-item"><strong>${stat.hg}</strong><span>HG</span></div>
-        <div class="stat-item"><strong>${stat.weekendEq}</strong><span>WE-Äq.</span></div>
-        <div class="stat-item"><strong>${stat.bdRemaining ?? '—'}</strong><span>Rest BD</span></div>
-      </div>`;
-    $('#statsGrid').appendChild(div);
-  }
-}
-
-function renderIssues(monthData) {
-  const issues = collectIssues(state, monthData);
-  $('#issuesList').innerHTML = '';
-  if (!issues.length) {
-    const empty = document.createElement('div');
-    empty.className = 'issue-card';
-    empty.innerHTML = `<div class="issue-head"><strong>Keine relevanten Konflikte</strong><span class="small-chip green">ok</span></div><p>Der Monat enthält aktuell keine orangefarbenen oder roten Regelverstöße.</p>`;
-    $('#issuesList').appendChild(empty);
-    return;
-  }
-  issues.forEach(issue => {
-    const card = document.createElement('div');
-    card.className = 'issue-card';
-    card.innerHTML = `<div class="issue-head"><strong>${issue.title}</strong><span class="small-chip ${issue.level}">${labelByLevel(issue.level)}</span></div><p>${issue.details}</p>`;
-    $('#issuesList').appendChild(card);
+  const openBd = Object.values(monthData.days || {}).filter(day => !day.bd).length;
+  const openHg = Object.values(monthData.days || {}).filter(day => !day.hg).length;
+  const table = document.createElement('table');
+  table.className = 'distribution-table';
+  table.innerHTML = `
+    <thead>
+      <tr>
+        <th>Mitarbeitende</th>
+        <th>BD</th>
+        <th>HG</th>
+        <th>Wochenende</th>
+        <th>BD-Soll</th>
+        <th>Rest</th>
+      </tr>
+    </thead>
+    <tbody></tbody>`;
+  const tbody = table.querySelector('tbody');
+  stats.forEach(stat => {
+    const row = document.createElement('tr');
+    const remaining = stat.bdRemaining ?? '';
+    row.innerHTML = `
+      <td>${stat.name}</td>
+      <td>${stat.bd}</td>
+      <td>${stat.hg}</td>
+      <td>${stat.weekendEq}</td>
+      <td>${stat.bdTarget || ''}</td>
+      <td class="${Number(remaining) < 0 ? 'over-target' : ''}">${remaining}</td>`;
+    tbody.appendChild(row);
   });
+  const openRow = document.createElement('tr');
+  openRow.className = 'open-row';
+  openRow.innerHTML = `<td>Offen</td><td>${openBd}</td><td>${openHg}</td><td></td><td></td><td></td>`;
+  tbody.appendChild(openRow);
+  $('#statsGrid').replaceChildren(table);
 }
 
 function openPicker(dateIso, role) {
