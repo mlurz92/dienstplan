@@ -192,7 +192,7 @@ Bei aktivierter Betriebssystemeinstellung **Bewegung reduzieren** werden Animati
 
 ## Monatliche Kontrastfarbsysteme
 
-Jeder Monat besitzt ein eigenes harmonisches Farbsystem. Innerhalb dieses Systems werden Samstag, Sonntag und gesetzlicher Feiertag in unterschiedlichen Intensitäten und Kontraststufen dargestellt. Die Grundfarbe wechselt mit jedem Monat, während die Hierarchie gleich bleibt: Samstag ist die leichteste, Sonntag die stärkere und Feiertag die markanteste Variante.
+Jeder Monat besitzt ein eigenes harmonisches Farbsystem. Innerhalb dieses Systems werden die **vollständigen Zeilen** von Samstag, Sonntag und gesetzlichem Feiertag in mittleren bis dunkleren Nuancen des gerade aktiven Grundtons dargestellt. Die Grundfarbe wechselt mit jedem Monat, während die Hierarchie gleich bleibt: Samstag erhält 38 Prozent, Sonntag 50 Prozent und ein Feiertag 62 Prozent Monatsfarbe in der Mischung mit Weiß. Ausschließlich das Wochentagsfeld regulärer Werktage erhält mit 14 Prozent eine deutlich hellere Nuance; die übrigen Zellen dieser Werktagszeilen bleiben neutral.
 
 | Monat | Thema | Charakter |
 |---|---|---|
@@ -209,7 +209,7 @@ Jeder Monat besitzt ein eigenes harmonisches Farbsystem. Innerhalb dieses System
 | November | Schieferblau | ruhiges Blau-Grau |
 | Dezember | Tannengrün und Rubin | winterliches Grün mit festlichem Feiertagsakzent |
 
-Die Monatsfarbe steuert außerdem Hintergrundlicht, Fokusrahmen, ausgewählte Mehrtagesfelder, die Monatsplakette und Teile der Glasreflexion.
+Die Monatsfarbe steuert außerdem Hintergrundlicht, Fokusrahmen, ausgewählte Mehrtagesfelder, die Monatsplakette und Teile der Glasreflexion. Das Browser-Theme bleibt davon ausdrücklich unabhängig und wird beim Monatswechsel nicht verändert.
 
 ## Tabellarischer Monatsplan
 
@@ -217,10 +217,10 @@ Jeder Kalendertag wird als eigene Zeile gerendert. Die Tabelle bleibt horizontal
 
 ### Zeilenklassen
 
-- Werktag ohne Feiertag: neutrale Tabellenfarbe
-- Samstag: leichte Monatskontrastfarbe
-- Sonntag: stärkere Monatskontrastfarbe
-- Feiertag: markanteste Monatskontrastfarbe und Feiertagsname im Wochentagsfeld
+- Werktag ohne Feiertag: ausschließlich das Wochentagsfeld trägt eine sehr helle Nuance der aktuellen Monatsgrundfarbe; die restliche Zeile bleibt neutral
+- Samstag: vollständige Zeile in einer mittleren Monatsnuance
+- Sonntag: vollständige Zeile in einer dunkleren Monatsnuance
+- Feiertag: vollständige Zeile in der markantesten Monatsnuance und Feiertagsname im Wochentagsfeld
 
 ### Hover- und Fokusverhalten
 
@@ -242,6 +242,8 @@ Beim Überfahren wird eine Zeile nur minimal hervorgehoben. Es erfolgt keine Gr�
 ## Monatsnavigation und Serverladen
 
 Der Monat kann mit Pfeiltasten, Monatsauswahl und Jahresauswahl gewechselt werden. Beim Öffnen eines Monats wird zuerst die Pages-Functions-Programmierschnittstelle abgefragt. Der geladene Serverstand ersetzt den im Browser gespeicherten Stand dieses Monats.
+
+Die Jahresauswahl wird relativ zum aktuellen Kalenderjahr erweitert und ist daher nicht auf einen längst abgelaufenen statischen Zeitraum beschränkt. Noch nicht gespeicherte Änderungen werden vor einem Monatswechsel gezielt ihrem Ursprungsmonat zugeordnet und gespeichert. Eine Anforderungskennung verhindert außerdem, dass bei sehr schnellen aufeinanderfolgenden Wechseln eine langsamere, ältere Serverantwort den zuletzt gewählten Monat überschreibt.
 
 Ist der Server nicht erreichbar, verwendet die Anwendung eine vorhandene lokale Monatskopie. Fehlt auch diese, wird ein leerer Monatsdatensatz erzeugt. Zusätzlich werden der vorherige und der nächste Monat geladen, damit monatsübergreifende Regeln ohne sichtbare Unterbrechung arbeiten können.
 
@@ -601,6 +603,8 @@ dienstplan/
 │   ├── defaults.js
 │   ├── rules.js
 │   └── state.js
+├── tests/
+│   └── rules.test.js
 └── functions/
     ├── _utils.js
     └── api/
@@ -625,6 +629,8 @@ dienstplan/
 
 ## Qualitätssicherung
 
+Das Repository enthält automatisierte Node.js-Tests für Monatslängen einschließlich Schaltjahr, zeitabhängige Qualifikation, zentrale rote Konflikte, Wochenendäquivalente und Statistik/Aktivierungszeiträume. `npm run check` prüft die Syntax aller zentralen Browser-, Regel-, Status-, Function- und Service-Worker-Module; `npm test` führt die fachlichen Regressionstests aus.
+
 Für diese Version wurden folgende Prüfungen durchgeführt:
 - Syntaxprüfung aller geänderten JavaScript-Dateien mit `node --check`
 - gezielte Regellogikprüfung für BD am Vortag und BD–FZA–BD
@@ -639,7 +645,7 @@ Für diese Version wurden folgende Prüfungen durchgeführt:
 
 - **Monat bleibt leer:** Serverstatus prüfen; bei vorhandener lokaler Kopie Browser neu laden; KV-Binding kontrollieren.
 - **Speicherstatus bleibt offline:** Netzwerk, Pages Functions und Binding `DIENSTPLAN_KV` prüfen.
-- **Alte Oberfläche sichtbar:** Seite hart neu laden oder Service-Worker-Cache löschen; aktuelle Cache-Version ist `dienstplanrad-v6`.
+- **Alte Oberfläche sichtbar:** Seite hart neu laden oder Service-Worker-Cache löschen; aktuelle Cache-Version ist `dienstplanrad-v8`.
 - **Excel-Bibliothek nicht geladen:** Netzwerkzugriff auf den SheetJS-CDN prüfen und Seite neu laden.
 - **FZA von Lurz oder anderer Person nach BD sichtbar:** Prüfen, ob der Eintrag bewusst manuell gesetzt wurde; manuelle FZA-Einträge bleiben absichtlich sichtbar.
 - **Becker-FZA fehlt:** Prüfen, ob am vorausgehenden Samstag tatsächlich Becker als BD eingetragen ist und ob der angezeigte Tag der erste reguläre Werktag ist.
@@ -673,7 +679,7 @@ Sinnvolle Erweiterungspunkte:
 - weitere regionale Feiertagsprofile
 - visuelle Jahresübersicht
 - serverseitige PDF-Erzeugung
-- automatisierte Browser- und Regeltests
+- zusätzliche automatisierte Browser-Regressionstests
 
 ## Glossar
 

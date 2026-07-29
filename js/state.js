@@ -71,8 +71,6 @@ export async function bootstrapState() {
 }
 
 export async function loadMonth(year, month, forceServer = false) {
-  state.currentYear = year;
-  state.currentMonth = month;
   try {
     const data = await api.getMonth(year, month);
     setMonthData(year, month, data.month || createEmptyMonth(year, month));
@@ -110,8 +108,6 @@ export async function warmAdjacentMonths(year, month) {
   });
   await Promise.allSettled(tasks);
   state.serverReady = previousReady;
-  state.currentYear = year;
-  state.currentMonth = month;
 }
 
 export function scheduleSave(saveFn) {
@@ -121,13 +117,17 @@ export function scheduleSave(saveFn) {
 }
 
 export async function persistCurrentMonth() {
-  const month = getMonthData(state.currentYear, state.currentMonth);
+  return persistMonth(state.currentYear, state.currentMonth);
+}
+
+export async function persistMonth(year, monthNumber) {
+  const month = getMonthData(year, monthNumber);
   month.updatedAt = new Date().toISOString();
   month.revision = (month.revision || 0) + 1;
-  setMonthData(state.currentYear, state.currentMonth, month);
+  setMonthData(year, monthNumber, month);
   state.saveStatus = 'saving';
   try {
-    await api.saveMonth(state.currentYear, state.currentMonth, month);
+    await api.saveMonth(year, monthNumber, month);
     state.saveStatus = 'saved';
     state.serverReady = true;
     state.dirty = false;
