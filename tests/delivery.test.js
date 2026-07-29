@@ -90,3 +90,25 @@ test('Cloudflare revalidates the app shell and application assets on every visit
     );
   }
 });
+
+/**
+ * Der Auslieferungsstempel muss zum Release-Token des Modulgraphen passen.
+ *
+ * Er ist die Antwort auf einen realen Vorfall: Die Live-Seite lief auf einem
+ * Zweig, dem das Monatsfarbsystem vollständig fehlte – `applyMonthTheme` kam
+ * dort kein einziges Mal vor. Von außen war das nicht zu erkennen, weil die
+ * Anwendung im Übrigen normal aussah. Mit dem Stempel genügt ein Aufruf:
+ *
+ *     curl -s https://dienstplanrad.pages.dev/ | grep dienstplanrad-build
+ */
+test('the deployed build stamp matches the module graph release token', async () => {
+  const html = await read('index.html');
+  const stamp = html.match(/name="dienstplanrad-build"\s+content="([^"]+)"/)?.[1];
+  const token = html.match(/\?v=([a-z0-9.-]+)/i)?.[1];
+
+  assert.ok(stamp, 'index.html braucht einen Auslieferungsstempel');
+  assert.equal(stamp, token, 'Stempel und Release-Token müssen denselben Stand bezeichnen');
+
+  const app = await read('js/app.js');
+  assert.match(app, /dienstplanrad-build/, 'der Stempel muss zur Laufzeit ausgelesen werden');
+});

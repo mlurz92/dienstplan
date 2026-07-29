@@ -5,6 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>DienstplanRAD</title>
   <meta name="theme-color" content="#0b0f14" />
+  <!--
+    Auslieferungsstempel. Er macht von außen prüfbar, welcher Stand tatsächlich
+    online ist – mit einem einzigen Aufruf:
+
+        curl -s https://dienstplanrad.pages.dev/ | grep dienstplanrad-build
+
+    Der Anlass ist konkret: Die Seite lief über lange Zeit auf einem Stand, dem
+    das Monatsfarbsystem vollständig fehlte, weil das Hosting einen anderen
+    Zweig als main auslieferte. Von außen war das nicht zu erkennen, weil die
+    Anwendung im Übrigen normal funktionierte.
+  -->
+  <meta name="dienstplanrad-build" content="20260729.4" />
   <script>
     (() => {
       const cachePrefix = 'dienstplanrad';

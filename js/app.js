@@ -61,7 +61,21 @@ function monthOrdinal(year, month) {
 window.addEventListener('DOMContentLoaded', init);
 window.addEventListener('beforeunload', async () => { if (state.dirty) await persistCurrentMonth(); });
 
+/**
+ * Auslieferungsstempel aus dem Kopf der Seite in den DOM und die Konsole
+ * heben. `document.documentElement.dataset.build` beantwortet damit in den
+ * Entwicklerwerkzeugen sofort die Frage, welcher Stand gerade läuft.
+ */
+function markBuild() {
+  const build = document.querySelector('meta[name="dienstplanrad-build"]')?.content;
+  if (!build) return;
+  document.documentElement.dataset.build = build;
+  const status = document.getElementById('saveStatus')?.closest('.status-wrap');
+  if (status) status.title = `DienstplanRAD · Stand ${build}`;
+}
+
 async function init() {
+  markBuild();
   cacheElements();
   bindEvents();
   buildStaticSelectors();
