@@ -1186,6 +1186,44 @@ Excel-Import mit produktiven Arbeitsmappen, Accessibility-Audits sowie Last- und
 
 ## 21. Deployment und Betrieb
 
+### 21.0 Prüfen, welcher Stand tatsächlich online ist
+
+**Diese Prüfung ist verbindlich, bevor ein Fehlerbild im Code gesucht wird.**
+
+```bash
+curl -s https://dienstplanrad.pages.dev/ | grep dienstplanrad-build
+```
+
+Der Auslieferungsstempel im Kopf der Seite muss dem Release-Token des Modulgraphen entsprechen; ein Test
+hält beide zusammen. Zusätzlich lässt sich jede Datei direkt gegen das Repository stellen:
+
+```bash
+for f in index.html styles.css js/app.js js/theme.js; do
+  git show origin/main:$f > /tmp/repo && curl -sL -o /tmp/live "https://dienstplanrad.pages.dev/$f"
+  cmp -s /tmp/repo /tmp/live && echo "$f identisch" || echo "$f ABWEICHEND"
+done
+```
+
+**Warum das hier steht.** Genau diese Prüfung fehlte über einen langen Zeitraum, und sie hätte mehrere
+Fehlersuchen erspart. Die Live-Seite lief auf dem Zweig `agent/aero-month-palettes-readme` statt auf
+`main` – auf einem Stand, dem das Monatsfarbsystem **vollständig fehlte**:
+
+| Suchbegriff | Treffer im ausgelieferten Stand |
+|---|---|
+| `applyMonthTheme` | 0 |
+| `MONTH_PALETTES` | 0 |
+| `month-accent` in `styles.css` | 0 |
+
+`/js/theme.js` lieferte dort HTML statt JavaScript – die Datei existierte im Deployment gar nicht,
+Cloudflare fiel auf `index.html` zurück. Zusätzlich lag unter `/sw.js` noch der cachende Worker mit
+`CACHE = 'dienstplanrad-v4'`, eine Version, die in diesem Repository nie existiert hat; der damalige
+`app.js` registrierte ihn aktiv. Kein Eingriff am Code konnte unter diesen Umständen wirken, und auch ein
+fabrikneues Gerät zeigte dasselbe Bild.
+
+**Behebung im Hosting**, nicht im Code: In den Einstellungen des Pages-Projekts ist der Produktionszweig
+auf `main` zu stellen und ein Deployment auszulösen. Danach beantwortet der Aufruf oben jederzeit, ob der
+ausgelieferte Stand der erwartete ist.
+
 ### 21.1 Cloudflare Pages
 
 1. Repository mit einem Pages-Projekt verbinden.
