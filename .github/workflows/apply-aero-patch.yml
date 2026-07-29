@@ -1,0 +1,42 @@
+name: Apply Aero patch
+
+on:
+  push:
+    branches:
+      - agent/aero-month-palettes-readme
+    paths:
+      - '.aero-payload/**'
+      - '.github/workflows/apply-aero-patch.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/aero-month-palettes-readme
+          fetch-depth: 0
+
+      - name: Decode and apply validated patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .aero-payload/part-* | base64 --decode > /tmp/aero_patch.zip
+          echo 'ea0af4d5583e79ebd419c12d71436c807e0088a8311ee148d046a008dc7aa181  /tmp/aero_patch.zip' | sha256sum --check
+          unzip -o /tmp/aero_patch.zip -d .
+          rm -rf .aero-payload
+          rm -f .github/workflows/apply-aero-patch.yml
+
+      - name: Commit final application state
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Apply Aero glass design, monthly palettes and complete README'
+          git push origin HEAD:agent/aero-month-palettes-readme
