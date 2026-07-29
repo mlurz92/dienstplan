@@ -1,14 +1,44 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, access } from 'node:fs/promises';
 
 const read = path => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
+const exists = async path => {
+  try {
+    await access(new URL(`../${path}`, import.meta.url));
+    return true;
+  } catch {
+    return false;
+  }
+};
 
+/**
+ * Die Anwendung hat keinen Service Worker mehr – und darf auch keinen
+ * zurückbekommen. Der frühere Worker lieferte eigenen Code Cache-First aus und
+ * hat ausgerollte Korrekturen dauerhaft von den Clients ferngehalten. Dieser
+ * Test ist die Sperre dagegen: Er schlägt an, sobald wieder eine Worker-Datei
+ * im Projekt liegt oder irgendwo eine Registrierung erfolgt.
+ */
+test('the application ships without any service worker and never registers one', async () => {
+  assert.equal(await exists('sw.js'), false, 'sw.js darf nicht wieder eingeführt werden');
+  assert.equal(await exists('service-worker.js'), false, 'kein Worker unter alternativem Namen');
+
+  const sources = await Promise.all(['index.html', 'js/app.js', 'js/state.js', 'js/theme.js'].map(read));
+  for (const source of sources) {
+    const registrations = [...source.matchAll(/serviceWorker\s*\.\s*register\s*\(/g)];
+    assert.equal(registrations.length, 0, 'kein serviceWorker.register() im Auslieferungsstand');
+  }
+});
+
+/**
+ * Ein bereits installierter Worker aus früheren Fassungen muss trotzdem
+ * verschwinden. Das erledigen zwei voneinander unabhängige Schichten: ein
+ * Inline-Skript vor der ersten eigenen Asset-Anfrage und zusätzlich der
+ * Anwendungsstart. Beide bleiben dauerhaft bestehen – es ist nicht absehbar,
+ * wann der letzte betroffene Client das nächste Mal vorbeikommt.
+ */
 test('legacy service workers are neutralized before versioned application assets load', async () => {
-  const [html, worker] = await Promise.all([
-    read('index.html'),
-    read('sw.js')
-  ]);
+  const [html, app] = await Promise.all([read('index.html'), read('js/app.js')]);
 
   const cleanupPosition = html.indexOf('dienstplanrad:legacy-cleanup');
   const stylesheetPosition = html.indexOf('rel="stylesheet"');
@@ -20,10 +50,8 @@ test('legacy service workers are neutralized before versioned application assets
   assert.match(html, /navigator\.serviceWorker\.getRegistrations\(\)/);
   assert.match(html, /caches\.keys\(\)/);
 
-  assert.match(worker, /self\.skipWaiting\(\)/);
-  assert.match(worker, /self\.clients\.claim\(\)/);
-  assert.match(worker, /self\.registration\.unregister\(\)/);
-  assert.match(worker, /caches\.delete\(/);
+  assert.match(app, /getRegistrations\(\)/, 'der Anwendungsstart räumt zusätzlich auf');
+  assert.match(app, /caches\.delete\(/);
 });
 
 test('all release-critical shell and module assets share one cache-busting token', async () => {
@@ -44,7 +72,9 @@ test('all release-critical shell and module assets share one cache-busting token
 test('Cloudflare revalidates the app shell and application assets on every visit', async () => {
   const headers = await read('_headers');
 
-  for (const route of ['/', '/index.html', '/sw.js']) {
+  assert.doesNotMatch(headers, /^\/sw\.js/m, 'kein Eintrag für eine nicht mehr existierende Worker-Datei');
+
+  for (const route of ['/', '/index.html']) {
     assert.match(
       headers,
       new RegExp(`${route.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\r?\\n\\s+Cache-Control: no-cache, no-store, must-revalidate`),

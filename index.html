@@ -24,10 +24,10 @@
       document.documentElement.dataset.assetCleanup = cleanupKey;
     })();
   </script>
-  <link rel="manifest" href="/manifest.webmanifest?v=20260729.1" />
-  <link rel="stylesheet" href="/styles.css?v=20260729.1" />
+  <link rel="manifest" href="/manifest.webmanifest?v=20260729.2" />
+  <link rel="stylesheet" href="/styles.css?v=20260729.2" />
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" defer></script>
-  <script type="module" src="/js/app.js?v=20260729.1"></script>
+  <script type="module" src="/js/app.js?v=20260729.2"></script>
 </head>
 <body>
   <div class="ambient-layer" aria-hidden="true">
@@ -127,6 +127,15 @@
             <span class="section-note">Direkt aus dem Monatsplan berechnet</span>
           </div>
           <div id="statsGrid" class="stats-grid excel-stats"></div>
+
+          <div class="section-title-row issue-heading">
+            <div>
+              <div class="eyebrow">Prüfung</div>
+              <h3>Offene Punkte</h3>
+            </div>
+            <span class="section-note" id="issueSummary"></span>
+          </div>
+          <div id="issueList" class="issue-list"></div>
         </section>
       </section>
     </main>
