@@ -1,11 +1,13 @@
 import { ABSENCE_TYPES, MONTH_NAMES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, toIsoDate } from './defaults.js';
-import { state, bootstrapState, getMonthData, getMonthLabel, loadMonth, persistCurrentMonth, saveLocalBootstrap, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js';
+import { state, bootstrapState, getMonthData, getMonthLabel, loadMonth, persistCurrentMonth, persistMonth, saveLocalBootstrap, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js';
 import { api } from './api.js';
 import { buildStats, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getPlanningStaff, getPreference, getStaffById, labelForAbsence, labelForPreference, setAbsence, setAssignment, setPreference, weekdayLabel } from './rules.js';
 
 const $ = selector => document.querySelector(selector);
 const els = {};
 let pendingConflict = null;
+let monthRequestId = 0;
+let themeTransitionTimer = null;
 const monthNameBySheet = Object.fromEntries(SHEET_NAMES.map((name, idx) => [name, idx + 1]));
 
 
@@ -80,30 +82,28 @@ function getSaxonyHolidayName(dateIso) {
   return getSaxonyHolidays(Number(dateIso.slice(0, 4))).get(dateIso) || '';
 }
 
-function applyMonthTheme(month) {
+function applyMonthTheme(month, animate = true) {
   const palette = MONTH_PALETTES[month - 1] || MONTH_PALETTES[0];
   const root = document.documentElement;
+  if (animate && root.dataset.month && root.dataset.month !== String(month)) {
+    root.classList.add('month-theme-transition');
+    document.body?.classList.add('month-content-transition');
+    clearTimeout(themeTransitionTimer);
+    themeTransitionTimer = setTimeout(() => {
+      root.classList.remove('month-theme-transition');
+      document.body?.classList.remove('month-content-transition');
+    }, 720);
+  }
   const values = {
     '--month-accent': palette.accent,
     '--month-accent-strong': palette.accentStrong,
     '--month-glow': palette.glow,
-    '--month-panel-tint': palette.panelTint,
-    '--saturday-bg': palette.saturdayBg,
-    '--saturday-edge': palette.saturdayEdge,
-    '--saturday-text': palette.saturdayText,
-    '--sunday-bg': palette.sundayBg,
-    '--sunday-edge': palette.sundayEdge,
-    '--sunday-text': palette.sundayText,
-    '--holiday-bg': palette.holidayBg,
-    '--holiday-edge': palette.holidayEdge,
-    '--holiday-text': palette.holidayText
+    '--month-panel-tint': palette.panelTint
   };
   Object.entries(values).forEach(([key, value]) => root.style.setProperty(key, value));
   root.dataset.month = String(month);
   const label = document.getElementById('monthPaletteLabel');
   if (label) label.textContent = `Monatskontrast · ${palette.name}`;
-  const themeMeta = document.getElementById('themeColorMeta');
-  if (themeMeta) themeMeta.setAttribute('content', palette.accentStrong);
 }
 
 window.addEventListener('DOMContentLoaded', init);
@@ -158,7 +158,8 @@ function buildStaticSelectors() {
     option.textContent = MONTH_NAMES[i - 1];
     $('#monthSelect').append(option);
   }
-  for (let year = 2025; year <= 2030; year++) {
+  const currentYear = new Date().getFullYear();
+  for (let year = Math.min(2025, currentYear - 5); year <= Math.max(2030, currentYear + 5); year++) {
     const option = document.createElement('option');
     option.value = String(year);
     option.textContent = String(year);
@@ -172,12 +173,26 @@ function populateSelectors() {
 }
 
 async function openCurrentMonth(year, month, forceServer = false) {
+  const requestId = ++monthRequestId;
+  $('#yearSelect').value = String(year);
+  $('#monthSelect').value = String(month);
+  applyMonthTheme(month);
+  const previousYear = state.currentYear;
+  const previousMonth = state.currentMonth;
+  if (state.dirty) {
+    clearTimeout(state.saveTimer);
+    state.saveTimer = null;
+    await persistMonth(previousYear, previousMonth);
+  }
   setStatus('loading', forceServer ? 'Lädt Serverstand …' : 'Lädt …');
   await loadMonth(year, month, forceServer);
+  if (requestId !== monthRequestId) return;
+  state.currentYear = year;
+  state.currentMonth = month;
   await warmAdjacentMonths(year, month);
+  if (requestId !== monthRequestId) return;
   setStatus(state.serverReady ? 'saved' : 'offline', state.serverReady ? 'Gespeichert' : 'Offline – lokaler Stand');
   populateSelectors();
-  applyMonthTheme(month);
   render();
 }
 
@@ -633,16 +648,20 @@ function onApplyBatch() {
 }
 
 function shiftMonth(delta) {
-  const next = new Date(state.currentYear, state.currentMonth - 1 + delta, 1);
+  const selectedYear = Number($('#yearSelect').value) || state.currentYear;
+  const selectedMonth = Number($('#monthSelect').value) || state.currentMonth;
+  const next = new Date(selectedYear, selectedMonth - 1 + delta, 1);
   $('#yearSelect').value = String(next.getFullYear());
   $('#monthSelect').value = String(next.getMonth() + 1);
   openCurrentMonth(next.getFullYear(), next.getMonth() + 1);
 }
 
 function markDirty() {
+  const year = state.currentYear;
+  const month = state.currentMonth;
   scheduleSave(async () => {
     setStatus('saving', 'Speichert …');
-    await persistCurrentMonth();
+    await persistMonth(year, month);
     setStatus(state.serverReady ? 'saved' : 'offline', state.serverReady ? 'Gespeichert' : 'Offline gespeichert');
   });
 }
@@ -665,7 +684,14 @@ async function onExcelImport(event) {
   const file = event.target.files?.[0];
   if (!file) return;
   if (!window.XLSX) { alert('Excel-Bibliothek noch nicht geladen.'); return; }
-  const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+  let workbook;
+  try {
+    workbook = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+  } catch (error) {
+    alert(`Excel-Datei konnte nicht gelesen werden: ${error.message}`);
+    event.target.value = '';
+    return;
+  }
   const summary = [];
   const touchedMonths = [];
   for (const sheetName of workbook.SheetNames) {
@@ -703,7 +729,8 @@ function importMonthSheet(sheetName, sheet) {
   const dayCols = [];
   rows[dayRowIndex].forEach((cell, index) => {
     const n = Number(cell);
-    if (index >= 2 && Number.isFinite(n) && n >= 1 && n <= 31) dayCols.push({ col: index, day: n, iso: toIsoDate(year, month, n) });
+    const daysInMonth = new Date(year, month, 0).getDate();
+    if (index >= 2 && Number.isInteger(n) && n >= 1 && n <= daysInMonth) dayCols.push({ col: index, day: n, iso: toIsoDate(year, month, n) });
   });
 
   const normalizeName = name => String(name || '').replace(/\s+/g, ' ').trim().toLowerCase();
@@ -778,11 +805,23 @@ async function exportJsonBackup() {
 async function onJsonImport(event) {
   const file = event.target.files?.[0];
   if (!file) return;
-  const payload = JSON.parse(await file.text());
+  let payload;
+  try {
+    payload = JSON.parse(await file.text());
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('Die Wurzel muss ein JSON-Objekt sein.');
+  } catch (error) {
+    alert(`JSON-Sicherung konnte nicht gelesen werden: ${error.message}`);
+    event.target.value = '';
+    return;
+  }
   if (payload.settings) state.settings = payload.settings;
   if (payload.staff) state.staff = payload.staff;
   if (payload.rbnNames) state.rbnNames = payload.rbnNames;
-  if (Array.isArray(payload.months)) payload.months.forEach(([key, value]) => state.months.set(key, value));
+  if (Array.isArray(payload.months)) payload.months.forEach(entry => {
+    if (!Array.isArray(entry) || !/^\d{4}-(0[1-9]|1[0-2])$/.test(entry[0]) || !entry[1] || typeof entry[1] !== 'object') return;
+    const [year, month] = entry[0].split('-').map(Number);
+    setMonthData(year, month, entry[1]);
+  });
   saveLocalBootstrap();
   try { await api.importJson(payload); } catch {}
   render();
