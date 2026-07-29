@@ -1,15 +1,58 @@
 :root {
+  /* ------------------------------------------------------------------------
+     KSG-Markentoken (Designsystem §1, verbindlich)
+
+     Klinik für Radiologie und Nuklearmedizin, Klinikum St. Georg Leipzig.
+     Diese Werte sind gesetzt und werden nicht aus dem visuellen Eindruck
+     abgeleitet. KSG-Rot ist Wortmarke und belegter Status-/Akzentton, nie
+     beliebige Dekorfarbe und in der Fläche zurückhaltend.
+     ------------------------------------------------------------------------ */
+  --ksg-red: #E3000B;
+  --ksg-red-ink: #B80009;      /* dunklere Textvariante, 6,90:1 auf Weiß */
+  --ksg-gray: #555553;
+  --ksg-text-black: #000000;
+  --ksg-secondary-text: #595959;
+  --ksg-table-line: #BFBFBF;
+
+  /* ------------------------------------------------------------------------
+     App-Token (Designsystem §8)
+
+     Eigener Namensraum für Bildschirmoberflächen; bewusst getrennt von den
+     Dokument- und Web-Token, damit nichts davon je in eine Druckvorlage wandert.
+     ------------------------------------------------------------------------ */
+  --app-radius: 15px;
+  --app-radius-sm: 9px;
+  --app-elevation-1: 0 1px 2px rgba(9,14,20,.14), 0 7px 18px rgba(9,14,20,.08);
+  --app-elevation-2: 0 12px 34px rgba(0,0,0,.22), 0 2px 8px rgba(0,0,0,.12);
+  --app-focus-ring: 2px;
+  --app-focus-offset: 2px;
+
+  /* Weißraum-Leiter (§1b): zwischen Blöcken immer größer als innerhalb. */
+  --flow-tight: 4px;
+  --flow-inner: 6px;
+  --flow-block: 12px;
+  --flow-group: 20px;
+  --flow-section: 24px;
+  --flow-major: 32px;
+
+  /* Optische Laufweite je Größe (§1b) – Arial läuft groß zu weit, klein zu eng. */
+  --tracking-display: -.012em;
+  --tracking-title: -.006em;
+  --tracking-small: .012em;
+  --tracking-tabular: .02em;
+  --tracking-caps: .06em;
+
   --bg: #0d1117;
   --sheet: rgba(250,252,255,.84);
   --sheet-solid: #f8fafc;
   --line: rgba(17,24,39,.72);
   --line-soft: rgba(125,136,150,.42);
-  --text: #161b22;
-  --muted: #66717f;
+  --text: var(--ksg-text-black);
+  --muted: var(--ksg-secondary-text);
   --green: #24764a;
   --yellow: #986800;
   --orange: #a94d00;
-  --red: #b42318;
+  --red: var(--ksg-red-ink);
   --month-accent: #4f8fbd;
   --month-accent-strong: #1f5f8f;
   --month-glow: rgba(78,151,205,.34);
@@ -21,8 +64,9 @@
   --saturday-row-bg: color-mix(in srgb, var(--month-accent) 14%, white);
   --sunday-row-bg: color-mix(in srgb, var(--month-accent) 22%, white);
   --holiday-row-bg: color-mix(in srgb, var(--month-accent) 30%, white);
-  --radius: 15px;
-  --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --radius: var(--app-radius);
+  /* §1: Bildschirmschrift der Marke ist Arial. */
+  --font: Arial, "Helvetica Neue", Helvetica, "Liberation Sans", sans-serif;
   color-scheme: light;
 }
 
@@ -81,12 +125,35 @@ body.month-content-transition .plan-table tbody tr { animation: none; }
   body.month-content-transition .month-palette-label { animation: none; }
 }
 
+/* Wer im Betriebssystem "Transparenz reduzieren" gesetzt hat, bekommt deckende
+   Flächen statt Milchglas. Das ist die von den Barrierefreiheits-Leitlinien
+   ausdrücklich geforderte Rücknahme des Effekts – dieselbe Einstellung, mit der
+   Apple die Liquid-Glass-Kritik beantwortet hat. Die Farbhierarchie und jede
+   Information bleiben dabei vollständig erhalten. */
+@media (prefers-reduced-transparency: reduce) {
+  .topbar, .toolbar, .glass-inset, .dialog-card, .month-palette-label {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+  .glass-panel, .dialog-card { background: #f4f7fa; }
+  .glass-inset { background: #eef2f6; }
+  .sheet-panel { background: #ffffff; }
+  .ambient-layer { display: none; }
+  .app-dialog::backdrop { background: rgba(6,10,15,.78); backdrop-filter: none; }
+}
+
 @media print {
   .month-enter-next, .month-enter-prev { animation: none !important; opacity: 1 !important; transform: none !important; }
 }
 
 * { box-sizing: border-box; }
-html, body { margin: 0; min-height: 100%; font-family: var(--font); }
+html, body {
+  margin: 0; min-height: 100%; font-family: var(--font);
+  /* §1b verbindlich: Ziffern immer tabellarisch. Tages-, BD-, HG- und
+     Wochenendkolonnen fluchten dadurch exakt untereinander – bei
+     proportionalen Ziffern wandert die 1 aus der Spalte. */
+  font-variant-numeric: tabular-nums lining-nums;
+}
 html {
   background: #0b0f14;
 }
@@ -165,7 +232,11 @@ select, textarea, input[type="text"], input[list] {
   padding: .45rem .55rem;
   box-shadow: inset 0 1px 2px rgba(22,30,40,.08), 0 1px 0 rgba(255,255,255,.8);
 }
-select:focus, textarea:focus, input:focus { outline: 2px solid color-mix(in srgb, var(--month-accent) 72%, white); outline-offset: 1px; }
+/* §1b: sichtbarer Fokus 2 px mit 2 px Offset. */
+select:focus-visible, textarea:focus-visible, input:focus-visible, button:focus-visible, .file-btn:focus-within {
+  outline: var(--app-focus-ring) solid var(--month-accent-strong);
+  outline-offset: var(--app-focus-offset);
+}
 textarea { resize: vertical; }
 label { display: grid; gap: .3rem; color: var(--muted); font-size: .9rem; }
 
@@ -250,17 +321,17 @@ label { display: grid; gap: .3rem; color: var(--muted); font-size: .9rem; }
 .brand-mark {
   width: 40px; height: 40px; display: grid; place-items: center; border-radius: 10px;
   background:
-    linear-gradient(145deg, rgba(255,255,255,.24), transparent 42%),
-    linear-gradient(145deg, #27313d, #0f151c);
-  color: #fff; font-weight: 760; font-size: 12px; letter-spacing: .08em;
+    linear-gradient(145deg, rgba(255,255,255,.26), transparent 44%),
+    linear-gradient(150deg, var(--ksg-red), #A80008);
+  color: #fff; font-weight: 760; font-size: 12px; letter-spacing: var(--tracking-caps);
   border: 1px solid rgba(255,255,255,.32);
   box-shadow: inset 0 1px 0 rgba(255,255,255,.28), 0 6px 18px rgba(0,0,0,.28);
 }
 h1, h2, h3 { margin: 0; }
-h1 { font-size: 1.22rem; letter-spacing: -.015em; }
-h2 { font-size: 1.32rem; letter-spacing: -.015em; }
+h1 { font-size: 1.22rem; letter-spacing: var(--tracking-title); }
+h2 { font-size: 1.32rem; letter-spacing: var(--tracking-title); }
 h3 { font-size: 1.05rem; }
-.eyebrow { text-transform: uppercase; letter-spacing: .12em; font-size: .65rem; color: #6c7682; margin-bottom: 2px; }
+.eyebrow { text-transform: uppercase; letter-spacing: var(--tracking-caps); font-size: .65rem; color: var(--ksg-secondary-text); margin-bottom: 2px; }
 .subline { color: #67717c; margin-top: 2px; font-size: .82rem; }
 .topbar-controls, .toolbar-group { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .month-selector { display: flex; align-items: center; gap: 4px; padding: 3px; border-radius: 10px; }
@@ -742,4 +813,49 @@ h3 { font-size: 1.05rem; }
 
 @media print {
   .ambient-layer { display: none !important; }
+}
+
+/* --------------------------------------------------------------------------
+   Offene Punkte – sichtbare Sammelprüfung des Monats
+   -------------------------------------------------------------------------- */
+
+.issue-heading { margin-top: var(--flow-section); }
+.issue-list { margin-top: var(--flow-inner); }
+.issue-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--flow-tight);
+  max-height: 268px;
+  overflow: auto;
+  contain: paint;
+}
+.issue-item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--flow-inner);
+  padding: 5px 8px;
+  border-radius: 7px;
+  border: 1px solid rgba(15,23,42,.10);
+  background: rgba(255,255,255,.72);
+  border-left: 3px solid var(--ksg-table-line);
+  font-size: .78rem;
+}
+.issue-item.red { border-left-color: var(--ksg-red); background: rgba(255,244,243,.82); }
+.issue-item.orange { border-left-color: var(--orange); background: rgba(255,248,242,.82); }
+.issue-item.yellow { border-left-color: #d2a21a; }
+.issue-text { display: grid; gap: 1px; min-width: 0; }
+.issue-text strong { font-weight: 700; color: var(--text); }
+.issue-text span { color: var(--ksg-secondary-text); letter-spacing: var(--tracking-small); }
+.issue-empty {
+  margin: var(--flow-inner) 0 0;
+  color: var(--ksg-secondary-text);
+  font-size: .8rem;
+  letter-spacing: var(--tracking-small);
+}
+
+/* Im Druck steht der Plan selbst im Vordergrund. */
+@media print {
+  .issue-heading, .issue-list { display: none !important; }
 }

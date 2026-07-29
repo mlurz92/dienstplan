@@ -29,11 +29,12 @@ Bedienreferenz, Architekturübersicht, Regelwerksdokumentation und Entwicklungsl
 10. [Dialoge und Eingabeflüsse](#10-dialoge-und-eingabeflüsse)
 11. [Statistik](#11-statistik)
 12. [Monatsfarben und Bewegungsdesign](#12-monatsfarben-und-bewegungsdesign)
+12a. [Markenkonformität (KSG-Designsystem)](#12a-markenkonformität-ksg-designsystem)
 13. [Monatsnavigation und Wettlaufschutz](#13-monatsnavigation-und-wettlaufschutz)
 14. [Speichern, Synchronisieren und lokaler Ausfallbetrieb](#14-speichern-synchronisieren-und-lokaler-ausfallbetrieb)
 15. [Backend und HTTP-API](#15-backend-und-http-api)
 16. [Excel, JSON, Drucken und PDF](#16-excel-json-drucken-und-pdf)
-17. [Auslieferung, Cache-Sicherheit und Legacy-Worker](#17-auslieferung-cache-sicherheit-und-legacy-worker)
+17. [Auslieferung und Cache-Sicherheit](#17-auslieferung-und-cache-sicherheit)
 18. [Sicherheit und Datenschutz](#18-sicherheit-und-datenschutz)
 19. [Barrierefreiheit und Responsivität](#19-barrierefreiheit-und-responsivität)
 20. [Lokale Entwicklung und Tests](#20-lokale-entwicklung-und-tests)
@@ -128,7 +129,7 @@ bleibt chronologisch; die Spalten behalten auf jedem Tag dieselbe Bedeutung.
 | Excel | SheetJS 0.20.3 über CDN |
 | Tests | `node:test` und `node:assert/strict` |
 | Installation | Web App Manifest, Anzeigeart `standalone` |
-| Anwendungs-Worker | Kein cachender Fetch-Worker; `sw.js` dient nur der Altlastbereinigung |
+| Anwendungs-Worker | Keiner. Die Anwendung liefert und registriert keinen Service Worker |
 
 Der Browser lädt die Dateien unmittelbar aus dem Repository. Das erleichtert Diagnose und Deployment:
 Die ausgelieferte Quelldatei entspricht der überprüften Quelldatei. Das Frontend hält DOM-Logik in
@@ -157,7 +158,6 @@ schreibt pro Frame konkrete `rgb()`- und `rgba()`-Werte.
 ├── styles.css                       Layout, Glasdesign, Tabellenfarben, Animationen und Druck
 ├── manifest.webmanifest             Installationsmetadaten
 ├── _headers                         Cache-, Sicherheits- und Berechtigungsheader
-├── sw.js                            selbstneutralisierender Legacy-Worker ohne fetch-Handler
 ├── package.json                     Prüf- und Testskripte
 ├── icons/
 │   └── icon.svg                     skalierbares any-/maskable-Icon
@@ -414,9 +414,14 @@ Alternanzhinweis.
 - gleichzeitige Abwesenheit von Dr. Becker und Dr. Martin an einem regulären Werktag genau einmal als
   roten Hinweis auf die CT-Leitungsbesetzung.
 
-Die Funktion ist fachlich vorhanden und getestet, wird im aktuellen UI aber nicht als eigener
-Konfliktbericht gerendert. Sichtbar sind die Bewertungen an den Einteilungen, im Picker, im
-Bestätigungsdialog und in der Statistik.
+Das Ergebnis erscheint unter der Statistik als **„Offene Punkte"**: eine Kopfzeile mit der Kurzbilanz
+(offene Einteilungen und Auffälligkeiten) und darunter die Liste. Rote und orange Meldungen stehen
+oben, die offenen Tage folgen – eine lange Liste unbesetzter Tage würde die fachlich wichtigen
+Meldungen sonst verdecken. Ist nichts zu tun, sagt die Liste das ausdrücklich.
+
+Zuvor war die Funktion zwar vorhanden und getestet, ihr Ergebnis wurde aber nirgends angezeigt; die
+Dokumentation beschrieb damit eine Zusage, welche die Anwendung nicht eingelöst hat. Im Druck wird der
+Block ausgeblendet – dort steht der Plan selbst im Vordergrund.
 
 `computeWeekendEquivalent()` zählt je Wochenende:
 
@@ -661,6 +666,50 @@ Information, Palette und Funktion bleiben erhalten.
 
 ---
 
+## 12a. Markenkonformität (KSG-Designsystem)
+
+Die Oberfläche gehört zur **Klinik für Radiologie und Nuklearmedizin, Klinikum St. Georg Leipzig**, und
+folgt deren verbindlichem Designsystem: §1 Markenführung, §1b Feinsatz und Weißraum, §8 App-Oberflächen.
+
+### 12a.1 Übernommene Vorgaben
+
+| Vorgabe | Umsetzung |
+|---|---|
+| **Markenfarben** | `--ksg-red: #E3000B`, `--ksg-gray: #555553`, `--ksg-secondary-text: #595959`, `--ksg-table-line: #BFBFBF` als benannte Token, nicht hart eingesetzt |
+| **KSG-Rot als belegter Akzent** | Trägt die Wortmarke und den kritischen Status. Für Text die abgedunkelte Variante `--ksg-red-ink: #B80009` (6,90:1 auf Weiß); reines `#E3000B` erreicht 4,92:1 und bleibt Flächen- und Markenton |
+| **Bildschirmschrift Arial** | `--font: Arial, "Helvetica Neue", Helvetica, "Liberation Sans", sans-serif` statt der vorherigen freien Schriftwahl |
+| **Tabellenziffern** | `font-variant-numeric: tabular-nums lining-nums` global. Tages-, BD-, HG- und Wochenendkolonnen fluchten dadurch exakt; bei proportionalen Ziffern wandert die Eins aus der Spalte |
+| **Optische Laufweite** | `--tracking-caps` 0,06em für Versalmarken, `--tracking-title` −0,006em für Überschriften, `--tracking-small` 0,012em für Kleintext |
+| **Weißraum-Leiter** | `--flow-tight` 4 → `--flow-inner` 6 → `--flow-block` 12 → `--flow-group` 20 → `--flow-section` 24 → `--flow-major` 32. Abstand zwischen Blöcken immer größer als innerhalb |
+| **Sichtbarer Fokus** | 2 px Kontur mit 2 px Offset (`--app-focus-ring`, `--app-focus-offset`) |
+| **Eigener App-Namensraum** | `--app-*` für Radien, Elevation und Fokus, getrennt von Dokument- und Web-Token, damit nichts davon je in eine Druckvorlage wandert |
+| **Kontrast** | Helle Graustufen sind nie Textfarbe; Fließtext auf `--ksg-text-black`, Sekundärtext auf `--ksg-secondary-text` (7,00:1) |
+
+### 12a.2 Dokumentierter Konflikt: das Monatsfarbsystem
+
+Das Designsystem kennt keinen Token für eine monatsweise wechselnde Grundfarbe und untersagt, Markenrot
+als beliebige Dekorfarbe zu verwenden. Die zwölf Monatspaletten sind aber ausdrücklich gefordert und über
+mehrere Abstimmungsrunden festgelegt worden.
+
+Die Referenzhierarchie des Designsystems stellt die Nutzeranforderung an die erste Stelle und verlangt,
+einen Konflikt zu protokollieren statt ihn stillschweigend aufzulösen. Deshalb gilt:
+
+* Die Monatsfarbe ist **keine Dekoration**, sondern Informationskodierung – sie trägt die Hierarchie
+  Wochentagsspalte / Samstag / Sonntag / Feiertag und die Monatsidentität beim Blättern.
+* Sie berührt **kein** Markentoken: KSG-Rot bleibt der Wortmarke und dem kritischen Status vorbehalten.
+* Alle daraus abgeleiteten Flächen sind auf Textkontrast geprüft (mindestens 4,5:1 über alle zwölf
+  Paletten, siehe 12.x) – die Kontrastvorgabe des Designsystems wird also eingehalten.
+
+### 12a.3 Transparenz zurücknehmen
+
+Milchglas ist bewusst dosiert (siehe Kapitel 12). Zusätzlich wird
+`@media (prefers-reduced-transparency: reduce)` bedient: Wer im Betriebssystem „Transparenz reduzieren"
+aktiviert hat, bekommt deckende Flächen, keinen Weichzeichner und keine Hintergrund-Orbs. Farbhierarchie
+und Informationsgehalt bleiben dabei vollständig erhalten.
+
+Das ist die von den Barrierefreiheits-Leitlinien ausdrücklich geforderte Rücknahme – dieselbe
+Einstellung, mit der auch Apple die Lesbarkeitskritik an Liquid Glass beantwortet hat.
+
 ## 13. Monatsnavigation und Wettlaufschutz
 
 Alle Navigationswege führen durch `openCurrentMonth()`:
@@ -847,7 +896,7 @@ Stand wird lokal übernommen und nach Möglichkeit an `/api/import` gespiegelt.
 
 ---
 
-## 17. Auslieferung, Cache-Sicherheit und Legacy-Worker
+## 17. Auslieferung und Cache-Sicherheit
 
 ### 17.1 Warum diese Schicht existiert
 
@@ -883,17 +932,24 @@ Die Position im HTML ist absichtlich früh: Die Bereinigung hängt nicht von ein
 veralteten `app.js` ab. `releaseLegacyServiceWorker()` wiederholt sie während `init()` als defensive
 zweite Ebene.
 
-### 17.4 Tombstone unter `/sw.js`
+### 17.4 Kein Service Worker
 
-`sw.js` ist kein Anwendungs- oder Offline-Worker. Es besitzt keinen `fetch`-Handler. Seine einzige Aufgabe
-ist, eine noch bekannte Registrierung unter der historischen URL zu neutralisieren:
+Die Anwendung liefert **keinen Service Worker** aus, und sie registriert auch keinen.
 
-1. `skipWaiting()` bei Installation;
-2. Löschen der `dienstplanrad`-Caches;
-3. `clients.claim()`;
-4. `registration.unregister()`.
+Der ursprüngliche Worker lieferte eigenen Anwendungscode Cache-First aus. Ein Client, der ihn einmal
+installiert hatte, bekam dauerhaft alte Fassungen von `styles.css` und den JS-Modulen; ausgerollte
+Korrekturen erreichten ihn nicht mehr. Eine Zwischenfassung ließ eine leere Worker-Datei als Grabstein
+unter der historischen URL stehen, damit ein Browser dort ein Update findet, das sich selbst abmeldet.
+Auch dieser Rest ist entfernt: Registriert hat ihn niemand mehr, und die Abmeldung erledigen zwei
+Schichten in der Seite selbst zuverlässiger (siehe 17.3).
 
-Die Datei bleibt aus Migrationsgründen erreichbar und wird mit `no-store` ausgeliefert.
+`tests/delivery.test.js` hält das fest. Der Test schlägt an, sobald wieder eine Worker-Datei im Projekt
+liegt oder irgendwo `serviceWorker.register(` auftaucht. Damit kann die Ursache nicht zurückkehren.
+
+**Folge für den Betrieb:** Es gibt keine Zwischenschicht mehr, die Dateien festhalten könnte. Die
+Aktualität hängt allein an den Cache-Headern und dem Release-Token – beides in 17.5 beschrieben. Der
+Datenteil bleibt offlinefähig, weil Stammdaten und geladene Monate in `localStorage` liegen; ein
+Kaltstart ohne Netz lädt die Anwendung dagegen bewusst nicht mehr.
 
 ### 17.5 Cloudflare-Header
 
@@ -901,11 +957,10 @@ Die Datei bleibt aus Migrationsgründen erreichbar und wird mit `no-store` ausge
 |---|---|
 | `/` | `no-cache, no-store, must-revalidate` |
 | `/index.html` | `no-cache, no-store, must-revalidate` |
-| `/sw.js` | `no-cache, no-store, must-revalidate` |
 | `/styles.css` | `no-cache, must-revalidate` |
 | `/js/*` | `no-cache, must-revalidate` |
 
-HTML und Worker dürfen nicht gespeichert wiederverwendet werden. CSS und JavaScript dürfen lokal
+HTML darf nicht gespeichert wiederverwendet werden. CSS und JavaScript dürfen lokal
 vorliegen, müssen aber revalidiert werden. Release-Token und Header ergänzen sich: Der Token trennt
 Releases, die Header verhindern unkontrollierte Wiederverwendung.
 
@@ -1069,7 +1124,7 @@ Beim ersten API-Aufruf initialisiert `getOrInit()` fehlende Einstellungen, Perso
 - `npm test`;
 - alle Browserimporte tragen denselben `?v=`-Token;
 - `_headers` enthält die Revalidierungsregeln;
-- `sw.js` bleibt ohne `fetch`-Handler;
+- es existiert kein Service Worker und keine Registrierung;
 - Pfeile, Dropdowns und schnelle Umkehr im Browser prüfen;
 - KV-Binding und Zugriffsschutz prüfen;
 - JSON-Sicherung vor größeren Stammdatenänderungen erstellen.
@@ -1125,7 +1180,7 @@ API beziehungsweise KV-Betrieb.
 | SheetJS fehlt | CDN-Erreichbarkeit prüfen |
 | keine Animation | `prefers-reduced-motion` prüfen |
 | falsche Monatsfarbe nach Deployment | `dataset.month`, `dataset.palette`, aktuellen `?v=`-Token und `_headers` prüfen |
-| alte Origin wirkt anders als neue | Inline-Bereinigung, `/sw.js`, Service-Worker-Registrierungen und `dienstplanrad`-Caches prüfen |
+| alte Origin wirkt anders als neue | Inline-Bereinigung, Service-Worker-Registrierungen und `dienstplanrad`-Caches prüfen |
 | Änderung noch nicht am Server | 1100-ms-Debounce und Statusanzeige beachten |
 
 `document.documentElement.dataset.month` und `.dataset.palette` zeigen das aktive Theme-Ziel.

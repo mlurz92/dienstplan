@@ -1,9 +1,9 @@
-import { ABSENCE_TYPES, MONTH_NAMES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, toIsoDate } from './defaults.js?v=20260729.1';
-import { state, bootstrapState, getMonthData, getMonthLabel, loadMonth, persistCurrentMonth, persistMonth, saveLocalBootstrap, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260729.1';
-import { api } from './api.js?v=20260729.1';
-import { applyMonthTheme, prefersReducedMotion } from './theme.js?v=20260729.1';
-import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260729.1';
-import { buildStats, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getPlanningStaff, getPreference, getStaffById, labelForAbsence, labelForPreference, setAbsence, setAssignment, setPreference, weekdayLabel } from './rules.js?v=20260729.1';
+import { ABSENCE_TYPES, MONTH_NAMES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, toIsoDate } from './defaults.js?v=20260729.2';
+import { state, bootstrapState, getMonthData, getMonthLabel, loadMonth, persistCurrentMonth, persistMonth, saveLocalBootstrap, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260729.2';
+import { api } from './api.js?v=20260729.2';
+import { applyMonthTheme, prefersReducedMotion } from './theme.js?v=20260729.2';
+import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260729.2';
+import { buildStats, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getPlanningStaff, getPreference, getStaffById, labelForAbsence, labelForPreference, setAbsence, setAssignment, setPreference, weekdayLabel } from './rules.js?v=20260729.2';
 
 const $ = selector => document.querySelector(selector);
 
@@ -170,6 +170,7 @@ function render() {
   $('#monthTitle').textContent = getMonthLabel();
   renderPlanTable(monthData);
   renderStats(monthData);
+  renderIssues(monthData);
 }
 
 function renderPlanTable(monthData) {
@@ -380,6 +381,60 @@ function renderStats(monthData) {
   openRow.innerHTML = `<td>Offen</td><td>${openBd}</td><td>${openHg}</td><td></td><td></td><td></td>`;
   tbody.appendChild(openRow);
   $('#statsGrid').replaceChildren(table);
+}
+
+/**
+ * Sammelprüfung des Monats als sichtbare Liste.
+ *
+ * `collectIssues` gab es samt Tests bereits, die Oberfläche hat das Ergebnis
+ * aber nie gezeigt – die Beschreibung in der Dokumentation lief also ins Leere.
+ * Die Liste beantwortet die letzte Frage des Planungsvorgangs: Was fehlt noch,
+ * und wo ist etwas fachlich auffällig?
+ */
+function renderIssues(monthData) {
+  const container = $('#issueList');
+  const summary = $('#issueSummary');
+  if (!container) return;
+
+  const issues = collectIssues(state, monthData);
+  const bySeverity = level => issues.filter(issue => issue.level === level).length;
+  const offen = issues.filter(issue => issue.title.includes('offen')).length;
+  const auffaellig = issues.length - offen;
+
+  if (summary) {
+    summary.textContent = issues.length === 0
+      ? 'Der Monat ist vollständig besetzt und ohne Auffälligkeiten.'
+      : `${offen} offene Einteilung${offen === 1 ? '' : 'en'} · ${auffaellig} Auffälligkeit${auffaellig === 1 ? '' : 'en'}`;
+  }
+
+  if (issues.length === 0) {
+    container.replaceChildren(Object.assign(document.createElement('p'), {
+      className: 'issue-empty',
+      textContent: 'Nichts zu tun – alle Tage sind besetzt, keine Regel meldet sich.'
+    }));
+    return;
+  }
+
+  // Rote und orange Punkte zuerst, danach die offenen Stellen. Lange Listen
+  // offener Tage würden die fachlich wichtigen Meldungen sonst verdecken.
+  const relevant = issues.filter(issue => issue.level !== 'yellow');
+  const list = document.createElement('ul');
+  list.className = 'issue-items';
+  for (const issue of [...relevant, ...issues.filter(issue => issue.level === 'yellow')].slice(0, 40)) {
+    const item = document.createElement('li');
+    item.className = `issue-item ${issue.level}`;
+    item.innerHTML = `<span class="small-chip ${issue.level}">${labelByLevel(issue.level)}</span>
+      <span class="issue-text"><strong>${esc(issue.title)}</strong><span>${esc(issue.details)}</span></span>`;
+    list.appendChild(item);
+  }
+  const rest = issues.length - Math.min(issues.length, 40);
+  container.replaceChildren(list);
+  if (rest > 0) {
+    container.appendChild(Object.assign(document.createElement('p'), {
+      className: 'issue-empty',
+      textContent: `… und ${rest} weitere.`
+    }));
+  }
 }
 
 function openPicker(dateIso, role) {
