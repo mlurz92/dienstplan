@@ -1,8 +1,9 @@
-const CACHE = 'dienstplanrad-v3';
+const CACHE = 'dienstplanrad-v4';
 const CORE = [
   '/',
   '/index.html',
   '/styles.css',
+  '/excel-layout.css?v=3',
   '/js/app.js',
   '/js/api.js',
   '/js/defaults.js',
