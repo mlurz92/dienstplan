@@ -1,995 +1,601 @@
 # DienstplanRAD
 
-**Manuelle Bereitschafts- und Hintergrunddienstplanung für die Klinik für Radiologie und Nuklearmedizin.**
+DienstplanRAD ist eine installierbare Web-Anwendung zur manuellen Monatsplanung von Bereitschaftsdiensten
+(BD), Hintergrunddiensten (HG) und zwei Rufbereitschaften Nuklearmedizin (RBN). Sie richtet sich an die
+Klinik für Radiologie und Nuklearmedizin und verbindet eine vertraute, Excel-artige Tagesliste mit
+Live-Regelprüfung, Verteilungsstatistik, dokumentierten Konfliktfreigaben, Cloudflare-KV-Speicherung und
+lokaler Ausfallsicherheit.
 
-DienstplanRAD ist eine installierbare Web-Anwendung zur monatsweisen Planung von
-Bereitschaftsdiensten (BD) und Hintergrunddiensten (HG). Die Anwendung plant **nicht automatisch** – sie
-lässt die Planerin bzw. den Planer jede Entscheidung selbst treffen und legt daneben in Echtzeit eine
-vollständige, farbkodierte Regelbewertung, eine Verteilungsstatistik und eine lückenlose
-Konflikt-Dokumentation. Gespeichert wird in Cloudflare KV, gearbeitet werden kann auch vollständig offline.
+Die Anwendung plant nicht automatisch. Der Mensch besetzt jeden Dienst selbst; DienstplanRAD bewertet
+jede mögliche Einteilung, erklärt jeden Hinweis und verhindert, dass harte Konflikte unbemerkt bestätigt
+werden. Der Grundsatz lautet:
 
-Diese Datei beschreibt den **vollständigen aktuellen Stand** der Anwendung – Architektur, Datenmodell,
-Regelwerk, jede Oberflächenkomponente, jede Interaktion, jede Animation, jeden Import- und Exportweg sowie
-den Betrieb. Sie ist kein Changelog, sondern die vollständige Referenz.
+> **Der Mensch entscheidet. Die Anwendung prüft, erklärt, speichert und dokumentiert.**
 
----
+Diese README beschreibt den vollständigen aktuellen Stand der Anwendung. Sie ist Betriebsanleitung,
+Bedienreferenz, Architekturübersicht, Regelwerksdokumentation und Entwicklungsleitfaden in einem.
 
 ## Inhaltsverzeichnis
 
-1. [Zielsetzung und Planungsphilosophie](#1-zielsetzung-und-planungsphilosophie)
-2. [Technischer Überblick](#2-technischer-überblick)
-3. [Projektstruktur](#3-projektstruktur)
-4. [Datenmodell](#4-datenmodell)
-5. [Stammdaten: Mitarbeitende, Abwesenheiten, Wünsche](#5-stammdaten-mitarbeitende-abwesenheiten-wünsche)
-6. [Das Regelwerk im Detail](#6-das-regelwerk-im-detail)
-7. [Feiertagslogik](#7-feiertagslogik)
-8. [Benutzeroberfläche – Aufbau und Bedienung](#8-benutzeroberfläche--aufbau-und-bedienung)
-9. [Dialoge](#9-dialoge)
-10. [Statistik und Auswertung](#10-statistik-und-auswertung)
-11. [Monatsfarben, Animationen und Design-Philosophie](#11-monatsfarben-animationen-und-design-philosophie)
-12. [Persistenz, Synchronisierung und Offline-Betrieb](#12-persistenz-synchronisierung-und-offline-betrieb)
-13. [Backend-API](#13-backend-api)
-14. [Import und Export](#14-import-und-export)
-15. [Drucken und PDF](#15-drucken-und-pdf)
-16. [Installation, Manifest und Auslieferung](#16-installation-manifest-und-auslieferung)
-17. [Sicherheit und Datenschutz](#17-sicherheit-und-datenschutz)
-18. [Barrierefreiheit und Responsivität](#18-barrierefreiheit-und-responsivität)
-19. [Entwicklung, Tests und Deployment](#19-entwicklung-tests-und-deployment)
-20. [Anpassung und Erweiterung](#20-anpassung-und-erweiterung)
-21. [Fehlerbilder und Diagnose](#21-fehlerbilder-und-diagnose)
-22. [Glossar](#22-glossar)
+1. [Zweck und Planungsphilosophie](#1-zweck-und-planungsphilosophie)
+2. [Funktionsumfang](#2-funktionsumfang)
+3. [Technische Architektur](#3-technische-architektur)
+4. [Projektstruktur](#4-projektstruktur)
+5. [Datenmodell](#5-datenmodell)
+6. [Personal, Rollen und Stammdaten](#6-personal-rollen-und-stammdaten)
+7. [Regelwerk und Bewertungsstufen](#7-regelwerk-und-bewertungsstufen)
+8. [Feiertage und Werktage](#8-feiertage-und-werktage)
+9. [Benutzeroberfläche](#9-benutzeroberfläche)
+10. [Dialoge und Eingabeflüsse](#10-dialoge-und-eingabeflüsse)
+11. [Statistik](#11-statistik)
+12. [Monatsfarben und Bewegungsdesign](#12-monatsfarben-und-bewegungsdesign)
+13. [Monatsnavigation und Wettlaufschutz](#13-monatsnavigation-und-wettlaufschutz)
+14. [Speichern, Synchronisieren und lokaler Ausfallbetrieb](#14-speichern-synchronisieren-und-lokaler-ausfallbetrieb)
+15. [Backend und HTTP-API](#15-backend-und-http-api)
+16. [Excel, JSON, Drucken und PDF](#16-excel-json-drucken-und-pdf)
+17. [Auslieferung, Cache-Sicherheit und Legacy-Worker](#17-auslieferung-cache-sicherheit-und-legacy-worker)
+18. [Sicherheit und Datenschutz](#18-sicherheit-und-datenschutz)
+19. [Barrierefreiheit und Responsivität](#19-barrierefreiheit-und-responsivität)
+20. [Lokale Entwicklung und Tests](#20-lokale-entwicklung-und-tests)
+21. [Deployment und Betrieb](#21-deployment-und-betrieb)
+22. [Anpassung, Diagnose und Glossar](#22-anpassung-diagnose-und-glossar)
 
 ---
 
-## 1. Zielsetzung und Planungsphilosophie
+## 1. Zweck und Planungsphilosophie
 
-### 1.1 Das Grundprinzip: assistierte, nicht automatisierte Planung
+### 1.1 Assistierte statt automatisierte Planung
 
-Dienstplanung in einer radiologischen Klinik ist nicht rein kombinatorisch. Sie enthält Absprachen,
-Rücksichtnahmen, Erfahrungswissen und Ausnahmen, die kein Algorithmus zuverlässig kennt. DienstplanRAD
-folgt deshalb konsequent einem einzigen Leitsatz:
+Radiologische Dienstplanung enthält fachliche Qualifikationen, individuelle Absprachen, Abwesenheiten,
+Wünsche, Urlaubsübergänge, Wochenendbelastung und bewusst akzeptierte Ausnahmen. DienstplanRAD behandelt
+diese Faktoren als Entscheidungshilfe, nicht als Autopilot.
 
-> **Der Mensch entscheidet, die Anwendung erklärt.**
+Eine Einteilung entsteht ausschließlich durch eine aktive Auswahl. Die Anwendung:
 
-Jede Einteilung wird manuell vorgenommen. Die Anwendung schlägt niemals selbständig eine Person vor,
-belegt niemals automatisch einen Tag und überschreibt niemals eine Entscheidung. Stattdessen:
+- bewertet jede aktive Person für den konkreten Tag und die konkrete Rolle;
+- zeigt die höchste ausgelöste Bewertungsstufe und zugleich alle Begründungen;
+- lässt grüne, gelbe und orange Einteilungen unmittelbar zu;
+- verlangt für rote Einteilungen eine ausdrückliche Bestätigung;
+- protokolliert jede rote Freigabe mit Zeitpunkt, Tag, Rolle, Person, Gründen und optionalem Kommentar;
+- berechnet Verteilung und offene Dienste nach jeder Änderung neu;
+- überschreibt keine bereits geplanten Dienste durch einen Excel-Import.
 
-* bewertet sie **jede mögliche Person für jeden Tag und jede Rolle** live nach dem hinterlegten Regelwerk,
-* zeigt das Ergebnis als **vierstufige Ampel** (grün / gelb / orange / rot),
-* nennt zu jeder Bewertung **jede einzelne auslösende Begründung im Klartext**,
-* verlangt bei roten Konflikten eine **explizite Bestätigung** und
-* protokolliert diese Bestätigung revisionssicher mit Zeitstempel, Gründen und optionalem Kommentar.
+### 1.2 Warum eine Tagesliste
 
-Damit bleibt die Planungshoheit vollständig beim Menschen, während gleichzeitig kein Regelverstoß
-unbemerkt bleibt.
+Der Monatsplan verwendet eine Zeile je Kalendertag statt eines klassischen Kalenderrasters. Diese Form
+entspricht dem klinischen Arbeitsplan, hält BD, HG, beide RBN-Felder, Abwesenheiten und Wünsche in einer
+Leserichtung zusammen und lässt sich ohne zweite Darstellungslogik auf A4 ausgeben. Vertikales Scrollen
+bleibt chronologisch; die Spalten behalten auf jedem Tag dieselbe Bedeutung.
 
-### 1.2 Warum eine Tabelle und kein Kalenderraster
+### 1.3 Spezifischer Nutzwert
 
-Die zentrale Darstellung ist bewusst eine **Excel-artige Zeilentabelle mit einer Zeile pro Kalendertag** –
-nicht ein Monatsraster. Gründe:
-
-* Der Dienstplan wird traditionell als Liste gelesen, verteilt und gedruckt; die Liste ist das gewohnte
-  Format des Hauses.
-* Eine Zeile pro Tag bietet Platz für **alle** Informationen dieses Tages nebeneinander: BD, HG, beide
-  RBN-Felder, sämtliche Abwesenheiten und sämtliche Dienstwünsche.
-* Vertikales Scrollen entspricht dem chronologischen Lesen; ein Monatsraster erzwingt Blicksprünge.
-* Der Ausdruck entspricht 1 : 1 dem Bildschirm – kein zweites Layout, keine Überraschungen.
-
-### 1.3 Der spezifische Nutzwert
-
-Was die Anwendung für genau diesen Einsatzzweck auszeichnet:
-
-* **Regelwerk statt Notizzettel.** Persönliche Absprachen (z. B. „Dr. Polednia dienstags und sonntags
-  weder BD noch HG") sind fest kodiert und wirken bei jeder Auswahl, statt im Gedächtnis der Planenden
-  zu leben.
-* **Monatsübergreifende Prüfung.** Abstandsregeln enden nicht am Monatsersten. Vor- und Folgemonat werden
-  im Hintergrund vorgeladen, damit Wochenend-, Abstands- und BD-FZA-BD-Prüfungen über Monatsgrenzen hinweg
-  korrekt greifen.
-* **Ableitungen statt Doppeleingaben.** Der Freizeitausgleich nach einem Dienst wird abgeleitet und
-  angezeigt, ohne dass er von Hand gepflegt werden muss.
-* **Sofortige Verteilungstransparenz.** Unter dem Plan steht jederzeit, wer wie viele BD und HG hat, wie
-  viele Wochenenden das entspricht und wie weit jede Person vom Soll entfernt ist.
-* **Farbliche Monatsidentität.** Jeder Monat hat eine eigene Grundfarbe. Beim Blättern ist auf einen Blick
-  klar, in welchem Monat man sich befindet – und der Wechsel selbst ist als weiche Bewegung gestaltet.
-* **Kein Serverzwang.** Bei Netzausfall wird lokal weitergearbeitet; sobald der Server wieder antwortet,
-  synchronisiert die Anwendung ohne Zutun.
+- **Vollständige Erklärbarkeit:** Kein farbiger Chip steht ohne Textbegründung im Raum.
+- **Monatsübergreifende Regeln:** Vor- und Folgemonat werden vorgeladen, damit der Erste nicht blind für
+  den letzten Tag des Vormonats ist.
+- **Qualifikation am Diensttag:** Beförderungen und Aktivzeiträume werden gegen das geplante Datum
+  ausgewertet, nicht gegen das heutige Datum.
+- **Ableitungen statt Doppeleingabe:** Der erste reguläre Werktag nach einem Dienst kann als FZA erkannt
+  und in der Darstellung passend behandelt werden.
+- **Sofortige Verteilungssicht:** BD, HG, Wochenend-Äquivalent, Soll und Rest stehen direkt unter dem Plan.
+- **Monatsidentität:** Jeder Monat besitzt eine eigene Palette; Farbe, Titel und Inhalt wechseln als
+  zusammenhängende, richtungsbezogene Bewegung.
+- **Robuste Auslieferung:** Release-Token, Revalidierungsheader und aktive Bereinigung alter Worker
+  verhindern, dass eine Hosting-Adresse dauerhaft veraltete CSS- oder JavaScript-Dateien ausliefert.
 
 ---
 
-## 2. Technischer Überblick
+## 2. Funktionsumfang
 
-### 2.1 Technologie-Entscheidungen
+### 2.1 Planung
+
+- monatsweise Navigation per Pfeiltasten, Monatsauswahl, Jahresauswahl oder „Aktueller Monat“;
+- je Kalendertag genau ein Feld für BD, HG, RBN und 2. RBN;
+- personengebundene BD-/HG-Auswahl mit Live-Eignungsbewertung;
+- Löschen einer Einteilung im selben Auswahldialog;
+- freie RBN-Namen mit lernender Vorschlagsliste;
+- Einzel- und Sammelerfassung von Abwesenheiten und Dienstwünschen;
+- automatische Speicherung mit Statusanzeige;
+- monatsübergreifende Prüfung geladener Dienste.
+
+### 2.2 Kontrolle
+
+- fünf sichtbare Zustände: geeignet, Hinweis, Konflikt, Bestätigung und nicht wählbar;
+- Klartextgründe in Tabelle, Auswahl und Bestätigungsdialog;
+- explizite Protokollierung bestätigter roter Konflikte;
+- Monatsstatistik mit offenen BD- und HG-Stellen;
+- sächsische Feiertage und Feiertagsblöcke ohne externen Kalenderdienst;
+- zeitzonensichere Berechnung lokaler Kalendertage.
+
+### 2.3 Datenaustausch
+
+- additiver Mehrmonatsimport aus der bestehenden Excel-Arbeitsmappe;
+- Excel-Export des angezeigten Monats;
+- serverseitige oder lokale JSON-Vollsicherung;
+- validierte JSON-Wiederherstellung;
+- druckoptimierte A4-Ausgabe über den nativen Druckdialog.
+
+---
+
+## 3. Technische Architektur
 
 | Bereich | Umsetzung |
 |---|---|
-| Frontend | Reines ES-Modul-JavaScript, kein Framework, kein Build-Schritt |
-| Styling | Eine einzelne handgeschriebene `styles.css`, moderne CSS-Features |
-| Backend | Cloudflare Pages Functions (serverless, Edge) |
-| Datenhaltung | Cloudflare KV (Key-Value-Store), Binding `DIENSTPLAN_KV` |
-| Lokale Persistenz | `localStorage` (Bootstrap-Stammdaten und jeder geladene Monat) |
-| Offline-Fähigkeit | `localStorage` – jeder geladene Monat und die Stammdaten bleiben lokal verfügbar |
-| Excel | SheetJS (`xlsx` 0.20.3) via CDN, `defer` geladen |
-| Tests | `node:test` aus der Node-Standardbibliothek, keine externen Test-Abhängigkeiten |
+| Frontend | HTML, handgeschriebenes CSS und native ES-Module |
+| Framework/Build | Kein UI-Framework, Bundler oder Transpiler |
+| Backend | Cloudflare Pages Functions |
+| Serverdaten | Cloudflare KV, Binding `DIENSTPLAN_KV` |
+| Lokale Daten | `localStorage` für Bootstrapdaten und geladene Monate |
+| Excel | SheetJS 0.20.3 über CDN |
+| Tests | `node:test` und `node:assert/strict` |
+| Installation | Web App Manifest, Anzeigeart `standalone` |
+| Anwendungs-Worker | Kein cachender Fetch-Worker; `sw.js` dient nur der Altlastbereinigung |
 
-### 2.2 Warum kein Build-Schritt
+Der Browser lädt die Dateien unmittelbar aus dem Repository. Das erleichtert Diagnose und Deployment:
+Die ausgelieferte Quelldatei entspricht der überprüften Quelldatei. Das Frontend hält DOM-Logik in
+`app.js`, Zustand und Persistenz in `state.js`, HTTP-Zugriffe in `api.js`, Regeln in `rules.js`,
+Kalenderlogik in `holidays.js`, Vorgaben in `defaults.js` und das Farbsystem in `theme.js`.
 
-Die gesamte Anwendung besteht aus statischen Dateien, die der Browser direkt lädt. Es gibt kein Bundling,
-kein Transpiling, keine Node-Abhängigkeit im Produktivpfad. Vorteile für den Klinikbetrieb:
+`rules.js`, `defaults.js`, `holidays.js` und der rechnende Teil von `theme.js` sind DOM-frei. Dadurch
+laufen die fachlichen Tests direkt unter Node. Nur `applyMonthTheme()` schreibt Farbvariablen auf
+`document.documentElement`; `app.js` übernimmt Rendering und Ereignisse.
 
-* Ein Deployment ist ein Git-Push – Cloudflare Pages liefert das Repository-Root unverändert aus.
-* Jede Datei im Repository ist exakt die Datei, die im Browser läuft; Debugging ohne Sourcemaps.
-* Keine Abhängigkeitsdrift, keine Sicherheitslücken in einer Build-Toolchain.
-* `npm run check` und `npm test` benötigen nur Node selbst.
+### 3.1 Browseranforderungen
 
-### 2.3 Laufzeit-Anforderungen im Browser
-
-Genutzte moderne Web-Plattform-Features:
-
-* **ES-Module** (`<script type="module">`) mit statischen Imports.
-* **`<dialog>` mit `showModal()`** für alle vier Dialoge, inklusive nativem `::backdrop`, Fokusfalle und
-  Escape-Handling.
-* **`@property`** zur Typisierung der Monatsvariablen als `<color>`. Der Farbverlauf selbst hängt nicht
-  daran – er wird in JavaScript interpoliert (siehe 11.3) und funktioniert deshalb auch ohne diese
-  Unterstützung.
-* **`color-mix(in srgb, …)`** für die gesamte abgeleitete Farbhierarchie.
-* **`backdrop-filter`** für die Glas-Optik der Panels.
-* **`structuredClone`** für tiefe Kopien der Vorgabedaten.
-* **`localStorage`**, **`fetch`**, **Web App Manifest**.
-
-Zielbrowser sind aktuelle Chromium-, Firefox- und Safari-Versionen. Da der Farbverlauf in JavaScript
-gerechnet und als fertige `rgb()`-Werte geschrieben wird, ist er von `@property`- und
-`color-mix`-Eigenheiten der jeweiligen Engine unabhängig.
+Die Anwendung nutzt ES-Module, `fetch`, `localStorage`, `structuredClone`, `requestAnimationFrame`,
+`performance.now()`, `matchMedia`, native `<dialog>`-Elemente, CSS Custom Properties, `color-mix`,
+`backdrop-filter` mit Rückfallebene und ein Web App Manifest. Ziel sind aktuelle Chromium-, Firefox- und
+Safari-Versionen. Der Monatsfarbverlauf hängt nicht von animierbaren CSS-Custom-Properties ab: JavaScript
+schreibt pro Frame konkrete `rgb()`- und `rgba()`-Werte.
 
 ---
 
-## 3. Projektstruktur
+## 4. Projektstruktur
 
-```
+```text
 .
-├── index.html                     Vollständiges statisches Markup: Shell, Tabellengerüst, alle 4 Dialoge
-├── styles.css                     Gesamtes Design: Layout, Glas-Optik, Monatsfarben, Animationen, Druck
-├── manifest.webmanifest           Web-App-Manifest (Name, Icon, Farben, standalone)
-├── _headers                       Cloudflare-Pages-Sicherheitsheader
-├── package.json                   Skripte: check, test, deploy-note
+├── index.html                       App-Shell, Tabellenrahmen, Toolbar und vier Dialoge
+├── styles.css                       Layout, Glasdesign, Tabellenfarben, Animationen und Druck
+├── manifest.webmanifest             Installationsmetadaten
+├── _headers                         Cache-, Sicherheits- und Berechtigungsheader
+├── sw.js                            selbstneutralisierender Legacy-Worker ohne fetch-Handler
+├── package.json                     Prüf- und Testskripte
 ├── icons/
-│   └── icon.svg                   Skalierbares App-Icon (any + maskable)
+│   └── icon.svg                     skalierbares any-/maskable-Icon
 ├── js/
-│   ├── app.js                     Anwendungslogik: Rendering, Ereignisse, Dialoge, Import/Export
-│   ├── theme.js                   Monatsfarbsystem: Paletten, OKLCH-Farbmathematik, Übergangsschleife
-│   ├── holidays.js                Feiertage in Sachsen, Werktagsbegriff, Feiertagsblöcke
-│   ├── state.js                   Zustandsobjekt, Lade-/Speicherpfade, localStorage, Monats-Cache
-│   ├── rules.js                   Regelwerk: Bewertung, Statistik, Selektoren, Datumsutilities
-│   ├── defaults.js                Vorgabedaten: Personal, Abwesenheits-/Wunschtypen, Monatsnamen
-│   └── api.js                     Dünner Fetch-Wrapper über alle REST-Endpunkte
+│   ├── app.js                       UI, Rendering, Navigation, Dialoge und Im-/Export
+│   ├── api.js                       zentraler Fetch-Wrapper
+│   ├── defaults.js                  Monatsnamen, Personal, Typen und leeres Monatsschema
+│   ├── holidays.js                  Sachsen-Feiertage, Werktage und Feiertagsblöcke
+│   ├── rules.js                     Bewertung, Getter/Setter, Statistik und Sammelprüfung
+│   ├── state.js                     Laufzeitzustand, localStorage und Serverpersistenz
+│   └── theme.js                     zwölf Paletten, OKLCH-Mathematik und rAF-Animation
 ├── functions/
-│   ├── _utils.js                  KV-Zugriff, JSON-Antworten, Schlüsselbildung, Schema-Normalisierung
+│   ├── _utils.js                    KV-Helfer, Antworten und Schemanormalisierung
 │   └── api/
-│       ├── bootstrap.js              GET  /api/bootstrap
-│       ├── settings.js               GET/PUT /api/settings
-│       ├── staff.js                  GET/PUT /api/staff
-│       ├── rbn-names.js              GET/PUT /api/rbn-names
-│       ├── export.js                 GET  /api/export
-│       ├── import.js                 POST /api/import
-│       └── month/[year]/[month].js   GET/PUT /api/month/:year/:month
+│       ├── bootstrap.js
+│       ├── export.js
+│       ├── import.js
+│       ├── rbn-names.js
+│       ├── settings.js
+│       ├── staff.js
+│       └── month/[year]/[month].js
 └── tests/
-    ├── rules.test.js              Regressionstests für Kernregeln und Statistik
-    ├── timezone.test.js           Regelprüfung unter deutscher Zeitzone
-    └── theme.test.js              Regressionstests für Farbmathematik, Kontrast und Zeitverlauf
+    ├── delivery.test.js             Cache-, Asset- und Legacy-Worker-Garantien
+    ├── month-navigation.test.js     Navigations- und Animationsreihenfolge
+    ├── rules.test.js                Kernregeln und Statistik
+    ├── theme.test.js                Paletten, Kontrast, Farbraum und Zeitkurve
+    └── timezone.test.js             Regeln unter Europe/Berlin
 ```
-
-### 3.1 Modulverantwortlichkeiten und Abhängigkeitsrichtung
-
-```
-defaults.js   (keine Abhängigkeiten – reine Daten und Datums-Helfer)
-holidays.js   (Feiertage und Werktagsbegriff – eine Quelle für Anzeige und Regelwerk)
-     ▲
-     ├── rules.js    (reine Funktionen: Bewertung, Statistik, Getter/Setter – kein DOM)
-     ├── state.js    (Zustand, Persistenz, Netzwerk – kein DOM)
-     ├── api.js      (Netzwerk – kein DOM)
-     ▲
-theme.js         (Paletten und Farbmathematik rein; nur applyMonthTheme fasst das DOM an)
-     ▲
-     └── app.js      (Rendering, Ereignisse, Dialoge)
-```
-
-Diese Trennung ist strikt: `rules.js` und `defaults.js` enthalten **keinerlei** DOM- oder
-Browser-API-Zugriff und sind deshalb direkt in Node testbar. In `theme.js` ist der gesamte
-rechnende Teil – Farbraumkonversion, Mischung, Zeitkurve – ebenfalls seiteneffektfrei und
-exportiert; nur `applyMonthTheme` schreibt tatsächlich auf `<html>`. Dadurch sind Farbharmonie
-und Kontrast automatisiert prüfbar, statt nur im Browser beurteilbar. `functions/_utils.js` importiert
-`js/defaults.js` – Personalstamm und leeres Monatsschema sind damit auf Client und Server garantiert
-identisch, ohne Duplikat.
 
 ---
 
-## 4. Datenmodell
+## 5. Datenmodell
 
-### 4.1 Der Monat als Datensatz
+### 5.1 Monatsobjekt
 
-Alles ist monatsweise organisiert. Ein Monat ist ein eigenständiges JSON-Objekt (`createEmptyMonth`):
+Jeder Monat ist ein selbstständiger Datensatz:
 
 ```jsonc
 {
   "schemaVersion": 1,
   "year": 2026,
   "month": 7,
-  "revision": 12,                       // steigt bei jedem Speichern um 1
-  "updatedAt": "2026-07-14T09:21:03.512Z",
-
-  "days": {                             // ein Eintrag je Kalendertag, ISO-Datum als Schlüssel
-    "2026-07-01": { "bd": "lurz", "hg": "dalitz", "rbn1": "Meyer", "rbn2": "", "notes": "" }
+  "revision": 12,
+  "updatedAt": "2026-07-29T12:00:00.000Z",
+  "days": {
+    "2026-07-01": {
+      "bd": "lurz",
+      "hg": "dalitz",
+      "rbn1": "Meyer",
+      "rbn2": "",
+      "notes": ""
+    }
   },
-
-  "absences":       { "lurz": { "2026-07-20": "urlaub" } },
-  "absenceSources": { "lurz": { "2026-07-20": "manual" } },   // "manual" | "import"
-  "preferences":    { "martin": { "2026-07-04": "kein-bd" } },
-
-  "overrideLog": [                      // jede bestätigte rote Einteilung
+  "absences": {
+    "lurz": { "2026-07-20": "urlaub" }
+  },
+  "absenceSources": {
+    "lurz": { "2026-07-20": "manual" }
+  },
+  "preferences": {
+    "martin": { "2026-07-04": "kein-bd" }
+  },
+  "overrideLog": [
     {
-      "timestamp": "2026-07-14T09:20:55.104Z",
+      "timestamp": "2026-07-29T12:00:00.000Z",
       "dateIso": "2026-07-11",
       "role": "bd",
       "staffId": "becker",
       "reasons": ["Urlaub eingetragen"],
-      "comment": "mit Mitarbeitender abgestimmt"
+      "comment": "abgestimmt"
     }
   ],
   "importLog": []
 }
 ```
 
-**Feldsemantik im Einzelnen:**
+`createEmptyMonth(year, month)` legt jeden gültigen Kalendertag bereits mit leeren BD-, HG-, RBN-,
+2.-RBN- und Notizfeldern an. Schaltjahre folgen der nativen Kalenderberechnung. `ensureMonthShape()`
+mischt gespeicherte Nutzdaten über dieses vollständige Gerüst; fehlende Tage werden beim Lesen und
+Schreiben ergänzt.
 
-* `schemaVersion` – Formatkennung für zukünftige Migrationen.
-* `year`, `month` – Redundant zum Speicherschlüssel, damit ein exportierter Monat selbsterklärend bleibt.
-* `revision` – Monoton steigender Zähler, in `persistMonth` erhöht. Dient der Nachvollziehbarkeit.
-* `updatedAt` – ISO-Zeitstempel des letzten Speicherns.
-* `days` – **Vollständig vorbelegt**: `createEmptyMonth` erzeugt für jeden Tag des Monats einen Eintrag,
-  auch wenn nichts eingetragen ist. Dadurch ist die Einfügereihenfolge der Objektschlüssel chronologisch
-  und das Rendering kann direkt über `Object.entries(days)` laufen. Schaltjahre werden über
-  `new Date(year, month, 0).getDate()` korrekt behandelt (getestet: 2028 = 29, 2027 = 28 Tage).
-* `days[iso].bd` / `.hg` – **Personen-ID** (nicht Name!), leer bei offener Stelle.
-* `days[iso].rbn1` / `.rbn2` – Freitext für Rufbereitschaft Nuklearmedizin, erste und zweite Kraft.
-* `days[iso].notes` – Im Datenmodell vorhandenes Freitextfeld, aktuell in der Tabelle nicht dargestellt.
-* `absences[staffId][iso]` – Typkennung aus `ABSENCE_TYPES`.
-* `absenceSources[staffId][iso]` – Herkunft der Abwesenheit. Entscheidend, weil die Anzeige importierte und
-  manuelle FZA-Einträge unterschiedlich behandelt (siehe 8.5.4).
-* `preferences[staffId][iso]` – Typkennung aus `PREFERENCE_TYPES`.
-* `overrideLog` – Wächst nur an; kein Eintrag wird je entfernt.
-* `importLog` – Reserviert für Importprotokolle.
+### 5.2 Feldbedeutung
 
-### 4.2 Globale Datensätze
+- `schemaVersion`: Grundlage späterer Datenmigrationen.
+- `year`, `month`: selbstbeschreibende Datumszuordnung.
+- `revision`: steigt bei jedem Speichern um eins.
+- `updatedAt`: ISO-Zeitpunkt der letzten Speicherung.
+- `days[iso].bd`, `days[iso].hg`: stabile Personal-ID oder leerer String.
+- `days[iso].rbn1`, `days[iso].rbn2`: freier Text.
+- `days[iso].notes`: im Schema vorhanden, derzeit ohne sichtbare Tabellenspalte.
+- `absences[staffId][iso]`: Abwesenheitstyp.
+- `absenceSources[staffId][iso]`: `manual` oder `import`.
+- `preferences[staffId][iso]`: Dienstwunschtyp.
+- `overrideLog`: unveränderlich anwachsende Konfliktfreigaben.
+- `importLog`: reservierte Importhistorie, derzeit ohne sichtbare Pflege- oder Auswertungsoberfläche.
 
-Neben den Monaten existieren drei globale Objekte:
+### 5.3 Globale Daten und Schlüssel
 
-| Schlüssel | Inhalt |
-|---|---|
-| `app:settings` | `{ schemaVersion, holidayRegion: "SN", fixedMenuOrder, appName }` |
-| `app:staff` | Vollständige Personalliste (siehe Abschnitt 5) |
-| `app:rbn-names` | Alphabetisch sortiertes, dublettenfreies Array der bisher eingegebenen RBN-Namen |
+| Datensatz | Cloudflare-KV-Schlüssel | Lokaler Schlüssel |
+|---|---|---|
+| Einstellungen | `app:settings` | Bestandteil von `dienstplanrad:bootstrap` |
+| Personal | `app:staff` | Bestandteil von `dienstplanrad:bootstrap` |
+| RBN-Namen | `app:rbn-names` | Bestandteil von `dienstplanrad:bootstrap` |
+| Monat | `year:2026:month:07` | `dienstplanrad:month:2026-07` |
 
-### 4.3 Speicherschlüssel
-
-| Ort | Schlüsselformat |
-|---|---|
-| Cloudflare KV, Monat | `year:2026:month:07` |
-| Cloudflare KV, global | `app:settings`, `app:staff`, `app:rbn-names` |
-| `localStorage`, Monat | `dienstplanrad:month:2026-07` |
-| `localStorage`, global | `dienstplanrad:bootstrap` |
-
-### 4.4 In-Memory-Zustand
-
-`state` (in `js/state.js`) hält zur Laufzeit:
-
-| Feld | Bedeutung |
-|---|---|
-| `settings`, `staff`, `rbnNames` | Aktuelle Stammdaten |
-| `months` | `Map` von `"JJJJ-MM"` auf Monatsobjekt – der Arbeits-Cache |
-| `currentYear`, `currentMonth` | Angezeigter Monat |
-| `saveStatus` | `loading` \| `saving` \| `saved` \| `offline` \| `error` |
-| `dirty` | Ungespeicherte Änderungen vorhanden |
-| `saveTimer` | Handle des Debounce-Timers |
-| `serverReady` | Letzte Serverkommunikation erfolgreich |
-| `currentBatchMode` | `absence` \| `preference` – aktiver Modus des Sammel-Dialogs |
-| `currentPicker` | `{ dateIso, role }` des offenen Auswahldialogs |
-| `cachedBootstrap` | Rohantwort des letzten Bootstrap-Aufrufs |
-
-Der `months`-Cache ist bewusst monatsübergreifend: Regeln wie „BD-Wochenende direkt nach BD-Wochenende"
-lesen über `getAssignment(state, iso, role)` aus **beliebigen** geladenen Monaten, nicht nur aus dem
-angezeigten.
+Der Laufzeitzustand hält `settings`, `staff`, `rbnNames`, eine `Map` geladener Monate, angezeigtes Jahr
+und Monat, Speicherstatus, Dirty-Flag, Debounce-Timer und den letzten Serverzustand.
 
 ---
 
-## 5. Stammdaten: Mitarbeitende, Abwesenheiten, Wünsche
+## 6. Personal, Rollen und Stammdaten
 
-### 5.1 Personalstamm
+### 6.1 Standardpersonal
 
-Der Standard-Personalstamm ist in `js/defaults.js` als `DEFAULT_STAFF` hinterlegt und wird beim ersten
-Serverstart in KV geschrieben. Danach ist die KV-Kopie maßgeblich.
+| ID | Anzeige | Rolle | BD-Soll | Max. BD | HG | Samstags-BD | Aktivität |
+|---|---|---|---:|---:|---|---|---|
+| `schaefer` | Prof. Schäfer | Chefarzt | – | – | – | – | ab 01.01.2025, nur Abwesenheitsliste |
+| `lurz` | Dr. Lurz | FA/OA | 4 | – | ja | ja | ab 01.01.2025 |
+| `polednia` | Dr. Polednia | FA/OA | 3 | – | ja | ja | ab 01.01.2025 |
+| `dalitz` | Fr. Dalitz | FÄ/OÄ | 4 | – | ja | ja | ab 01.01.2025 |
+| `becker` | Dr. Becker | FÄ/OÄ | 3 | – | ja | ja | ab 01.01.2025 |
+| `hellmann` | Fr. Hellmann | FÄ | 2 | 2 | ja | ja | ab 01.10.2026 |
+| `martin` | Dr. Martin | FA | 4 | – | ja | ja | ab 01.01.2025 |
+| `elhouba` | Hr. El Houba | AA, ab 22.09.2026 FA | 4 | – | ab Beförderung | ab Beförderung | ab 01.01.2025 |
+| `licenji` | Fr. Licenji | AÄ | 4 | – | nein | nein | ab 01.01.2025 |
+| `sebastian` | Hr. Sebastian | AA | 4 | – | nein | nein | ab 01.01.2025 |
 
-| ID | Name | Rolle | Kategorie | BD-Soll | Max. BD | HG | Sa-BD | Aktiv ab |
-|---|---|---|---|---|---|---|---|---|
-| `schaefer` | Prof. Schäfer | Chefarzt | `urlaub-only` | – | – | – | – | 2025-01-01 |
-| `lurz` | Dr. Lurz | FA/OA | `fa` | 4 | – | ja | ja | 2025-01-01 |
-| `polednia` | Dr. Polednia | FA/OA | `fa` | 3 | – | ja | ja | 2025-01-01 |
-| `dalitz` | Fr. Dalitz | FÄ/OÄ | `fa` | 4 | – | ja | ja | 2025-01-01 |
-| `becker` | Dr. Becker | FÄ/OÄ | `fa` | 3 | – | ja | ja | 2025-01-01 |
-| `hellmann` | Fr. Hellmann | FÄ | `fa` | 2 | **2** | ja | ja | **2026-10-01** |
-| `martin` | Dr. Martin | FA | `fa` | 4 | – | ja | ja | 2025-01-01 |
-| `elhouba` | Hr. El Houba | AA → **FA ab 2026-09-22** | `aa` | 4 | – | nein → **ja** | nein → **ja** | 2025-01-01 |
-| `licenji` | Fr. Licenji | AÄ | `aa` | 4 | – | nein | nein | 2025-01-01 |
-| `sebastian` | Hr. Sebastian | AA | `aa` | 4 | – | nein | nein | 2025-01-01 |
+Gespeichert werden IDs, nicht Anzeigenamen. Namensänderungen wirken dadurch auf alle Monate, ohne
+Dienstdaten umzuschreiben. `activeFrom` und `activeUntil` begrenzen Sichtbarkeit und Planbarkeit.
+`includeInPlanning` steuert den Dienstpool; `includeInAbsenceList` steuert die Abwesenheitsverwaltung.
 
-**Feldbedeutungen:**
+Die feste Planungsreihenfolge lautet:
 
-* `id` – Interner, unveränderlicher Schlüssel. Alle Einteilungen speichern diese ID, nie den Namen. Eine
-  Namensänderung wirkt dadurch rückwirkend auf alle Pläne, ohne Datenmigration.
-* `name` – Anzeigename in Tabelle, Dialogen und Excel-Export.
-* `short` – Kurzform für die dicht gesetzten Zusammenfassungsspalten („Becker: U").
-* `category` – `fa` (Facharzt), `aa` (Assistenzarzt), `urlaub-only` (erscheint nur in der Abwesenheitsliste).
-* `roleLabel` – Angezeigte Funktionsbezeichnung, geschlechtsgerecht gepflegt (FA/FÄ, AA/AÄ, OA/OÄ).
-* `activeFrom` / `activeUntil` – Zeitfenster der Zugehörigkeit. Außerhalb erscheint die Person weder im
-  Auswahldialog noch in der Statistik. `activeUntil: null` bedeutet „unbefristet".
-* `includeInPlanning` – Teil des Dienstpools (BD/HG einteilbar).
-* `includeInAbsenceList` – Erscheint in Abwesenheits- und Wunschverwaltung. Für Prof. Schäfer ist dies
-  `true`, während `includeInPlanning` `false` ist: Der Chefarzt wird nicht eingeteilt, seine Abwesenheiten
-  werden aber geführt.
-* `bdTarget` – Monatlicher BD-Richtwert. Überschreitung erzeugt eine gelbe Warnung, keine Sperre.
-* `maxBd` – Hartes Monatsmaximum. Erreichen erzeugt einen **roten** Konflikt.
-* `canHg`, `canSaturdayBd` – Qualifikationsflags.
-* `promotionDate`, `promotedRoleLabel`, `promotedCanHg`, `promotedCanSaturdayBd` – **Zeitgesteuerter
-  Rollenwechsel.** Ab dem Stichtag gelten die `promoted*`-Werte. Die Bewertung nutzt immer das Datum des
-  jeweiligen Diensttages, nicht das heutige Datum – ein Plan für Dezember 2026 rechnet also bereits mit der
-  Beförderung, ein Plan für Juli 2026 noch nicht.
-
-### 5.2 Anzeigereihenfolge
-
-`STAFF_ORDER` legt die Reihenfolge im Auswahldialog fest und ist bewusst **nicht alphabetisch**, sondern
-folgt der eingespielten Planungsreihenfolge des Hauses:
-
-```
+```text
 lurz → polednia → dalitz → becker → hellmann → martin → elhouba → licenji → sebastian
 ```
 
-`getPlanningStaff()` wendet diese Reihenfolge an und filtert anschließend nach `includeInPlanning` und
-Aktivzeitraum am konkreten Tag. Die Liste ist damit tagesabhängig unterschiedlich lang.
+### 6.2 Zeitabhängige Rollen
 
-### 5.3 Abwesenheitstypen (`ABSENCE_TYPES`)
+`getRoleProperties(person, dateIso)` wendet ab `promotionDate` die Felder `promotedRoleLabel`,
+`promotedCanHg` und `promotedCanSaturdayBd` an. Hr. El Houba ist bis einschließlich 21.09.2026 AA ohne
+HG- und Samstags-BD-Berechtigung; ab 22.09.2026 gilt er als FA mit beiden Berechtigungen.
 
-| ID | Label | Kürzel in der Tabelle |
+### 6.3 Abwesenheiten
+
+| ID | Bezeichnung | Kurzform |
 |---|---|---|
-| `urlaub` | Urlaub | `U` |
-| `fza` | FZA/Frei | `FZA` |
-| `weiterbildung` | Weiterbildung | `WB` |
-| `sonstige` | Sonstige Abwesenheit | `abwesend` |
+| `urlaub` | Urlaub | U |
+| `fza` | FZA/Frei | FZA |
+| `weiterbildung` | Weiterbildung | WB |
+| `sonstige` | Sonstige Abwesenheit | abwesend |
 
-Jede Abwesenheit erzeugt bei einer Einteilung an diesem Tag einen **roten** Konflikt.
+Jede Abwesenheit erzeugt bei einer Diensteinteilung am selben Tag einen roten Konflikt.
 
-### 5.4 Dienstwunschtypen (`PREFERENCE_TYPES`)
+### 6.4 Wünsche
 
-| ID | Label | Kürzel | Wirkung |
-|---|---|---|---|
-| `kein-bd` | Kein BD | `kein BD` | rot bei BD |
-| `kein-hg` | Kein HG | `kein HG` | rot bei HG |
-| `kein-dienst` | Kein Dienst | `kein Dienst` | rot bei BD **und** HG |
-| `bd-bevorzugt` | BD bevorzugt | `+BD` | positiver Hinweis bei BD |
-| `hg-bevorzugt` | HG bevorzugt | `+HG` | positiver Hinweis bei HG |
-| `dienst-bevorzugt` | Dienst bevorzugt | `+Dienst` | positiver Hinweis bei beiden |
+| ID | Bezeichnung | Wirkung |
+|---|---|---|
+| `kein-bd` | Kein BD | rot bei BD |
+| `kein-hg` | Kein HG | rot bei HG |
+| `kein-dienst` | Kein Dienst | rot bei BD und HG |
+| `bd-bevorzugt` | BD bevorzugt | positiver Grund bei BD |
+| `hg-bevorzugt` | HG bevorzugt | positiver Grund bei HG |
+| `dienst-bevorzugt` | Dienst bevorzugt | positiver Grund bei BD und HG |
 
-Positive Wünsche verschlechtern die Bewertung nie – sie erscheinen als zusätzliche Begründungszeile im
-Tooltip und in der Auswahlliste und machen sichtbar, dass hier ein Wunsch **erfüllt** wird.
+Positive Wünsche senken keine Bewertungsstufe. Sie machen sichtbar, dass eine Einteilung einem Wunsch
+entspricht.
 
 ---
 
-## 6. Das Regelwerk im Detail
+## 7. Regelwerk und Bewertungsstufen
 
-Herzstück ist `evaluateCandidate({ state, monthData, dateIso, role, staffId })` in `js/rules.js`. Die
-Funktion wird für **jede Person in jeder geöffneten Auswahlliste** und zusätzlich für **jede bereits
-gesetzte Einteilung bei jedem Rendering** aufgerufen. Sie ist frei von Seiteneffekten.
+`evaluateCandidate({ state, monthData, dateIso, role, staffId })` ist die zentrale, seiteneffektfreie
+Bewertung. Sie läuft für alle Personen im Picker und für jede bereits gesetzte Einteilung bei jedem
+Rendering.
 
-### 6.0 Kalendertage und Zeitzone
+### 7.1 Stufen
 
-Alle Regeln rechnen mit **lokalen Kalendertagen**. Datumsobjekte entstehen als lokale Mitternacht; für den
-Rückweg zum ISO-Datum ist `toISOString()` ausdrücklich verboten. In jeder Zeitzone mit positivem
-UTC-Versatz – ganzjährig in Deutschland – liegt lokale Mitternacht in UTC noch am Vortag, aus dem
-04.07.2026 wird `2026-07-03`.
-
-Genau darauf fußten sämtliche Abstands-, Wochenend- und Feiertagsblockregeln, und sie haben deshalb den
-jeweils falschen Tag geprüft. In UTC – der Standardzeitzone von Testläufern – fällt das nicht auf.
-`tests/timezone.test.js` erzwingt daher `Europe/Berlin`.
-
-### 6.1 Severity-Modell
-
-```js
-const severityRank = { green: 0, yellow: 1, orange: 2, red: 3, gray: -1 };
-```
-
-Jede zutreffende Regel ruft `push(level, reason)` auf. Das Endniveau ist das **Maximum** aller Level, die
-Begründungsliste enthält jedoch **alle** ausgelösten Gründe – auch die von niedrigerem Rang. Nichts wird
-unterdrückt: Wer eine rote Einteilung bestätigt, sieht dabei auch die gelben Nebenhinweise.
-
-| Stufe | Bedeutung | Konsequenz in der Bedienung |
+| Stufe | Bedeutung | Bedienung |
 |---|---|---|
-| **grün** | Keine relevanten Konflikte | Direkt wählbar |
-| **gelb** | Hinweis, planerisch vertretbar | Direkt wählbar |
-| **orange** | Konflikt, nachrangig wählen | Direkt wählbar, deutlich markiert |
-| **rot** | Regelverstoß | Bestätigungsdialog und Protokolleintrag |
-| **grau** | Person zu diesem Zeitpunkt nicht aktiv / nicht im Pool | Ausschluss: nicht auswählbar |
+| grün | keine relevanten Konflikte | direkt wählbar |
+| gelb | Hinweis | direkt wählbar |
+| orange | relevanter Konflikt, nachrangig | direkt wählbar |
+| rot | harter Regelverstoß | nur über Bestätigungsdialog |
+| grau | nicht aktiv oder nicht planbar | deaktiviert, nicht wählbar |
 
-**Grau ist kein Schweregrad, sondern ein Ausschluss** und wird getrennt geführt. Zuvor lief es über
-dieselbe Rangfolge und trug den Rang −1 – es konnte den Ausgangswert „grün" damit nie überschreiben. Eine
-Person außerhalb ihres Aktivzeitraums wurde dadurch als **„geeignet"** ausgewiesen, während die Begründung
-darunter das Gegenteil sagte. Graue Einträge sind jetzt sichtbar abgesetzt und nicht anklickbar.
+Bei mehreren Regeln bestimmt die höchste Stufe die Farbe. Alle Gründe bleiben erhalten. Ohne Treffer
+ergänzt die Bewertung „Keine relevanten Konflikte“. Grau ist ein Ausschlusszustand mit `canSelect: false`,
+kein schwächeres Grün.
 
-Ist am Ende `level === 'green'` und keine Begründung gesetzt, ergänzt die Funktion „Keine relevanten
-Konflikte", damit der Tooltip nie leer bleibt.
+### 7.2 Qualifikation und Tageskollisionen
 
-### 6.2 Rollen- und Aktivitätsprüfungen
+- Person außerhalb des aktiven Planungszeitraums: grau.
+- HG ohne tagesgültige HG-Berechtigung: rot.
+- Samstags-BD ohne tagesgültige Berechtigung: rot.
+- dieselbe Person am selben Tag zugleich in BD und HG: rot.
+- eingetragene Abwesenheit: rot.
+- passender „Kein …“-Wunsch: rot.
+- passender positiver Wunsch: erklärender grüner Grund.
 
-| Regel | Stufe |
-|---|---|
-| Person nicht im aktiven Dienstpool (`includeInPlanning === false`) | grau |
-| Person am Tag nicht aktiv (außerhalb `activeFrom` / `activeUntil`) | grau |
-| HG, aber `canHg === false` → „HG nur für Fachärzte zulässig" | **rot** |
-| Samstags-BD, aber `canSaturdayBd === false` → „Samstags-BD nur für Fachärzte zulässig" | **rot** |
+### 7.3 Personenspezifische Regeln
 
-Für `canHg` und `canSaturdayBd` gilt stets der über `getRoleProperties(person, dateIso)` **zum Diensttag**
-ermittelte Wert – inklusive Beförderungsstichtag.
+- Dr. Polednia darf dienstags und sonntags weder BD noch HG übernehmen: rot.
+- Dr. Beckers Samstags-BD ist nachrangig: orange.
+- Fr. Dalitz als HG an Sonntag oder Montag bei gleichzeitigem Sebastian-BD: orange.
+- Dr. Becker als BD am ersten regulären Werktag nach eigenem Samstags-BD: rot.
 
-### 6.3 Tages- und Personenkollisionen
+### 7.4 BD-Abstände
 
-| Regel | Stufe |
-|---|---|
-| Dieselbe Person am selben Tag bereits in der jeweils anderen Rolle | **rot** |
-| Abwesenheit am Tag eingetragen (jeder Typ) | **rot** |
-| Wunsch „kein Dienst" | **rot** |
-| Wunsch „kein BD" bei BD-Einteilung | **rot** |
-| Wunsch „kein HG" bei HG-Einteilung | **rot** |
-| Wunsch „BD/HG/Dienst bevorzugt" passend zur Rolle | grün (positiver Hinweis) |
+Die Anwendung sortiert alle eigenen BD-Termine aus sämtlichen geladenen Monaten und prüft beide
+Richtungen:
 
-### 6.4 Personenspezifische Sonderregeln
+- eigener BD am Vortag oder Folgetag: gelb;
+- sonstiger Abstand von zwei oder drei Tagen: gelb;
+- werktägliches Muster BD–FZA–BD mit eingetragenem FZA in der Mitte: eigener gelber Hinweis statt
+  allgemeinem Kurzabstand;
+- ein im Vor- oder Folgemonat liegender Termin wirkt mit, sobald der Nachbarmonat geladen ist.
 
-Fest kodierte Hausabsprachen:
+Die beidseitige Prüfung macht das Ergebnis unabhängig von der Reihenfolge, in der Dienste eingetragen
+werden.
 
-| Regel | Stufe |
-|---|---|
-| **Dr. Polednia** dienstags und sonntags weder BD noch HG | **rot** |
-| **Dr. Becker** Samstags-BD nur nachrangig | orange |
-| **Fr. Dalitz** HG an Sonntag/Montag, wenn am selben Tag Hr. Sebastian BD hat, nur nachrangig | orange |
-| **Dr. Becker** BD am nächsten regulären Werktag nach eigenem Samstags-BD gesperrt | **rot** |
+### 7.5 Kontingente und Urlaub
 
-Die letzte Regel sucht rückwärts nach einem Samstag mit Becker-BD und bricht ab, sobald ein regulärer
-Werktag dazwischenliegt. **Regulärer Werktag heißt: Montag bis Freitag und kein gesetzlicher Feiertag.**
+- erreichtes `bdTarget`: gelb;
+- erreichtes `maxBd`: rot, ohne zusätzlichen Sollhinweis;
+- BD direkt vor einem Urlaubstag: orange.
 
-Die frühere Fassung kannte weder Feiertage noch den Werktagsbegriff. Sie schlug auch **sonntags** an und
-sperrte bei einem Feiertagsmontag den Feiertag statt des darauffolgenden Arbeitstags. Die Anzeige in der
-Tabelle rechnete dagegen bereits feiertagsbewusst – der Plan wies also einen anderen Tag als
-Freizeitausgleich aus als den, den die Regel sperrte. Beide nutzen jetzt dieselbe Funktion aus
-`js/holidays.js`. Beispiel Pfingsten 2026: Nach Becker-BD am Samstag 23.05. sind Pfingstsonntag und
-Pfingstmontag frei, gesperrt ist Dienstag der 26.05.
+### 7.6 HG-Häufung
 
-### 6.5 BD-Abstandsregeln
+- HG an drei aufeinanderfolgenden Tagen: orange;
+- erneuter HG innerhalb von drei Kalendertagen: gelb;
+- HG am Tag vor eigenem BD: orange;
+- Freitag-HG vor Samstag-BD bleibt als gewünschtes Wochenendmuster zulässig.
 
-Für die Rolle BD wird die **vollständige, monatsübergreifende** Liste eigener BD-Termine der Person
-gebildet (`listOwnRoleDates` über alle Einträge in `state.months`), sortiert und der unmittelbar
-vorhergehende BD gesucht:
+### 7.7 Wochenenden
 
-| Situation | Stufe | Begründungstext |
-|---|---|---|
-| Abstand = 1 Tag rückwärts | gelb | „BD bereits am Vortag" |
-| Abstand = 2 Tage, Muster BD–FZA–BD, alle drei Tage Mo–Fr, am Zwischentag `fza` eingetragen | gelb | „BD–FZA–BD werktags" |
-| Abstand 2–3 Tage rückwärts (sonstige Fälle) | gelb | „Kurzer Abstand zum letzten BD" |
-| Abstand = 1 Tag vorwärts | gelb | „BD bereits am Folgetag" |
-| Abstand 2–3 Tage vorwärts | gelb | „Kurzer Abstand zum nächsten BD" |
+Freitag, Samstag und Sonntag werden über den zugehörigen Freitag zu einer Wochenendeinheit gruppiert.
 
-Die Prüfung läuft **in beide Richtungen**. Zuvor wurde ausschließlich der vorhergehende eigene BD
-betrachtet: Wer den Dienst am Tag *vor* einem bereits eingetragenen eigenen BD besetzte, bekam überhaupt
-keinen Hinweis, während der umgekehrte Weg gewarnt hat – dieselbe Dienstfolge wurde je nach
-Eingabereihenfolge unterschiedlich bewertet.
+- BD an zwei unmittelbar aufeinanderfolgenden Wochenenden: rot.
+- sonstige Dienstwiederholung an aufeinanderfolgenden Wochenenden: orange.
 
-Die BD-FZA-BD-Erkennung liest den Zwischentag aus dem **richtigen** Monatsobjekt – auch wenn dieser Tag im
-Vormonat liegt.
+### 7.8 Oster- und Pfingstblock
 
-### 6.6 Kontingentregeln
+Der Osterblock umfasst Karfreitag bis Ostermontag, der Pfingstblock Pfingstsamstag bis Pfingstmontag.
+Wer im jeweils anderen Block bereits BD oder HG hat, erhält im betrachteten Block einen orangefarbenen
+Alternanzhinweis.
 
-| Regel | Stufe |
-|---|---|
-| `maxBd` gesetzt und im Monat bereits erreicht → „Monatsmaximum von N BD bereits erreicht" | **rot** |
-| Sonst: `bdTarget` im Monat bereits erreicht → „BD-Richtwert N bereits erreicht" | gelb |
+### 7.9 Sammelprüfung und Verteilung
 
-Die Prüfungen schließen einander aus: Wo ein hartes Maximum greift, erscheint kein zusätzlicher
-Richtwerthinweis. Gezählt wird über `countRoleInMonth` ausschließlich innerhalb des angezeigten Monats.
+`collectIssues()` meldet:
 
-### 6.7 Urlaubsübergang
+- jeden Tag ohne BD und jeden Tag ohne HG als offenen Punkt;
+- jede bestehende orange oder rote Einteilung;
+- gleichzeitige Abwesenheit von Dr. Becker und Dr. Martin an einem regulären Werktag genau einmal als
+  roten Hinweis auf die CT-Leitungsbesetzung.
 
-| Regel | Stufe |
-|---|---|
-| BD am Tag unmittelbar vor Urlaubsbeginn („BD unmittelbar vor Urlaubsbeginn") | orange |
+Die Funktion ist fachlich vorhanden und getestet, wird im aktuellen UI aber nicht als eigener
+Konfliktbericht gerendert. Sichtbar sind die Bewertungen an den Einteilungen, im Picker, im
+Bestätigungsdialog und in der Statistik.
 
-Erkannt wird der Folgetag mit Abwesenheitstyp `urlaub`.
+`computeWeekendEquivalent()` zählt je Wochenende:
 
-### 6.8 HG-Häufungsregeln
-
-| Regel | Stufe |
-|---|---|
-| HG an drei aufeinanderfolgenden Tagen (Vortag **und** Vorvortag ebenfalls HG) | orange |
-| Erneuter HG innerhalb von drei Kalendertagen | gelb |
-| HG am Tag vor eigenem BD | orange |
-
-**Ausnahme:** Die Kombination *Freitag HG + Samstag BD* ist ein bewusst gewünschtes, eingespieltes
-Wochenendmuster und wird nicht bemängelt.
-
-### 6.9 Wochenendregeln
-
-`applyWeekendWarnings` betrachtet ausschließlich Freitag, Samstag und Sonntag. Die drei Tage werden über
-den zugehörigen Freitag zu einer **Wochenendeinheit** normalisiert; anschließend wird das Vorwochenende
-(Freitag–Sonntag) geprüft:
-
-| Situation | Stufe |
-|---|---|
-| BD am aktuellen Wochenende, BD bereits am Vorwochenende | **rot** („BD-Wochenende direkt nach BD-Wochenende") |
-| Sonstige Dienstwiederholung an aufeinanderfolgenden Wochenenden | orange |
-
-### 6.10 Oster-/Pfingst-Alternanz
-
-`applyHolidayBlockWarnings` definiert zwei Blöcke:
-
-* **Osterblock:** Karfreitag, Karsamstag, Ostersonntag, Ostermontag
-* **Pfingstblock:** Pfingstsamstag, Pfingstsonntag, Pfingstmontag
-
-Liegt der betrachtete Tag in einem der Blöcke und hat dieselbe Person im **jeweils anderen** Block bereits
-BD oder HG, wird „Bereits Dienst im alternierenden Oster-/Pfingstblock" als **orange** gemeldet. Damit wird
-die Hausregel unterstützt, dass niemand beide großen Feiertagsblöcke eines Jahres trägt.
-
-### 6.11 Sammelprüfung `collectIssues`
-
-Zusätzlich zur Einzelbewertung existiert eine Monatsprüfung, die zusammenträgt:
-
-* jeden Tag ohne BD und jeden Tag ohne HG als gelben Punkt,
-* jede gesetzte Einteilung, deren Bewertung orange oder rot ist,
-* **Becker/Martin gleichzeitig an einem regulären Werktag abwesend** als roten Punkt mit dem Hinweis
-  „CT-Leitungsbesetzung prüfen" – genau einmal je Tag. Zuvor lief die Prüfung über beide Personen und
-  meldete denselben Tag doppelt; Feiertage zählten als Arbeitstag.
-
-Das Ergebnis ist nach Schweregrad absteigend sortiert.
-
-### 6.12 Wochenend-Äquivalent
-
-`computeWeekendEquivalent(monthData, staffId)` gruppiert alle Freitage, Samstage und Sonntage des Monats zu
-Wochenendeinheiten und bewertet je Einheit:
-
-| Belegung der Einheit | Gewicht |
-|---|---|
-| mindestens ein BD | **1,0** |
-| kein BD, aber mindestens ein HG | **0,5** |
-| weder BD noch HG | 0 |
-
-Ein BD-Wochenende zählt also unabhängig davon, ob es einen oder drei BD-Tage umfasst, genau einmal – der
-Kennwert misst *belastete Wochenenden*, nicht Dienste. Der Testfall bestätigt: BD am 03.07., HG am 05.07.
-und HG am 10.07.2026 ergeben 1,5.
+- mindestens ein BD: 1,0;
+- kein BD, aber mindestens ein HG: 0,5;
+- kein Dienst: 0.
 
 ---
 
-## 7. Feiertagslogik
+## 8. Feiertage und Werktage
 
-### 7.1 Berechnung
+`js/holidays.js` ist die gemeinsame Quelle für Darstellung und Regelwerk. Es rechnet ausschließlich mit
+lokalen Kalendertagen und formatiert ISO-Daten aus lokalen Jahr-, Monats- und Tageswerten. Ein
+`toISOString()`-Rückweg wird vermieden, weil lokale Mitternacht in Deutschland in UTC noch auf den
+Vortag fallen kann.
 
-Feiertage werden vollständig lokal berechnet – kein externer Dienst, kein Netzzugriff. Grundlage ist die
-**Gaußsche Osterformel**, aus der alle beweglichen Feiertage abgeleitet werden.
+Für Sachsen (`SN`) gelten:
 
-Die Berechnung liegt in `js/holidays.js` und ist die **einzige** Quelle für Anzeige und Regelwerk. Zuvor
-existierten zwei Osterformeln und zwei Werktagsprüfungen – eine in `app.js` für die Darstellung, eine in
-`rules.js` für die Bewertung – die sich widersprachen.
+- Neujahr, Tag der Arbeit, Tag der Deutschen Einheit, Reformationstag, erster und zweiter
+  Weihnachtsfeiertag;
+- Karfreitag, Ostermontag, Christi Himmelfahrt und Pfingstmontag relativ zum berechneten Ostersonntag;
+- Buß- und Bettag als Mittwoch vor dem 23. November.
 
-### 7.2 Berücksichtigte Feiertage (Sachsen, `holidayRegion: "SN"`)
-
-**Feste Termine:**
-
-| Datum | Feiertag |
-|---|---|
-| 01.01. | Neujahr |
-| 01.05. | Tag der Arbeit |
-| 03.10. | Tag der Deutschen Einheit |
-| 31.10. | Reformationstag |
-| 25.12. | 1. Weihnachtsfeiertag |
-| 26.12. | 2. Weihnachtsfeiertag |
-
-**Bewegliche Termine (relativ zu Ostersonntag):**
-
-| Offset | Feiertag |
-|---|---|
-| −2 | Karfreitag |
-| +1 | Ostermontag |
-| +39 | Christi Himmelfahrt |
-| +50 | Pfingstmontag |
-
-**Buß- und Bettag:** Der Mittwoch vor dem 23. November – berechnet, indem vom 23. November rückwärts zum
-vorangehenden Mittwoch gegangen wird (fällt der 23. selbst auf einen Mittwoch, wird eine volle Woche
-zurückgegangen). Sachsen ist das einzige Bundesland mit diesem gesetzlichen Feiertag.
-
-### 7.3 Zwischenspeicherung und Zeitzonensicherheit
-
-Berechnete Feiertage werden pro Jahr in einer `Map` gecacht. Gerechnet wird durchgehend mit **lokalen
-Kalendertagen** (siehe 6.0); `toISOString()` kommt nirgends zum Einsatz, weil es das Datum in deutscher
-Zeitzone um einen Tag nach hinten verschieben würde.
-
-### 7.4 Wirkung in der Oberfläche
-
-* Die Tageszeile erhält die Klasse `holiday-row` mit der stärksten Farbstufe der Monatspalette.
-* In der Wochentagsspalte steht unter dem ausgeschriebenen Wochentag der **Feiertagsname** in kleiner,
-  fetter Schrift.
-* Der Zeilentooltip (`title`) nennt den Feiertag.
-* Im Sammel-Dialog erhalten Feiertagskacheln dieselbe Einfärbung und zeigen den Namen mit.
-* Für die Ableitung des Freizeitausgleichs gelten Feiertage **nicht** als reguläre Werktage.
+Ein regulärer Werktag ist Montag bis Freitag und kein gesetzlicher Feiertag. Dieser Begriff steuert
+FZA-Ableitung, Becker-Sperre und die CT-Leitungsprüfung. Feiertage erhalten in Tabelle und Sammelraster
+einen Namen, einen Tooltip und die stärkste Monatsflächenfarbe.
 
 ---
 
-## 8. Benutzeroberfläche – Aufbau und Bedienung
+## 9. Benutzeroberfläche
 
-### 8.1 Gesamtaufbau
+### 9.1 Ebenen
 
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│ Ambient-Layer (drei weiche, driftende Farborbs, hinter allem)        │
-│ ┌──────────────────────────────────────────────────────────────────┐ │
-│ │ Topbar   Marke │ Monatsnavigation │ Speicherstatus               │ │
-│ ├──────────────────────────────────────────────────────────────────┤ │
-│ │ Toolbar  Navigation & Verwaltung │ Import & Export               │ │
-│ ├──────────────────────────────────────────────────────────────────┤ │
-│ │ Sheet-Panel                                                      │ │
-│ │   Überschrift │ Monatsfarb-Badge │ Ampellegende                  │ │
-│ │   Plantabelle (8 Spalten, eine Zeile je Tag, sticky Kopfzeile)   │ │
-│ │   Statistik (Verteilungstabelle)                                 │ │
-│ └──────────────────────────────────────────────────────────────────┘ │
-└──────────────────────────────────────────────────────────────────────┘
-```
+Die Oberfläche besteht aus:
 
-Die Shell ist auf `max-width: 1720px` zentriert und nutzt ein Grid mit 9 px Abstand bei 12 px Außenabstand –
-bewusst kompakt, damit auf einem Klinikmonitor möglichst viele Tageszeilen ohne Scrollen sichtbar sind.
+1. dunklem Ambient-Hintergrund mit drei langsam driftenden Farborbs;
+2. gläserner Kopfleiste;
+3. gläserner Werkzeugleiste;
+4. großer Arbeitsfläche mit Monatskopf, Tabelle und Statistik;
+5. modalen nativen Dialogen.
 
-### 8.2 Topbar
+Die Arbeitsfläche ist auf maximal 1720 px zentriert. Kleine schwebende Elemente verwenden echtes
+`backdrop-filter`; die große Tabellenfläche erzeugt ihre Glaswirkung mit Lichtkanten, Tönung und Schatten,
+ohne den kostspieligen Vollflächen-Weichzeichner.
 
-**Markenblock (links):**
-* Quadratisches Logo „DR" mit dunklem Verlauf, Innenlicht und Schlagschatten.
-* Eyebrow: „Klinik für Radiologie und Nuklearmedizin" – versal, weit gesperrt, klein.
-* Titel: „DienstplanRAD".
-* Subline: „Manuelle Dienstplanung · Cloud-Synchronisierung · Live-Validierung".
+### 9.2 Kopfleiste
 
-**Monatsnavigation (rechts, in einer Glas-Einfassung):**
+Links stehen DR-Marke, Klinikbezeichnung, App-Name und Funktionszeile. Rechts befinden sich:
 
-| Element | Verhalten |
+- Pfeil zum Vormonat;
+- Monats-Dropdown mit zwölf deutschen Monaten;
+- Jahres-Dropdown von mindestens 2025 bis 2030 und dynamischer Erweiterung um jeweils fünf Jahre um das
+  aktuelle Jahr;
+- Pfeil zum Folgemonat;
+- animierter Speicherstatuspunkt mit Statusbeschreibung.
+
+Die Pfeile rechnen von den sichtbaren Dropdownwerten aus und behandeln Jahresgrenzen über ein natives
+Datumsobjekt.
+
+### 9.3 Werkzeugleiste
+
+| Element | Funktion |
 |---|---|
-| `‹` Vormonat | Springt einen Monat zurück, inklusive Jahreswechsel |
-| Monats-Dropdown | Alle zwölf Monate mit deutschem Namen |
-| Jahres-Dropdown | Von `min(2025, aktuelles Jahr − 5)` bis `max(2030, aktuelles Jahr + 5)` |
-| `›` Folgemonat | Springt einen Monat vor, inklusive Jahreswechsel |
-
-Beide Pfeiltasten rechnen ausdrücklich mit den **aktuellen Werten der Dropdowns**, nicht mit dem
-Zustandsobjekt. Dadurch bleibt das Verhalten auch dann korrekt, wenn ein Monatswechsel noch lädt. Der
-Jahreswechsel entsteht automatisch über `new Date(jahr, monat - 1 + delta, 1)`: Ein Klick auf „›" im
-Dezember 2026 landet zuverlässig im Januar 2027.
-
-**Statusanzeige:**
-
-| Punktfarbe | Text | Bedeutung |
-|---|---|---|
-| gelb | „Lädt …" | Monat wird geladen |
-| gelb | „Speichert …" | Speichervorgang läuft |
-| grün | „Gespeichert" | Serverstand aktuell |
-| orange | „Offline – lokaler Stand" / „Offline gespeichert" | Nur lokal gespeichert |
-| rot | (Fehlertext) | Fehlerzustand |
-
-Der Punkt „atmet" dauerhaft (`status-breathe`, 2,4 s) und signalisiert damit ohne Text, dass die Anwendung
-lebt und synchronisiert.
-
-### 8.3 Toolbar
-
-**Gruppe 1 – Navigation und Verwaltung:**
-
-| Schaltfläche | Wirkung |
-|---|---|
-| **Aktueller Monat** | Setzt beide Dropdowns auf heute und öffnet den laufenden Monat |
-| **Abwesenheiten** | Öffnet den Sammel-Dialog im Abwesenheitsmodus |
-| **Dienstwünsche** | Öffnet den Sammel-Dialog im Wunschmodus |
-| **Serverstand neu laden** | Lädt den angezeigten Monat mit `forceServer` neu; Status zeigt „Lädt Serverstand …" |
-
-**Gruppe 2 – Import und Export:**
-
-| Schaltfläche | Wirkung |
-|---|---|
-| **Excel importieren** | Dateidialog `.xlsx`/`.xls`, Mehrmonats-Import (siehe 14.1) |
-| **Excel exportieren** | Erzeugt `dienstplan_JJJJ_MM.xlsx` des angezeigten Monats |
-| **PDF exportieren** | Startet `window.print()` mit dem Druck-Stylesheet |
-| **JSON sichern** | Vollsicherung aller Daten als JSON-Datei |
-| **JSON laden** | Spielt eine JSON-Sicherung ein |
-
-Die beiden Dateiauswahlen sind als `<label class="file-btn">` mit verstecktem `<input type="file">`
-umgesetzt und damit optisch nicht von den übrigen Schaltflächen unterscheidbar.
-
-### 8.4 Kopfbereich des Plans
-
-Links: Eyebrow „Bereitschaftsdienstplan" über der Monatsüberschrift (z. B. „August 2026").
-Rechts, übereinander:
-
-* Das **Monatsfarb-Badge**: eine Pille mit „Monatskontrast · «Palettenname»", eingefärbt in der aktuellen
-  Monatsfarbe, mit Glas-Hintergrund und farbigem Schein.
-* Die **Ampellegende**: geeignet / Hinweis / Konflikt / Bestätigung nötig, jeweils mit Farbmuster.
-  Auf schmalen Bildschirmen wird die Legende ausgeblendet, das Badge bleibt.
-
-### 8.5 Die Plantabelle
-
-Acht Spalten mit festen Breiten (`table-layout: fixed`, Mindestbreite 1090 px, horizontal scrollbar):
-
-| # | Spalte | Breite | Inhalt |
-|---|---|---|---|
-| 1 | Tag | 42 px | Tageszahl, rechtsbündig, fett |
-| 2 | Wochentag | 154 px | Ausgeschriebener Wochentag, darunter ggf. Feiertagsname |
-| 3 | BD | 145 px | Einteilungsschaltfläche Bereitschaftsdienst |
-| 4 | HG | 145 px | Einteilungsschaltfläche Hintergrunddienst |
-| 5 | RBN | 125 px | Freitextfeld mit Vorschlagsliste |
-| 6 | 2. RBN | 125 px | Freitextfeld mit Vorschlagsliste |
-| 7 | Urlaub / FZA | 220 px | Zusammenfassung aller Abwesenheiten des Tages |
-| 8 | Kein Dienst / Wünsche | 230 px | Zusammenfassung aller Dienstwünsche des Tages |
-
-Die Kopfzeile ist `position: sticky` und bleibt beim vertikalen Scrollen stehen. Jede Zelle ist genau 30 px
-hoch, ohne Innenabstand – die Steuerelemente füllen die Zelle vollständig aus. Das erzeugt die gewünschte,
-dichte Tabellenkalkulations-Anmutung.
-
-#### 8.5.1 Zeilenfarbgebung
-
-Die Tabelle trägt die Monatsfarbe in zwei Richtungen: **senkrecht** als kräftiger Anker, **waagerecht**
-als helle Wäsche.
-
-| Fläche | Anteil der Monatsfarbe | Wirkung |
-|---|---|---|
-| **Wochentagsspalte** (alle Zeilen) | **46 %** | Dunkle Nuance, durchgehender senkrechter Streifen |
-| Samstagszeile | 14 % | Hellste Wäsche, 4 px Kante links an der Tageszahl |
-| Sonntagszeile | 22 % | Kräftigere Wäsche, 4 px kräftige Kante links |
-| Feiertagszeile | 30 % | Stärkste Wäsche, 5 px Kante links, 3 px an der Wochentagsspalte |
-| Werktagszellen sonst | – | Neutrales Weiß |
-
-Zwei Gestaltungsentscheidungen stecken darin:
-
-* **Die Wochentagsspalte behält ihre dunkle Nuance in jeder Zeile** – auch in Wochenend- und
-  Feiertagszeilen. Dadurch entsteht ein ununterbrochener senkrechter Anker, an dem die waagerechten
-  Wäschen entlanglaufen, statt ihn zu zerschneiden.
-* **Unter den Zeilentypen bleibt die Wertigkeit erhalten:** Samstag ist besonders, Sonntag ist
-  besonderer, ein Feiertag ist am besondersten. Weil eine ganze Zeile über die volle Tabellenbreite
-  wirkt, tragen diese Flächen deutlich weniger Farbe als der schmale senkrechte Streifen – dieselbe
-  Farbmenge würde in der Breite erschlagend wirken.
-
-Alle vier Werte entstehen aus **einer** Grundfarbe, deshalb ist die Hierarchie in jedem der zwölf Monate
-identisch wahrnehmbar und wechselt geschlossen mit.
-
-**Schrift auf farbigen Flächen** verwendet einen eigenen Palettenton `--month-ink`: die Monatsfarbe auf
-eine feste Helligkeit abgedunkelt, Farbton und Buntheit bleiben erhalten. Die Schrift trägt damit sichtbar
-die Monatsfarbe und hält trotzdem in jeder Palette denselben Kontrast. Nachgemessen über alle zwölf
-Paletten und alle vier Flächen liegt der schlechteste Wert bei **5,63:1** und damit durchgehend über
-WCAG AA; ein Test hält das fest. Der zuvor verwendete Ton hätte auf der dunklen Wochentagsspalte in
-keiner einzigen Palette AA erreicht (schlechtester Wert 3,33:1).
-
-Zusätzlich liegt auf Wochenend- und Feiertagszeilen ein diagonaler, sehr schwacher Weißverlauf – dieselbe
-Lichtkante, die auch Panels und Schaltflächen tragen, damit die eingefärbten Zeilen nicht flach wirken.
-
-**Spezifitätsfalle:** Die Basisregel `.plan-table th, .plan-table td` hat die Spezifität (0,1,1). Ein
-reiner Klassenselektor wie `.weekday-cell` (0,1,0) verliert dagegen – die Einfärbung der Wochentagsspalte
-kam deshalb nie an, unabhängig von jedem Farbwechsel. Alle Zellregeln sind daher konsequent auf
-`.plan-table td.<klasse>` (0,2,1) hochgezogen und die Zeilentypen auf `.plan-table tr.<typ> td` (0,2,2).
-Damit ist die Rangfolge Zelle < Zeilentyp eindeutig und unabhängig von der Quellreihenfolge.
-
-#### 8.5.2 Einteilungsschaltflächen (BD/HG)
-
-Jede Zelle enthält eine Schaltfläche mit zwei Elementen:
-
-* **Name** der eingeteilten Person, bei Überlänge mit Auslassungspunkten – oder `—` bei offener Stelle.
-* **Chip** rechts: bei belegter Stelle die Bewertungsstufe („geeignet", „Hinweis", „Konflikt", „rot"), bei
-  offener Stelle das neutrale Label „offen".
-
-Der Tooltip (`title`) enthält **alle** Begründungen der Bewertung, je Zeile eine. Bei offener Stelle steht
-dort die Handlungsaufforderung „BD eintragen" bzw. „HG eintragen".
-
-Entscheidend: Die Bewertung wird **bei jedem Rendering neu berechnet**. Wird an anderer Stelle im Monat
-etwas geändert – ein Urlaub gesetzt, ein Wochenende belegt, ein Kontingent gefüllt – aktualisieren sich
-alle betroffenen Chips sofort. Ein Plan kann sich also im Nachhinein „einfärben", ohne dass man die
-betroffene Zelle angefasst hat.
-
-#### 8.5.3 RBN-Felder
-
-Beide RBN-Spalten sind Freitextfelder mit Platzhalter „manuell" und einer gemeinsamen `<datalist>`. Beim
-Verlassen eines Feldes:
-
-1. Der getrimmte Wert wird in den Monat geschrieben.
-2. Ist der Name neu, wird er in `state.rbnNames` aufgenommen, dedupliziert und mit
-   `localeCompare(…, 'de')` sortiert – deutsche Umlaute landen also an der richtigen Stelle.
-3. Die Namensliste wird lokal gesichert und – falls erreichbar – zum Server geschrieben.
-4. Der Monat wird als geändert markiert und die Speicherung eingeplant.
-
-Die Vorschlagsliste **lernt** damit im laufenden Betrieb: Nach wenigen Monaten genügt ein Anfangsbuchstabe.
-Schlägt die Serverspeicherung fehl, ist das folgenlos – die Liste bleibt lokal erhalten.
-
-#### 8.5.4 Zusammenfassungsspalten und die FZA-Ableitung
-
-Die Spalten 7 und 8 sind vollflächige, unauffällige Schaltflächen. Sie zeigen kommagetrennt
-`Kurzname: Kürzel` für alle Personen mit `includeInAbsenceList` und öffnen bei Klick den
-Tagesmarkierungs-Dialog für genau dieses Datum. Der Tooltip zeigt dieselben Einträge zeilenweise
-ausgeschrieben.
-
-Die Abwesenheitsspalte enthält eine besondere Intelligenz – die **Ableitung des Freizeitausgleichs**:
-
-* **Abgeleitete Anzeige (Dr. Becker):** Ist ein Tag der erste reguläre Werktag nach einem Samstags-BD von
-  Dr. Becker, erscheint „Becker: FZA" **automatisch**, ohne dass eine Abwesenheit eingetragen wurde. Der
-  Tooltip erklärt die Herkunft ausdrücklich: „automatisch aus Samstags-BD für den nächsten regulären
-  Werktag abgeleitet". Ein bereits vorhandener manueller FZA-Eintrag wird dadurch nicht verdoppelt.
-* **Unterdrückte Redundanz (alle Personen):** Ein FZA-Eintrag, der **nicht** manuell gesetzt wurde
-  (`absenceSources ≠ "manual"`, also aus einem Import stammt) und der ohnehin auf den ersten regulären
-  Werktag nach einem eigenen BD fällt, wird **nicht** angezeigt. Er ist selbstverständliche Folge des
-  Dienstes und würde die Spalte nur zumüllen. Manuell gesetzte FZA bleiben immer sichtbar – wer sie bewusst
-  eingetragen hat, will sie auch sehen.
-
-„Regulärer Werktag" heißt dabei: Montag bis Freitag **und** kein sächsischer Feiertag. Die Suche läuft bis
-zu sieben Tage rückwärts und bricht ab, sobald ein regulärer Werktag ohne BD dazwischenliegt – ein
-Brückentag oder ein Feiertagsblock unterbricht die Ableitung also nicht.
-
-#### 8.5.5 Mikrointeraktionen der Tabelle
-
-* Zeilen erscheinen beim Rendern **gestaffelt**: `row-soft-arrive`, 300 ms, 7 ms Versatz je Zeile,
-  90 ms Grundverzögerung. Der Monat „läuft ein" statt schlagartig zu erscheinen.
-* Beim Überfahren verschiebt sich eine Zeile um 1 px nach rechts, wird minimal heller und gesättigter und
-  hebt sich per `z-index` über ihre Nachbarn.
-* Alle interaktiven Elemente der Zelle haben eine sichtbare `:focus-visible`-Kontur in der Monatsfarbe,
-  nach innen versetzt, damit sie das enge Zellraster nicht sprengt.
-
----
-
-## 9. Dialoge
-
-Alle vier Dialoge sind native `<dialog>`-Elemente, geöffnet mit `showModal()`. Sie erben dadurch
-Fokusfalle, Escape-zum-Schließen, Inertisierung des Hintergrunds und einen echten `::backdrop` – ohne
-eigenen JavaScript-Aufwand. Jeder Dialog öffnet mit `dialog-glass-open` (250 ms: aus 12 px Tiefe, 97,5 %
-Skalierung und 3 px Unschärfe heraus), der Hintergrund blendet in 220 ms ein.
-
-### 9.1 Auswahldialog (Personalauswahl)
-
-Geöffnet durch Klick auf eine BD- oder HG-Zelle.
-
-* **Eyebrow:** „Bereitschaftsdienst" bzw. „Hintergrunddienst".
-* **Titel:** Deutsches Datum und Rolle, z. B. „11.07.2026 · BD".
-* **Untertitel:** „Farbkodierte Eignungsbewertung mit Tooltip-Begründung. Rote Konflikte erfordern eine
-  explizite Bestätigung."
-* **Liste:** Für jede an diesem Tag aktive, planbare Person eine Karte mit
-  – Name und Bewertungs-Chip in der Kopfzeile,
-  – **allen** Begründungen als einzelne Zeilen darunter,
-  – Einfärbung der gesamten Karte nach Bewertungsstufe,
-  – Tooltip mit denselben Begründungen.
-* **Aktionen:** „Abbrechen" und „Eintrag löschen" (leert die Zelle).
-
-Die Begründungen stehen **direkt in der Liste**, nicht nur im Tooltip. Die Entscheidung ist damit ohne
-Hover und ohne zweiten Klick vollständig informiert – auf einem Touch-Gerät der einzige gangbare Weg.
-
-### 9.2 Konfliktbestätigung
-
-Erscheint ausschließlich, wenn eine Person mit roter Bewertung gewählt wird.
-
-* **Eyebrow:** „Bestätigung erforderlich", Titel „Roter Konflikt".
-* **Klartext:** „«Name» wird für BD am «Datum» mit rotem Konflikt eingetragen."
-* **Gründe:** Jede rote Begründung als eigener roter Chip.
-* **Kommentarfeld:** dreizeilig, optional, Platzhalter „z. B. mit Mitarbeitendem abgestimmt".
-* **Aktionen:** „Abbrechen" oder „Trotzdem eintragen".
-
-Bei Bestätigung wird die Einteilung gesetzt **und** ein Eintrag im `overrideLog` des Monats abgelegt:
-Zeitstempel, Datum, Rolle, Personen-ID, sämtliche Gründe und der Kommentar. Anschließend schließen sich
-Konflikt- **und** Auswahldialog. Der Vorgang ist damit vollständig dokumentiert und im JSON-Export
-nachlesbar – ohne dass die Planenden dafür etwas tun müssen.
-
-### 9.3 Tagesmarkierungs-Dialog
-
-Geöffnet durch Klick auf eine der beiden Zusammenfassungsspalten.
-
-* **Titel:** „Markierungen für «Datum»", Hinweis: „Mehrfachauswahl pro Datum. Änderungen werden automatisch
-  gespeichert."
-* Pro Person eine Zeile mit Name und Funktionsbezeichnung, darunter zwei Chip-Gruppen:
-  * **Abwesenheit:** alle vier Typen plus „keine".
-  * **Dienstwunsch:** alle sechs Typen plus „kein Wunsch".
-* Der jeweils aktive Chip ist in der Monatsfarbe hervorgehoben.
-
-Jeder Klick wirkt sofort: Wert setzen → als geändert markieren → Dialog neu aufbauen → Tabelle neu rendern.
-Die Auswirkung auf die Ampeln im Hintergrund ist also unmittelbar sichtbar. Es gibt bewusst keine
-„Übernehmen"-Schaltfläche – der Dialog ist ein Direktmanipulations-Werkzeug.
-
-### 9.4 Sammel-Dialog (Komforteingabe)
-
-Der schnellste Weg für Urlaubsblöcke und Wunschserien, geöffnet über „Abwesenheiten" oder „Dienstwünsche".
-
-* **Kopf:** Modusabhängige Beschriftung, Untertitel „Beliebige einzelne Tage auswählen, Typ festlegen,
-  gesammelt übernehmen."
-* **Zwei Auswahlfelder:** Mitarbeitende und Typ. Eine Änderung baut das Raster sofort neu auf.
-* **Tagesraster:** eine Kachel je Kalendertag mit Tageszahl, Wochentagskürzel, ggf. Feiertagsname und dem
-  aktuell gesetzten Wert (oder `—`). Samstage, Sonntage und Feiertage tragen dieselbe Farbhierarchie wie
-  die Plantabelle.
-* **Vorbelegung:** Kacheln, die bereits den gewählten Typ tragen, sind vorausgewählt. Man sieht damit auf
-  einen Blick den Bestand und kann ihn erweitern oder – durch Abwählen und erneutes Übernehmen –
-  korrigieren.
-* **Auswahl:** Klick schaltet eine Kachel um.
-* **Aktionen:** „Auswahl zurücksetzen" (hebt alle Markierungen auf) und „Übernehmen" (schreibt den
-  gewählten Typ auf alle markierten Tage, rendert neu, schließt den Dialog).
-
-Auf schmalen Bildschirmen wird das Raster auf vier Spalten reduziert und die Auswahlfelder untereinander
-gestellt.
-
----
-
-## 10. Statistik und Auswertung
-
-Unter dem Plan steht dauerhaft – nicht in einem Reiter, nicht in einem Dialog – die Verteilungstabelle mit
-dem Zusatz „Direkt aus dem Monatsplan berechnet".
+| Aktueller Monat | setzt beide Auswahlfelder auf heute und öffnet den Monat |
+| Abwesenheiten | Sammelerfassung für Abwesenheiten |
+| Dienstwünsche | Sammelerfassung für Wünsche |
+| Serverstand neu laden | erzwingt das Laden des aktuellen Monats vom Server |
+| Excel importieren | liest `.xlsx` oder `.xls` |
+| Excel exportieren | schreibt den sichtbaren Monat |
+| PDF exportieren | öffnet den Druckdialog |
+| JSON sichern | exportiert Server- oder lokalen Gesamtstand |
+| JSON laden | validiert und importiert eine Sicherung |
+
+### 9.4 Monatskopf
+
+Der Kopf zeigt „Bereitschaftsdienstplan“, den deutschen Monatstitel, das Badge
+„Monatskontrast · Palettenname“ und die Legende für geeignet, Hinweis, Konflikt, nicht wählbar und
+Bestätigung.
+
+### 9.5 Plantabelle
 
 | Spalte | Inhalt |
 |---|---|
-| **Mitarbeitende** | Name |
-| **BD** | Anzahl Bereitschaftsdienste im Monat |
-| **HG** | Anzahl Hintergrunddienste im Monat |
-| **Wochenende** | Wochenend-Äquivalent (BD = 1,0 / nur HG = 0,5), eine Nachkommastelle |
-| **BD-Soll** | Richtwert der Person, leer wenn keiner gesetzt |
-| **Rest** | Soll minus Ist; **negative Werte rot** hervorgehoben (`over-target`) |
+| Tag | Tageszahl |
+| Wochentag | ausgeschriebener Wochentag und gegebenenfalls Feiertag |
+| BD | bewertete Personenauswahl |
+| HG | bewertete Personenauswahl |
+| RBN | lernendes Freitextfeld |
+| 2. RBN | zweites lernendes Freitextfeld |
+| Urlaub / FZA | Tageszusammenfassung und Detaildialog |
+| Kein Dienst / Wünsche | Tageszusammenfassung und Detaildialog |
 
-Die letzte Zeile „Offen" zählt die Tage **ohne** BD und **ohne** HG. Sie ist die schnellste Antwort auf die
-wichtigste Frage des Planungsprozesses: *Bin ich fertig?*
+Die Tabelle nutzt `table-layout: fixed`, eine Mindestbreite von 1090 px, einen eigenen horizontalen
+Scrollbereich und eine sticky Kopfzeile. Auf schmalen Geräten werden keine fachlichen Spalten
+ausgeblendet.
 
-Aufgenommen werden nur Personen mit `includeInPlanning`, die **am Ersten des Monats aktiv** sind. Die
-Funktionsbezeichnung wird zum **15. des Monats** ausgewertet, also zur Monatsmitte – fällt ein
-Beförderungsstichtag in den Monat, zeigt die Statistik die überwiegend gültige Rolle. Beides ist durch
-Tests abgesichert (Fr. Hellmann fehlt im September 2026 und erscheint im Oktober 2026).
+### 9.6 Zeilen und Zellen
 
-Die Statistik rendert bei **jeder** Änderung neu. Eine Einteilung verschiebt die Zahlen sofort – man plant
-also permanent mit sichtbarer Verteilung, statt am Ende nachzuzählen.
+- Wochentagsspalte: 46 % Monatsfarbe als durchgehender vertikaler Anker.
+- Samstag: 14 % Monatsfarbe.
+- Sonntag: 22 % Monatsfarbe.
+- Feiertag: 30 % Monatsfarbe.
+- Werktagszellen: neutrales Weiß.
+- Schrift auf Farbflächen: berechnetes `--month-ink` mit mindestens WCAG-AA-Kontrast.
+
+BD-/HG-Schaltflächen zeigen Namen, Stufenchip und alle Gründe im Tooltip. Offene Felder zeigen `—` und
+„offen“. Nach jeder Änderung werden auch bestehende Einteilungen neu bewertet.
+
+### 9.7 RBN-Namen
+
+Beim Verlassen eines RBN-Feldes wird der Wert getrimmt und gespeichert. Neue Namen werden dedupliziert,
+mit deutscher Sortierung in `state.rbnNames` aufgenommen, lokal gesichert und nach Möglichkeit an
+`/api/rbn-names` übertragen. Beide RBN-Spalten teilen dieselbe `<datalist>`.
+
+### 9.8 FZA-Darstellung
+
+- Für Dr. Becker erscheint am ersten regulären Werktag nach eigenem Samstags-BD automatisch „Becker:
+  FZA“, sofern kein gleichwertiger sichtbarer Eintrag vorhanden ist.
+- Importierte, nicht manuelle FZA-Einträge können unterdrückt werden, wenn sie exakt dem automatisch
+  ableitbaren ersten Werktag nach eigenem BD entsprechen.
+- Manuelle FZA-Einträge bleiben immer sichtbar.
 
 ---
 
-## 11. Monatsfarben, Animationen und Design-Philosophie
+## 10. Dialoge und Eingabeflüsse
 
-### 11.1 Gestaltungsidee
+Alle Dialoge sind native `<dialog>`-Elemente. Dadurch kommen Fokusfalle, Escape-Verhalten,
+Hintergrund-Inertisierung und `::backdrop` aus der Browserplattform.
 
-Die Oberfläche folgt einer **Liquid-Glass-/Aero-Milchglas-Ästhetik**: geschichtete, halbtransparente
-Glasflächen über einem dunklen, leicht bewegten Farbraum. Das ist kein Selbstzweck. Der dunkle Hintergrund
-lässt die eigentliche Arbeitsfläche – die weiße, streng gerasterte Tabelle – wie ein physisches Blatt
-Papier auf einem Tisch wirken. Alles Bedienende (Panels, Leisten, Dialoge) liegt sichtbar *darüber*, alles
-Inhaltliche liegt *darin*. Diese Ebenentrennung macht die Anwendung auch nach Stunden noch lesbar.
+### 10.1 Personenauswahl
 
-Das Farbsystem hält sich strikt an eine Regel: **Chrom ist neutral, Inhalt trägt Farbe.** Farbe erscheint
-nur dort, wo sie Information transportiert – Wochenend- und Feiertagshierarchie, Ampelbewertung,
-Speicherstatus, Monatsidentität.
+Ein Klick auf BD oder HG öffnet eine Karte je aktiver planbarer Person. Jede Karte enthält Name,
+Bewertungsstufe und alle Gründe. Nicht planbare oder am Datum inaktive Personen werden bereits vor dem
+Rendern herausgefiltert und erscheinen nicht als Karte. „Eintrag löschen“ leert die aktuelle Rolle;
+„Abbrechen“ verändert nichts.
 
-#### Milchglas ist dosiert, nicht flächendeckend
+### 10.2 Rote Konfliktfreigabe
 
-Echtes `backdrop-filter` kostet **Fläche × Radius**: Der Compositor liest in jedem Frame die Pixel hinter
-dem Element, faltet sie mit dem Weichzeichner und setzt das Ergebnis wieder zusammen. Zuvor lag derselbe
-`blur(25px)` auf allen Panels – auch auf der großen Arbeitsfläche, dem mit Abstand größten Element der
-Seite. Gemessen an dieser Oberfläche:
+Die Auswahl einer roten Karte öffnet den Bestätigungsdialog. Er zeigt Person, Rolle, Datum, alle Gründe
+und ein optionales Kommentarfeld. „Trotzdem eintragen“ setzt den Dienst und ergänzt `overrideLog`.
 
-| Zustand | Bilder pro Sekunde |
+### 10.3 Tagesmarkierungen
+
+Ein Klick auf eine Zusammenfassungsspalte zeigt jede Person mit Rollenlabel sowie allen
+Abwesenheits- und Wunschchips. Änderungen wirken sofort, markieren den Monat als geändert und rendern
+Plan und Bewertung neu. Es gibt keine zusätzliche Übernehmen-Schaltfläche.
+
+### 10.4 Sammelerfassung
+
+Abwesenheiten und Wünsche besitzen einen eigenen Modus. Person und Typ werden gewählt; anschließend
+lassen sich beliebige Tageskacheln markieren. Die Kacheln zeigen Tageszahl, Wochentag, Feiertag und
+aktuellen Wert. „Auswahl zurücksetzen“ hebt Markierungen auf, „Übernehmen“ schreibt den gewählten Typ auf
+alle markierten Tage.
+
+---
+
+## 11. Statistik
+
+Die Statistik steht unmittelbar unter dem Monat und wird bei jeder Änderung neu berechnet.
+
+| Spalte | Aussage |
 |---|---|
-| vorher, Weichzeichner auf allen Panels | 9 |
-| ohne Weichzeichner auf der Arbeitsfläche | 16 |
-| zusätzlich ohne `filter` auf den Hintergrund-Orbs | 22 |
+| Mitarbeitende | Anzeigename |
+| BD | BD-Anzahl im Monat |
+| HG | HG-Anzahl im Monat |
+| Wochenende | Wochenend-Äquivalent |
+| BD-Soll | persönlicher Richtwert |
+| Rest | Soll minus Ist; negative Werte werden hervorgehoben |
 
-Daraus folgt die heutige Aufteilung:
+Die Schlusszeile „Offen“ zählt unbesetzte BD- und HG-Tage. Planbare Personen werden anhand ihrer
+Aktivität zum Monatsersten aufgenommen; das Rollenlabel wird für die Monatsmitte bestimmt.
 
-* **Echtes Milchglas** tragen nur die kleinen, schwebenden Elemente, hinter denen sich tatsächlich etwas
-  bewegt: Kopfleiste, Werkzeugleiste, Dialoge, Glas-Einfassungen und das Farb-Badge. Genau dafür ist der
-  Effekt gedacht.
-* **Die große Arbeitsfläche** bekommt stattdessen eine geschichtete Glasoptik *ohne* Weichzeichner:
-  Lichtkante oben, feine Brechung an der Unterkante, Monatstönung, tiefer weicher Schlagschatten. Sie
-  wirkt dadurch dichter, ist hinter einer engen Datentabelle deutlich besser lesbar und kostet nichts.
-* **Die Hintergrund-Orbs** kommen ohne `filter: blur()` aus. Ein radialer Verlauf ist bereits weich; die
-  Weichheit übernehmen die Verlaufsstopps.
-* `contain: paint` grenzt das Neuzeichnen auf die jeweilige Fläche ein, `@supports` liefert eine
-  Rückfallebene für Browser ohne `backdrop-filter`.
+---
 
-### 11.2 Die zwölf Monatspaletten
+## 12. Monatsfarben und Bewegungsdesign
 
-Jeder Monat besitzt eine eigene, benannte Grundfarbe:
+### 12.1 Paletten
 
-| Monat | Palette | Grundfarbe |
+| Monat | Palette | Akzent |
 |---|---|---|
 | Januar | Eisblau | `#4f8fbd` |
 | Februar | Rubinrose | `#b46483` |
@@ -1004,653 +610,549 @@ Jeder Monat besitzt eine eigene, benannte Grundfarbe:
 | November | Schieferblau | `#657b9d` |
 | Dezember | Tannengrün & Rubin | `#416f62` |
 
-Die Auswahl ist bewusst **jahreszeitlich motiviert**: kühles Eisblau im Januar, Lavendel und Frühlingsgrün
-im Frühjahr, warme Koralle und Bernstein im Hochsommer, Kupfer und Pflaume im Herbst, Tannengrün zur
-Weihnachtszeit. Alle zwölf Töne haben eine vergleichbare Sättigung und Helligkeit, sodass Kontrast und
-Lesbarkeit über das ganze Jahr konstant bleiben und keine Palette „lauter" wirkt als eine andere.
+Aus jeder Palette entstehen Akzent, starker Akzent, kontrastierter Schriftton, Glow, Paneltönung und die
+vier Tabellenflächen. Der Farbton wird bei Aufhellung und Übergang in OKLCH behandelt. Zwischen zwei
+Farben folgt die Interpolation dem kürzeren Farbtonbogen; gegenüberliegende Paletten laufen deshalb nicht
+durch ein ausgewaschenes Grau.
 
-Aus jeder Palette entsteht ein vollständiger Variablensatz:
+### 12.2 Farbverlauf
 
-| Variable | Herkunft | Verwendung |
-|---|---|---|
-| `--month-accent` | Palette | Grundfarbe: Kanten, Fokusringe, Basis aller Ableitungen |
-| `--month-accent-strong` | Palette | Dunklere Variante: kräftige Kanten, Badge-Text |
-| `--month-ink` | berechnet | Schriftton auf farbigen Tabellenflächen, kontrastgeprüft |
-| `--month-glow` | Palette | Halbtransparenter Schein: Ambient-Orbs, Panel-Schatten, Badge-Leuchten |
-| `--month-panel-tint` | Palette | Sehr schwache Einfärbung der Glasflächen |
-| `--weekday-field-bg` | berechnet | Wochentagsspalte, 46 % |
-| `--saturday-row-bg` | berechnet | Samstagszeilen, 14 % |
-| `--sunday-row-bg` | berechnet | Sonntagszeilen, 22 % |
-| `--holiday-row-bg` | berechnet | Feiertagszeilen, 30 % |
+`applyMonthTheme()`:
 
-Die berechneten Werte entstehen in `js/theme.js` als **fertige, konkrete Farben** und werden als
-Inline-Style auf `<html>` geschrieben. Weitere Farben leitet das Stylesheet per `color-mix` ab –
-Fokusringe, Chip-Hintergründe, Auswahlmarkierungen, Panel-Schein. **Eine** Farbe steuert das gesamte
-Erscheinungsbild eines Monats.
+1. normalisiert die Monatszahl modulo zwölf;
+2. liest den tatsächlich sichtbaren Variablensatz als Start;
+3. setzt Zielmonat und Palettenname sofort in `dataset.month` und `dataset.palette`;
+4. interpoliert neun konkrete Farbvariablen über 720 ms;
+5. verwendet `performance.now()` als Zeitbasis und `requestAnimationFrame()` als Takt;
+6. nutzt `cubic-bezier(0.40, 0, 0.22, 1)`;
+7. übernimmt bei schneller Folgereaktion den aktuellen Zwischenstand als neuen Start;
+8. setzt am Ende die Zielwerte exakt.
 
-Gemischt wird nicht linear in sRGB, sondern in **OKLCH**: Beim Aufhellen bleibt der Farbton exakt
-erhalten, statt in Richtung Violett oder Grün zu kippen, wie es die naive sRGB-Mischung heller Töne tut.
+Die Animation bleibt korrekt, wenn ein Renderframe ausfällt: Der nächste Frame setzt am zeitlich
+richtigen Fortschritt fort. Ein erneuter Sicherheitsaufruf aus `render()` beendet einen bereits laufenden
+Übergang zum selben Ziel nicht.
 
-### 11.3 Der Farbwechsel beim Monatswechsel
+### 12.3 Inhaltsbewegung
 
-Dieser Wechsel ist die auffälligste Interaktion der Anwendung. Er wird **nicht** über CSS-Transitions
-gefahren, sondern von `js/theme.js` selbst interpoliert – aus einem konkreten, gemessenen Grund.
+Farbe reagiert sofort auf die Navigationsabsicht. Der neue Inhalt gleitet erst nach Laden und vollständigem
+`render()` ein. Animiert werden:
 
-#### Warum keine CSS-Transition
+- `#monthTitle`;
+- `#printArea`;
+- `#statsGrid`.
 
-Der naheliegende Weg wäre, die Monatsvariablen per `@property` als `<color>` zu registrieren und eine
-`transition` darauf zu legen. Das war die frühere Umsetzung, und sie war nicht reproduzierbar:
+Beim Vorwärtswechsel kommen sie aus `translate3d(22px, 0, 0)`, beim Rückwärtswechsel aus `-22px`.
+Opacity und Transform laufen 520 ms mit `cubic-bezier(.22, 1, .36, 1)`. Die Klassen werden nach 700 ms
+entfernt. Währenddessen ruht die zeilenweise Einlaufanimation, damit eine bereits vollständig gesetzte
+Tabelle als Einheit erscheint. Beim Erststart darf jede Zeile mit 7 ms Versatz weich eintreffen.
 
-* **Der Start hängt vom freien Main-Thread ab.** Eine Transition beginnt mit der Stilberechnung des
-  Frames, in dem der neue Wert erstmals berechnet wird. Genau in diesem Moment baut die Anwendung die
-  Monatstabelle neu auf. Messungen zeigten mal einen weichen Verlauf, mal überhaupt keine Bewegung bis
-  zum Ende – in einem Durchlauf stand die Farbe nach 1000 ms noch exakt auf dem Ausgangswert und sprang
-  dann.
-* **Abgeleitete Variablen lösen nicht überall neu auf.** Die Flächenfarben waren als nicht registrierte
-  Custom Properties über `color-mix(… var(--month-accent) …)` definiert. Ob eine solche Ableitung
-  während der Animation der Basisvariablen Frame für Frame neu aufgelöst wird, ist zwischen den Engines
-  nicht verlässlich gleich.
+### 12.4 Weitere Bewegung
 
-#### Wie es jetzt läuft
+- Panel-Einlauf mit gestaffelter Verzögerung;
+- langsame Ambient-Orbs;
+- wandernde Glasreflexe;
+- 1–2-px-Hoverbewegungen;
+- atmender Speicherstatuspunkt;
+- kurzer Sättigungspuls auf dem kleinen Palettenbadge;
+- Dialogöffnung mit Opacity, leichter Skalierung und Tiefenbewegung.
 
-1. **Sofortige Reaktion.** `openCurrentMonth` startet den Farbwechsel als **Erstes** – vor Speichern,
-   Laden und Rendern. Er ist damit unabhängig von Netzgeschwindigkeit und Datenmenge und beginnt in dem
-   Moment, in dem geklickt wird. Das gilt gleichermaßen für beide Pfeiltasten, das Monats-Dropdown, das
-   Jahres-Dropdown und „Aktueller Monat".
-2. **Ein Frame Vorlauf.** Danach wartet die Anwendung einen Animationsframe, bevor Laden und Rendern
-   den Main-Thread belegen – der erste Schritt des Verlaufs ist damit gezeichnet, bevor Arbeit anfällt.
-3. **Zeitbasierte Interpolation.** Eine `requestAnimationFrame`-Schleife schreibt in jedem Frame fertige
-   Farbwerte. Der Fortschritt kommt aus `performance.now()`, nicht aus der Frame-Zählung: Blockiert ein
-   langer Frame die Schleife, springt sie auf den korrekten Fortschritt und läuft weich weiter, statt
-   stehenzubleiben. Genau diese Eigenschaft macht den Wechsel unempfindlich gegen Ladelast.
-4. **OKLCH statt sRGB, über den kürzeren Farbtonbogen.** Eine Gerade durch den Farbraum führt zwischen
-   gegenüberliegenden Tönen (Koralle → Tannengrün) nahe an der Neutralachse vorbei – gemessen fiel die
-   Buntheit in der Mitte von 59 auf 11, die Fläche wurde für einen Moment grau. Über den Farbtonwinkel
-   gedreht bleibt die Buntheit über den gesamten Weg erhalten: Die Fläche wandert sichtbar über Bernstein
-   und Oliv nach Salbeigrün, statt durch Grau zu tauchen.
-5. **Eine Kurve, die die volle Dauer nutzt.** Die sonst verwendete Kurve `cubic-bezier(.22, 1, .36, 1)`
-   legt rund 98 % des Weges im ersten Drittel zurück – die Zielfarbe war nach 245 von 640 ms erreicht,
-   der Rest der Dauer blieb wirkungslos. Für eine großflächige Farbfläche liest sich das als Schnappen.
-   Der Wechsel läuft daher über **720 ms** mit `cubic-bezier(0.40, 0, 0.22, 1)`: ruhiger Antritt,
-   getragene Mitte, weiches Auslaufen.
-6. **Zwei Geschwindigkeiten.** Der Inhalt gleitet in 520 ms mit der schnelleren Kurve herein, die Farbe
-   zieht in 720 ms darunter nach. Der Plan ist sofort lesbar, die Fläche kommt getragen hinterher – das
-   Gegenteil eines gleichzeitigen Umschaltens.
-7. **Weiche Verkettung.** Ein neuer Wechsel liest den **tatsächlich sichtbaren** Zustand als
-   Ausgangspunkt, auch mitten in einem laufenden Verlauf. Schnelles Blättern kettet dadurch weich, statt
-   zu springen.
-8. **Nicht zerstörendes Sicherheitsnetz.** `render()` wendet die Palette des gerenderten Monats erneut an,
-   damit Farbe und Inhalt auch bei Reload, Excel-Import oder JSON-Wiederherstellung nie auseinanderlaufen.
-   Läuft bereits ein Übergang auf genau dieses Ziel, bleibt er unangetastet. Ohne diese Sperre schoss der
-   Sicherheitsnetz-Aufruf den gerade gestarteten Verlauf ab und die Farbe sprang mitten in der Bewegung
-   ans Ziel – nach außen exakt das Bild, das wie „gar keine Animation" aussah.
-9. **Erstanwendung ohne Übergang.** Beim Programmstart werden die Farben direkt gesetzt. Die Anwendung
-   startet in der richtigen Farbe, statt aus dem Standardblau hineinzublenden.
-10. **Richtungsabhängige Inhaltsbewegung.** Monatstitel, Plantabelle und Statistik gleiten in Leserichtung
-    ein: beim Vorwärtsblättern von rechts, beim Rückwärtsblättern von links. Bei einem Direktsprung
-    bestimmt der Vorzeichenvergleich der Monatsordnungszahlen (`Jahr × 12 + Monat`) die Richtung – von
-    März auf Dezember läuft es nach vorn, von Dezember auf März zurück.
-11. **Mitziehende Umgebung.** Ambient-Orbs, Panel-Schatten, Farb-Badge, Fokusringe und die gesamte
-    Flächenhierarchie leiten sich aus demselben Satz ab und wandern im selben Verlauf mit. Nichts bleibt
-    in der alten Farbe zurück.
-12. **Robuste Monatsnormalisierung.** Die Monatszahl wird modulo 12 normalisiert, sodass auch ein
-    rechnerisch entstandener Wert außerhalb von 1–12 nie zu einer fehlenden Palette führt.
-
-Das Farb-Badge nennt zusätzlich den Namen der Palette („Monatskontrast · Bernstein") – die Farbe ist damit
-nicht nur Atmosphäre, sondern benannte, überprüfbare Information. Zur Diagnose spiegeln
-`document.documentElement.dataset.month` und `dataset.palette` jederzeit den aktiven Zustand.
-
-### 11.4 Weitere Animationen und Mikrointeraktionen
-
-| Element | Effekt | Dauer |
-|---|---|---|
-| Panels beim Start | `glass-surface-enter`: aus 10 px Tiefe, 99,2 % Skalierung, 3 px Unschärfe | 560 ms, gestaffelt 0 / 55 / 110 ms |
-| Ambient-Orb 1 | Drift über 34 rem, sanfte Skalierung, in `--month-accent` | 18 s, alternierend |
-| Ambient-Orb 2 | Gegenläufige Drift in `--month-glow` | 22 s, alternierend |
-| Ambient-Orb 3 | Weiße Aufhellung von unten | 26 s, alternierend |
-| Glas-Reflex | `glass-reflection`: wandernde elliptische Lichtkante über jedem Panel | 12 s, alternierend |
-| Topbar/Toolbar bei Hover | 2 px anheben, Rand aufhellen, Schein in Monatsfarbe | 240 ms |
-| Tabellenrahmen bei Hover | Randfarbe wechselt zur Monatsfarbe, farbiger Außenschein | 260 ms |
-| Schaltflächen bei Hover | 1 px anheben, hellerer Verlauf, tieferer Schatten | 160 ms |
-| Statuspunkt | `status-breathe`: Skalierung 0,9 → 1,08 mit Leuchtstärke | 2,4 s, endlos |
-| Tageszeilen (nur Erststart) | `row-soft-arrive`, 7 ms Versatz je Zeile | 300 ms |
-| Farb-Badge beim Wechsel | `month-content-breathe`, Sättigungspuls | 680 ms |
-| Dialoge | `dialog-glass-open` und Backdrop-Einblendung | 250 / 220 ms |
-| Karten und Kacheln | 1 px anheben mit weichem Schatten | 160 ms |
-
-Alle Bewegungen sind kurz, richtungsstabil und laufen über dieselbe Beschleunigungskurve. Nichts blinkt,
-nichts springt, nichts wiederholt sich aufdringlich – die einzigen Dauerbewegungen (Orbs, Reflex,
-Statuspunkt) sind so langsam, dass sie unterhalb der bewussten Wahrnehmungsschwelle bleiben.
-
-Zwei Entscheidungen sind messbasiert und betreffen ausdrücklich den Monatswechsel:
-
-* **Der Sättigungspuls liegt nur auf dem kleinen Farb-Badge.** Ein `filter` auf der gesamten Plantabelle
-  erzwingt in jedem Frame ein Neurastern der kompletten Fläche und hat genau die Frames gekostet, die der
-  Farbverlauf braucht. Tabelle und Statistik bewegen sich ausschließlich über `transform` und `opacity` –
-  beides läuft im Compositor.
-* **Die gestaffelte Zeilen-Einblendung ruht während des Monatswechsels.** Zusammen mit der
-  Containerbewegung erschien die Tabelle rund 300 ms lang leer: Die letzte Zeile startet erst nach
-  90 ms + 31 × 7 ms, der Plan fiel mitten im Wechsel in ein Loch. Jetzt gleitet eine bereits vollständig
-  gesetzte Tabelle herein; beim Erststart bleibt der gestaffelte Aufbau erhalten.
-
-### 11.5 Bewegungsreduktion
-
-Die Anwendung respektiert `prefers-reduced-motion: reduce` auf drei Ebenen:
-
-* **Global in CSS:** Alle Animations- und Übergangsdauern werden auf 0,001 ms gesetzt.
-* **Gezielt:** Farbübergang, Inhalts-Slide und Sättigungspuls werden zusätzlich explizit deaktiviert.
-* **In JavaScript:** `applyMonthTheme` und `animateMonthContent` prüfen die Einstellung selbst und setzen
-  Farben dann hart, statt eine unterdrückte Animation zu starten.
-
-Funktional ändert sich nichts – jede Farbe, jede Hierarchie und jede Information bleibt vollständig
-erhalten. Auch beim Drucken werden die Einlaufanimationen ausdrücklich neutralisiert, damit kein
-teiltransparenter Zwischenzustand auf Papier landen kann.
+`prefers-reduced-motion: reduce` deaktiviert Farbverlauf, Inhaltsbewegung und dekorative Animationen.
+Information, Palette und Funktion bleiben erhalten.
 
 ---
 
-## 12. Persistenz, Synchronisierung und Offline-Betrieb
+## 13. Monatsnavigation und Wettlaufschutz
 
-### 12.1 Start der Anwendung
+Alle Navigationswege führen durch `openCurrentMonth()`:
 
-```
-DOMContentLoaded
-  └─ init()
-       ├─ cacheElements()          DOM-Referenzen einsammeln
-       ├─ bindEvents()             alle Ereignisse registrieren
-       ├─ buildStaticSelectors()   Monats- und Jahresliste aufbauen
-       ├─ releaseLegacyServiceWorker()  alten Worker abmelden, Caches leeren
-       ├─ setStatus('loading')
-       ├─ bootstrapState()         Stammdaten: Server → localStorage → Vorgaben
-       ├─ applyMonthTheme(…, ohne Animation)
-       ├─ populateSelectors()
-       └─ openCurrentMonth(…, forceServer = true)
-```
+- Vormonat und Folgemonat über `shiftMonth()`;
+- Monats-Dropdown;
+- Jahres-Dropdown;
+- „Aktueller Monat“;
+- Server-Reload des sichtbaren Monats.
 
-### 12.2 Dreistufige Ladekette
+### 13.1 Angefordert versus geladen
 
-Sowohl `bootstrapState` als auch `loadMonth` folgen derselben Kaskade:
+`state.currentYear` und `state.currentMonth` bezeichnen den fertig geladenen Monat.
+`requestedYear` und `requestedMonth` bezeichnen das zuletzt angeforderte Ziel. Richtung und
+`targetChanged` werden gegen das zuletzt angeforderte Ziel berechnet.
 
-1. **Server** (`/api/…`) – bei Erfolg wird der Stand übernommen, `serverReady = true` gesetzt und eine
-   Kopie in `localStorage` geschrieben.
-2. **`localStorage`** – bei Netzfehler wird der letzte lokale Stand verwendet, `serverReady = false`.
-3. **Leerer Monat / Vorgabestammdaten** – wenn auch lokal nichts vorliegt.
+Das ist für schnelle Umkehr entscheidend: Wird während „Juli → August“ sofort wieder Juli gewählt, ist
+der geladene Zustand möglicherweise noch Juli, die sichtbare Farbanimation aber bereits August. Der
+Vergleich gegen `requestedMonth` erkennt die echte Rückwärtsbewegung und führt die Palette wieder sicher
+zu Juli.
 
-Es gibt damit **keinen Zustand, in dem die Anwendung nicht bedienbar ist**. Auch der Erstaufruf ohne Netz
-liefert einen vollständig funktionsfähigen, leeren Monat mit korrekten Kalendertagen und Feiertagen.
+### 13.2 Request-ID
 
-### 12.3 Vorladen der Nachbarmonate
+Jeder Aufruf erhöht `monthRequestId`. Nach dem Laden des Hauptmonats und nach dem Vorladen der
+Nachbarmonate prüft der Aufruf, ob er noch der jüngste ist. Ein älterer Request darf sich dadurch nicht
+mehr als sichtbarer aktueller Monat veröffentlichen und die UI nicht überschreiben. Der abgeschlossene
+Abruf kann zuvor dennoch den Monatscache, dessen lokale Kopie oder den Verbindungsstatus aktualisiert
+haben; diese Hintergrunddaten sind nicht mit dem publizierten Navigationsziel gleichzusetzen.
 
-Nach jedem Monatswechsel lädt `warmAdjacentMonths(jahr, monat)` Vor- und Folgemonat parallel
-(`Promise.allSettled`) in den Cache. Zwei Zwecke:
+### 13.3 Speichersicherheit
 
-* **Regelkorrektheit.** Abstands-, Wochenend- und BD-FZA-BD-Prüfungen brauchen Daten jenseits der
-  Monatsgrenze. Ohne Vorladen wäre ein BD am 1. des Monats regeltechnisch blind für den 31. des Vormonats.
-* **Wahrgenommene Geschwindigkeit.** Das Blättern in Nachbarmonate erfolgt aus dem Speicher.
-
-Wichtig: Das Vorladen **verändert den Statusindikator nicht**. `state.serverReady` wird vorher gesichert
-und danach wiederhergestellt – ein fehlgeschlagener Hintergrundabruf darf einen erfolgreich geladenen
-Hauptmonat nicht als „offline" erscheinen lassen.
-
-### 12.4 Speicherstrategie
-
-**Debounce statt Speicherknopf.** Jede Änderung ruft `markDirty()` auf, das über `scheduleSave` einen Timer
-von **1100 ms** setzt. Weitere Änderungen innerhalb dieser Zeit verschieben den Zeitpunkt. Erst danach wird
-geschrieben. Schnelle Eingabefolgen erzeugen so genau einen Speichervorgang.
-
-Der Speichervorgang selbst (`persistMonth`):
-
-1. `updatedAt` auf jetzt setzen, `revision` erhöhen.
-2. **Immer zuerst** in `localStorage` schreiben – der lokale Stand ist damit sicher, bevor Netzwerk im
-   Spiel ist.
-3. Status auf „Speichert …".
-4. `PUT /api/month/:year/:month`.
-5. Erfolg → „Gespeichert", `dirty = false`. Fehler → „Offline gespeichert", `serverReady = false`, `dirty`
-   bleibt gesetzt.
-
-**Wichtig:** `markDirty()` merkt sich Jahr und Monat **zum Zeitpunkt der Änderung** in der Closure. Wird
-während des laufenden Debounce der Monat gewechselt, wird trotzdem der korrekte – der geänderte – Monat
-gespeichert.
-
-### 12.5 Schutz vor Datenverlust
-
-Drei Sicherungen greifen ineinander:
-
-* **Vor jedem Monatswechsel:** Sind Änderungen offen, wird der Timer abgebrochen und der bisherige Monat
-  **sofort ausgeschrieben**, bevor der neue geladen wird.
-* **Vor dem Verlassen der Seite:** `beforeunload` löst eine Speicherung des aktuellen Monats aus.
-* **Immer lokal zuerst:** Selbst ein abgebrochener Serverschreibvorgang lässt den Stand in `localStorage`
-  zurück, von wo er beim nächsten Start geladen wird.
-
-### 12.6 Wettlaufschutz beim Monatswechsel
-
-`openCurrentMonth` vergibt bei jedem Aufruf eine fortlaufende `requestId`. Nach jedem `await` wird geprüft,
-ob inzwischen ein neuerer Aufruf gestartet wurde; wenn ja, bricht der alte Aufruf **ohne Rendering** ab.
-Schnelles, mehrfaches Klicken auf die Pfeiltasten kann so niemals dazu führen, dass ein zwischenzeitlich
-fertig geladener älterer Monat den neueren überschreibt. Da der Farbwechsel vor dieser Kette liegt, folgt
-die Farbe immer dem zuletzt angeforderten Monat.
+Bei offenem Dirty-Zustand speichert die Navigation `loadedYear` und `loadedMonth`, also den tatsächlich
+bearbeiteten Monat. Das Navigationsziel kann bereits weitergelaufen sein, ohne den Speicheradressaten zu
+verändern.
 
 ---
 
-## 13. Backend-API
+## 14. Speichern, Synchronisieren und lokaler Ausfallbetrieb
 
-Alle Endpunkte sind Cloudflare Pages Functions unter `functions/api/`. Antworten sind stets JSON mit
-`Cache-Control: no-store` und `Content-Type: application/json; charset=utf-8`.
+### 14.1 Startkette
+
+1. Das Inline-Skript im `<head>` startet Legacy-Worker- und Cachebereinigung.
+2. Versionierte Styles und ES-Module werden geladen.
+3. `DOMContentLoaded` startet `init()`.
+4. DOM-Referenzen, Ereignisse und statische Auswahlfelder werden aufgebaut.
+5. `releaseLegacyServiceWorker()` wiederholt die Bereinigung defensiv.
+6. `bootstrapState()` lädt Server, lokalen Stand oder Vorgaben.
+7. Die Startpalette wird ohne Übergang gesetzt.
+8. Der aktuelle Monat wird geladen und die Nachbarmonate werden erwärmt.
+
+### 14.2 Ladekaskade
+
+Für Bootstrapdaten und Monate gilt:
+
+1. Server;
+2. `localStorage`;
+3. Standarddaten beziehungsweise leerer Monat.
+
+Bereits geladene Anwendungsdateien vorausgesetzt, bleibt die Planung bei Netz- oder Backend-Ausfall mit
+lokalen Daten nutzbar. Ein Kaltstart ohne Netz ist nicht garantiert, weil kein cachender Anwendungs-
+Service-Worker HTML, CSS oder JavaScript vorhält.
+
+### 14.3 Nachbarmonate
+
+`warmAdjacentMonths()` lädt Vor- und Folgemonat parallel mit `Promise.allSettled`. Das verbessert
+Blättergeschwindigkeit und Regelkorrektheit. Der sichtbare Serverstatus wird dabei gesichert und danach
+wiederhergestellt; ein fehlgeschlagener Hintergrundabruf verfälscht den Hauptstatus nicht.
+
+### 14.4 Automatisches Speichern
+
+`scheduleSave()` entprellt Änderungen 1100 ms. `persistMonth()`:
+
+1. setzt `updatedAt`;
+2. erhöht `revision`;
+3. schreibt zuerst in `localStorage`;
+4. sendet anschließend `PUT /api/month/:year/:month`;
+5. setzt bei Erfolg „Gespeichert“, bei Fehler „Offline gespeichert“.
+
+Monatswechsel brechen einen offenen Timer ab und speichern den tatsächlich geladenen Monat sofort.
+`beforeunload` stößt ebenfalls eine Speicherung an.
+
+Die Speicherung besitzt keine Datensatzsperre, keinen Compare-and-swap und keinen serverseitigen
+Revisionskonflikt. Arbeiten mehrere Browser gleichzeitig am selben Monat, gewinnt das zuletzt
+eingegangene `PUT`. `revision` dient der Nachvollziehbarkeit, nicht der konkurrierenden
+Änderungsauflösung.
+
+### 14.5 Status
+
+| Zustand | Anzeige |
+|---|---|
+| Laden | gelber Punkt, „Lädt …“ |
+| erzwungenes Laden | gelber Punkt, „Lädt Serverstand …“ |
+| Speichern | gelber Punkt, „Speichert …“ |
+| synchron | grüner Punkt, „Gespeichert“ |
+| lokal | orangefarbener Punkt, „Offline – lokaler Stand“ oder „Offline gespeichert“ |
+
+`setStatus()` enthält zusätzlich eine rote `error`-Farbzuordnung als Reserve; der aktuelle
+Anwendungsfluss ruft diesen Status nicht auf.
+
+---
+
+## 15. Backend und HTTP-API
 
 | Methode | Pfad | Zweck |
 |---|---|---|
-| `GET` | `/api/bootstrap` | Settings, Personal und RBN-Namen in einem Aufruf |
-| `GET` | `/api/month/:year/:month` | Einen Monat lesen (`:month` zweistellig) |
-| `PUT` | `/api/month/:year/:month` | Einen Monat schreiben |
-| `GET` | `/api/settings` | Einstellungen lesen |
-| `PUT` | `/api/settings` | Einstellungen schreiben |
-| `GET` | `/api/staff` | Personal lesen |
-| `PUT` | `/api/staff` | Personal schreiben |
-| `GET` | `/api/rbn-names` | RBN-Namensliste lesen |
-| `PUT` | `/api/rbn-names` | RBN-Namensliste schreiben |
-| `GET` | `/api/export` | Vollsicherung: Settings, Personal, RBN-Namen und **alle** Monate 2025–2030 |
-| `POST` | `/api/import` | Vollsicherung einspielen |
+| GET | `/api/bootstrap` | Einstellungen, Personal und RBN-Namen |
+| GET | `/api/month/:year/:month` | normalisierten Monat lesen |
+| PUT | `/api/month/:year/:month` | normalisierten Monat schreiben |
+| GET/PUT | `/api/settings` | Einstellungen |
+| GET/PUT | `/api/staff` | Personal |
+| GET/PUT | `/api/rbn-names` | RBN-Vorschläge |
+| GET | `/api/export` | Gesamtstand 2025–2030 |
+| POST | `/api/import` | Gesamt- oder Teilstand einspielen |
 
-### 13.1 Zentrale Backend-Mechanismen
+Alle API-Antworten sind JSON mit UTF-8 und `Cache-Control: no-store`.
 
-* **`getOrInit(context, key, fallback)`** – Liest einen Schlüssel; existiert er nicht, wird der Vorgabewert
-  **geschrieben** und zurückgegeben. Der allererste Aufruf der Anwendung initialisiert damit den KV-Store
-  vollständig selbst. Es gibt keinen Setup-Schritt.
-* **`ensureMonthShape(year, month, payload)`** – Legt ein leeres Monatsgerüst an und mischt die Nutzdaten
-  darüber, wobei `days` **feldweise** gemischt wird. Folgen: fehlende Tage werden ergänzt, ein
-  unvollständiger oder älterer Datensatz wird beim Lesen **und** beim Schreiben normalisiert. Die Anwendung
-  erhält nie einen Monat mit Lücken.
-* **`kv(context)`** – Wirft eine klare Fehlermeldung, wenn das Binding `DIENSTPLAN_KV` fehlt, statt später
-  mit undefiniertem Verhalten zu scheitern.
-* **`defaults()`** – Erzeugt frische Kopien der Vorgabedaten aus `js/defaults.js`. Client und Server teilen
-  sich damit **eine einzige Quelle** für Personalstamm und Monatsschema.
-* Der Export iteriert die Jahre **2025 bis 2030** und nimmt nur tatsächlich vorhandene Monate auf; leere
-  Zeiträume blähen die Sicherung nicht auf.
-* Der Import schreibt nur die Abschnitte, die im Nutzdatenobjekt vorhanden sind – eine Teilwiederherstellung
-  (etwa nur des Personalstamms) ist damit möglich.
+- `kv(context)` verlangt `DIENSTPLAN_KV`.
+- `getOrInit()` liest einen Schlüssel und initialisiert ihn bei Bedarf.
+- `put()` serialisiert JSON.
+- `defaults()` liefert frische Kopien.
+- `monthStorageKey()` erzeugt zweistellige Monatsschlüssel.
+- `ensureMonthShape()` ergänzt fehlende Tage und Standardfelder.
+- Der Client-Wrapper liest auch nicht-JSON-förmige Fehlerantworten kontrolliert und wirft bei
+  Nicht-2xx einen verständlichen Fehler.
 
 ---
 
-## 14. Import und Export
+## 16. Excel, JSON, Drucken und PDF
 
-### 14.1 Excel-Import (Bestandspläne)
+### 16.1 Excel-Import
 
-Der Import ist auf die **im Haus gewachsene Arbeitsplan-Arbeitsmappe** zugeschnitten und liest mehrere
-Monate in einem Durchgang.
+Unterstützte Blattnamen sind `Jan`, `Feb`, `Mrz`, `Apr`, `Mai`, `Jun`, `Jul`, `Aug`, `Sep`, `Okt`,
+`Nov`, `Dez`.
 
-**Blatterkennung:** Berücksichtigt werden Blätter mit den Namen `Jan`, `Feb`, `Mrz`, `Apr`, `Mai`, `Jun`,
-`Jul`, `Aug`, `Sep`, `Okt`, `Nov`, `Dez`. Alle anderen Blätter werden stillschweigend übergangen.
+Die Tageszeile ist die erste Zeile mit mindestens 20 gültigen Tageszahlen ab Spalte drei. Das Jahr wird
+aus einer vierstelligen `20xx`-Angabe in den ersten Zeilen gelesen, sonst aus der sichtbaren Auswahl.
+Personalzeilen werden über „Arbeitsplatz“ und eine normalisierte Namenszuordnung erkannt.
 
-**Kopf- und Spaltenerkennung:**
-* Die **Tageszeile** ist die erste Zeile, die ab Spalte 3 mindestens 20 Zahlen zwischen 1 und 31 enthält –
-  eine robuste Heuristik, die ohne feste Zeilennummern auskommt.
-* Das **Jahr** wird über eine `20\d{2}`-Suche in den ersten beiden Zeilen der ersten Spalte gefunden;
-  schlägt das fehl, gilt das aktuell angezeigte Jahr.
-* Es werden nur Tageszahlen übernommen, die im jeweiligen Monat tatsächlich existieren – ein 31. Februar
-  aus einer verrutschten Vorlage kann nicht entstehen.
-
-**Zeilenerkennung:** Gesucht werden Zeilenpaare, deren erste Spalte einen Personennamen und deren zweite
-Spalte den Text `Arbeitsplatz` enthält. Die Zeile darunter gilt als **Dienstzeile**. Namen werden
-normalisiert (Mehrfachleerzeichen zusammengefasst, getrimmt, kleingeschrieben) und über eine
-Zuordnungstabelle auf Personen-IDs abgebildet – zusätzlich zu den Namen aus dem Personalstamm sind alle
-gebräuchlichen Schreibweisen fest hinterlegt.
-
-**Wertzuordnung:**
-
-| Feld | Zellwert | Ergebnis |
-|---|---|---|
-| Arbeitsplatz | `U` | Urlaub |
-| Arbeitsplatz | `F`, `FZA` | FZA/Frei |
-| Arbeitsplatz | `WB` | Weiterbildung |
-| Arbeitsplatz | `K`, `KK`, `ZU`, `§15C`, `DR` | Sonstige Abwesenheit |
-| Dienst | `D` | Bereitschaftsdienst |
-| Dienst | `HG` | Hintergrunddienst |
-
-Alle importierten Abwesenheiten werden mit `absenceSources = "import"` markiert – die Grundlage für die
-Unterdrückung redundanter FZA-Anzeigen (siehe 8.5.4).
-
-**Zusammenführung (`mergeMonthData`) – additiv, niemals zerstörend:**
-
-* Eine BD- oder HG-Einteilung wird **nur** übernommen, wenn das Zielfeld **leer** ist. Bereits geplante
-  Dienste werden nie überschrieben.
-* Abwesenheiten und Dienstwünsche werden übernommen bzw. aktualisiert, inklusive Herkunftskennzeichnung.
-* RBN-Felder und Notizen bleiben vollständig unberührt.
-
-Nach dem Import werden alle berührten Monate zum Server geschrieben, die Ansicht neu gerendert und eine
-Zusammenfassung je Blatt in einem Hinweisfenster angezeigt.
-
-### 14.2 Excel-Export
-
-Erzeugt eine Arbeitsmappe mit einem Blatt (benannt `JJJJ-MM`) und dem Dateinamen
-`dienstplan_JJJJ_MM.xlsx`:
-
-* Kopfzeile mit Titel „Bereitschaftsdienstplan" und Monatsbezeichnung.
-* Spaltenüberschriften: Tag, Wochentag, BD, HG, 1. RBN, 2. RBN.
-* Eine Zeile je Kalendertag; das Datum als `TT.MM.`, Personen mit **vollem Namen** (nicht als ID – die
-  Datei ist für Menschen bestimmt).
-* Leerzeile, dann der Block „Statistik" mit je Person `BD n`, `HG n`, `WE n`, `Ziel n`.
-* Festgelegte Spaltenbreiten (10/12/28/28/18/18 Zeichen), damit die Datei ohne Nacharbeit lesbar ist.
-
-Ist SheetJS noch nicht geladen, erscheint der Hinweis „Excel-Bibliothek noch nicht geladen." statt eines
-Fehlers.
-
-### 14.3 JSON-Sicherung
-
-**Sichern:** Bevorzugt wird `/api/export` verwendet – die vollständige, serverseitige Sicherung aller Monate
-2025–2030. Ist der Server nicht erreichbar, wird als Rückfallebene der komplette lokale Speicher exportiert.
-Der Dateiname trägt das Tagesdatum: `dienstplanrad_backup_JJJJ-MM-TT.json`.
-
-**Laden:** Die Datei wird gelesen und **validiert**:
-
-* Die Wurzel muss ein JSON-Objekt sein (kein Array, kein Skalar) – sonst erscheint eine verständliche
-  Fehlermeldung mit dem konkreten Grund.
-* `settings`, `staff` und `rbnNames` werden übernommen, wenn vorhanden.
-* Jeder Monatseintrag muss ein Array-Paar sein, dessen Schlüssel exakt dem Muster `JJJJ-MM` mit gültigem
-  Monat 01–12 entspricht und dessen Wert ein Objekt ist. **Ungültige Einträge werden einzeln übersprungen**,
-  nicht der gesamte Import abgebrochen.
-
-Anschließend wird lokal gesichert, die Sicherung – falls möglich – zum Server gespiegelt und neu gerendert.
-Schlägt die Serverspiegelung fehl, bleibt die lokale Wiederherstellung dennoch bestehen.
-
----
-
-## 15. Drucken und PDF
-
-„PDF exportieren" ruft `window.print()` auf; ein eigenes Druck-Stylesheet formt dabei die Bildschirmansicht
-in ein Klinikdokument um.
-
-| Aspekt | Druckverhalten |
+| Excelwert | Ergebnis |
 |---|---|
-| Seitenformat | **A4 hoch**, 6 mm Rand |
-| Ausgeblendet | Topbar, Toolbar, Legendenblock, Ambient-Layer, Hintergrundverläufe, Bewertungs-Chips |
-| Glas-Optik | Vollständig entfernt: kein `backdrop-filter`, keine Schatten, keine Rundungen |
-| Hintergrund | Reines Weiß, Text reines Schwarz |
-| Tabelle | Feste Mindestbreite aufgehoben, Schriftgröße 8,3 px, Zeilenhöhe 18 px |
-| Zellinhalte | 17 px hoch, 8 px Schrift |
-| Feiertagsname | 5,5 px – vorhanden, aber untergeordnet |
-| Statistik | Auf 120 mm Breite begrenzt, 5 mm unter dem Plan |
-| Rahmen | Durchgehend reines Schwarz für maximalen Kopierkontrast |
-| Flächenfarben | Auf **feste** Graublautöne umgestellt: Wochentagsspalte `#9dbdd4`, Samstag `#eaf1f6`, Sonntag `#dae7f0`, Feiertag `#c8dbe7`, Schrift `#10314a` – jeweils mit `!important`, da `js/theme.js` die Werte als Inline-Style setzt |
-| Animationen | Vollständig neutralisiert |
+| `U` | Urlaub |
+| `F`, `FZA` | FZA/Frei |
+| `WB` | Weiterbildung |
+| `K`, `KK`, `ZU`, `§15C`, `DR` | Sonstige Abwesenheit |
+| `D` in Dienstzeile | BD |
+| `HG` in Dienstzeile | HG |
 
-Die Umstellung auf feste Druckfarben ist eine bewusste Entscheidung: Der Ausdruck bleibt bei jedem Monat und
-auf jedem Drucker – auch in Graustufen – **identisch lesbar**, und die Wertigkeitshierarchie
-Samstag < Sonntag < Feiertag bleibt als Grauabstufung erhalten. Ein zwölffarbiger Ausdruck wäre auf
-Klinikdruckern unberechenbar.
+Importierte Abwesenheiten erhalten Quelle `import`. Die Zusammenführung ist additiv:
 
-Ein ganzer Monat passt so auf ein einziges A4-Blatt, inklusive Statistik.
+- bestehende BD-/HG-Felder werden nicht überschrieben;
+- neue Dienste füllen nur leere Felder;
+- Abwesenheiten und ihre Quellen werden ergänzt;
+- die allgemeine Zusammenführungsfunktion übernimmt vorhandene Wünsche aus strukturierten
+  Monatsdaten; der aktuelle Excel-Parser erzeugt selbst keine Wünsche;
+- RBN und Notizen bleiben unverändert.
 
----
+### 16.2 Excel-Export
 
-## 16. Installation, Manifest und Auslieferung
+Dateiname: `dienstplan_JJJJ_MM.xlsx`. Das Blatt `JJJJ-MM` enthält Titel, Tag, Wochentag, BD, HG, beide
+RBN-Spalten sowie einen Statistikblock. Personen werden als vollständige Namen ausgegeben.
+Abwesenheiten, Wünsche, `overrideLog`, `importLog` und Notizen werden nicht exportiert; Excel ist damit
+ein Arbeitsauszug, aber kein verlustfreies Sicherungs- oder Rundreiseformat.
 
-### 16.1 Manifest
+### 16.3 JSON
 
-| Feld | Wert |
-|---|---|
-| `name` / `short_name` | DienstplanRAD |
-| `start_url` | `/` |
-| `display` | `standalone` (eigenes Fenster, keine Browserleiste) |
-| `background_color` | `#0d1117` |
-| `theme_color` | `#111820` |
-| `icons` | `/icons/icon.svg`, `sizes: any`, `purpose: any maskable` |
+Die Sicherung bevorzugt `/api/export`; bei Serverausfall exportiert sie Bootstrapdaten und alle lokal
+geladenen Monate. Dateiname: `dienstplanrad_backup_JJJJ-MM-TT.json`.
 
-Ein einzelnes SVG deckt alle Größen ab – es gibt keine Bitmap-Icon-Matrix zu pflegen. Die Anwendung lässt
-sich damit als eigenständiges Fenster installieren.
+Beim Import muss die Wurzel ein Objekt sein. Globale Abschnitte sind optional. Monatseinträge müssen
+Array-Paare mit Schlüssel `JJJJ-MM` und Objektwert sein; ungültige Einzelmonate werden übersprungen. Der
+Stand wird lokal übernommen und nach Möglichkeit an `/api/import` gespiegelt.
 
-### 16.2 Kein Service Worker – und warum
+### 16.4 Drucken
 
-Die Anwendung hatte einen Service Worker. Er ist **entfernt**, und das ist eine bewusste Entscheidung.
+„PDF exportieren“ ruft `window.print()` auf. Das Druckstylesheet:
 
-Der Worker lieferte eigenen Anwendungscode zunächst Cache-First aus. Ein Client, der ihn einmal installiert
-hatte, bekam damit dauerhaft alte Fassungen von `styles.css` und den JS-Modulen: Ausgerollte Korrekturen
-erreichten ihn nicht mehr, solange der Cache-Name unverändert blieb. Genau daran ist eine bereits behobene
-und deployte Fassung des Monatsfarbwechsels gescheitert – der Fehler war weg, kam beim Nutzer aber nie an.
-Eine spätere Fassung stellte auf Network-First um, doch damit blieb vom Worker im Wesentlichen nur noch
-seine Fehleranfälligkeit übrig: Für eine Anwendung, die ohnehin an einem Server hängt, war der Gewinn
-gering und das Risiko hoch.
-
-**Was das praktisch bedeutet:**
-
-* Es gibt **kein Asset-Caching** mehr. Jede Änderung erreicht die Clients über das normale HTTP-Caching,
-  ohne Versionspflege und ohne Sonderfälle.
-* Der **Datenteil bleibt offlinefähig**: Stammdaten und jeder geladene Monat liegen weiterhin in
-  `localStorage`, die dreistufige Ladekette (Server → `localStorage` → leerer Monat) ist unverändert. Bei
-  einem Netzausfall im laufenden Betrieb wird also weitergearbeitet und lokal gespeichert.
-* Ein **Kaltstart ohne Netz** lädt die Anwendung dagegen nicht mehr, weil die Dateien nicht vorgehalten
-  werden. Für eine Klinikarbeitsplatz-Anwendung mit ständiger Netzanbindung ist das der richtige Tausch.
-
-### 16.3 Befreiung bereits installierter Clients
-
-Das Löschen der Datei allein genügt nicht: Eine bestehende Registrierung bleibt im Browser aktiv und
-bedient weiter aus ihrem Cache. `releaseLegacyServiceWorker()` meldet deshalb bei jedem Start alle
-Registrierungen ab und löscht alle Caches mit dem Präfix `dienstplanrad`. Der Aufruf bleibt dauerhaft
-bestehen – es ist nicht absehbar, wann der letzte betroffene Client das nächste Mal vorbeikommt.
-
-Ein **erzwungenes Neuladen** nach dem Abmelden wurde erprobt und wieder verworfen: In beiden Varianten –
-aus der laufenden Initialisierung heraus wie auch nach dem `load`-Ereignis – blieb die Seite danach
-reproduzierbar bei „Lädt …" stehen, weil die abgebrochenen Anfragen nie wieder aufgesetzt wurden. Die
-Abmeldung allein wirkt dauerhaft; spätestens der nächste Aufruf lädt garantiert ungecachten Code.
-
-## 17. Sicherheit und Datenschutz
-
-### 17.1 HTTP-Header (`_headers`)
-
-| Header | Wert | Zweck |
-|---|---|---|
-| `X-Frame-Options` | `SAMEORIGIN` | Kein Einbetten in fremde Seiten (Clickjacking-Schutz) |
-| `X-Content-Type-Options` | `nosniff` | Kein MIME-Type-Raten |
-| `Referrer-Policy` | `strict-origin-when-cross-origin` | Keine Pfadweitergabe an Dritte |
-| `Permissions-Policy` | `geolocation=(), microphone=(), camera=()` | Sensorzugriffe vollständig abgeschaltet |
-
-### 17.2 Datenhaltung
-
-* Personenbezogene Daten beschränken sich auf **Namen und Diensteinteilungen** – keine Kontaktdaten, keine
-  Kennungen, keine Gesundheitsdaten von Patientinnen und Patienten.
-* Es gibt **kein Tracking**, keine Analytik, keine Drittanbieter-Einbindung außer der SheetJS-Bibliothek
-  über CDN.
-* Alle Nutzdaten liegen im KV-Store des betreibenden Cloudflare-Kontos sowie im `localStorage` der
-  benutzten Geräte.
-* Die Anwendung besitzt **keine eigene Benutzerverwaltung**. Der Zugriffsschutz erfolgt auf Ebene des
-  Deployments – etwa über Cloudflare Access oder eine Netzbeschränkung. Das ist bei der Inbetriebnahme
-  bewusst zu konfigurieren.
-* `localStorage` überdauert das Schließen des Browsers. Auf geteilten Arbeitsplätzen ist dies bei der
-  Geräteauswahl zu berücksichtigen.
+- verwendet A4 hoch mit 6 mm Rand;
+- entfernt Navigation, Glas, Schatten, Animationen und Bewertungs-Chips;
+- setzt Schwarz auf Weiß;
+- komprimiert Zeilen und Schrift;
+- verwendet feste, druckerunabhängige Graublauwerte für Wochentag, Samstag, Sonntag und Feiertag;
+- hält Statistik und vollständigen Monat auf einer Seite, soweit Druckertreiber und Datenmenge dies
+  zulassen.
 
 ---
 
-## 18. Barrierefreiheit und Responsivität
+## 17. Auslieferung, Cache-Sicherheit und Legacy-Worker
 
-### 18.1 Barrierefreiheit
+### 17.1 Warum diese Schicht existiert
 
-* **Semantisches Markup:** `header`, `section`, `main`, `table` mit `thead`/`tbody`, `dialog`, `menu`, echte
-  `<button>`- und `<label>`-Elemente. Keine `div`-Attrappen für interaktive Elemente.
-* **Sprachauszeichnung:** `<html lang="de">` – Screenreader wählen die richtige Aussprache.
-* **Native Dialoge:** Fokusfalle, Escape und Hintergrund-Inertisierung kommen von der Plattform und sind
-  damit korrekt und konsistent.
-* **Tastaturbedienung:** Vollständig. Alle Steuerelemente sind fokussierbar, alle Aktionen ohne Maus
-  erreichbar.
-* **Sichtbarer Fokus:** Eigene `:focus-visible`-Konturen in der Monatsfarbe, nach innen versetzt, damit sie
-  im engen Zellraster nicht abgeschnitten werden.
-* **Doppelte Kodierung:** Bewertungen werden **nie allein über Farbe** transportiert. Jeder Chip trägt
-  zusätzlich einen Text („geeignet", „Hinweis", „Konflikt", „rot"), jeder Tooltip die vollständigen
-  Begründungen, und im Auswahldialog stehen die Gründe unmittelbar in der Liste. Auch bei Farbfehlsicht ist
-  jede Bewertung eindeutig lesbar.
-* **Dekoration ausgeblendet:** Der Ambient-Layer trägt `aria-hidden="true"`.
-* **Bewegungsreduktion:** siehe 11.5.
+Ein installierter Cache-First-Worker kann auf einer bestimmten Origin alte `styles.css`- und
+JavaScript-Fassungen weiterreichen, obwohl dasselbe Repository unter einer neuen Adresse korrekt läuft.
+Browserwechsel auf derselben Adresse löst einen originseitig beziehungsweise workerseitig
+festgehaltenen Assetstand nicht zuverlässig. DienstplanRAD behandelt die Konsistenz des Modulgraphs
+deshalb als Teil der Anwendung.
 
-### 18.2 Responsivität
+### 17.2 Gemeinsamer Release-Token
 
-Umbruchpunkt bei **980 px**:
+Alle releasekritischen Shell- und Modulgraph-Assets verwenden denselben Token:
 
-* Topbar und Toolbar stellen sich vertikal, Steuergruppen nehmen die volle Breite ein.
-* Die Monatsnavigation dehnt sich; beide Dropdowns teilen sich den Platz gleichmäßig.
-* Der Legendenblock rückt nach links; die Ampellegende wird ausgeblendet, das Monatsfarb-Badge bleibt.
-* Die Auswahlfelder des Sammel-Dialogs stapeln sich; das Tagesraster wird auf vier Spalten reduziert.
-
-Die Plantabelle behält ihre Mindestbreite von 1090 px und scrollt innerhalb ihres eigenen Containers
-horizontal. Das ist Absicht: Ein Umbrechen oder Ausblenden von Spalten würde den Plan verfälschen. Der
-Seitenkörper selbst scrollt nie horizontal.
-
----
-
-## 19. Entwicklung, Tests und Deployment
-
-### 19.1 Lokale Entwicklung
-
-Es genügt ein beliebiger statischer Server im Projektwurzelverzeichnis:
-
-```bash
-npx serve .            # oder: python3 -m http.server 8080
+```text
+?v=20260729.1
 ```
 
-Ohne laufende Pages Functions schlagen die API-Aufrufe fehl; die Anwendung fällt dann automatisch in den
-Offline-Modus und ist – abgesehen von der Serversynchronisierung – vollständig bedienbar.
+Das gilt für Manifest, Stylesheet, App-Einstieg und die internen Imports aus `app.js`, `state.js` und
+`rules.js`. Das Icon `/icons/icon.svg` bleibt davon unabhängig unversioniert. Ein alter Cacheeintrag
+ohne den Shell-/Modul-Query-String kann nicht irrtümlich als aktuelle Code- oder Style-Datei dienen. Bei
+einer zukünftigen Änderung muss der Token im gesamten Browser-Modulgraph gemeinsam erhöht werden;
+`tests/delivery.test.js` erzwingt genau einen einheitlichen Wert.
 
-Mit Backend:
+### 17.3 Inline-Bereinigung
+
+Vor Stylesheet und Modulscript startet `index.html`:
+
+- `navigator.serviceWorker.getRegistrations()` und `unregister()` für Registrierungen des Origins;
+- `caches.keys()` und Löschen aller Cache-Namen mit Präfix `dienstplanrad`;
+- Ablage des Abschluss-Promises als `window.__dienstplanLegacyCleanup`.
+
+Die Position im HTML ist absichtlich früh: Die Bereinigung hängt nicht von einem möglicherweise
+veralteten `app.js` ab. `releaseLegacyServiceWorker()` wiederholt sie während `init()` als defensive
+zweite Ebene.
+
+### 17.4 Tombstone unter `/sw.js`
+
+`sw.js` ist kein Anwendungs- oder Offline-Worker. Es besitzt keinen `fetch`-Handler. Seine einzige Aufgabe
+ist, eine noch bekannte Registrierung unter der historischen URL zu neutralisieren:
+
+1. `skipWaiting()` bei Installation;
+2. Löschen der `dienstplanrad`-Caches;
+3. `clients.claim()`;
+4. `registration.unregister()`.
+
+Die Datei bleibt aus Migrationsgründen erreichbar und wird mit `no-store` ausgeliefert.
+
+### 17.5 Cloudflare-Header
+
+| Route | Cache-Control |
+|---|---|
+| `/` | `no-cache, no-store, must-revalidate` |
+| `/index.html` | `no-cache, no-store, must-revalidate` |
+| `/sw.js` | `no-cache, no-store, must-revalidate` |
+| `/styles.css` | `no-cache, must-revalidate` |
+| `/js/*` | `no-cache, must-revalidate` |
+
+HTML und Worker dürfen nicht gespeichert wiederverwendet werden. CSS und JavaScript dürfen lokal
+vorliegen, müssen aber revalidiert werden. Release-Token und Header ergänzen sich: Der Token trennt
+Releases, die Header verhindern unkontrollierte Wiederverwendung.
+
+---
+
+## 18. Sicherheit und Datenschutz
+
+`_headers` setzt für alle Pfade:
+
+| Header | Wert |
+|---|---|
+| `X-Frame-Options` | `SAMEORIGIN` |
+| `X-Content-Type-Options` | `nosniff` |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` |
+| `Permissions-Policy` | `geolocation=(), microphone=(), camera=()` |
+
+Pflegbare Namen, Rollenbezeichnungen, Feiertagsnamen und Bewertungsgründe werden vor Einbettung in
+`innerHTML` escaped. Die Anwendung enthält keine Analytik und kein Tracking. Die einzige
+Drittanbieter-Laufzeitressource ist SheetJS vom offiziellen CDN.
+
+Gespeichert werden Namen, Dienste, Abwesenheiten, Wünsche und Freigabekommentare. Patientendaten,
+Kontaktdaten und Zugangsdaten gehören nicht in das System. Cloudflare KV und Browser-`localStorage`
+enthalten personenbezogene Planungsdaten; Geräte- und Deploymentzugriff müssen organisatorisch
+geschützt werden. Die Anwendung besitzt keine eigene Authentifizierung. Cloudflare Access,
+Netzsegmentierung oder ein gleichwertiger Schutz ist Aufgabe des Betriebs.
+
+Ebenso gibt es keine Rollenverwaltung, API-Autorisierung, CSRF-Abwehr, semantische
+Serverschemavalidierung, Import-Größenlimits, Rate-Limits, Content-Security-Policy oder
+Subresource-Integrity-Prüfsumme für SheetJS. `overrideLog` dokumentiert die Entscheidung, aber keine
+verifizierte Benutzeridentität. Jede Person mit Zugriff auf Site und API kann Daten lesen und schreiben.
+
+---
+
+## 19. Barrierefreiheit und Responsivität
+
+- `<html lang="de">`;
+- semantische Bereiche, Tabellen, Buttons, Labels, Menüs und native Dialoge;
+- weitgehend native Tastaturbedienung über Buttons, Selects, Eingabefelder und Dialoge;
+- sichtbare `:focus-visible`-Konturen;
+- Textlabel zusätzlich zu jeder Farbe;
+- Klartextgründe ohne Hover-Zwang im Personendialog;
+- `aria-hidden` auf rein dekorativem Ambient-Layer;
+- inaktive oder nicht planbare Personen werden aus der Kandidatenauswahl entfernt;
+- reduzierte Bewegung über CSS und JavaScript;
+- neutralisierte Druckanimationen.
+
+Unter 980 px stapeln sich Kopf- und Werkzeugleiste, Monatsauswahl und Sammelsteuerung. Das Tagesraster
+verwendet vier Spalten. Die große Plantabelle behält alle acht fachlichen Spalten und scrollt intern
+horizontal.
+
+Die Anwendung beansprucht keine formale Barrierefreiheitszertifizierung. Pfeil- und Schließen-Buttons
+stützen sich teilweise auf Symbol und `title`, der Speicherstatus ist kein `aria-live`-Bereich,
+`title`-Tooltips sind auf Touch-Geräten eingeschränkt und Importmeldungen verwenden `window.alert`.
+Eine vollständige Screenreader-Prüfung ist nicht Bestandteil der automatischen Tests.
+
+---
+
+## 20. Lokale Entwicklung und Tests
+
+### 20.1 Start
+
+Nur Frontend:
+
+```bash
+python -m http.server 8080
+```
+
+Ohne Pages Functions fällt die Anwendung auf lokale Daten und Standardwerte zurück.
+
+Mit Cloudflare-Laufzeit und KV:
 
 ```bash
 npx wrangler pages dev . --kv DIENSTPLAN_KV
 ```
 
-### 19.2 Prüfungen
+### 20.2 Befehle
 
 ```bash
-npm run check          # Syntaxprüfung aller JS-Module und der Backend-Utils
-npm test               # Regressionstests des Regelwerks
+npm run check
+npm test
 ```
 
-`npm run check` prüft `js/app.js`, `js/api.js`, `js/defaults.js`, `js/rules.js`, `js/state.js`,
-`js/theme.js`, `js/holidays.js` und `functions/_utils.js` mit `node --check`.
+`npm run check` prüft laut aktuellem `package.json` die Syntax von `app.js`, `api.js`, `defaults.js`,
+`rules.js`, `state.js`, `theme.js` und `functions/_utils.js`. `npm test` führt alle Dateien unter
+`tests/*.test.js` aus.
 
-### 19.3 Testabdeckung
+### 20.3 32 Regressionstests
 
-Insgesamt 26 Tests, alle ohne DOM, ohne Netzwerk und ohne externe Abhängigkeiten.
+**`rules.test.js` – 5 Tests**
 
-**Regelwerk (`tests/rules.test.js`)**
+- korrekte Februar-Länge in Schalt- und Normaljahr;
+- zeitabhängige Beförderungsrechte;
+- Abwesenheit, Doppelrolle und persönliche Sperren;
+- Wochenend-Äquivalent;
+- Statistik, Aktivdatum und Restwert.
 
-| Test | Prüft |
-|---|---|
-| `createEmptyMonth creates exactly the valid leap-year days` | Februar 2028 = 29 Tage, Februar 2027 = 28 Tage |
-| `time-dependent promotion changes HG and Saturday-BD eligibility` | El Houba am 21.09.2026 ohne, am 22.09.2026 mit HG-Berechtigung |
-| `absence, same-day double assignment and personal restrictions become red conflicts` | Urlaub → rot, BD+HG am selben Tag → rot, Polednia sonntags → rot |
-| `weekend equivalent counts BD weekends once and HG-only weekends as half` | Ergebnis 1,5 für BD-Wochenende plus reines HG-Wochenende |
-| `statistics honor activation dates and calculate remaining targets` | Hellmann fehlt im September 2026, erscheint im Oktober; Restwert korrekt |
+**`timezone.test.js` – 13 Tests unter `Europe/Berlin`**
 
-**Regelwerk unter deutscher Zeitzone (`tests/timezone.test.js`)**
+- Testzeitzone;
+- BD am Vortag;
+- drei HG-Tage;
+- HG vor eigenem BD samt Freitag/Samstag-Ausnahme;
+- BD vor Urlaubsbeginn;
+- aufeinanderfolgende BD-Wochenenden;
+- Oster-/Pfingstalternanz;
+- BD–FZA–BD;
+- Monatsgrenze;
+- inaktive Person als Ausschluss;
+- symmetrischer BD-Abstand;
+- Becker-Sperre am ersten echten Werktag;
+- eindeutige Becker/Martin-Meldung.
 
-Diese Datei erzwingt `Europe/Berlin` und deckt genau die Regeln ab, die zuvor am falschen Kalendertag
-gerechnet haben – unter UTC waren alle davon unauffällig.
+**`theme.test.js` – 8 Tests**
 
-| Test | Prüft |
-|---|---|
-| BD am Vortag | Der unmittelbar vorhergehende eigene BD wird erkannt |
-| HG an drei Tagen | Drei aufeinanderfolgende HG ergeben orange |
-| HG vor eigenem BD | Wird erkannt; Freitag-HG vor Samstags-BD bleibt zulässig |
-| BD vor Urlaubsbeginn | Der Folgetag mit Urlaub wird erkannt |
-| Aufeinanderfolgende Wochenenden | BD-Wochenende nach BD-Wochenende ergibt rot |
-| Oster-/Pfingst-Alternanz | Dienst im einen Block meldet sich im anderen |
-| BD–FZA–BD | Wird als solches erkannt, nicht als kurzer Abstand |
-| Monatsübergreifend | BD am 31. des Vormonats wirkt auf den 1. |
-| Ausschluss | Eine nicht aktive Person ist grau und nicht wählbar, nicht „geeignet" |
-| Symmetrie | BD am Tag davor und danach werden gleich bewertet |
-| Becker-Sperre | Trifft den ersten regulären Werktag, nicht Wochenende oder Feiertag |
-| Doppelmeldung | Becker/Martin gleichzeitig abwesend erscheint genau einmal |
+- zwölf eindeutige Paletten und sichere Normalisierung;
+- Farbparser;
+- Flächenhierarchie;
+- WCAG-AA-Kontrast aller Paletten und Flächen;
+- kontrastierter Schriftton;
+- farbtreue Interpolation ohne graue Mitte;
+- Alphakanal;
+- monotone, über die Dauer verteilte Zeitkurve.
 
-**Farbsystem (`tests/theme.test.js`)**
+**`delivery.test.js` – 3 Tests**
 
-| Test | Prüft |
-|---|---|
-| Palettenzuordnung | Zwölf verschiedene Grundfarben; Monatswerte außerhalb 1–12 laufen sicher um |
-| `parseColor` | Hex, Kurz-Hex und `rgba()` |
-| Flächenhierarchie | Samstag < Sonntag < Feiertag, Wochentagsspalte am kräftigsten; 0 % ergibt Weiß |
-| **Kontrast** | `--month-ink` hält auf allen vier Flächen **aller zwölf Paletten** mindestens 4,5:1 |
-| `deepen` | Farbton bleibt erhalten (kürzerer Winkelbogen), Zielhelligkeit wird erreicht |
-| Interpolation | Endpunkte exakt getroffen; die Buntheit bricht auf dem gesamten Weg nicht ein |
-| Alphakanal | Der halbtransparente Schein bleibt über den ganzen Verlauf transparent |
-| Zeitkurve | Geklemmt, monoton, und die Bewegung verteilt sich über die volle Dauer statt zu schnappen |
+- Inline-Bereinigung vor Stylesheet und Modulgraph plus Tombstone-Verhalten;
+- ein gemeinsamer Release-Token für die releasekritischen Shell- und Modulgraph-Assets;
+- Cloudflare-Revalidierung für Shell, Worker, CSS und Module.
 
-Die Tests kommen ohne DOM, ohne Netzwerk und ohne externe Abhängigkeiten aus – genau deshalb ist die
-DOM-Freiheit von `rules.js`, `defaults.js` und dem rechnenden Teil von `theme.js` eine harte Regel.
-Besonders die Kontrast- und Harmonieprüfungen wären im Browser nur per Augenmaß zu beurteilen; als Test
-sind sie eine harte Zusage über alle zwölf Paletten hinweg.
+**`month-navigation.test.js` – 3 Tests**
 
-### 19.4 Deployment auf Cloudflare Pages
+- Farbstart vor Laden und Inhaltsanimation nach Rendering;
+- Pfeile und beide Dropdowns verwenden dieselbe Pipeline;
+- schnelle Umkehr vergleicht gegen den zuletzt angeforderten Monat.
 
-1. Repository mit dem Pages-Projekt verbinden.
-2. **Build-Befehl:** *keiner*. **Ausgabeverzeichnis:** Repository-Wurzel.
-3. KV-Namespace anlegen und als **`DIENSTPLAN_KV`** an das Projekt binden.
-4. Deployen. Der erste Aufruf initialisiert Einstellungen, Personalstamm und RBN-Liste selbständig.
-5. Zugriffsschutz konfigurieren (siehe 17.2).
+Zusätzlich wurde der Ablauf real in Chromium geprüft: messbare Zwischenfarben, korrekte Zielpalette,
+richtige Inhaltsrichtung, schneller Vor-/Zurück-Wechsel und direkter Dropdown-Sprung.
 
-Ein Push auf den Standardbranch löst das Deployment aus. Eine Cache-Version ist nicht mehr zu pflegen –
-ohne Service Worker gilt ausschließlich das normale HTTP-Caching, eine Änderung erreicht die Clients also
-von selbst.
+Nicht automatisiert sind echte Browser-E2E- und visuelle Regressionstests, API-/KV-Integration,
+Excel-Import mit produktiven Arbeitsmappen, Accessibility-Audits sowie Last- und Mehrbenutzertests.
 
 ---
 
-## 20. Anpassung und Erweiterung
+## 21. Deployment und Betrieb
 
-| Vorhaben | Vorgehen |
+### 21.1 Cloudflare Pages
+
+1. Repository mit einem Pages-Projekt verbinden.
+2. Keinen Build-Befehl konfigurieren.
+3. Repository-Wurzel als Ausgabeverzeichnis verwenden.
+4. KV-Namespace erstellen.
+5. Binding exakt `DIENSTPLAN_KV` nennen.
+6. Zugriffsschutz konfigurieren.
+7. Deployment ausführen.
+
+Beim ersten API-Aufruf initialisiert `getOrInit()` fehlende Einstellungen, Personal- und RBN-Daten.
+
+### 21.2 Release-Checkliste
+
+- `npm run check`;
+- `npm test`;
+- alle Browserimporte tragen denselben `?v=`-Token;
+- `_headers` enthält die Revalidierungsregeln;
+- `sw.js` bleibt ohne `fetch`-Handler;
+- Pfeile, Dropdowns und schnelle Umkehr im Browser prüfen;
+- KV-Binding und Zugriffsschutz prüfen;
+- JSON-Sicherung vor größeren Stammdatenänderungen erstellen.
+
+### 21.3 Manifest
+
+| Feld | Wert |
 |---|---|
-| **Person hinzufügen** | Eintrag in `DEFAULT_STAFF` (`js/defaults.js`) ergänzen **und** die ID in `STAFF_ORDER` an der gewünschten Position einfügen. Ohne den zweiten Schritt erscheint die Person nicht im Auswahldialog. |
-| **Person ausscheiden lassen** | `activeUntil` auf das letzte Datum setzen. Vergangene Pläne bleiben unverändert korrekt. |
-| **Rollenwechsel terminieren** | `promotionDate` plus `promotedRoleLabel`, `promotedCanHg`, `promotedCanSaturdayBd` setzen. |
-| **Dienstkontingent ändern** | `bdTarget` (weich, gelb) bzw. `maxBd` (hart, rot) anpassen. |
-| **Abwesenheits- oder Wunschtyp ergänzen** | `ABSENCE_TYPES` bzw. `PREFERENCE_TYPES` erweitern; die kurzen Tabellenkürzel in `shortAbsenceLabel` / `shortPreferenceLabel` in `js/app.js` ergänzen. |
-| **Regel hinzufügen oder ändern** | In `evaluateCandidate` (`js/rules.js`) über `push(level, reason)` ergänzen. Die Begründung erscheint automatisch in Tooltip, Auswahlliste und – bei roten Konflikten – im Protokoll. |
-| **Feiertagsregion wechseln** | Feste Termine und Buß-und-Bettag-Sonderfall in `getSaxonyHolidays` (`js/app.js`) anpassen; `holidayRegion` in `DEFAULT_SETTINGS` mitführen. |
-| **Monatsfarbe ändern** | Den betreffenden Eintrag in `MONTH_PALETTES` (`js/theme.js`) anpassen. Die gesamte Ableitungskette – Wochentagsspalte, Zeilenwäschen, Schriftton, Orbs, Fokusringe, Badge – folgt automatisch, und der Kontrasttest prüft die neue Farbe sofort mit. |
-| **Flächenstärken ändern** | `SURFACE_MIX` in `js/theme.js`. Die Startwerte in `:root` und die Druckfarben in `styles.css` mitziehen und `npm test` laufen lassen – der Kontrasttest schlägt an, wenn eine Fläche zu dunkel wird. |
-| **Dauer oder Kurve des Farbwechsels** | `THEME_DURATION_MS` und `EASE` in `js/theme.js`. |
-| **Bestehende Daten migrieren** | `schemaVersion` erhöhen und die Umwandlung in `ensureMonthShape` (`functions/_utils.js`) vornehmen, damit sie beim Lesen **und** Schreiben greift. |
+| `name`, `short_name` | DienstplanRAD |
+| `start_url` | `/` |
+| `display` | `standalone` |
+| `background_color` | `#0d1117` |
+| `theme_color` | `#111820` |
+| Icon | `/icons/icon.svg`, `any maskable` |
 
-**Wichtig bei Personaländerungen:** Nach dem ersten Start ist die **KV-Kopie** maßgeblich, nicht mehr die
-Datei. Änderungen an `DEFAULT_STAFF` wirken auf bestehende Installationen erst, wenn `app:staff` über
-`PUT /api/staff` oder eine JSON-Wiederherstellung aktualisiert wird.
+Das Manifest macht die Anwendung installierbar. Installierbarkeit bedeutet nicht, dass ein Kaltstart
+ohne Netz garantiert ist.
 
 ---
 
-## 21. Fehlerbilder und Diagnose
+## 22. Anpassung, Diagnose und Glossar
 
-| Beobachtung | Ursache | Vorgehen |
-|---|---|---|
-| Status bleibt dauerhaft „Offline – lokaler Stand" | Kein Netz oder fehlendes KV-Binding | „Serverstand neu laden"; im Cloudflare-Dashboard prüfen, ob `DIENSTPLAN_KV` gebunden ist |
-| Serverfehler „KV Binding DIENSTPLAN_KV nicht vorhanden" | Namespace nicht an das Projekt gebunden | Binding anlegen und neu deployen |
-| Eine Person fehlt im Auswahldialog | `includeInPlanning === false`, Aktivzeitraum trifft nicht zu, oder ID fehlt in `STAFF_ORDER` | Stammdaten prüfen |
-| Person in der Statistik unerwartet abwesend | Statistik prüft die Aktivität zum **Ersten** des Monats | `activeFrom` prüfen |
-| Excel-Import bringt nichts ein | Blattname nicht in der erlaubten Liste, Tageszeile nicht erkannt, oder `Arbeitsplatz`-Zeilen fehlen | Blattbenennung und Struktur prüfen |
-| Import überschreibt keine Dienste | Beabsichtigt – die Zusammenführung ist rein additiv | Zielfelder gegebenenfalls vorher leeren |
-| „Excel-Bibliothek noch nicht geladen." | SheetJS-CDN noch nicht bereit oder nicht erreichbar | Kurz warten; bei dauerhaftem Fehler Netzzugang zum CDN prüfen |
-| Farbwechsel springt ohne Übergang | Betriebssystem meldet „Bewegung reduzieren" oder Browser kennt `@property` nicht | Beabsichtigtes Verhalten |
-| Alte Version nach Deployment | HTTP-Cache des Browsers | Einmal hart neu laden. Der frühere Service Worker, der alten Code dauerhaft festhielt, ist entfernt und wird beim nächsten Aufruf automatisch abgemeldet |
-| Änderung scheint verloren | Debounce von 1100 ms noch nicht abgelaufen | Kurz warten; Monatswechsel und Seitenverlassen erzwingen die Speicherung ohnehin |
+### 22.1 Anpassung
 
-**Diagnosehilfen:** `document.documentElement.dataset.month` und `.dataset.palette` zeigen den aktuell
-aktiven Monat und die aktive Palette. Der `overrideLog` eines Monats im JSON-Export dokumentiert jede
-bestätigte rote Einteilung mit Zeitpunkt, Gründen und Kommentar.
+| Ziel | Stelle |
+|---|---|
+| Person ergänzen | `DEFAULT_STAFF` und `STAFF_ORDER` in `js/defaults.js` |
+| Aktivität begrenzen | `activeFrom` / `activeUntil` |
+| Beförderung | `promotionDate` und `promoted*` |
+| Soll/Maximum | `bdTarget` / `maxBd` |
+| Abwesenheits-/Wunschtyp | Arrays in `defaults.js`, Kurzlabel in `app.js` |
+| Regel | `evaluateCandidate()` oder zugehörige Hilfsfunktion in `rules.js` |
+| Feiertage | `js/holidays.js` |
+| Palette | `MONTH_PALETTES` in `theme.js` |
+| Flächenstärke | `SURFACE_MIX` in `theme.js` |
+| Farbdauer/-kurve | `THEME_DURATION_MS` und `EASE` |
+| Datenmigration | `schemaVersion` und `ensureMonthShape()` |
+| Browserrelease | gemeinsamen `?v=`-Token im vollständigen Modulgraph erhöhen |
 
----
+Bei bestehenden Installationen ist die KV-Kopie des Personals maßgeblich. Änderungen an
+`DEFAULT_STAFF` ersetzen `app:staff` nicht automatisch. Eine Administrationsoberfläche für Personal,
+Einstellungen und Zugriffsrechte existiert derzeit nicht; solche Änderungen erfolgen über Code,
+API beziehungsweise KV-Betrieb.
 
-## 22. Glossar
+### 22.2 Diagnose
+
+| Beobachtung | Prüfung |
+|---|---|
+| dauerhaft offline | Netz, Pages Functions und `DIENSTPLAN_KV` prüfen |
+| Person fehlt | `includeInPlanning`, `STAFF_ORDER`, `activeFrom`, `activeUntil` prüfen |
+| Excel importiert nichts | Blattname, Tageszeile, „Arbeitsplatz“-Zeilen und Namenszuordnung prüfen |
+| Import überschreibt keinen Dienst | beabsichtigt; Ziel vorher leeren |
+| SheetJS fehlt | CDN-Erreichbarkeit prüfen |
+| keine Animation | `prefers-reduced-motion` prüfen |
+| falsche Monatsfarbe nach Deployment | `dataset.month`, `dataset.palette`, aktuellen `?v=`-Token und `_headers` prüfen |
+| alte Origin wirkt anders als neue | Inline-Bereinigung, `/sw.js`, Service-Worker-Registrierungen und `dienstplanrad`-Caches prüfen |
+| Änderung noch nicht am Server | 1100-ms-Debounce und Statusanzeige beachten |
+
+`document.documentElement.dataset.month` und `.dataset.palette` zeigen das aktive Theme-Ziel.
+Ein manueller Hard Reload ist keine normale Releaseanforderung; die Auslieferungsschicht ist so gebaut,
+dass sie veraltete Assets selbst neutralisiert.
+
+### 22.3 Glossar
 
 | Begriff | Bedeutung |
 |---|---|
-| **BD** | Bereitschaftsdienst – der Hauptdienst, eine Person je Tag |
-| **HG** | Hintergrunddienst – fachärztliche Rückfallebene, eine Person je Tag |
-| **RBN** | Rufbereitschaft Nuklearmedizin, in zwei Stufen (RBN und 2. RBN) |
-| **FZA** | Freizeitausgleich nach geleistetem Dienst |
-| **WB** | Weiterbildung |
-| **FA / FÄ** | Facharzt / Fachärztin |
-| **OA / OÄ** | Oberarzt / Oberärztin |
-| **AA / AÄ** | Assistenzarzt / Assistenzärztin |
-| **Wochenend-Äquivalent** | Kennzahl belasteter Wochenenden: BD = 1,0 / nur HG = 0,5 |
-| **Override** | Bewusst bestätigte Einteilung trotz rotem Konflikt, protokolliert |
-| **Monatspalette** | Die zwölf jahreszeitlich abgestimmten Grundfarben, je Monat eine |
-| **Bootstrap** | Der erste Ladevorgang: Einstellungen, Personal und RBN-Namen in einem Aufruf |
-| **KV** | Cloudflare Key-Value-Store – die serverseitige Datenhaltung |
-| **Manifest** | Web App Manifest – macht die Anwendung installierbar, mit eigenem Fenster und Icon |
+| BD | Bereitschaftsdienst |
+| HG | Hintergrunddienst |
+| RBN | Rufbereitschaft Nuklearmedizin |
+| FZA | Freizeitausgleich |
+| WB | Weiterbildung |
+| FA/FÄ | Facharzt/Fachärztin |
+| OA/OÄ | Oberarzt/Oberärztin |
+| AA/AÄ | Assistenzarzt/Assistenzärztin |
+| Override | bestätigte rote Einteilung mit Protokolleintrag |
+| Wochenend-Äquivalent | BD-Wochenende 1,0; reines HG-Wochenende 0,5 |
+| Bootstrap | gemeinsames Laden von Einstellungen, Personal und RBN-Namen |
+| KV | Cloudflare Key-Value-Store |
+| Release-Token | einheitlicher Query-String der releasekritischen Shell- und Modulgraph-Assets |
+| Tombstone-Worker | Worker ohne Fetch-Logik, der alte Registrierungen und Caches neutralisiert |
 
 ---
 
-**DienstplanRAD** · Klinik für Radiologie und Nuklearmedizin · Manuelle Dienstplanung mit
-Live-Regelvalidierung, Cloudflare-Synchronisierung und vollständigem Offline-Betrieb.
+**DienstplanRAD** verbindet manuelle Planungshoheit mit erklärbarer Regelprüfung, unmittelbarer
+Verteilungssicht, harmonischer Monatsidentität und einer Auslieferung, die jede Origin zuverlässig auf
+denselben aktuellen Anwendungsstand bringt.

@@ -1,9 +1,9 @@
-import { ABSENCE_TYPES, MONTH_NAMES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, toIsoDate } from './defaults.js';
-import { state, bootstrapState, getMonthData, getMonthLabel, loadMonth, persistCurrentMonth, persistMonth, saveLocalBootstrap, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js';
-import { api } from './api.js';
-import { applyMonthTheme, prefersReducedMotion } from './theme.js';
-import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js';
-import { buildStats, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getPlanningStaff, getPreference, getStaffById, labelForAbsence, labelForPreference, setAbsence, setAssignment, setPreference, weekdayLabel } from './rules.js';
+import { ABSENCE_TYPES, MONTH_NAMES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, toIsoDate } from './defaults.js?v=20260729.1';
+import { state, bootstrapState, getMonthData, getMonthLabel, loadMonth, persistCurrentMonth, persistMonth, saveLocalBootstrap, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260729.1';
+import { api } from './api.js?v=20260729.1';
+import { applyMonthTheme, prefersReducedMotion } from './theme.js?v=20260729.1';
+import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260729.1';
+import { buildStats, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getPlanningStaff, getPreference, getStaffById, labelForAbsence, labelForPreference, setAbsence, setAssignment, setPreference, weekdayLabel } from './rules.js?v=20260729.1';
 
 const $ = selector => document.querySelector(selector);
 
@@ -16,6 +16,8 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp
 const els = {};
 let pendingConflict = null;
 let monthRequestId = 0;
+let requestedYear = null;
+let requestedMonth = null;
 const monthNameBySheet = Object.fromEntries(SHEET_NAMES.map((name, idx) => [name, idx + 1]));
 
 
@@ -125,13 +127,17 @@ function populateSelectors() {
 
 async function openCurrentMonth(year, month, forceServer = false) {
   const requestId = ++monthRequestId;
-  const previousYear = state.currentYear;
-  const previousMonth = state.currentMonth;
+  const loadedYear = state.currentYear;
+  const loadedMonth = state.currentMonth;
+  const previousYear = requestedYear ?? state.currentYear;
+  const previousMonth = requestedMonth ?? state.currentMonth;
+  const targetChanged = month !== previousMonth || year !== previousYear;
+  requestedYear = year;
+  requestedMonth = month;
   // Farbwechsel sofort auslösen – unabhängig von Ladezeit oder Datenquelle.
   const direction = Math.sign(monthOrdinal(year, month) - monthOrdinal(previousYear, previousMonth)) || 1;
-  if (month !== previousMonth || year !== previousYear) {
+  if (targetChanged) {
     applyMonthTheme(month);
-    animateMonthContent(direction);
     // Einen Frame abwarten, damit der erste Schritt des Farbverlaufs gezeichnet
     // ist, bevor Laden und Rendern den Main-Thread belegen. Der Verlauf selbst
     // ist zeitbasiert und übersteht auch einen blockierten Frame.
@@ -140,7 +146,7 @@ async function openCurrentMonth(year, month, forceServer = false) {
   if (state.dirty) {
     clearTimeout(state.saveTimer);
     state.saveTimer = null;
-    await persistMonth(previousYear, previousMonth);
+    await persistMonth(loadedYear, loadedMonth);
   }
   setStatus('loading', forceServer ? 'Lädt Serverstand …' : 'Lädt …');
   await loadMonth(year, month, forceServer);
@@ -152,6 +158,9 @@ async function openCurrentMonth(year, month, forceServer = false) {
   setStatus(state.serverReady ? 'saved' : 'offline', state.serverReady ? 'Gespeichert' : 'Offline – lokaler Stand');
   populateSelectors();
   render();
+  // Erst der vollständig gerenderte Zielmonat gleitet herein. So bleibt die
+  // Bewegung auch bei langsamer Netzwerkantwort inhaltlich korrekt.
+  if (targetChanged) animateMonthContent(direction);
 }
 
 function render() {
