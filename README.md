@@ -1,1340 +1,603 @@
 # DienstplanRAD
 
-**DienstplanRAD** ist eine browserbasierte, manuell geführte Anwendung zur monatlichen Planung radiologischer Bereitschafts- und Hintergrunddienste. Die Anwendung bildet den vertrauten Aufbau einer Excel-Dienstplantabelle nach, ergänzt ihn jedoch um regelbasierte Eignungshinweise, automatische Speicherung, Cloudflare-Workers-KV-Persistenz, Excel- und JSON-Datenaustausch, druckoptimierte Ausgabe sowie eine installierbare Progressive Web Application.
+**DienstplanRAD** ist eine browserbasierte Anwendung zur manuellen Erstellung monatlicher radiologischer Bereitschafts- und Hintergrunddienstpläne. Sie bewahrt die direkte Übersicht einer klassischen Excel-Dienstplanung, ergänzt diese aber um kontextbezogene Regelhinweise, strukturierte Abwesenheits- und Wunschpflege, automatisch berechnete Statistik, Cloud-Speicherung, lokale Rückfallebenen, Excel- und JSON-Datenaustausch sowie eine druckoptimierte Ausgabe.
 
-Die Anwendung ist bewusst **kein automatischer Dienstplanalgorithmus**. Sie verteilt keine Dienste selbstständig, führt keine Optimierungsläufe aus und ersetzt keine fachliche oder organisatorische Entscheidung. Jede Besetzung wird durch den planenden Nutzer manuell ausgewählt. Die Regelengine dient ausschließlich als kontextbezogene Entscheidungshilfe.
+Die Anwendung ist bewusst **kein automatischer Dienstplanalgorithmus**. Sie weist keine Dienste selbstständig zu, führt keine Optimierungsläufe durch und ersetzt keine fachliche oder organisatorische Entscheidung. Jeder Name wird aktiv durch den planenden Nutzer ausgewählt. Die Regelengine erläutert Risiken und Präferenzen, verhindert die Auswahl aber grundsätzlich nicht; nur rote Konflikte erfordern eine ausdrückliche Bestätigung.
 
 ---
 
 ## Inhaltsverzeichnis
 
-1. [Zielsetzung und Grundprinzip](#zielsetzung-und-grundprinzip)
-2. [Produktionsumgebung](#produktionsumgebung)
-3. [Funktionsumfang auf einen Blick](#funktionsumfang-auf-einen-blick)
-4. [Benutzeroberfläche und Designphilosophie](#benutzeroberfläche-und-designphilosophie)
-5. [Monatliche Kontrastfarbsysteme](#monatliche-kontrastfarbsysteme)
-6. [Tabellarischer Monatsplan](#tabellarischer-monatsplan)
-7. [Mitarbeitendenstamm und feste Auswahlreihenfolge](#mitarbeitendenstamm-und-feste-auswahlreihenfolge)
-8. [Manuelle Bereitschaftsdienst- und Hintergrunddienstplanung](#manuelle-bereitschaftsdienst--und-hintergrunddienstplanung)
-9. [RBN-Felder](#rbn-felder)
-10. [Abwesenheiten](#abwesenheiten)
-11. [Dienstwünsche](#dienstwünsche)
-12. [Regelbewertung und Konfliktstufen](#regelbewertung-und-konfliktstufen)
-13. [Vollständige fachliche Regelmatrix](#vollständige-fachliche-regelmatrix)
-14. [Statistik unterhalb des Monatsplans](#statistik-unterhalb-des-monatsplans)
-15. [Gesetzliche Feiertage in Sachsen](#gesetzliche-feiertage-in-sachsen)
-16. [Excel-Import](#excel-import)
-17. [Excel-Export](#excel-export)
-18. [PDF- und Druckausgabe](#pdf--und-druckausgabe)
-19. [JSON-Sicherung und Wiederherstellung](#json-sicherung-und-wiederherstellung)
-20. [Speicher- und Synchronisationsmodell](#speicher--und-synchronisationsmodell)
-21. [Offlinebetrieb und Progressive Web Application](#offlinebetrieb-und-progressive-web-application)
-22. [Cloudflare-Pages-Functions-Programmierschnittstelle](#cloudflare-pages-functions-programmierschnittstelle)
-23. [Workers-KV-Datenstruktur](#workers-kv-datenstruktur)
-24. [Datenmodell](#datenmodell)
-25. [Projektstruktur](#projektstruktur)
-26. [Deployment auf Cloudflare Pages](#deployment-auf-cloudflare-pages)
-27. [Sicherheits- und Datenschutzaspekte](#sicherheits--und-datenschutzaspekte)
-28. [Browser- und Systemanforderungen](#browser--und-systemanforderungen)
-29. [Bedienablauf im Regelbetrieb](#bedienablauf-im-regelbetrieb)
-30. [Fehlerbilder und Fehlerbehebung](#fehlerbilder-und-fehlerbehebung)
-31. [Bekannte funktionale Grenzen](#bekannte-funktionale-grenzen)
-32. [Qualitätssicherung und technische Prüfungen](#qualitätssicherung-und-technische-prüfungen)
-33. [Weiterentwicklung](#weiterentwicklung)
+1. [Zielsetzung und Einsatzbereich](#zielsetzung-und-einsatzbereich)
+2. [Leitprinzipien](#leitprinzipien)
+3. [Produktionsumgebung](#produktionsumgebung)
+4. [Funktionsumfang](#funktionsumfang)
+5. [Benutzeroberfläche im Überblick](#benutzeroberflache-im-uberblick)
+6. [Aero-Peak- und Liquid-Glass-Designsystem](#aero-peak--und-liquid-glass-designsystem)
+7. [Animationen und Bewegung](#animationen-und-bewegung)
+8. [Monatliche Kontrastfarbsysteme](#monatliche-kontrastfarbsysteme)
+9. [Tabellarischer Monatsplan](#tabellarischer-monatsplan)
+10. [Spalten und Datenfelder](#spalten-und-datenfelder)
+11. [Monatsnavigation und Serverladen](#monatsnavigation-und-serverladen)
+12. [Mitarbeitendenstamm](#mitarbeitendenstamm)
+13. [Zeitabhängige Qualifikationen](#zeitabhangige-qualifikationen)
+14. [Manuelle BD-Planung](#manuelle-bd-planung)
+15. [Manuelle HG-Planung](#manuelle-hg-planung)
+16. [RBN-Felder](#rbn-felder)
+17. [Abwesenheiten](#abwesenheiten)
+18. [FZA-Anzeigelogik](#fza-anzeigelogik)
+19. [Dienstwünsche](#dienstwunsche)
+20. [Einzel- und Mehrtagespflege](#einzel--und-mehrtagespflege)
+21. [Farbige Regelbewertung](#farbige-regelbewertung)
+22. [Vollständige Regelmatrix](#vollstandige-regelmatrix)
+23. [BD-Abstände](#bd-abstande)
+24. [Wochenendlogik](#wochenendlogik)
+25. [Oster- und Pfingstlogik](#oster--und-pfingstlogik)
+26. [Statistik](#statistik)
+27. [Feiertage in Sachsen](#feiertage-in-sachsen)
+28. [Excel-Import](#excel-import)
+29. [Excel-Export](#excel-export)
+30. [PDF- und Druckausgabe](#pdf--und-druckausgabe)
+31. [JSON-Sicherung](#json-sicherung)
+32. [Speicher- und Synchronisationsmodell](#speicher--und-synchronisationsmodell)
+33. [Lokaler Browserstand](#lokaler-browserstand)
+34. [Cloudflare Pages Functions](#cloudflare-pages-functions)
+35. [Workers KV](#workers-kv)
+36. [Datenmodell](#datenmodell)
+37. [Progressive Web Application](#progressive-web-application)
+38. [Service Worker](#service-worker)
+39. [Responsive Verhalten](#responsive-verhalten)
+40. [Tastatur und Barrierearmut](#tastatur-und-barrierearmut)
+41. [Sicherheit und Datenschutz](#sicherheit-und-datenschutz)
+42. [Projektstruktur](#projektstruktur)
+43. [Deployment](#deployment)
+44. [Qualitätssicherung](#qualitatssicherung)
+45. [Fehlerbehebung](#fehlerbehebung)
+46. [Bekannte Grenzen](#bekannte-grenzen)
+47. [Pflege und Weiterentwicklung](#pflege-und-weiterentwicklung)
+48. [Glossar](#glossar)
 
 ---
 
-# Zielsetzung und Grundprinzip
+## Zielsetzung und Einsatzbereich
 
-DienstplanRAD wurde für eine Arbeitsweise entwickelt, bei der der Dienstplan weiterhin bewusst durch eine fachlich verantwortliche Person erstellt wird. Das System soll die Übersichtlichkeit einer klassischen Excel-Dienstplantabelle erhalten, gleichzeitig aber typische Fehlerquellen und wiederkehrende Prüfaufgaben reduzieren.
+DienstplanRAD wurde für die monatliche Planung radiologischer Dienste mit einer kleinen, namentlich definierten Mitarbeitendengruppe entwickelt. Der primäre Anwendungsfall ist die manuelle Besetzung der täglichen Bereitschaftsdienste und Hintergrunddienste unter Berücksichtigung von Qualifikation, Abwesenheiten, Dienstwünschen, Wochenenden, Feiertagen, persönlichen Richtwerten und einigen personenspezifischen Sonderregeln.
 
-Das Kernkonzept besteht aus fünf Ebenen:
+Die Oberfläche orientiert sich absichtlich an der vorhandenen Excel-Dienstplanung:
+- jeder Kalendertag entspricht einer Tabellenzeile
+- Bereitschaftsdienst, Hintergrunddienst und RBN stehen in getrennten Spalten
+- Urlaub, Freizeitausgleich und Wünsche werden direkt am jeweiligen Tag sichtbar
+- die Statistik steht unmittelbar unter dem Monatsplan
+- es gibt keine separate Checkliste und kein raumgreifendes Dashboard
 
-1. **Manuelle Entscheidungshoheit**  
-   Jede Einteilung wird aktiv ausgewählt. Keine Person wird automatisch in einen Dienst eingetragen.
+Der Nutzen liegt nicht in einer automatischen Verteilung, sondern in einer schnelleren, sichereren und nachvollziehbareren manuellen Entscheidung.
 
-2. **Kontextbezogene Regelprüfung**  
-   Vor der Auswahl einer Person bewertet die Anwendung Qualifikation, Abwesenheiten, Wünsche, Abstände, Wochenenden, Urlaubsbeginn und definierte Sonderregeln.
+## Leitprinzipien
 
-3. **Nicht blockierende Planung**  
-   Auch eine fachlich ungünstige oder regelwidrige Einteilung bleibt grundsätzlich möglich. Nur rote Konflikte verlangen eine ausdrückliche Bestätigung.
+- **Manuelle Entscheidungshoheit:** Die Anwendung schlägt keine fertigen Pläne vor. Jede Einteilung wird aktiv gewählt.
+- **Nicht blockierende Regeln:** Auch orange oder rote Kandidaten bleiben auswählbar. Rote Einteilungen verlangen eine explizite Bestätigung.
+- **Excel-nahe Dichte:** Der Monatsplan bleibt kompakt und zeilenorientiert. Dekorative Elemente dürfen die Lesbarkeit der Tabelle nicht beeinträchtigen.
+- **Server-first beim Öffnen:** Beim Öffnen eines Monats wird zuerst der aktuelle Serverstand angefordert. Ist der Server nicht erreichbar, wird ein vorhandener lokaler Monatsstand verwendet.
+- **Automatische Speicherung:** Änderungen werden nach einer kurzen Bündelungszeit lokal und über die Pages-Functions-Programmierschnittstelle in Workers KV gespeichert.
+- **Transparente Hinweise:** Jede farbliche Bewertung besitzt eine textliche Begründung im Auswahlfenster und als Tooltip.
+- **Keine versteckte FZA-Automatik:** Dienstbedingtes FZA wird nicht pauschal für alle Mitarbeitenden in der Tabelle erzeugt. Nur die ausdrücklich definierte Becker-Ausnahme wird visuell abgeleitet.
 
-4. **Excel-nahe Darstellung**  
-   Die Tage stehen zeilenweise. Bereitschaftsdienst, Hintergrunddienst, RBN-Felder, Abwesenheiten und Dienstwünsche stehen in klar getrennten Spalten.
+## Produktionsumgebung
 
-5. **Automatische Persistenz**  
-   Änderungen werden lokal zwischengespeichert und anschließend über Cloudflare Pages Functions in Workers KV gespeichert.
-
----
-
-# Produktionsumgebung
-
-| Komponente | Festgelegter Wert |
+| Komponente | Konfiguration |
 |---|---|
 | GitHub-Repository | `mlurz92/dienstplan` |
 | Produktionsbranch | `main` |
 | Cloudflare-Pages-Projekt | `dienstplanrad` |
 | Produktionsadresse | `https://dienstplanrad.pages.dev` |
 | Workers-KV-Namespace | `dienstplanrad-kv` |
-| KV-Binding in Pages Functions | `DIENSTPLAN_KV` |
+| KV-Binding | `DIENSTPLAN_KV` |
 | Feiertagsregion | Sachsen |
-| Nutzungskonzept | ein planender Nutzer, keine Mehrbenutzerkoordination |
-| Zugriffsschutz | keiner |
+| Nutzung | ein planender Nutzer |
+| Zugriffsschutz | kein Anwendungsschutz und keine Cloudflare-Access-Policy |
 
-Jeder Merge in den Branch `main` löst über die bestehende GitHub-Verknüpfung ein neues Cloudflare-Pages-Deployment aus.
+Jeder Merge in `main` löst über die bestehende GitHub-Verknüpfung ein Cloudflare-Pages-Deployment aus. Die statischen Dateien und die Pages Functions werden gemeinsam veröffentlicht.
 
----
+## Funktionsumfang
 
-# Funktionsumfang auf einen Blick
-
-- monatliche manuelle Bereitschaftsdienstplanung
-- monatliche manuelle Hintergrunddienstplanung
-- zwei frei beschreibbare RBN-Felder pro Kalendertag
+- manuelle tägliche BD-Besetzung
+- manuelle tägliche HG-Besetzung
+- zwei freie RBN-Felder je Tag
 - feste Mitarbeitendenreihenfolge
-- zeitabhängige Aktivierung und Qualifikationsänderung einzelner Mitarbeitender
-- farbcodierte Eignungsbewertung
-- verpflichtende Bestätigung roter Konflikte
-- optionale Begründung bei bestätigten roten Konflikten
-- Urlaub, Freizeitausgleich, Weiterbildung und sonstige Abwesenheiten
-- positive und negative Dienstwünsche
-- Einzel- und Mehrtagespflege
-- monatsübergreifende Abstandsprüfung
+- zeitabhängige Aktivierung von Mitarbeitenden
+- zeitabhängiger Qualifikationswechsel
+- Urlaub, FZA/Frei, Weiterbildung und sonstige Abwesenheit
+- negative und positive Dienstwünsche
+- Einzel- und Mehrtagesbearbeitung
+- farbcodierte Kandidatenbewertung
+- Pflichtbestätigung bei roten Konflikten
+- optionaler Kommentar zu roten Übersteuerungen
+- Monatsstatistik direkt unter dem Plan
 - Wochenendäquivalente
-- Oster- und Pfingstblockprüfung
-- gesetzliche Feiertage in Sachsen
-- monatlich wechselnde Kontrastfarben für Samstag, Sonntag und Feiertag
-- Excel-Import aus Jahresplanern
-- Excel-Export des aktuellen Monats
-- druckoptimierte A4-Hochformatansicht
-- JSON-Gesamtsicherung
-- serverseitige KV-Speicherung
-- lokaler Browserfallback
+- Sachsen-Feiertage einschließlich beweglicher Feiertage
+- zwölf monatlich wechselnde Kontrastfarbsysteme
+- Excel-Import
+- Excel-Export
+- A4-Druckansicht und PDF über den Browser
+- vollständige JSON-Sicherung
+- serverseitige KV-Persistenz
+- lokale Browserkopie
 - installierbare Progressive Web Application
 - Service-Worker-Cache für Kernressourcen
 
----
+## Benutzeroberfläche im Überblick
 
-# Benutzeroberfläche und Designphilosophie
+### Kopfbereich
 
-## Grundidee
+Der schwebende Kopfbereich enthält die Produktmarke `DR`, den Klinikbezug, den Anwendungsnamen, eine kurze Funktionsbeschreibung, die Monats- und Jahresnavigation sowie den sichtbaren Speicherstatus.
 
-Die Oberfläche verbindet zwei bewusst unterschiedliche Gestaltungsprinzipien:
+### Toolbar
 
-- **Excel-nahe Informationsdichte im Monatsplan**
-- **Aero-Peak- und Liquid-Glass-Anmutung im Anwendungsrahmen**
+Die Toolbar fasst die Arbeitsaktionen in zwei Gruppen zusammen:
+- **Planung und Pflege:** aktueller Monat, Abwesenheiten, Dienstwünsche, Serverstand neu laden
+- **Datenaustausch:** Excel importieren, Excel exportieren, PDF exportieren, JSON sichern, JSON laden
 
-Der Tabellenbereich bleibt nüchtern, eng gerastert und sofort scanbar. Kopfbereich, Toolbar, Dialoge, Fensterränder und Bedienelemente verwenden dagegen halbtransparente Flächen, Hintergrundunschärfe, Reflexionskanten, mehrschichtige Schatten und dezente Monatsfarbreflexe.
+### Monatsblatt
 
-Dadurch entsteht kein dekoratives Dashboard, sondern eine professionelle Arbeitsoberfläche mit einem klaren Schwerpunkt auf der Tabelle.
+Das Monatsblatt ist die zentrale Arbeitsfläche. Es besteht aus der eigentlichen Dienstplantabelle und der darunterliegenden Statistik. Es gibt keine seitliche Statistik, keine Checkliste und kein separates Prüfprotokoll.
 
-## Aero-Peak-Elemente
+### Dialoge
 
-Die Aero-Peak-Anmutung entsteht durch:
+- Personenauswahl für BD und HG
+- tagesbezogene Abwesenheits- und Wunschpflege
+- Mehrfachauswahl für mehrere Kalendertage
+- Bestätigungsdialog für rote Konflikte
 
-- dunklen neutralen Hintergrund
-- farbigen Monatslichtschein im oberen Hintergrundbereich
-- stark kontrastierende, halbtransparente Fensterflächen
-- helle Reflexionslinie am oberen Rand der Glasflächen
-- tiefe, aber weiche Schlagschatten
-- leicht metallisch wirkende Bedienelemente
-- eingelassene Monats- und Statusfelder
-- klare helle Kanten vor dunklem Hintergrund
+## Aero-Peak- und Liquid-Glass-Designsystem
 
-## Liquid-Glass-Elemente
+Das Design verbindet eine nüchterne Excel-Tabelle mit einem schwebenden, halbtransparenten Anwendungsrahmen. Die Tabelle bleibt bewusst deckender als die Umgebung, damit Namen, Kürzel und Konfliktmarkierungen schnell gelesen werden können.
 
-Die Liquid-Glass-Anmutung entsteht durch:
+### Glasflächen
 
-- `backdrop-filter` mit Unschärfe und erhöhter Farbsättigung
-- semitransparente Flächen statt vollständig deckender Karten
-- überlagerte lineare Verläufe
-- innere Lichtkante
-- dezente Spiegelung in der oberen Hälfte von Fenstern und Schaltflächen
-- dynamisch an den Monat angepasste Lichtreflexe
-- transparente Dialoge mit abgedunkeltem und weichgezeichnetem Hintergrund
+- halbtransparente Flächen mit mehrschichtigen linearen Verläufen
+- Hintergrundunschärfe über `backdrop-filter`
+- erhöhte Farbsättigung hinter Glasflächen
+- helle obere Reflexionskante
+- dezente innere Schatten
+- weiche, tiefe Außenschatten
+- monatsabhängiger Farbschein in den Fensterflächen
 
-## Bewusste Begrenzung der Glaseffekte
+### Schwebende Umgebung
 
-Der Tabellenkörper ist absichtlich weniger transparent als der Anwendungsrahmen. Dienstplanung verlangt eine hohe Lesbarkeit, stabile Zellgrenzen und eine schnelle visuelle Orientierung. Zu starke Transparenz innerhalb der Zellen würde Namen, Kürzel und Konfliktmarkierungen unnötig beeinträchtigen.
+Drei große, unscharfe Lichtkörper bewegen sich langsam im Hintergrund. Ihre Farbe greift die jeweilige Monatsfarbe auf. Die Lichtkörper sind rein dekorativ, blockieren keine Interaktion und werden in der Druckansicht vollständig ausgeblendet.
 
-Die Anwendung verwendet daher:
+### Bedienelemente
 
-- Glaswirkung für Rahmen und Interaktion
-- Excel-Raster für operative Planung
-- Monatsfarben ausschließlich als funktionale Orientierung
+- glänzende obere Lichtzone
+- sanfter Höhenversatz beim Überfahren
+- kurze, nicht aufdringliche Schattenanimation
+- deutliche Fokusmarkierung
+- farblich mit dem Monat harmonisierte Fokusfarbe
 
-## Kopfbereich
+### Tabellenpriorität
 
-Der Kopfbereich enthält:
+Innerhalb des Tabellenrasters werden die Glaseffekte bewusst reduziert. Die Zellgrenzen bleiben dunkel, die Zeilenhöhen kompakt und die Eingabeflächen flach. Damit bleibt der Plan in seiner Informationsdichte näher an Excel als an einem Dashboard.
 
-- Produktmarke `DR`
-- Bezeichnung der Klinik
-- Anwendungsname DienstplanRAD
-- kurze Funktionsbeschreibung
-- Navigation zum vorherigen Monat
-- Monatsauswahl
-- Jahresauswahl
-- Navigation zum nächsten Monat
-- Speicherstatus
+## Animationen und Bewegung
 
-## Speicherstatus
+- **Fensteraufbau:** Kopfbereich, Toolbar und Monatsblatt erscheinen mit einer kurzen vertikalen Einblendung.
+- **Zeilenaufbau:** Die Kalendertage erscheinen mit sehr kurzem, gestaffeltem Versatz.
+- **Hintergrundbewegung:** Die drei Lichtkörper driften langsam und unabhängig voneinander.
+- **Reflexionsbewegung:** Eine diffuse Lichtreflexion bewegt sich sehr langsam über Glasflächen.
+- **Speicherstatus:** Der Statuspunkt pulsiert dezent.
+- **Dialogöffnung:** Dialoge blenden aus leichter Unschärfe und geringem Größenversatz ein.
+- **Interaktionsfeedback:** Auswahlkarten, Mehrtagesfelder und Metadaten-Chips heben sich beim Überfahren minimal an.
 
-Der Statusbereich zeigt unter anderem:
+Bei aktivierter Betriebssystemeinstellung **Bewegung reduzieren** werden Animationen und Übergänge praktisch vollständig deaktiviert.
 
-- `Lädt …`
-- `Lädt Serverstand …`
-- `Gespeichert`
-- `Speichert …`
-- `Offline – lokaler Stand`
-- `Offline gespeichert`
+## Monatliche Kontrastfarbsysteme
 
-Der farbige Statuspunkt unterstützt die Textanzeige, ersetzt sie aber nicht.
+Jeder Monat besitzt ein eigenes harmonisches Farbsystem. Innerhalb dieses Systems werden Samstag, Sonntag und gesetzlicher Feiertag in unterschiedlichen Intensitäten und Kontraststufen dargestellt. Die Grundfarbe wechselt mit jedem Monat, während die Hierarchie gleich bleibt: Samstag ist die leichteste, Sonntag die stärkere und Feiertag die markanteste Variante.
 
-## Toolbar
-
-Die Toolbar enthält:
-
-- aktuellen Monat öffnen
-- Abwesenheiten verwalten
-- Dienstwünsche verwalten
-- Serverstand neu laden
-- Excel-Datei importieren
-- aktuellen Monat als Excel-Datei exportieren
-- Druck- beziehungsweise PDF-Dialog öffnen
-- JSON-Sicherung exportieren
-- JSON-Sicherung importieren
-
-## Dialoge
-
-Die Anwendung verwendet native HTML-Dialoge für:
-
-- Auswahl einer Person für Bereitschaftsdienst oder Hintergrunddienst
-- tagesbezogene Abwesenheiten und Wünsche
-- komfortable Mehrtagesauswahl
-- Bestätigung roter Konflikte
-
-Dialoge behalten die Glaswirkung bei, besitzen jedoch einen ausreichend deckenden Hintergrund für eine zuverlässige Lesbarkeit.
-
----
-
-# Monatliche Kontrastfarbsysteme
-
-Jeder Monat besitzt ein eigenes Farbthema. Das Farbthema verändert nicht die fachliche Bewertung, sondern ausschließlich die visuelle Orientierung für Samstag, Sonntag, gesetzliche Feiertage, Monatsakzent und Hintergrundlichtschein.
-
-| Monat | Bezeichnung des Farbthemas | Charakter |
+| Monat | Thema | Charakter |
 |---|---|---|
-| Januar | Eisblau | kühl, klar, kontrastreich |
-| Februar | Rubinrose | gedämpftes Rosa bis Rubin |
-| März | Salbeigrün | ruhiges Grün mit natürlichem Kontrast |
-| April | Lavendel | violett-lavendelfarbene Abstufung |
-| Mai | Frühlingsgrün | frisches, kräftigeres Grün |
-| Juni | Türkis | kühles Türkis mit hoher Lesbarkeit |
-| Juli | Koralle | warmes Korallrot |
-| August | Bernstein | gold- bis bernsteinfarbene Akzente |
-| September | Pflaume | gedecktes Pflaumenviolett |
-| Oktober | Kupfer | warme Kupfer- und Brauntöne |
-| November | Schieferblau | kühles, gedämpftes Blau |
-| Dezember | Tannengrün und Rubin | grüne Grundakzente, rubinfarbene Feiertage |
+| Januar | Eisblau | kühl und klar |
+| Februar | Rubinrose | gedämpftes Rosa und Rubin |
+| März | Salbeigrün | ruhiges Frühlingsgrün |
+| April | Lavendel | kühles Violett |
+| Mai | Frühlingsgrün | helles Blattgrün |
+| Juni | Türkis | frisches Blaugrün |
+| Juli | Koralle | warme Koralltöne |
+| August | Bernstein | goldene Sommertöne |
+| September | Pflaume | gedecktes Violett |
+| Oktober | Kupfer | warme Kupfer- und Erdtöne |
+| November | Schieferblau | ruhiges Blau-Grau |
+| Dezember | Tannengrün und Rubin | winterliches Grün mit festlichem Feiertagsakzent |
 
-## Semantik der Kalendertagsfarben
+Die Monatsfarbe steuert außerdem Hintergrundlicht, Fokusrahmen, ausgewählte Mehrtagesfelder, die Monatsplakette und Teile der Glasreflexion.
 
-Innerhalb eines Monats werden drei unterschiedliche Kontraststufen verwendet:
+## Tabellarischer Monatsplan
 
-- **Samstag:** hellste Wochenendkontrastfarbe
-- **Sonntag:** stärkerer und dunklerer Wochenendkontrast
-- **gesetzlicher Feiertag:** eigenständige Feiertagsfarbe mit stärkster Randmarkierung
+Jeder Kalendertag wird als eigene Zeile gerendert. Die Tabelle bleibt horizontal scrollbar, wenn das verfügbare Fenster schmaler als die definierte Mindestbreite ist. Die Tabellenüberschrift bleibt beim vertikalen Scrollen fixiert.
 
-Wenn ein Feiertag auf einen Samstag oder Sonntag fällt, erhält die Feiertagsdarstellung visuell Vorrang.
+### Zeilenklassen
 
-## Feiertagsbezeichnung in der Tabelle
+- Werktag ohne Feiertag: neutrale Tabellenfarbe
+- Samstag: leichte Monatskontrastfarbe
+- Sonntag: stärkere Monatskontrastfarbe
+- Feiertag: markanteste Monatskontrastfarbe und Feiertagsname im Wochentagsfeld
 
-Der Name des Feiertags erscheint direkt unter dem ausgeschriebenen Wochentag. Beispiele:
+### Hover- und Fokusverhalten
 
-- Freitag  
-  Karfreitag
+Beim Überfahren wird eine Zeile nur minimal hervorgehoben. Es erfolgt keine Größenänderung der Zellen. Eingabefelder und Schaltflächen erhalten eine klare, monatsfarbene Fokusmarkierung für Tastaturbedienung.
 
-- Mittwoch  
-  Buß- und Bettag
+## Spalten und Datenfelder
 
-Diese Zusatzbezeichnung wird platzsparend in kleinerer Schrift dargestellt.
+| Spalte | Inhalt | Bedienung |
+|---|---|---|
+| Tag | numerischer Kalendertag | nicht editierbar |
+| Wochentag | ausgeschriebener Wochentag und gegebenenfalls Feiertagsname | nicht editierbar |
+| BD | Bereitschaftsdienst | Klick öffnet die farbbewertete Personenauswahl |
+| HG | Hintergrunddienst | Klick öffnet die farbbewertete Personenauswahl |
+| RBN | erstes freies RBN-Feld | direkte Texteingabe mit Vorschlagsliste |
+| 2. RBN | zweites freies RBN-Feld | direkte Texteingabe mit Vorschlagsliste |
+| Urlaub / FZA | kompakte Abwesenheitszusammenfassung | Klick öffnet die Tagespflege |
+| Kein Dienst / Wünsche | kompakte Wunschzusammenfassung | Klick öffnet die Tagespflege |
 
-## Dynamische Browserfarbe
+## Monatsnavigation und Serverladen
 
-Beim Monatswechsel wird zusätzlich die `theme-color` des Dokuments angepasst. Unterstützte Browser können dadurch auch Browserrahmen oder installierte Progressive-Web-Application-Fenster an das jeweilige Monatsfarbthema anpassen.
+Der Monat kann mit Pfeiltasten, Monatsauswahl und Jahresauswahl gewechselt werden. Beim Öffnen eines Monats wird zuerst die Pages-Functions-Programmierschnittstelle abgefragt. Der geladene Serverstand ersetzt den im Browser gespeicherten Stand dieses Monats.
 
----
-
-# Tabellarischer Monatsplan
-
-Der Monatsplan ist die zentrale Arbeitsfläche.
-
-## Zeilenstruktur
-
-Jeder Kalendertag des ausgewählten Monats belegt genau eine Tabellenzeile.
-
-Die Zeilen werden aus dem Monatsdatenmodell erzeugt. Die Anzahl entspricht automatisch der realen Monatslänge.
-
-## Spalten
-
-| Spalte | Inhalt |
-|---|---|
-| Tag | numerischer Kalendertag |
-| Wochentag | ausgeschriebener Wochentag, gegebenenfalls mit Feiertagsname |
-| BD | manuell gewählter Bereitschaftsdienst |
-| HG | manuell gewählter Hintergrunddienst |
-| RBN | erstes frei beschreibbares RBN-Feld |
-| 2. RBN | zweites frei beschreibbares RBN-Feld |
-| Urlaub / FZA | kompakte tagesbezogene Abwesenheitsübersicht |
-| Kein Dienst / Wünsche | kompakte tagesbezogene Wunschübersicht |
-
-## Zellinteraktion
-
-### Bereitschaftsdienst und Hintergrunddienst
-
-Ein Klick auf die jeweilige Zelle öffnet die farbcodierte Personenauswahl.
-
-### RBN
-
-RBN-Felder werden direkt als Textfeld bearbeitet. Die Eingabe wird beim Verlassen beziehungsweise Ändern des Feldes übernommen.
-
-### Urlaub, Freizeitausgleich und Wünsche
-
-Ein Klick auf die jeweilige Zusammenfassungszelle öffnet den tagesbezogenen Bearbeitungsdialog.
-
-## Tabellenraster
-
-Die Zellgrenzen sind bewusst stärker ausgeprägt als in einer typischen Webanwendung. Dadurch bleibt die Darstellung auch bei längeren Namen, vielen Einträgen und gedruckten Plänen eindeutig.
-
-## Horizontales Scrollen
-
-Bei kleineren Bildschirmen bleibt die Tabelle vollständig erhalten und wird horizontal scrollbar. Spalten werden nicht automatisch entfernt oder semantisch zusammengelegt.
-
----
-
-# Mitarbeitendenstamm und feste Auswahlreihenfolge
-
-## Feste Planungsreihenfolge
-
-Die Auswahlreihenfolge ist bewusst stabil und wird nicht nach Eignungsfarbe sortiert:
-
-1. Dr. Lurz
-2. Dr. Polednia
-3. Fr. Dalitz
-4. Dr. Becker
-5. Fr. Hellmann
-6. Dr. Martin
-7. Hr. El Houba
-8. Fr. Licenji
-9. Hr. Sebastian
-
-Die feste Reihenfolge verhindert, dass sich Namen bei jeder Regeländerung im Auswahlmenü verschieben.
-
-## Prof. Schäfer
-
-Prof. Schäfer ist:
-
-- in der Abwesenheitsverwaltung enthalten
-- nicht im Bereitschaftsdienst- oder Hintergrunddienstpool enthalten
-- nicht Bestandteil der Dienstverteilungsstatistik
-
-## Standarddaten
-
-| Person | Rolle | Bereitschaftsdienst-Richtwert | Besonderheiten |
-|---|---|---:|---|
-| Dr. Lurz | Facharzt / Oberarzt | ungefähr 4 | Bereitschaftsdienst und Hintergrunddienst möglich |
-| Dr. Polednia | Facharzt / Oberarzt | ungefähr 3 | dienstags und sonntags kein Bereitschaftsdienst oder Hintergrunddienst |
-| Fr. Dalitz | Fachärztin / Oberärztin | ungefähr 4 | Sonderregel bei Hintergrunddienst an Sonntag oder Montag mit Bereitschaftsdienst von Hr. Sebastian |
-| Dr. Becker | Fachärztin / Oberärztin | ungefähr 3 | Samstags-Bereitschaftsdienst nachrangig |
-| Fr. Hellmann | Fachärztin | maximal 2 | ab 1. Oktober 2026 aktiv, maximal zwei Bereitschaftsdienste pro Monat, Hintergrunddienst zusätzlich möglich |
-| Dr. Martin | Facharzt | ungefähr 4 | Bereitschaftsdienst und Hintergrunddienst möglich |
-| Hr. El Houba | zunächst Assistenzarzt, später Facharzt | ungefähr 4 | Facharztstatus ab 22. September 2026 |
-| Fr. Licenji | Assistenzärztin | ungefähr 4 | kein Hintergrunddienst, kein Samstags-Bereitschaftsdienst |
-| Hr. Sebastian | Assistenzarzt | ungefähr 4 | kein Hintergrunddienst, kein Samstags-Bereitschaftsdienst |
-
-Die Richtwerte sind mit Ausnahme des Maximums von Fr. Hellmann weiche Orientierungswerte.
-
----
-
-# Manuelle Bereitschaftsdienst- und Hintergrunddienstplanung
-
-## Bereitschaftsdienst
-
-Der Bereitschaftsdienst wird in der Spalte `BD` geplant.
-
-Der Auswahlprozess:
-
-1. Zelle anklicken.
-2. Personenauswahl öffnet sich.
-3. Jede Person erhält eine Eignungsfarbe.
-4. Gründe werden direkt unter dem Namen angezeigt.
-5. Auswahl anklicken.
-6. Bei roter Bewertung erscheint ein Bestätigungsdialog.
-7. Nach Bestätigung wird die Einteilung gespeichert.
-
-## Hintergrunddienst
-
-Der Hintergrunddienst wird identisch in der Spalte `HG` geplant. Zusätzlich wird die fachärztliche Berechtigung geprüft.
-
-## Löschen einer Einteilung
-
-Im Auswahlfenster kann der vorhandene Eintrag über `Eintrag löschen` entfernt werden.
-
-## Keine automatische Zuweisung
-
-Es gibt keine Funktion, die:
-
-- alle offenen Dienste automatisch besetzt
-- Dienste zufällig verteilt
-- eine mathematische Optimierung startet
-- Personen automatisch tauscht
-- freie Plätze repariert
-- Sollzahlen automatisch erzwingt
-
----
-
-# RBN-Felder
-
-Die beiden RBN-Spalten sind bewusst von Bereitschaftsdienst und Hintergrunddienst getrennt.
-
-## Eigenschaften
-
-- freie Texteingabe
-- keine Qualifikationsprüfung
-- keine Abstandsprüfung
-- keine Dienststatistik
-- keine Wochenendäquivalente
-- keine Konfliktfarbe
-- Autovervollständigung aus bereits verwendeten Namen
-
-## Vorschlagsliste
-
-Ein neu eingegebener RBN-Name wird in die serverseitig gespeicherte Vorschlagsliste aufgenommen. Die Vorschlagsliste wird alphabetisch sortiert.
-
-## Speicherzeitpunkt
-
-Die RBN-Eingabe wird bei einer tatsächlichen Feldänderung gespeichert, nicht nach jedem einzelnen Tastendruck.
-
----
-
-# Abwesenheiten
-
-## Unterstützte Abwesenheitsarten
-
-- Urlaub
-- Freizeitausgleich oder frei
-- Weiterbildung
-- sonstige Abwesenheit
-
-## Einzelpflege
-
-Ein Klick auf die Spalte `Urlaub / FZA` öffnet die tagesbezogene Bearbeitung für alle Mitarbeitenden.
-
-## Mehrtagespflege
-
-Über die Toolbar-Schaltfläche `Abwesenheiten` kann eine Person ausgewählt werden. Anschließend können beliebige einzelne Tage markiert und gemeinsam mit einer Abwesenheitsart versehen werden.
-
-Die Tage müssen keinen zusammenhängenden Zeitraum bilden.
-
-## Darstellung in der Tabelle
-
-Die Zusammenfassung verwendet kompakte Kennzeichnungen:
-
-| Interner Typ | Darstellung |
-|---|---|
-| Urlaub | `U` |
-| Freizeitausgleich / frei | `FZA` |
-| Weiterbildung | `WB` |
-| sonstige Abwesenheit | `abwesend` |
-
-Beispiel:
-
-```text
-Lurz: U, Becker: WB
-```
-
-## Freizeitausgleich direkt nach Bereitschaftsdienst
-
-Ein Freizeitausgleich am unmittelbaren Folgetag eines eigenen Bereitschaftsdienstes wird in der kompakten Tabellenspalte nicht angezeigt.
-
-Wichtig:
-
-- der Eintrag bleibt im Datenmodell gespeichert
-- der Eintrag bleibt im Bearbeitungsdialog sichtbar
-- der Eintrag bleibt für Regelprüfungen verfügbar
-- es handelt sich nur um eine visuelle Entlastung der Tageszeile
-
----
-
-# Dienstwünsche
-
-## Negative Wünsche
-
-- kein Bereitschaftsdienst
-- kein Hintergrunddienst
-- kein Dienst
-
-## Positive Wünsche
-
-- Bereitschaftsdienst bevorzugt
-- Hintergrunddienst bevorzugt
-- Dienst bevorzugt
-
-## Darstellung
-
-| Wunsch | Kompakte Anzeige |
-|---|---|
-| kein Bereitschaftsdienst | `kein BD` |
-| kein Hintergrunddienst | `kein HG` |
-| kein Dienst | `kein Dienst` |
-| Bereitschaftsdienst bevorzugt | `+BD` |
-| Hintergrunddienst bevorzugt | `+HG` |
-| Dienst bevorzugt | `+Dienst` |
-
-## Bearbeitung
-
-Dienstwünsche können:
-
-- tagesbezogen über die Tabellenzeile
-- oder für mehrere einzelne Tage über die Toolbar
-
-erfasst werden.
-
----
-
-# Regelbewertung und Konfliktstufen
-
-## Grün
-
-Grün bedeutet:
-
-- keine relevante Einschränkung erkannt
-- oder positiver Wunsch passend zur gewählten Dienstform
-
-Grün ist keine automatische Empfehlung im Sinne eines Autoplaners. Es signalisiert lediglich, dass keine höher gewichtete Regel greift.
-
-## Gelb
-
-Gelb kennzeichnet einen milden Hinweis. Die Einteilung kann ohne zusätzliche Bestätigung vorgenommen werden.
-
-Beispiele:
-
-- Bereitschaftsdienst-Richtwert erreicht
-- erneuter Hintergrunddienst innerhalb von drei Kalendertagen
-- Bereitschaftsdienst – Freizeitausgleich – Bereitschaftsdienst an Werktagen
-
-## Orange
-
-Orange kennzeichnet einen deutlichen Konflikt oder eine nachrangige Konstellation. Die Auswahl bleibt unmittelbar möglich.
-
-Beispiele:
-
-- weniger als drei dienstfreie Tage zwischen zwei Bereitschaftsdiensten
-- Bereitschaftsdienst unmittelbar vor Urlaub
-- Dienst an aufeinanderfolgenden Wochenenden
-- Hintergrunddienst am Tag vor eigenem Bereitschaftsdienst
-
-## Rot
-
-Rot kennzeichnet einen erheblichen Konflikt. Die Person kann weiterhin eingeteilt werden, aber nur nach ausdrücklicher Bestätigung.
-
-Beispiele:
-
-- Abwesenheit am Diensttag
-- kein-Dienst-Wunsch
-- fehlende Qualifikation
-- Bereitschaftsdienst an zwei aufeinanderfolgenden Tagen
-- Überschreitung des Bereitschaftsdienstmaximums von Fr. Hellmann
-
-## Grau
-
-Grau kennzeichnet eine nicht aktive oder nicht planbare Person.
-
----
-
-# Vollständige fachliche Regelmatrix
-
-## Allgemeine Regeln
-
-### Gleichzeitiger Bereitschaftsdienst und Hintergrunddienst
-
-Dieselbe Person am selben Tag in Bereitschaftsdienst und Hintergrunddienst:
-
-- Bewertung: rot
-- Auswahl: nur nach Bestätigung
-
-### Abwesenheit am Diensttag
-
-Jede eingetragene Abwesenheit am geplanten Diensttag:
-
-- Bewertung: rot
-
-### Negative Wünsche
-
-- kein Dienst bei Bereitschaftsdienst oder Hintergrunddienst: rot
-- kein Bereitschaftsdienst bei Bereitschaftsdienst: rot
-- kein Hintergrunddienst bei Hintergrunddienst: rot
-
-### Positive Wünsche
-
-- Bereitschaftsdienst bevorzugt bei Bereitschaftsdienst: grüne Begründung
-- Hintergrunddienst bevorzugt bei Hintergrunddienst: grüne Begründung
-- Dienst bevorzugt bei beiden Dienstformen: grüne Begründung
-
-## Qualifikationsregeln
-
-### Hintergrunddienst
-
-Hintergrunddienst ist nur für Personen mit Facharztberechtigung zulässig.
-
-Regelwidrige Auswahl:
-
-- Bewertung: rot
-
-### Samstags-Bereitschaftsdienst
-
-Samstags-Bereitschaftsdienst ist nur für Fachärztinnen und Fachärzte zulässig.
-
-Regelwidrige Auswahl:
-
-- Bewertung: rot
-
-### Hr. El Houba
-
-Bis einschließlich 21. September 2026 gelten die Assistenzarztberechtigungen.
-
-Ab 22. September 2026 gelten:
-
-- Facharztrolle
-- Hintergrunddienstberechtigung
-- Berechtigung zum Samstags-Bereitschaftsdienst
-
-## Personenspezifische Regeln
-
-### Dr. Polednia
-
-Dienstag und Sonntag:
-
-- kein Bereitschaftsdienst
-- kein Hintergrunddienst
-- Bewertung: rot
-
-### Dr. Becker
-
-Samstags-Bereitschaftsdienst:
-
-- Bewertung: orange
-- Begründung: nur nachrangig
-
-Nächster regulärer Werktag nach einem Samstags-Bereitschaftsdienst von Dr. Becker:
-
-- erneuter Bereitschaftsdienst rot
-- Hintergrunddienst wird durch diese Sonderregel nicht gesperrt
-
-### Fr. Dalitz und Hr. Sebastian
-
-Hintergrunddienst von Fr. Dalitz an Sonntag oder Montag bei gleichzeitigem Bereitschaftsdienst von Hr. Sebastian:
-
-- Bewertung: orange
-
-### Fr. Hellmann
-
-- ab 1. Oktober 2026 in der Auswahl sichtbar
-- maximal zwei Bereitschaftsdienste pro Monat
-- Überschreitung: rot
-- Hintergrunddienste zählen nicht in dieses Maximum
-
-## Bereitschaftsdienstabstände
-
-### Bereitschaftsdienst am Vortag
-
-Bereitschaftsdienst derselben Person an zwei aufeinanderfolgenden Tagen:
-
-- Bewertung: rot
-
-### Weniger als drei dienstfreie Tage
-
-Erneuter Bereitschaftsdienst mit weniger als drei dienstfreien Tagen seit dem letzten Bereitschaftsdienst:
-
-- Bewertung: orange
-
-### Bereitschaftsdienst – Freizeitausgleich – Bereitschaftsdienst
-
-Wenn alle drei Tage Werktage sind und der mittlere Tag als Freizeitausgleich geführt wird:
-
-- Bewertung: gelb
-
-Diese Konstellation ersetzt in diesem konkreten Fall die sonst orange Abstandsmarkierung.
-
-### Bereitschaftsdienst-Richtwert
-
-Wenn der persönliche Monatsrichtwert bereits erreicht ist:
-
-- Bewertung: gelb
-
-### Bereitschaftsdienstmaximum
-
-Wenn ein verbindliches Maximum bereits erreicht ist:
-
-- Bewertung: rot
-
-Aktuell betrifft dies Fr. Hellmann mit maximal zwei Bereitschaftsdiensten pro Monat.
-
-### Bereitschaftsdienst vor Urlaub
-
-Bereitschaftsdienst unmittelbar vor dem ersten Urlaubstag:
-
-- Bewertung: orange
-
-## Hintergrunddienstabstände
-
-### Drei aufeinanderfolgende Hintergrunddienste
-
-Dritter Hintergrunddienst an drei aufeinanderfolgenden Tagen:
-
-- Bewertung: orange
-
-### Erneuter Hintergrunddienst innerhalb von drei Kalendertagen
-
-- Bewertung: gelb
-
-### Hintergrunddienst am Tag vor eigenem Bereitschaftsdienst
-
-- Bewertung: orange
-
-Ausnahme:
-
-- Freitag-Hintergrunddienst vor eigenem Samstags-Bereitschaftsdienst
-- keine entsprechende Warnung aus dieser Regel
-
-## Wochenendregeln
-
-Ein Dienstwochenende umfasst Freitag bis Sonntag.
-
-### Wochenendäquivalent
-
-- mindestens ein Bereitschaftsdienst am Wochenende: `1,0`
-- ausschließlich Hintergrunddienst am Wochenende: `0,5`
-- Bereitschaftsdienst und Hintergrunddienst am selben Wochenende: insgesamt `1,0`
-- mehrere Dienste desselben Typs erhöhen das Äquivalent nicht weiter
-
-### Aufeinanderfolgende Wochenenden
-
-Dienst am Wochenende direkt nach einem Dienstwochenende:
-
-- normalerweise orange
-
-Bereitschaftsdienstwochenende direkt nach einem Bereitschaftsdienstwochenende:
-
-- rot
-
-## Oster- und Pfingstalternanz
-
-Osterblock:
-
-- Karfreitag
-- Karsamstag
-- Ostersonntag
-- Ostermontag
-
-Pfingstblock:
-
-- Pfingstsamstag
-- Pfingstsonntag
-- Pfingstmontag
-
-Wenn dieselbe Person bereits im jeweils anderen Block Bereitschaftsdienst oder Hintergrunddienst hat:
-
-- Bewertung: orange
-
-## Becker-Martin-Abwesenheitskonflikt
-
-Die Regelengine kann gleichzeitige werktägliche Abwesenheiten von Dr. Becker und Dr. Martin erkennen. Die aktuelle Hauptansicht enthält bewusst kein separates Prüfprotokoll. Die Abwesenheiten bleiben jedoch in der Datenstruktur vorhanden und stehen für regelbasierte Auswertungen zur Verfügung.
-
----
-
-# Statistik unterhalb des Monatsplans
-
-Die Statistik steht unmittelbar unter der Tabelle und nicht in einer Seitenleiste.
-
-## Spalten
-
-- Mitarbeitende
-- Anzahl Bereitschaftsdienste
-- Anzahl Hintergrunddienste
-- Wochenendäquivalent
-- Bereitschaftsdienst-Soll beziehungsweise Richtwert
-- verbleibende Differenz zum Richtwert
-
-## Offene Dienste
-
-Eine zusätzliche Zeile `Offen` zeigt:
-
-- Anzahl unbesetzter Bereitschaftsdienste
-- Anzahl unbesetzter Hintergrunddienste
-
-## Überschreitung
-
-Ein negativer Restwert wird hervorgehoben.
-
-## Nicht berücksichtigte Felder
-
-RBN-Einträge werden nicht in der Statistik berücksichtigt.
-
-Prof. Schäfer wird nicht in der Dienststatistik berücksichtigt.
-
----
-
-# Gesetzliche Feiertage in Sachsen
-
-Die Tabellenansicht markiert folgende implementierte Feiertage:
-
-## Feste Feiertage
-
-- Neujahr
-- Tag der Arbeit
-- Tag der Deutschen Einheit
-- Reformationstag
-- erster Weihnachtsfeiertag
-- zweiter Weihnachtsfeiertag
-
-## Bewegliche Feiertage
-
-- Karfreitag
-- Ostermontag
-- Christi Himmelfahrt
-- Pfingstmontag
-- Buß- und Bettag
-
-## Berechnung
-
-Ostern wird algorithmisch für das jeweilige Jahr berechnet. Die davon abhängigen Feiertage werden durch feste Tagesabstände bestimmt.
-
-Der Buß- und Bettag wird als Mittwoch vor dem 23. November berechnet.
-
-## Nicht enthalten
-
-Gemeindespezifische Sonderregelungen, beispielsweise Fronleichnam in einzelnen sächsischen Gemeinden, sind derzeit nicht Bestandteil der automatischen Markierung.
-
----
-
-# Excel-Import
-
-## Bibliothek
-
-Der Excel-Import verwendet SheetJS, das im Browser über ein externes Content-Delivery-Network geladen wird.
-
-## Unterstützte Monatsblätter
-
-Es werden ausschließlich folgende Monatsblattnamen erkannt:
-
-```text
-Jan
-Feb
-Mrz
-Apr
-Mai
-Jun
-Jul
-Aug
-Sep
-Okt
-Nov
-Dez
-```
-
-Andere Tabellenblätter, einschließlich separater Urlaubsübersichten, werden ignoriert.
-
-## Erwartete Jahresplanerstruktur
-
-Die Importlogik sucht:
-
-1. eine Zeile mit mindestens zwanzig numerischen Kalendertagen ab der dritten Spalte
-2. Mitarbeitendenzeilen mit `Arbeitsplatz` in der zweiten Spalte
-3. unmittelbar darunter die zugehörige Zeile `Dienst/Hintergrund`
-
-## Jahresbestimmung
-
-Das Jahr wird aus den ersten Zellen der ersten beiden Tabellenzeilen gelesen. Wird dort kein vierstelliges Jahr erkannt, verwendet die Anwendung das aktuell gewählte Jahr.
-
-## Dienstmarker
-
-| Excel-Marker | Importziel |
-|---|---|
-| `D` | Bereitschaftsdienst |
-| `HG` | Hintergrunddienst |
-
-## Abwesenheitsmarker
-
-| Excel-Marker | Importziel |
-|---|---|
-| `U` | Urlaub |
-| `F` | Freizeitausgleich / frei |
-| `FZA` | Freizeitausgleich / frei |
-| `WB` | Weiterbildung |
-| `K` | sonstige Abwesenheit |
-| `KK` | sonstige Abwesenheit |
-| `ZU` | sonstige Abwesenheit |
-| `§15C` | sonstige Abwesenheit |
-| `DR` | sonstige Abwesenheit |
-
-## Namenszuordnung
-
-Namen werden normalisiert:
-
-- Mehrfachleerzeichen werden entfernt
-- Groß- und Kleinschreibung werden vereinheitlicht
-- fest definierte Namensvarianten werden den internen Personenkennungen zugeordnet
-
-## Ergänzender Import
-
-Der Import erzeugt zunächst ein leeres Monatsimportobjekt und führt dieses anschließend mit dem vorhandenen Monat zusammen.
-
-Für Bereitschaftsdienst und Hintergrunddienst gilt:
-
-- vorhandene Einträge bleiben bestehen
-- importierte Einträge werden nur in leere Dienstfelder übernommen
-
-Abwesenheiten werden entsprechend der erkannten Marker in die Abwesenheitsstruktur eingetragen.
-
-## Aktuelle Begrenzung des Importdialogs
-
-Die Anwendung zeigt nach dem Import eine textbasierte Zusammenfassung. Ein detaillierter zellweiser Konfliktvergleich mit Einzelentscheidung ist derzeit nicht implementiert.
-
-## Speicherung importierter Monate
-
-Jeder berührte Monat wird nach dem Import über die Monats-Programmierschnittstelle in Workers KV gespeichert.
-
----
-
-# Excel-Export
-
-Der aktuelle Monatsplan kann als Excel-Datei exportiert werden.
-
-## Enthaltene Inhalte
-
-- Monatsüberschrift
-- Tag
-- Wochentag
-- Bereitschaftsdienst
-- Hintergrunddienst
-- erstes RBN-Feld
-- zweites RBN-Feld
-- Statistikzeilen
-
-## Dateiname
-
-```text
-dienstplan_JJJJ_MM.xlsx
-```
-
-## Arbeitsblattname
-
-```text
-JJJJ-MM
-```
-
-## Einordnung
-
-Der Export ist funktional und strukturiert. Er bildet derzeit nicht jede Formatierung der historischen Excel-Vorlage pixelgenau nach.
-
----
-
-# PDF- und Druckausgabe
-
-Die Schaltfläche `PDF exportieren` öffnet den Druckdialog des Browsers.
-
-## Drucklayout
-
-- A4
-- Hochformat
-- schmale Seitenränder
-- ausgeblendete Toolbar
-- ausgeblendeter Kopfbereich
-- ausgeblendete Farblegenden
-- reduzierte Zeilenhöhe
-- ausgeblendete Bewertungs-Chips
-- Statistik direkt unter dem Plan
-
-## PDF-Erstellung
-
-Die eigentliche PDF-Datei wird durch die PDF-Druckfunktion des Browsers erzeugt. Es existiert kein separater serverseitiger PDF-Generator.
-
----
-
-# JSON-Sicherung und Wiederherstellung
-
-## Export
-
-Die JSON-Sicherung enthält:
-
-- Einstellungen
-- Mitarbeitendenstamm
-- RBN-Vorschlagsliste
-- gespeicherte Monatsdaten
-
-Die Anwendung versucht zunächst, eine serverseitige Gesamtsicherung über `/api/export` abzurufen. Bei einem Fehler wird eine lokale Sicherung aus dem aktuellen Browserzustand erzeugt.
-
-## Dateiname
-
-```text
-dienstplanrad_backup_JJJJ-MM-TT.json
-```
-
-## Import
-
-Beim JSON-Import werden übernommen:
-
-- Einstellungen
-- Mitarbeitende
-- RBN-Vorschläge
-- Monate
-
-Anschließend versucht die Anwendung, die Sicherung über `/api/import` auf dem Server zu speichern.
-
-## Aktuelle Importstrategie
-
-Die JSON-Wiederherstellung ersetzt die im Importobjekt enthaltenen Bereiche im aktuellen Anwendungszustand. Eine grafische Auswahl einzelner Monate ist derzeit nicht implementiert.
-
----
-
-# Speicher- und Synchronisationsmodell
-
-## Server-first-Start
-
-Beim Öffnen eines Monats versucht die Anwendung zuerst, den aktuellen Stand von Cloudflare Workers KV zu laden.
-
-Ablauf:
-
-1. Bootstrap-Daten laden
-2. ausgewählten Monat vom Server laden
-3. Vormonat und Folgemonat im Hintergrund laden
-4. lokalen Browserstand aktualisieren
-5. Tabelle rendern
-
-## Warum angrenzende Monate geladen werden
-
-Vormonat und Folgemonat werden benötigt für:
-
-- monatsübergreifende Bereitschaftsdienstabstände
-- aufeinanderfolgende Dienstwochenenden
-- Hintergrunddienst vor Bereitschaftsdienst
-- Jahreswechsel
-
-## Lokale Speicherung
-
-Jeder geladene oder geänderte Monat wird zusätzlich in `localStorage` gespeichert.
-
-Schlüsselstruktur:
-
-```text
-dienstplanrad:bootstrap
-dienstplanrad:month:JJJJ-MM
-```
-
-## Automatische Speicherung
-
-Änderungen werden mit einer kurzen Verzögerung gebündelt. Aktuell beträgt diese ungefähr 1,1 Sekunden.
-
-Ablauf:
-
-1. Änderung im Arbeitsspeicher
-2. Zustand als geändert markieren
-3. vorherigen Speichertimer zurücksetzen
-4. neuen Speichertimer starten
-5. Monat lokal speichern
-6. Monat über die Pages Function speichern
-7. Speicherstatus aktualisieren
-
-## Revisionsnummer
-
-Bei jeder Speicherung wird die Revisionsnummer des Monats erhöht.
-
-## Zeitstempel
-
-Bei jeder Speicherung wird `updatedAt` mit einem ISO-Zeitstempel aktualisiert.
-
-## Offlinefall
-
-Kann der Server nicht erreicht werden:
-
-- wird der letzte lokale Monatsstand verwendet
-- zeigt die Oberfläche den Offlinestatus
-- bleiben Änderungen im Browser erhalten
-
-## Parallelbearbeitung
-
-Die Anwendung ist für einen planenden Nutzer konzipiert. Es existiert derzeit keine echte Transaktionssperre und kein grafischer Drei-Wege-Merge für parallele Browserinstanzen. Bei konkurrierenden Schreibvorgängen kann der zuletzt gespeicherte Stand gewinnen.
-
----
-
-# Offlinebetrieb und Progressive Web Application
-
-## Manifest
-
-Die Datei `manifest.webmanifest` definiert:
-
-- Anwendungsname
-- Kurzname
-- Startadresse
-- Standalone-Anzeigemodus
-- Hintergrundfarbe
-- Themenfarbe
-- Programmsymbole
-
-## Service Worker
-
-Der Service Worker verwendet den Cache:
-
-```text
-dienstplanrad-v5
-```
-
-## Vorgespeicherte Kernressourcen
-
-- Startseite
-- HTML-Datei
-- Stylesheet
-- Anwendungslogik
-- Programmierschnittstellen-Client
-- Standarddaten
-- Regelengine
-- Zustandsverwaltung
-- Web-App-Manifest
-
-## Navigationsstrategie
-
-Für Seitenaufrufe gilt:
-
-- zuerst Netzwerk
-- bei Fehler Fallback auf gecachte Startseite
-
-Dadurch wird beim normalen Öffnen bevorzugt die aktuelle Serverversion geladen.
-
-## Ressourcenstrategie
-
-Für sonstige GET-Anfragen gilt:
-
-- zuerst Cache
-- wenn nicht vorhanden Netzwerk
-- erfolgreiche Netzwerkantwort im Cache ablegen
-
-## Cachebereinigung
-
-Bei Aktivierung eines neuen Service Workers werden ältere DienstplanRAD-Caches entfernt.
-
-## SheetJS und Offlinebetrieb
-
-Die Excel-Bibliothek wird extern geladen. Ist sie bei einer vollständig offline gestarteten Sitzung nicht verfügbar, zeigt die Anwendung beim Excel-Import oder Excel-Export einen entsprechenden Hinweis.
-
----
-
-# Cloudflare-Pages-Functions-Programmierschnittstelle
-
-## Bootstrap
-
-```http
-GET /api/bootstrap
-```
-
-Liefert:
-
-- Einstellungen
-- Mitarbeitendenstamm
-- RBN-Vorschlagsliste
-
-## Monat laden
-
-```http
-GET /api/month/:year/:month
-```
-
-Beispiel:
-
-```http
-GET /api/month/2026/09
-```
-
-## Monat speichern
-
-```http
-PUT /api/month/:year/:month
-```
-
-Der übermittelte Monat wird normalisiert und in Workers KV gespeichert.
-
-## Einstellungen
-
-```http
-GET /api/settings
-PUT /api/settings
-```
+Ist der Server nicht erreichbar, verwendet die Anwendung eine vorhandene lokale Monatskopie. Fehlt auch diese, wird ein leerer Monatsdatensatz erzeugt. Zusätzlich werden der vorherige und der nächste Monat geladen, damit monatsübergreifende Regeln ohne sichtbare Unterbrechung arbeiten können.
 
 ## Mitarbeitendenstamm
 
-```http
-GET /api/staff
-PUT /api/staff
-```
+| Reihenfolge | Person | Rolle beziehungsweise Status | BD-Richtwert | Besonderheit |
+|---:|---|---|---:|---|
+| 1 | Dr. Lurz | FA/OA | 4 | BD, HG und Samstags-BD möglich |
+| 2 | Dr. Polednia | FA/OA | 3 | dienstags und sonntags weder BD noch HG |
+| 3 | Fr. Dalitz | FÄ/OÄ | 4 | Sonderhinweis bei Sebastian-BD an Sonntag oder Montag |
+| 4 | Dr. Becker | FÄ/OÄ | 3 | Samstags-BD nachrangig; nächster regulärer Werktag FZA und kein BD |
+| 5 | Fr. Hellmann | FÄ, 50 Prozent | 2 | ab 1. Oktober 2026; maximal zwei BD pro Monat |
+| 6 | Dr. Martin | FA | 4 | BD, HG und Samstags-BD möglich |
+| 7 | Hr. El Houba | AA bis 21. September 2026, danach FA | 4 | Qualifikation wechselt datumsgesteuert |
+| 8 | Fr. Licenji | AÄ | 4 | kein HG und kein Samstags-BD |
+| 9 | Hr. Sebastian | AA | 4 | kein HG und kein Samstags-BD |
 
-## RBN-Vorschlagsliste
+**Prof. Schäfer** steht ausschließlich in der Abwesenheitsverwaltung zur Verfügung. Er erscheint weder in BD-/HG-Auswahlmenüs noch in der Statistik.
 
-```http
-GET /api/rbn-names
-PUT /api/rbn-names
-```
+## Zeitabhängige Qualifikationen
 
-## Gesamtexport
+- **Fr. Hellmann:** erst ab dem 1. Oktober 2026 im aktiven Dienstpool sichtbar.
+- **Hr. El Houba:** bis einschließlich 21. September 2026 Assistenzarzt; ab 22. September 2026 Facharzt mit HG- und Samstags-BD-Berechtigung.
+- Aktive Zeiträume werden bereits beim Aufbau der Personenauswahl berücksichtigt.
 
-```http
-GET /api/export
-```
+## Manuelle BD-Planung
 
-Der aktuelle Endpunkt durchsucht die Jahre 2025 bis 2030.
+Ein Klick in eine BD-Zelle öffnet die Personenauswahl in der fest definierten Reihenfolge. Jede Person wird mit aktueller Bewertungsfarbe, Kurzlabel und allen zutreffenden Gründen dargestellt. Die Auswahl wird niemals aufgrund einer Regel vollständig gesperrt.
 
-## Gesamtimport
+Nach Auswahl wird der Name unmittelbar in die Zelle übernommen, die Monatsstatistik neu berechnet und die automatische Speicherung geplant.
 
-```http
-POST /api/import
-```
+## Manuelle HG-Planung
 
-## Gemeinsame Hilfsfunktionen
+Die HG-Bedienung entspricht der BD-Bedienung. Die Bewertungslogik berücksichtigt zusätzlich die Facharztqualifikation, kurze HG-Abstände, die definierte Dreierfolge, den Tag vor eigenem BD, Wochenendbelastungen und die Oster-/Pfingstalternanz.
 
-`functions/_utils.js` stellt bereit:
+## RBN-Felder
 
-- JSON-Antworten
-- JSON-Requestverarbeitung
-- Zugriff auf das KV-Binding
-- Initialisierung fehlender Schlüssel
-- JSON-Speicherung
-- Standardsätze
-- Monatsschlüssel
-- Normalisierung des Monatsobjekts
+RBN und 2. RBN sind freie Textfelder ohne BD-/HG-Regelprüfung und ohne Statistik. Beim Verlassen eines Feldes wird der Text gespeichert. Neue, noch unbekannte Einträge werden der RBN-Vorschlagsliste hinzugefügt und serverseitig gespeichert.
 
----
+Die Vorschlagsliste dient ausschließlich der schnelleren Texteingabe. Sie begrenzt die Eingabe nicht.
 
-# Workers-KV-Datenstruktur
+## Abwesenheiten
 
-## Anwendungsschlüssel
+Unterstützte Abwesenheitsarten:
+- Urlaub
+- FZA/Frei
+- Weiterbildung
+- sonstige Abwesenheit
 
-```text
-app:settings
-app:staff
-app:rbn-names
-```
+Abwesenheiten können tagesbezogen oder über die Mehrtagesauswahl gepflegt werden. Manuelle Eingaben werden mit der Quelle `manual` gespeichert. Aus Excel importierte Einträge erhalten die Quelle `import`. Ältere Datensätze ohne Quellenfeld bleiben kompatibel und gelten als Einträge unbekannter Herkunft.
 
-## Monatsschlüssel
+## FZA-Anzeigelogik
 
-```text
-year:JJJJ:month:MM
-```
+Die Spalte **Urlaub / FZA** unterscheidet zwischen echter beziehungsweise manuell gepflegter Abwesenheit und einem typischen dienstbedingten Ausgleichseintrag.
 
-Beispiel:
+### Grundregel
 
-```text
-year:2026:month:09
-```
+Es wird **kein allgemeines automatisches FZA nach BD** in die Tabelle geschrieben. Importierte oder ältere FZA-Einträge, die auf dem ersten regulären Werktag nach einem eigenen BD liegen, werden in der kompakten Tabellenspalte nicht angezeigt. Damit erscheinen keine automatischen Einträge wie `Lurz: FZA`, `Polednia: FZA` oder vergleichbare Nachdienstmarker.
 
-## Binding
+### Manuell gepflegtes FZA
 
-Die Pages Functions erwarten:
+Ein bewusst über die Anwendung manuell gesetztes FZA bleibt sichtbar, auch wenn es zeitlich nach einem BD liegt. Die Quelleninformation verhindert, dass eine echte manuelle Planung irrtümlich ausgeblendet wird.
 
-```text
-DIENSTPLAN_KV
-```
+### Becker-Ausnahme
 
-Fehlt das Binding, werfen die serverseitigen Funktionen den Fehler:
+Hat **Dr. Becker an einem Samstag BD**, wird am **nächsten regulären Werktag** ein FZA-Vermerk `Becker: FZA` angezeigt. Regulärer Werktag bedeutet Montag bis Freitag unter Ausschluss gesetzlicher Feiertage in Sachsen. Fällt der Montag auf einen Feiertag, wandert die Anzeige auf den nächsten regulären Werktag.
 
-```text
-KV Binding DIENSTPLAN_KV nicht vorhanden
-```
+Der Becker-Vermerk ist eine **abgeleitete Anzeige**. Er wird nicht als zusätzliche Abwesenheit in den Monatsdatensatz geschrieben. Besteht für Becker an diesem Tag bereits eine andere explizite Abwesenheit, wird diese explizite Abwesenheit angezeigt und nicht durch den abgeleiteten FZA-Vermerk überschrieben.
 
----
+## Dienstwünsche
 
-# Datenmodell
+Unterstützte Wunschtypen:
+- Kein BD
+- Kein HG
+- Kein Dienst
+- BD bevorzugt
+- HG bevorzugt
+- Dienst bevorzugt
 
-## Monatsobjekt
+Negative Wünsche führen in der passenden Dienstart zu einer roten Bewertung. Positive Wünsche erzeugen eine grüne Begründung, überschreiben aber keine höher priorisierte Warnung.
+
+## Einzel- und Mehrtagespflege
+
+### Tagesdialog
+
+Ein Klick auf die Abwesenheits- oder Wunschspalte öffnet für den gewählten Tag eine Liste aller abwesenheitsberechtigten Personen. Abwesenheit und Dienstwunsch werden getrennt gepflegt.
+
+### Mehrfachauswahl
+
+Über die Toolbar kann eine Person, ein Typ und eine beliebige Menge einzelner Tage gewählt werden. Die Tage müssen nicht zusammenhängen. Samstag, Sonntag und Feiertag übernehmen im Auswahlraster dieselbe Monatskontrastfarbe wie im Hauptplan.
+
+## Farbige Regelbewertung
+
+| Stufe | Bedeutung | Auswahl |
+|---|---|---|
+| Grün | geeignet oder positive Präferenz | direkt möglich |
+| Gelb | Hinweis beziehungsweise kurze Belastungsfolge | direkt möglich |
+| Orange | deutlicher organisatorischer Konflikt | direkt möglich |
+| Rot | starker Konflikt oder Qualifikationsproblem | nur nach Bestätigung |
+| Grau | nicht aktiv oder nicht im Dienstpool | nur in internen Sonderfällen |
+
+Treffen mehrere Gründe gleichzeitig zu, bestimmt die höchste Stufe die sichtbare Gesamtfarbe. Sämtliche Gründe bleiben im Auswahlfenster sichtbar.
+
+## Vollständige Regelmatrix
+
+| Regel | BD | HG | Stufe |
+|---|---|---|---|
+| Person am Tag abwesend | ja | ja | Rot |
+| Wunsch Kein Dienst | ja | ja | Rot |
+| Wunsch Kein BD | ja | nein | Rot |
+| Wunsch Kein HG | nein | ja | Rot |
+| Positive Präferenz | passend | passend | Grün |
+| gleiche Person am selben Tag bereits in anderer Dienstart | ja | ja | Rot |
+| Samstags-BD ohne Facharztqualifikation | ja | nein | Rot |
+| HG ohne Facharztqualifikation | nein | ja | Rot |
+| Polednia Dienstag oder Sonntag | ja | ja | Rot |
+| Becker Samstags-BD | ja | nein | Orange |
+| Dalitz So/Mo-HG bei Sebastian-BD | nein | ja | Orange |
+| Hellmann BD-Maximum erreicht | ja | nein | Rot |
+| persönlicher BD-Richtwert erreicht | ja | nein | Gelb |
+| BD unmittelbar vor Urlaub | ja | nein | Orange |
+| Becker nächster regulärer Werktag nach Samstags-BD | ja | nein | Rot |
+| BD am Vortag | ja | nein | Gelb |
+| BD–FZA–BD werktags | ja | nein | Gelb |
+| anderer kurzer BD-Abstand | ja | nein | Gelb |
+| dritter HG an drei aufeinanderfolgenden Tagen | nein | ja | Orange |
+| erneuter HG innerhalb von drei Kalendertagen | nein | ja | Gelb |
+| HG am Tag vor eigenem BD | nein | ja | Orange |
+| Freitag-HG vor eigenem Samstags-BD | nein | ja | zulässige Ausnahme |
+| Dienst an aufeinanderfolgenden Wochenenden | ja | ja | Orange |
+| BD-Wochenende direkt nach BD-Wochenende | ja | nein | Rot |
+| Dienst sowohl im Oster- als auch im Pfingstblock | ja | ja | Orange |
+
+## BD-Abstände
+
+Kurze BD-Abstände werden **nicht allein wegen des Abstands orange oder rot** bewertet.
+
+- BD am direkt vorherigen Kalendertag: gelber Hinweis
+- BD–FZA–BD an Werktagen: gelber Hinweis
+- anderer Abstand von weniger als drei Kalendertagen: gelber Hinweis
+
+Eine rote oder orange Gesamtfarbe kann trotzdem entstehen, wenn gleichzeitig ein anderer unabhängiger Grund vorliegt, beispielsweise Urlaub, fehlende Qualifikation, ein aufeinanderfolgendes BD-Wochenende oder die Becker-Sonderregel.
+
+## Wochenendlogik
+
+Ein Wochenende umfasst Freitag bis Sonntag. Pro Person und Wochenende wird für die Statistik höchstens ein Äquivalent gezählt:
+- mindestens ein BD: `1,0`
+- ausschließlich HG: `0,5`
+- BD und HG am selben Wochenende: insgesamt `1,0`
+
+Ein Dienst am direkt folgenden Wochenende erzeugt einen orangefarbenen Hinweis. Zwei direkt aufeinanderfolgende Wochenenden mit jeweils BD erzeugen einen roten Hinweis.
+
+## Oster- und Pfingstlogik
+
+Der Osterblock umfasst Karfreitag bis Ostermontag. Der Pfingstblock umfasst Pfingstsamstag bis Pfingstmontag. Hat eine Person bereits BD oder HG in einem Block, wird eine Einteilung im jeweils anderen Block orange markiert.
+
+## Statistik
+
+Die Statistik steht direkt unter dem Monatsplan und wird bei jeder Änderung neu aufgebaut. Sie enthält je aktiver Person:
+- Anzahl BD
+- Anzahl HG
+- Wochenendäquivalente
+- persönliches BD-Soll
+- Differenz zwischen Soll und aktueller BD-Anzahl
+
+Eine zusätzliche Zeile `Offen` zeigt die noch unbesetzten BD- und HG-Zellen des Monats.
+
+## Feiertage in Sachsen
+
+Die Anwendung berechnet folgende gesetzliche Feiertage:
+- Neujahr
+- Karfreitag
+- Ostermontag
+- Tag der Arbeit
+- Christi Himmelfahrt
+- Pfingstmontag
+- Tag der Deutschen Einheit
+- Reformationstag
+- Buß- und Bettag
+- 1. Weihnachtsfeiertag
+- 2. Weihnachtsfeiertag
+
+Ostern wird algorithmisch bestimmt. Der Buß- und Bettag wird als Mittwoch vor dem 23. November berechnet. Feiertage erhalten eine eigene Zeilenklasse und werden im Wochentagsfeld namentlich angezeigt.
+
+## Excel-Import
+
+Der Excel-Import verwendet SheetJS im Browser. Berücksichtigt werden Monatsblätter mit den Namen `Jan`, `Feb`, `Mrz`, `Apr`, `Mai`, `Jun`, `Jul`, `Aug`, `Sep`, `Okt`, `Nov` und `Dez`. Andere Blätter, insbesondere separate Urlaubsübersichten, werden ignoriert.
+
+### Erkennung der Mitarbeitendenblöcke
+
+Ein Mitarbeitendenblock wird über eine Zeile mit dem Typ `Arbeitsplatz` erkannt. Die direkt folgende Zeile wird als `Dienst/Hintergrund` interpretiert. Die Position im Blatt ist nicht auf feste Zeilennummern angewiesen.
+
+### Erkannte Marker
+
+| Excel-Marker | Ziel |
+|---|---|
+| D | BD |
+| HG | HG |
+| U | Urlaub |
+| F oder FZA | FZA/Frei |
+| WB | Weiterbildung |
+| K, KK, ZU, §15C, DR | sonstige Abwesenheit |
+
+### Ergänzendes Merge-Verhalten
+
+Jeder importierte Monat wird zunächst als isolierter leerer Monatsdatensatz aufgebaut. Danach werden Daten ergänzend in den vorhandenen Zielmonat übernommen. Vorhandene BD- oder HG-Einträge werden nicht überschrieben, wenn die Zielzelle bereits belegt ist. Abwesenheiten und Wünsche werden nach Person und Datum ergänzt.
+
+Importierte Abwesenheiten erhalten die Quellenkennung `import`. Diese Information wird insbesondere für die FZA-Anzeigelogik verwendet.
+
+## Excel-Export
+
+Der Export erzeugt eine Arbeitsmappe für den aktuell geöffneten Monat. Enthalten sind Titel, Tag, Wochentag, BD, HG, erstes RBN, zweites RBN sowie eine Statistiksektion. Der Dateiname folgt dem Schema `dienstplan_JJJJ_MM.xlsx`.
+
+Der Export ist funktional und kompakt. Eine vollständig pixelgenaue Reproduktion sämtlicher historischer Excel-Formatdetails ist kein Bestandteil des aktuellen Codes.
+
+## PDF- und Druckausgabe
+
+Die Schaltfläche PDF exportieren öffnet die Browserdruckfunktion. Das Druckstylesheet:
+- blendet Kopfbereich, Toolbar, Animationen und dekorative Hintergrundelemente aus
+- setzt A4-Hochformat
+- reduziert Zeilenhöhe und Schriftgröße
+- behält die Tabelle und Statistik bei
+- verwendet feste Druckfarben für Samstag, Sonntag und Feiertag
+
+## JSON-Sicherung
+
+Die JSON-Sicherung enthält Einstellungen, Mitarbeitendenstamm, RBN-Vorschlagsliste und alle vom Server exportierten Monatsdatensätze. Ist der Serverexport nicht erreichbar, wird ersatzweise der aktuell im Browser gehaltene Zustand exportiert.
+
+Beim JSON-Import werden vorhandene Einstellungen, Mitarbeitende, RBN-Namen und Monatsdaten in den Browserzustand übernommen. Anschließend versucht die Anwendung, die Sicherung über `/api/import` auch serverseitig zu speichern.
+
+## Speicher- und Synchronisationsmodell
+
+Änderungen wirken sofort im Arbeitsspeicher. Nach etwa 1,1 Sekunden ohne weitere Änderung wird ein Speichervorgang ausgelöst. Dabei wird der aktuelle Monatsdatensatz mit neuem Zeitstempel und erhöhter Revision zunächst in `localStorage` geschrieben und anschließend per `PUT` an die Monatsroute übertragen.
+
+Sichtbare Zustände:
+- `Lädt …`
+- `Speichert …`
+- `Gespeichert`
+- `Offline – lokaler Stand`
+- `Offline gespeichert`
+
+Das System ist für einen planenden Nutzer ausgelegt. Es gibt keine echte Mehrbenutzer-Sperre, keine zeilenweise Transaktion und keine grafische Konfliktauflösung zwischen gleichzeitig geöffneten Browsern.
+
+## Lokaler Browserstand
+
+Verwendete lokale Schlüssel:
+- `dienstplanrad:bootstrap` für Einstellungen, Mitarbeitende und RBN-Namen
+- `dienstplanrad:month:JJJJ-MM` für einzelne Monatsdatensätze
+
+Der lokale Stand dient als Rückfalloption, wenn die Serverabfrage fehlschlägt. Beim erfolgreichen Serverladen wird die lokale Monatskopie durch den Serverstand aktualisiert.
+
+## Cloudflare Pages Functions
+
+| Methode | Route | Aufgabe |
+|---|---|---|
+| GET | `/api/bootstrap` | Einstellungen, Mitarbeitende und RBN-Namen laden |
+| GET | `/api/month/:year/:month` | Monat laden oder initialisieren |
+| PUT | `/api/month/:year/:month` | Monat speichern |
+| GET/PUT | `/api/settings` | Einstellungen lesen oder schreiben |
+| GET/PUT | `/api/staff` | Mitarbeitendenstamm lesen oder schreiben |
+| GET/PUT | `/api/rbn-names` | RBN-Vorschlagsliste lesen oder schreiben |
+| GET | `/api/export` | Gesamtsicherung erzeugen |
+| POST | `/api/import` | Gesamtsicherung serverseitig einspielen |
+
+Die dynamische Monatsroute importiert die gemeinsamen Hilfsfunktionen über den korrekten relativen Pfad `../../../../_utils.js`.
+
+## Workers KV
+
+Die Pages Functions erwarten das Binding `DIENSTPLAN_KV`. Wesentliche Schlüssel:
+- `app:settings`
+- `app:staff`
+- `app:rbn-names`
+- `year:JJJJ:month:MM`
+
+Workers KV ist für das einbenutzerorientierte Nutzungskonzept ausreichend. Es ist jedoch keine relationale Datenbank und stellt keine transaktionale Mehrbenutzerbearbeitung bereit.
+
+## Datenmodell
+
+### Monatsdatensatz
 
 ```json
 {
   "schemaVersion": 1,
   "year": 2026,
   "month": 9,
-  "revision": 14,
-  "updatedAt": "2026-07-29T08:00:00.000Z",
-  "days": {},
+  "revision": 12,
+  "updatedAt": "2026-07-29T09:30:00.000Z",
+  "days": { "2026-09-01": { "bd": "", "hg": "", "rbn1": "", "rbn2": "", "notes": "" } },
   "absences": {},
+  "absenceSources": {},
   "preferences": {},
   "overrideLog": [],
   "importLog": []
 }
 ```
 
-## Tagesobjekt
+### Abwesenheitsquellen
 
-```json
-{
-  "bd": "lurz",
-  "hg": "becker",
-  "rbn1": "Name 1",
-  "rbn2": "Name 2",
-  "notes": ""
-}
-```
+- `manual`: bewusst über Tages- oder Mehrtagesdialog gesetzt
+- `import`: aus einem Excel-Jahresplaner übernommen
+- leer: historischer Datensatz ohne Quelleninformation
 
-## Abwesenheiten
+### Bestätigte rote Konflikte
 
-```json
-{
-  "lurz": {
-    "2026-09-14": "urlaub"
-  }
-}
-```
+Der `overrideLog` speichert Zeitstempel, Datum, Dienstart, Person, Regelgründe und optionalen Kommentar.
 
-## Dienstwünsche
+## Progressive Web Application
 
-```json
-{
-  "becker": {
-    "2026-09-18": "kein-bd"
-  }
-}
-```
+Das Manifest definiert DienstplanRAD als eigenständig startbare Progressive Web Application. Es verwendet das vorhandene Symbol `/icons/icon.svg`, einen neutralen dunklen Grundton und den Anzeigemodus `standalone`.
 
-## Bestätigte rote Konflikte
+## Service Worker
 
-```json
-{
-  "timestamp": "2026-07-29T08:00:00.000Z",
-  "dateIso": "2026-09-18",
-  "role": "bd",
-  "staffId": "becker",
-  "reasons": [
-    "Urlaub eingetragen"
-  ],
-  "comment": "Mit Mitarbeitender abgestimmt"
-}
-```
+Der Service Worker verwendet den Cache `dienstplanrad-v6`. Kernressourcen:
+- `/`
+- `/index.html`
+- `/styles.css`
+- `/js/app.js`
+- `/js/api.js`
+- `/js/defaults.js`
+- `/js/rules.js`
+- `/js/state.js`
+- `/manifest.webmanifest`
+- `/icons/icon.svg`
 
-Der Kommentar ist optional.
+Navigationsanfragen werden network-first behandelt; bei Ausfall wird die gespeicherte Startseite verwendet. Andere GET-Anfragen werden cache-first behandelt und nach erfolgreichem Abruf in den Cache übernommen. Alte Cache-Versionen werden bei Aktivierung gelöscht.
 
----
+## Responsive Verhalten
 
-# Projektstruktur
+Auf schmalen Bildschirmen werden Kopfbereich und Toolbar untereinander angeordnet. Monats- und Jahresfelder wachsen auf die verfügbare Breite. Die Regellegende wird ausgeblendet, der Monatsplan bleibt horizontal scrollbar. Die Mehrtagesauswahl reduziert ihre Spaltenzahl.
+
+## Tastatur und Barrierearmut
+
+Die Anwendung verwendet native Schaltflächen, Auswahlfelder, Eingabefelder und Dialoge. Dadurch bleiben grundlegende Tastaturinteraktionen erhalten. Fokusflächen werden monatsfarbig markiert. Dekorative Lichtkörper besitzen `aria-hidden="true"`. Bewegungen werden bei `prefers-reduced-motion: reduce` deaktiviert.
+
+Eine vollständige Prüfung nach WCAG oder BITV ist im aktuellen Projekt nicht dokumentiert.
+
+## Sicherheit und Datenschutz
+
+Die Produktionsadresse besitzt bewusst keinen Zugriffsschutz. Jeder, der die Adresse kennt, kann die statische Anwendung und die ungeschützten Programmierschnittstellen grundsätzlich aufrufen. Im Dienstplan stehen personenbezogene Namen sowie Urlaubs- und Abwesenheitsinformationen.
+
+Für einen produktiven Einsatz mit erhöhten Datenschutzanforderungen sollte Cloudflare Access oder eine vergleichbare vorgelagerte Zugriffskontrolle aktiviert werden. Ein ausschließlich im Frontend gespeichertes Passwort wäre kein wirksamer Schutz.
+
+## Projektstruktur
 
 ```text
-/
-├── README.md
-├── _headers
+dienstplan/
 ├── index.html
-├── manifest.webmanifest
-├── package.json
 ├── styles.css
+├── manifest.webmanifest
 ├── sw.js
+├── _headers
 ├── icons/
 │   └── icon.svg
 ├── js/
-│   ├── api.js
 │   ├── app.js
+│   ├── api.js
 │   ├── defaults.js
 │   ├── rules.js
 │   └── state.js
@@ -1347,419 +610,88 @@ Der Kommentar ist optional.
         ├── rbn-names.js
         ├── settings.js
         ├── staff.js
-        └── month/
-            └── [year]/
-                └── [month].js
+        └── month/[year]/[month].js
 ```
 
-## `index.html`
+## Deployment
 
-Enthält:
+1. Änderungen werden in einem Feature-Branch erstellt.
+2. Ein Pull Request wird gegen `main` geöffnet.
+3. Nach Prüfung wird der Pull Request nach `main` gemergt.
+4. Cloudflare Pages erkennt den neuen Commit im Produktionsbranch.
+5. Statische Dateien und Functions werden neu gebaut und veröffentlicht.
+6. Das Binding `DIENSTPLAN_KV` muss im Pages-Projekt auf `dienstplanrad-kv` zeigen.
+7. Der Service Worker mit neuer Cache-Version sorgt dafür, dass Browser nicht dauerhaft alte Dateien verwenden.
 
-- App-Shell
-- Kopfbereich
-- Toolbar
-- Monatsplan
-- Statistikbereich
-- Dialogstrukturen
-- SheetJS-Einbindung
-- Modulstart
+## Qualitätssicherung
 
-## `styles.css`
+Für diese Version wurden folgende Prüfungen durchgeführt:
+- Syntaxprüfung aller geänderten JavaScript-Dateien mit `node --check`
+- gezielte Regellogikprüfung für BD am Vortag und BD–FZA–BD
+- Prüfung der Abwesenheitsquellen `manual` und `import`
+- statische Kontrolle der Becker-FZA-Ausnahme
+- Browser-Render der vollständigen Oberfläche
+- Kontrolle der Monatsfarbvariablen
+- Kontrolle des Service-Worker-Caches
+- Prüfung des Branch-Diffs vor dem Merge
 
-Enthält:
+## Fehlerbehebung
 
-- Aero-Peak- und Liquid-Glass-System
-- Monatsfarbvariablen
-- Tabellenraster
-- Wochenend- und Feiertagsdarstellung
-- Dialogdesign
-- responsive Regeln
-- Druckregeln
+- **Monat bleibt leer:** Serverstatus prüfen; bei vorhandener lokaler Kopie Browser neu laden; KV-Binding kontrollieren.
+- **Speicherstatus bleibt offline:** Netzwerk, Pages Functions und Binding `DIENSTPLAN_KV` prüfen.
+- **Alte Oberfläche sichtbar:** Seite hart neu laden oder Service-Worker-Cache löschen; aktuelle Cache-Version ist `dienstplanrad-v6`.
+- **Excel-Bibliothek nicht geladen:** Netzwerkzugriff auf den SheetJS-CDN prüfen und Seite neu laden.
+- **FZA von Lurz oder anderer Person nach BD sichtbar:** Prüfen, ob der Eintrag bewusst manuell gesetzt wurde; manuelle FZA-Einträge bleiben absichtlich sichtbar.
+- **Becker-FZA fehlt:** Prüfen, ob am vorausgehenden Samstag tatsächlich Becker als BD eingetragen ist und ob der angezeigte Tag der erste reguläre Werktag ist.
+- **Roter Konflikt kann nicht direkt gewählt werden:** Im Bestätigungsdialog ausdrücklich `Trotzdem eintragen` wählen.
+- **Feiertag falsch:** Jahr, Systemdatum und Sachsen-Konfiguration prüfen.
 
-## `js/app.js`
+## Bekannte Grenzen
 
-Enthält:
+- keine automatische Planerstellung
+- keine Mehrbenutzer-Sperre
+- keine Transaktionen über mehrere KV-Schlüssel
+- kein integrierter Rollen- oder Zugriffsschutz
+- keine formale Freigabe- oder Signaturstufe
+- keine vollständige Undo-Historie
+- kein pixelgenauer Excel-Export aller historischen Formatdetails
+- keine serverseitige PDF-Erzeugung
+- keine automatische Konfliktauflösung
+- kein RBN-Regelwerk und keine RBN-Statistik
+- keine grafische Jahresübersicht innerhalb der Anwendung
+- keine dokumentierte vollständige WCAG-Konformität
 
-- Benutzerinteraktion
-- Monatsnavigation
-- dynamische Monatsfarbthemen
-- Feiertagsdarstellung Sachsen
-- Tabellenrendering
-- Personenauswahl
-- Abwesenheiten und Wünsche
-- RBN-Verwaltung
-- Statistik
-- Excel-Import und Excel-Export
-- JSON-Sicherung
-- Service-Worker-Registrierung
+## Pflege und Weiterentwicklung
 
-## `js/rules.js`
+Sinnvolle Erweiterungspunkte:
+- optionaler Cloudflare-Access-Schutz
+- versionierte Rücksetzpunkte
+- konfliktsicheres Mehrbenutzermodell
+- exakter historischer Excel-Layout-Export
+- integrierte Importvorschau mit Einzelkonflikten
+- bearbeitbarer Mitarbeitendenstamm in der Oberfläche
+- weitere regionale Feiertagsprofile
+- visuelle Jahresübersicht
+- serverseitige PDF-Erzeugung
+- automatisierte Browser- und Regeltests
 
-Enthält:
+## Glossar
 
-- Mitarbeitendenaktivität
-- zeitabhängige Qualifikation
-- Eignungsbewertung
-- Abstandsregeln
-- Wochenendregeln
-- Oster- und Pfingstregeln
-- Statistikberechnung
-- Bezeichnungsfunktionen
-
-## `js/state.js`
-
-Enthält:
-
-- globalen Anwendungszustand
-- lokalen Browsercache
-- Bootstrap-Ladevorgang
-- Monatsladen
-- Laden angrenzender Monate
-- verzögertes Speichern
-- Serverfallback
-
-## `js/api.js`
-
-Enthält den Browserclient für die Pages-Functions-Endpunkte.
-
-## `js/defaults.js`
-
-Enthält:
-
-- Monatsnamen
-- Tabellenblattnamen
-- Wochentage
-- Standardeinstellungen
-- feste Mitarbeitendenreihenfolge
-- Standardmitarbeitende
-- Abwesenheitsarten
-- Wunscharten
-- Erzeugung leerer Monate
-
-## `functions`
-
-Enthält die serverseitigen Cloudflare-Pages-Functions.
+| Begriff | Bedeutung |
+|---|---|
+| BD | Bereitschaftsdienst |
+| HG | Hintergrunddienst |
+| RBN | frei gepflegte RBN-Besetzung ohne Regelprüfung |
+| FZA | Freizeitausgleich beziehungsweise Frei |
+| FA/FÄ | Facharzt beziehungsweise Fachärztin |
+| AA/AÄ | Arzt beziehungsweise Ärztin in Weiterbildung |
+| KV | Cloudflare Workers KV; Schlüssel-Wert-Speicher |
+| PWA | Progressive Web Application |
+| Pages Functions | serverseitige Cloudflare-Funktionen innerhalb des Pages-Projekts |
+| Override | bewusst bestätigte rote Regelabweichung |
 
 ---
 
-# Deployment auf Cloudflare Pages
+## Zusammenfassung
 
-## Voraussetzungen
-
-- Cloudflare-Konto
-- Pages-Projekt `dienstplanrad`
-- GitHub-Verknüpfung mit `mlurz92/dienstplan`
-- Produktionsbranch `main`
-- Workers-KV-Namespace `dienstplanrad-kv`
-- Binding `DIENSTPLAN_KV`
-
-## Binding einrichten
-
-Im Cloudflare-Dashboard:
-
-1. Workers & Pages öffnen.
-2. Pages-Projekt `dienstplanrad` öffnen.
-3. Einstellungen öffnen.
-4. Bindings öffnen.
-5. KV namespace hinzufügen.
-6. Variablenname `DIENSTPLAN_KV` eintragen.
-7. Namespace `dienstplanrad-kv` auswählen.
-8. speichern.
-9. neues Deployment auslösen.
-
-## Build
-
-Die Anwendung benötigt keinen klassischen Framework-Build. Die statischen Dateien liegen im Repositorystamm. Pages Functions werden aus dem Verzeichnis `functions` erkannt.
-
-## Produktionsdeployment
-
-Ein Merge nach `main` löst das Deployment aus.
-
----
-
-# Sicherheits- und Datenschutzaspekte
-
-## Kein Zugriffsschutz
-
-Die Anwendung besitzt bewusst keinen Zugriffsschutz.
-
-Das bedeutet:
-
-- die Seitenadresse ist öffentlich erreichbar
-- die Pages-Functions-Endpunkte sind öffentlich erreichbar
-- Personen mit Kenntnis der Adresse können Daten lesen oder verändern
-
-Ein ausschließlich im Browser hinterlegtes Passwort wäre kein wirksamer Schutz.
-
-## Enthaltene Daten
-
-Die Anwendung verarbeitet unter anderem:
-
-- Namen von Mitarbeitenden
-- Dienstzeiten
-- Urlaubszeiten
-- Freizeitausgleich
-- Weiterbildungen
-- Dienstwünsche
-
-Diese Informationen sind personenbezogen und sollten entsprechend organisatorisch behandelt werden.
-
-## Keine Patientendaten
-
-Die Anwendung ist nicht für Patientendaten vorgesehen. Patientennamen, Diagnosen, Untersuchungsdaten oder andere Gesundheitsdaten dürfen nicht eingetragen werden.
-
-## Sicherheitsheader
-
-Die Datei `_headers` setzt für alle Pfade:
-
-- `X-Frame-Options: SAMEORIGIN`
-- `X-Content-Type-Options: nosniff`
-- `Referrer-Policy: strict-origin-when-cross-origin`
-- eine restriktive Permissions Policy für Geolokalisierung, Mikrofon und Kamera
-
-## Empfehlung für spätere Absicherung
-
-Für einen produktiven Umgang mit Personaldaten wäre Cloudflare Access oder eine andere serverseitige Authentisierung empfehlenswert.
-
----
-
-# Browser- und Systemanforderungen
-
-Empfohlen werden aktuelle Versionen von:
-
-- Google Chrome
-- Microsoft Edge
-- Mozilla Firefox
-- Safari
-
-Erforderliche Browserfunktionen:
-
-- JavaScript-Module
-- Fetch-Programmierschnittstelle
-- `localStorage`
-- HTML-Dialogelement
-- Service Worker
-- Cache Storage
-- CSS-Hintergrundunschärfe für den vollständigen Glaseffekt
-- moderne CSS-Funktionen wie `color-mix`
-
-Fehlt `backdrop-filter`, bleibt die Anwendung funktional, wirkt jedoch weniger stark wie Liquid Glass.
-
----
-
-# Bedienablauf im Regelbetrieb
-
-## Monat öffnen
-
-1. Anwendung aufrufen.
-2. Serverstand wird geladen.
-3. gewünschten Monat und gewünschtes Jahr auswählen.
-4. Monatsfarbthema wird automatisch aktiviert.
-5. gesetzliche Feiertage werden markiert.
-
-## Abwesenheiten erfassen
-
-1. `Abwesenheiten` auswählen.
-2. Person auswählen.
-3. Abwesenheitsart auswählen.
-4. einzelne Tage anklicken.
-5. `Übernehmen` auswählen.
-
-Alternativ kann die Tageszeile direkt geöffnet werden.
-
-## Dienstwünsche erfassen
-
-1. `Dienstwünsche` auswählen.
-2. Person auswählen.
-3. Wunschtyp auswählen.
-4. Tage markieren.
-5. übernehmen.
-
-## Bereitschaftsdienst eintragen
-
-1. Zelle in der Spalte `BD` auswählen.
-2. Begründungen prüfen.
-3. Person auswählen.
-4. roten Konflikt gegebenenfalls bestätigen.
-5. automatische Speicherung abwarten.
-
-## Hintergrunddienst eintragen
-
-Analog zum Bereitschaftsdienst in der Spalte `HG`.
-
-## RBN eintragen
-
-1. RBN-Feld anklicken.
-2. Text eingeben oder Vorschlag wählen.
-3. Feld verlassen.
-
-## Plan prüfen
-
-1. offene Bereitschaftsdienste und Hintergrunddienste in der Statistik prüfen.
-2. Dienstanzahlen und Wochenendäquivalente prüfen.
-3. orange oder rote Bewertungs-Chips direkt im Plan kontrollieren.
-
-## Export
-
-- Excel für Weiterverarbeitung
-- PDF über den Druckdialog
-- JSON für vollständige technische Sicherung
-
----
-
-# Fehlerbilder und Fehlerbehebung
-
-## `KV Binding DIENSTPLAN_KV nicht vorhanden`
-
-Ursache:
-
-- KV-Binding fehlt
-- falscher Variablenname
-- Deployment wurde nach Einrichtung des Bindings nicht erneuert
-
-Lösung:
-
-- Binding prüfen
-- exakt `DIENSTPLAN_KV` verwenden
-- neues Deployment starten
-
-## Anwendung zeigt Offlinestatus
-
-Mögliche Ursachen:
-
-- keine Netzwerkverbindung
-- Pages Function nicht erreichbar
-- KV-Fehler
-- Deploymentfehler
-
-Vorgehen:
-
-1. Seite neu laden.
-2. `Serverstand neu laden` auswählen.
-3. Cloudflare-Deployment prüfen.
-4. Binding prüfen.
-5. Browserkonsole prüfen.
-
-## Excel-Bibliothek nicht geladen
-
-Symptom:
-
-```text
-Excel-Bibliothek noch nicht geladen.
-```
-
-Ursache:
-
-- SheetJS-CDN nicht erreichbar
-- vollständig offline gestartete Sitzung
-- Browserblockade externer Skripte
-
-Lösung:
-
-- Netzwerkverbindung herstellen
-- Seite neu laden
-- Content-Blocker prüfen
-
-## Alte Oberfläche bleibt sichtbar
-
-Ursache:
-
-- alter Service Worker oder Browsercache
-
-Lösung:
-
-1. Seite vollständig neu laden.
-2. Browser schließen und neu öffnen.
-3. gegebenenfalls Websitedaten löschen.
-4. prüfen, ob der aktive Cache `dienstplanrad-v5` ist.
-
-## Monat speichert nicht
-
-Prüfen:
-
-- Speicherstatus
-- Netzwerk
-- `/api/month/JJJJ/MM`
-- KV-Binding
-- Browserkonsole
-
-## Person fehlt im Auswahlmenü
-
-Mögliche Ursachen:
-
-- Person ist noch nicht aktiv
-- Person ist nicht im Planungsdienstpool
-- Beschäftigungsende ist überschritten
-
-Beispiel:
-
-- Fr. Hellmann erscheint erst ab Oktober 2026.
-
----
-
-# Bekannte funktionale Grenzen
-
-- kein automatischer Dienstplan
-- keine Benutzerverwaltung
-- kein Zugriffsschutz
-- keine echte Mehrbenutzersynchronisation
-- keine serverseitige Konflikttransaktion
-- keine zellweise Excel-Importvorschau
-- keine grafische Auswahl einzelner JSON-Importmonate
-- Excel-Export nicht vollständig pixelidentisch zur historischen Vorlage
-- PDF-Erstellung über Browserdruck statt eigenem PDF-Generator
-- RBN ohne fachliche Regelprüfung
-- Jahresauswahl in der Oberfläche derzeit 2025 bis 2030
-- serverseitiger Gesamtexport derzeit 2025 bis 2030
-- keine gemeindespezifischen sächsischen Feiertage
-- keine elektronische Signatur
-- keine formale Planfreigabe
-- kein schreibgeschützter Abschlussstatus
-- keine automatische Freizeitausgleichseintragung
-- keine automatische Dienstkopplung
-- keine automatische Checkliste
-- kein separates Prüfprotokoll in der Hauptansicht
-
----
-
-# Qualitätssicherung und technische Prüfungen
-
-Vor Veröffentlichung der aktuellen Version wurden durchgeführt:
-
-- JavaScript-Syntaxprüfung von `js/app.js`
-- JavaScript-Syntaxprüfung von `js/rules.js`
-- JavaScript-Syntaxprüfung von `sw.js`
-- JavaScript-Syntaxprüfung der dynamischen Monats-Page-Function
-- Prüfung der relativen Importtiefe der dynamischen Monatsroute
-- Prüfung der Monatsfarbvariablen
-- Prüfung der Klassen für Samstag, Sonntag und Feiertag
-- Prüfung der Feiertagsberechnung für mehrere Jahre
-- Prüfung der Osterberechnung
-- Prüfung des Buß- und Bettags
-- Prüfung des Service-Worker-Cache-Namens
-- Prüfung der Trennung von Excel-Raster und Glasrahmen
-
----
-
-# Weiterentwicklung
-
-Mögliche nächste Entwicklungsschritte:
-
-- wirksamer Zugriffsschutz über Cloudflare Access
-- Importvorschau mit zellweisem Konfliktvergleich
-- exakter Nachbau des historischen Excel-Exportlayouts
-- serverseitige Revisionserkennung bei parallelen Sitzungen
-- benutzerdefinierbare Mitarbeitendenverwaltung
-- benutzerdefinierbare Feiertage und klinikinterne Sondertage
-- vollständig lokalisierte Farbanpassung
-- automatisierte Browser-End-to-End-Tests
-- automatisierte Regeltests
-- automatische Sicherungsversionen
-- selektive JSON-Wiederherstellung
-- optionaler schreibgeschützter Monatsabschluss
-- zugängliche Tastaturkurzbefehle
-
-Die grundlegende Produktphilosophie sollte auch bei späteren Erweiterungen erhalten bleiben:
-
-> Der Mensch plant. Die Anwendung strukturiert, prüft, dokumentiert und speichert.
+DienstplanRAD verbindet die vertraute, kompakte Struktur einer Excel-Dienstplantabelle mit einer manuellen, erklärbaren Regelprüfung und einer modernen schwebenden Glasoberfläche. Die Anwendung hält die Entscheidung beim planenden Nutzer, zeigt relevante Konflikte transparent an, speichert den Arbeitsstand lokal und in Cloudflare Workers KV und bildet die speziellen organisatorischen Regeln des radiologischen Dienstplans ab. Die aktuelle FZA-Logik verhindert allgemeine automatische Nachdienstvermerke und zeigt ausschließlich die definierte Becker-Ausnahme nach einem Samstags-BD am nächsten regulären Werktag.
