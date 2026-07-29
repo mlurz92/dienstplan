@@ -1,0 +1,144 @@
+import { createEmptyMonth, DEFAULT_SETTINGS, DEFAULT_STAFF, MONTH_NAMES } from './defaults.js';
+import { api } from './api.js';
+
+const LOCAL_KEY_PREFIX = 'dienstplanrad:';
+
+export const state = {
+  settings: structuredClone(DEFAULT_SETTINGS),
+  staff: structuredClone(DEFAULT_STAFF),
+  rbnNames: [],
+  months: new Map(),
+  currentYear: new Date().getFullYear(),
+  currentMonth: new Date().getMonth() + 1,
+  saveStatus: 'loading',
+  dirty: false,
+  saveTimer: null,
+  serverReady: false,
+  currentBatchMode: 'absence',
+  currentPicker: null,
+  cachedBootstrap: null
+};
+
+export function monthKey(year, month) { return `${year}-${String(month).padStart(2, '0')}`; }
+
+export function getMonthData(year, month) {
+  const key = monthKey(year, month);
+  if (!state.months.has(key)) state.months.set(key, createEmptyMonth(year, month));
+  return state.months.get(key);
+}
+
+export function setMonthData(year, month, payload) {
+  state.months.set(monthKey(year, month), payload || createEmptyMonth(year, month));
+  localStorage.setItem(`${LOCAL_KEY_PREFIX}month:${monthKey(year, month)}`, JSON.stringify(state.months.get(monthKey(year, month))));
+}
+
+export function readLocalMonth(year, month) {
+  const raw = localStorage.getItem(`${LOCAL_KEY_PREFIX}month:${monthKey(year, month)}`);
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch { return null; }
+}
+
+export function saveLocalBootstrap() {
+  localStorage.setItem(`${LOCAL_KEY_PREFIX}bootstrap`, JSON.stringify({ settings: state.settings, staff: state.staff, rbnNames: state.rbnNames }));
+}
+
+export function readLocalBootstrap() {
+  const raw = localStorage.getItem(`${LOCAL_KEY_PREFIX}bootstrap`);
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch { return null; }
+}
+
+export async function bootstrapState() {
+  try {
+    const data = await api.bootstrap();
+    state.settings = data.settings || structuredClone(DEFAULT_SETTINGS);
+    state.staff = data.staff || structuredClone(DEFAULT_STAFF);
+    state.rbnNames = Array.isArray(data.rbnNames) ? data.rbnNames : [];
+    state.cachedBootstrap = data;
+    state.serverReady = true;
+    saveLocalBootstrap();
+    return true;
+  } catch (error) {
+    const local = readLocalBootstrap();
+    if (local) {
+      state.settings = local.settings || structuredClone(DEFAULT_SETTINGS);
+      state.staff = local.staff || structuredClone(DEFAULT_STAFF);
+      state.rbnNames = local.rbnNames || [];
+    }
+    state.serverReady = false;
+    return false;
+  }
+}
+
+export async function loadMonth(year, month, forceServer = false) {
+  state.currentYear = year;
+  state.currentMonth = month;
+  try {
+    const data = await api.getMonth(year, month);
+    setMonthData(year, month, data.month || createEmptyMonth(year, month));
+    state.serverReady = true;
+    return getMonthData(year, month);
+  } catch (error) {
+    if (!forceServer) {
+      const local = readLocalMonth(year, month);
+      if (local) {
+        setMonthData(year, month, local);
+        state.serverReady = false;
+        return local;
+      }
+    }
+    const empty = createEmptyMonth(year, month);
+    setMonthData(year, month, empty);
+    state.serverReady = false;
+    return empty;
+  }
+}
+
+export async function warmAdjacentMonths(year, month) {
+  const previousReady = state.serverReady;
+  const prev = new Date(year, month - 2, 1);
+  const next = new Date(year, month, 1);
+  const tasks = [
+    [prev.getFullYear(), prev.getMonth() + 1],
+    [next.getFullYear(), next.getMonth() + 1]
+  ].map(async ([y, m]) => {
+    try {
+      const data = await api.getMonth(y, m);
+      setMonthData(y, m, data.month || createEmptyMonth(y, m));
+    } catch {
+      const local = readLocalMonth(y, m);
+      if (local) setMonthData(y, m, local);
+    }
+  });
+  await Promise.allSettled(tasks);
+  state.serverReady = previousReady;
+  state.currentYear = year;
+  state.currentMonth = month;
+}
+
+export function scheduleSave(saveFn) {
+  state.dirty = true;
+  clearTimeout(state.saveTimer);
+  state.saveTimer = setTimeout(saveFn, 1100);
+}
+
+export async function persistCurrentMonth() {
+  const month = getMonthData(state.currentYear, state.currentMonth);
+  month.updatedAt = new Date().toISOString();
+  month.revision = (month.revision || 0) + 1;
+  setMonthData(state.currentYear, state.currentMonth, month);
+  state.saveStatus = 'saving';
+  try {
+    await api.saveMonth(state.currentYear, state.currentMonth, month);
+    state.saveStatus = 'saved';
+    state.serverReady = true;
+    state.dirty = false;
+  } catch (error) {
+    state.saveStatus = 'offline';
+    state.serverReady = false;
+  }
+}
+
+export function getMonthLabel(year = state.currentYear, month = state.currentMonth) {
+  return `${MONTH_NAMES[month - 1]} ${year}`;
+}

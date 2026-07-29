@@ -1,0 +1,9 @@
+{
+  "name": "dienstplanrad",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Manueller Dienstplaner für Radiologie auf Cloudflare Pages",
+  "scripts": {
+    "deploy-note": "Deploy via Cloudflare Pages from GitHub repository root"
+  }
+}
