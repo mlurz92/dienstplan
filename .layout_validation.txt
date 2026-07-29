@@ -1,1 +1,0 @@
-Excel-style layout validated locally with node --check for js/app.js, js/rules.js and sw.js. Remove before merge if present.
