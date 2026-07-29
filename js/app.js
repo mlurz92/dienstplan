@@ -7,7 +7,6 @@ const $ = selector => document.querySelector(selector);
 const els = {};
 let pendingConflict = null;
 let monthRequestId = 0;
-let themeTransitionTimer = null;
 const monthNameBySheet = Object.fromEntries(SHEET_NAMES.map((name, idx) => [name, idx + 1]));
 
 
@@ -174,9 +173,6 @@ function populateSelectors() {
 
 async function openCurrentMonth(year, month, forceServer = false) {
   const requestId = ++monthRequestId;
-  $('#yearSelect').value = String(year);
-  $('#monthSelect').value = String(month);
-  applyMonthTheme(month);
   const previousYear = state.currentYear;
   const previousMonth = state.currentMonth;
   if (state.dirty) {

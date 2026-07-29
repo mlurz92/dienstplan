@@ -246,8 +246,6 @@ Der Monat kann mit Pfeiltasten, Monatsauswahl und Jahresauswahl gewechselt werde
 
 Die Jahresauswahl wird relativ zum aktuellen Kalenderjahr erweitert und ist daher nicht auf einen längst abgelaufenen statischen Zeitraum beschränkt. Noch nicht gespeicherte Änderungen werden vor einem Monatswechsel gezielt ihrem Ursprungsmonat zugeordnet und gespeichert. Eine Anforderungskennung verhindert außerdem, dass bei sehr schnellen aufeinanderfolgenden Wechseln eine langsamere, ältere Serverantwort den zuletzt gewählten Monat überschreibt.
 
-Der visuelle Monatswechsel beginnt bewusst **sofort bei der Bedienhandlung** und wartet nicht auf Netzwerk, lokalen Speicher oder das Vorladen der Nachbarmonate. Sowohl die beiden Pfeilschaltflächen als auch eine direkte Auswahl in Monats- oder Jahres-Dropdown schreiben zunächst das neue Navigationsziel in beide Auswahlfelder und aktivieren unmittelbar dessen Palette. Mehrere schnelle Pfeilklicks rechnen immer vom bereits sichtbaren Dropdown-Ziel weiter, nicht vom eventuell noch ladenden Datenmonat. Dadurch geht kein Klick verloren und die Farbanzeige bleibt auch bei langsamer Verbindung synchron mit der Nutzereingabe. Erst nach erfolgreicher Auswahlprüfung wird der neue Monatsinhalt gerendert; überholte Ladeantworten dürfen weder Auswahl noch Farbe zurücksetzen.
-
 Ist der Server nicht erreichbar, verwendet die Anwendung eine vorhandene lokale Monatskopie. Fehlt auch diese, wird ein leerer Monatsdatensatz erzeugt. Zusätzlich werden der vorherige und der nächste Monat geladen, damit monatsübergreifende Regeln ohne sichtbare Unterbrechung arbeiten können.
 
 ## Mitarbeitendenstamm
@@ -648,7 +646,7 @@ Für diese Version wurden folgende Prüfungen durchgeführt:
 
 - **Monat bleibt leer:** Serverstatus prüfen; bei vorhandener lokaler Kopie Browser neu laden; KV-Binding kontrollieren.
 - **Speicherstatus bleibt offline:** Netzwerk, Pages Functions und Binding `DIENSTPLAN_KV` prüfen.
-- **Alte Oberfläche sichtbar:** Seite hart neu laden oder Service-Worker-Cache löschen; aktuelle Cache-Version ist `dienstplanrad-v9`.
+- **Alte Oberfläche sichtbar:** Seite hart neu laden oder Service-Worker-Cache löschen; aktuelle Cache-Version ist `dienstplanrad-v8`.
 - **Excel-Bibliothek nicht geladen:** Netzwerkzugriff auf den SheetJS-CDN prüfen und Seite neu laden.
 - **FZA von Lurz oder anderer Person nach BD sichtbar:** Prüfen, ob der Eintrag bewusst manuell gesetzt wurde; manuelle FZA-Einträge bleiben absichtlich sichtbar.
 - **Becker-FZA fehlt:** Prüfen, ob am vorausgehenden Samstag tatsächlich Becker als BD eingetragen ist und ob der angezeigte Tag der erste reguläre Werktag ist.
