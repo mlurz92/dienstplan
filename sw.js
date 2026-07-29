@@ -1,59 +1,12 @@
-const CACHE = 'dienstplanrad-v2';
-const CORE = [
-  '/',
-  '/index.html',
-  '/styles.css',
-  '/js/app.js',
-  '/js/api.js',
-  '/js/defaults.js',
-  '/js/rules.js',
-  '/js/state.js',
-  '/js/planning-overview.js',
-  '/manifest.webmanifest'
-];
-
-self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE)
-      .then(cache => cache.addAll(CORE))
-      .then(() => self.skipWaiting())
-  );
-});
-
-self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys()
-      .then(keys => Promise.all(keys.filter(key => key !== CACHE).map(key => caches.delete(key))))
-      .then(() => self.clients.claim())
-  );
-});
-
+const CACHE = 'dienstplanrad-v3';
+const CORE = ['/', '/index.html', '/styles.css', '/compact.css', '/js/app.js', '/js/api.js', '/js/defaults.js', '/js/rules.js', '/js/state.js', '/js/planning-overview.js', '/manifest.webmanifest'];
+self.addEventListener('install', event => event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(CORE)).then(() => self.skipWaiting())));
+self.addEventListener('activate', event => event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key !== CACHE).map(key => caches.delete(key)))).then(() => self.clients.claim())));
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
-
   if (event.request.mode === 'navigate') {
-    event.respondWith(
-      fetch(event.request)
-        .then(response => {
-          const clone = response.clone();
-          caches.open(CACHE).then(cache => cache.put('/index.html', clone)).catch(() => {});
-          return response;
-        })
-        .catch(() => caches.match('/index.html'))
-    );
+    event.respondWith(fetch(event.request).then(response => { const clone = response.clone(); caches.open(CACHE).then(cache => cache.put('/index.html', clone)); return response; }).catch(() => caches.match('/index.html')));
     return;
   }
-
-  event.respondWith(
-    caches.match(event.request).then(cached => {
-      const network = fetch(event.request)
-        .then(response => {
-          const clone = response.clone();
-          caches.open(CACHE).then(cache => cache.put(event.request, clone)).catch(() => {});
-          return response;
-        })
-        .catch(() => cached);
-      return cached || network;
-    })
-  );
+  event.respondWith(caches.match(event.request).then(cached => cached || fetch(event.request).then(response => { const clone = response.clone(); caches.open(CACHE).then(cache => cache.put(event.request, clone)); return response; })));
 });
