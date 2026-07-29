@@ -79,13 +79,11 @@ export async function loadMonth(year, month, forceServer = false) {
     state.serverReady = true;
     return getMonthData(year, month);
   } catch (error) {
-    if (!forceServer) {
-      const local = readLocalMonth(year, month);
-      if (local) {
-        setMonthData(year, month, local);
-        state.serverReady = false;
-        return local;
-      }
+    const local = readLocalMonth(year, month);
+    if (local) {
+      setMonthData(year, month, local);
+      state.serverReady = false;
+      return local;
     }
     const empty = createEmptyMonth(year, month);
     setMonthData(year, month, empty);

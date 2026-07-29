@@ -59,11 +59,19 @@ export function setAssignment(monthData, dateIso, role, staffId) {
 }
 
 export function getAbsence(monthData, staffId, dateIso) { return monthData.absences?.[staffId]?.[dateIso] || ''; }
-export function setAbsence(monthData, staffId, dateIso, type) {
+export function getAbsenceSource(monthData, staffId, dateIso) { return monthData.absenceSources?.[staffId]?.[dateIso] || ''; }
+export function setAbsence(monthData, staffId, dateIso, type, source = 'manual') {
   monthData.absences ||= {};
+  monthData.absenceSources ||= {};
   monthData.absences[staffId] ||= {};
-  if (type) monthData.absences[staffId][dateIso] = type;
-  else delete monthData.absences[staffId][dateIso];
+  monthData.absenceSources[staffId] ||= {};
+  if (type) {
+    monthData.absences[staffId][dateIso] = type;
+    monthData.absenceSources[staffId][dateIso] = source;
+  } else {
+    delete monthData.absences[staffId][dateIso];
+    delete monthData.absenceSources[staffId][dateIso];
+  }
 }
 export function getPreference(monthData, staffId, dateIso) { return monthData.preferences?.[staffId]?.[dateIso] || ''; }
 export function setPreference(monthData, staffId, dateIso, type) {
@@ -175,8 +183,7 @@ export function evaluateCandidate({ state, monthData, dateIso, role, staffId }) 
   const prev2DateIso = addDays(date, -2).toISOString().slice(0,10);
   const prev3DateIso = addDays(date, -3).toISOString().slice(0,10);
   if (role === 'bd') {
-    if (getAssignment(state, prevDateIso, 'bd') === staffId) push('red', 'BD am Vortag – erneuter BD am Folgetag unzulässig');
-    const ownBdDates = listOwnRoleDates(state, staffId, 'bd').concat(dateIso).sort();
+    const ownBdDates = listOwnRoleDates(state, staffId, 'bd').filter(iso => iso !== dateIso).concat(dateIso).sort();
     const idx = ownBdDates.indexOf(dateIso);
     if (idx > 0) {
       const prevBd = parseIso(ownBdDates[idx - 1]);
@@ -187,8 +194,10 @@ export function evaluateCandidate({ state, monthData, dateIso, role, staffId }) 
       const fzaMonth = state.months.get(fzaMonthKey);
       const isWeekdayPattern = [prevBd, fzaDate, date].every(item => item.getDay() >= 1 && item.getDay() <= 5);
       const isBdFzaBd = diff === 2 && isWeekdayPattern && getAbsence(fzaMonth || monthData, staffId, fzaIso) === 'fza';
-      if (isBdFzaBd) push('yellow', 'BD–FZA–BD werktags');
-      else if (diff > 1 && diff < 4) push('orange', 'Weniger als 3 dienstfreie Tage seit letztem BD');
+
+      if (diff === 1) push('yellow', 'BD bereits am Vortag');
+      else if (isBdFzaBd) push('yellow', 'BD–FZA–BD werktags');
+      else if (diff > 1 && diff < 4) push('yellow', 'Kurzer Abstand zum letzten BD');
     }
     if (person.maxBd && currentBd >= person.maxBd) push('red', `Monatsmaximum von ${person.maxBd} BD bereits erreicht`);
     else if (person.bdTarget && currentBd >= person.bdTarget) push('yellow', `BD-Richtwert ${person.bdTarget} bereits erreicht`);

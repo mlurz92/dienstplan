@@ -1,7 +1,7 @@
 import { ABSENCE_TYPES, MONTH_NAMES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, toIsoDate } from './defaults.js';
 import { state, bootstrapState, getMonthData, getMonthLabel, loadMonth, persistCurrentMonth, saveLocalBootstrap, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js';
 import { api } from './api.js';
-import { buildStats, evaluateCandidate, fmtGermanDate, getAbsence, getAssignment, getPlanningStaff, getPreference, getStaffById, labelForAbsence, labelForPreference, setAbsence, setAssignment, setPreference, weekdayLabel } from './rules.js';
+import { buildStats, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getPlanningStaff, getPreference, getStaffById, labelForAbsence, labelForPreference, setAbsence, setAssignment, setPreference, weekdayLabel } from './rules.js';
 
 const $ = selector => document.querySelector(selector);
 const els = {};
@@ -191,8 +191,10 @@ function render() {
 function renderPlanTable(monthData) {
   const tbody = $('#planTableBody');
   tbody.innerHTML = '';
+  let rowIndex = 0;
   for (const [iso, day] of Object.entries(monthData.days)) {
     const tr = document.createElement('tr');
+    tr.style.setProperty('--row-index', String(rowIndex));
     const weekday = weekdayLabel(iso);
     const holidayName = getSaxonyHolidayName(iso);
     if (weekday === 'Sa') tr.classList.add('saturday-row');
@@ -221,6 +223,7 @@ function renderPlanTable(monthData) {
     tr.children[6].appendChild(buildAbsenceSummary(iso, monthData));
     tr.children[7].appendChild(buildPreferenceSummary(iso, monthData));
     tbody.appendChild(tr);
+    rowIndex += 1;
   }
 }
 
@@ -277,12 +280,67 @@ function buildRbnInput(dateIso, field, value) {
   return wrapper;
 }
 
-function isImmediatePostBdFza(personId, dateIso, absence) {
-  if (absence !== 'fza') return false;
-  const date = new Date(`${dateIso}T00:00:00`);
-  date.setDate(date.getDate() - 1);
-  const previousIso = date.toISOString().slice(0, 10);
-  return getAssignment(state, previousIso, 'bd') === personId;
+function parseIsoLocal(dateIso) {
+  const [year, month, day] = dateIso.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function toIsoLocal(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function isRegularWorkday(date) {
+  const weekday = date.getDay();
+  if (weekday === 0 || weekday === 6) return false;
+  return !getSaxonyHolidayName(toIsoLocal(date));
+}
+
+function isFirstRegularWorkdayAfterOwnBd(personId, dateIso) {
+  const target = parseIsoLocal(dateIso);
+  if (!isRegularWorkday(target)) return false;
+
+  for (let offset = 1; offset <= 7; offset += 1) {
+    const candidate = new Date(target);
+    candidate.setDate(target.getDate() - offset);
+    const candidateIso = toIsoLocal(candidate);
+
+    if (getAssignment(state, candidateIso, 'bd') === personId) {
+      for (let gap = offset - 1; gap >= 1; gap -= 1) {
+        const between = new Date(target);
+        between.setDate(target.getDate() - gap);
+        if (isRegularWorkday(between)) return false;
+      }
+      return true;
+    }
+
+    if (isRegularWorkday(candidate)) return false;
+  }
+
+  return false;
+}
+
+function isBeckerFzaAfterSaturdayBd(dateIso) {
+  const target = parseIsoLocal(dateIso);
+  if (!isRegularWorkday(target)) return false;
+
+  for (let offset = 1; offset <= 7; offset += 1) {
+    const candidate = new Date(target);
+    candidate.setDate(target.getDate() - offset);
+    const candidateIso = toIsoLocal(candidate);
+
+    if (candidate.getDay() === 6 && getAssignment(state, candidateIso, 'bd') === 'becker') {
+      for (let gap = offset - 1; gap >= 1; gap -= 1) {
+        const between = new Date(target);
+        between.setDate(target.getDate() - gap);
+        if (isRegularWorkday(between)) return false;
+      }
+      return true;
+    }
+
+    if (isRegularWorkday(candidate)) return false;
+  }
+
+  return false;
 }
 
 function buildAbsenceSummary(dateIso, monthData) {
@@ -290,13 +348,32 @@ function buildAbsenceSummary(dateIso, monthData) {
   wrapper.type = 'button';
   wrapper.className = 'cell-summary-button';
   const entries = [];
+  const details = [];
+
+  const beckerAbsence = getAbsence(monthData, 'becker', dateIso);
+  const derivedBeckerFza = isBeckerFzaAfterSaturdayBd(dateIso);
+  if (derivedBeckerFza && (!beckerAbsence || beckerAbsence === 'fza')) {
+    entries.push('Becker: FZA');
+    details.push('Becker: FZA – automatisch aus Samstags-BD für den nächsten regulären Werktag abgeleitet');
+  }
+
   for (const person of state.staff.filter(item => item.includeInAbsenceList)) {
     const absence = getAbsence(monthData, person.id, dateIso);
-    if (!absence || isImmediatePostBdFza(person.id, dateIso, absence)) continue;
-    entries.push(`${person.short}: ${shortAbsenceLabel(absence)}`);
+    if (!absence) continue;
+
+    const absenceSource = getAbsenceSource(monthData, person.id, dateIso);
+    if (absence === 'fza' && absenceSource !== 'manual' && isFirstRegularWorkdayAfterOwnBd(person.id, dateIso)) {
+      if (person.id === 'becker' && derivedBeckerFza) continue;
+      continue;
+    }
+
+    const label = `${person.short}: ${shortAbsenceLabel(absence)}`;
+    entries.push(label);
+    details.push(label);
   }
-  wrapper.textContent = entries.length ? entries.join(', ') : '';
-  wrapper.title = entries.length ? entries.join('\n') : 'Abwesenheiten bearbeiten';
+
+  wrapper.textContent = entries.join(', ');
+  wrapper.title = details.length ? details.join('\n') : 'Abwesenheiten bearbeiten';
   wrapper.addEventListener('click', () => openDayMetaDialog(dateIso));
   return wrapper;
 }
@@ -646,7 +723,7 @@ function importMonthSheet(sheetName, sheet) {
       const absenceMap = { 'U': 'urlaub', 'F': 'fza', 'FZA': 'fza', 'WB': 'weiterbildung', 'K': 'sonstige', 'KK': 'sonstige', 'ZU': 'sonstige', '§15C': 'sonstige', 'DR': 'sonstige' };
       if (workplaceValue) {
         const key = workplaceValue.toUpperCase();
-        if (absenceMap[key]) setAbsence(monthData, staffId, iso, absenceMap[key]);
+        if (absenceMap[key]) setAbsence(monthData, staffId, iso, absenceMap[key], 'import');
       }
       if (dutyValue === 'D') setAssignment(monthData, iso, 'bd', staffId);
       else if (dutyValue === 'HG') setAssignment(monthData, iso, 'hg', staffId);
@@ -663,7 +740,10 @@ function mergeMonthData(target, source) {
     if (!target.days[iso].hg && day.hg) target.days[iso].hg = day.hg;
   }
   for (const [staffId, absMap] of Object.entries(source.absences || {})) {
-    for (const [iso, type] of Object.entries(absMap)) setAbsence(target, staffId, iso, type);
+    for (const [iso, type] of Object.entries(absMap)) {
+      const sourceType = getAbsenceSource(source, staffId, iso) || 'import';
+      setAbsence(target, staffId, iso, type, sourceType);
+    }
   }
   for (const [staffId, prefMap] of Object.entries(source.preferences || {})) {
     for (const [iso, type] of Object.entries(prefMap)) setPreference(target, staffId, iso, type);
