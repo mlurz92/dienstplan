@@ -1,5 +1,5 @@
-import { MONTH_NAMES, PREFERENCE_TYPES, STAFF_ORDER, toIsoDate, WEEKDAYS } from './defaults.js';
-import { holidayBlocks, isFirstRegularWorkdayAfter, isRegularWorkdayIso } from './holidays.js';
+import { MONTH_NAMES, PREFERENCE_TYPES, STAFF_ORDER, toIsoDate, WEEKDAYS } from './defaults.js?v=20260729.1';
+import { holidayBlocks, isFirstRegularWorkdayAfter, isRegularWorkdayIso } from './holidays.js?v=20260729.1';
 
 function parseIso(date) { return new Date(`${date}T00:00:00`); }
 function addDays(date, days) { const d = new Date(date); d.setDate(d.getDate() + days); return d; }
