@@ -757,6 +757,35 @@ Alle Navigationswege führen durch `openCurrentMonth()`:
 - „Aktueller Monat“;
 - Server-Reload des sichtbaren Monats.
 
+### 13.0 Farbe und Monat wechseln gemeinsam
+
+Der sichtbare Wechsel läuft **vollständig vor dem Serverabruf** ab: Palette, Überschrift, Tabelle und
+Statistik schalten in einem Schritt um, danach zieht der Serverstand in einem zweiten Renderdurchlauf
+nach.
+
+Das ist die Behebung eines Fehlers, der nur mit antwortender API sichtbar war. Zuvor galt die umgekehrte
+Reihenfolge – Farbe sofort, Rendern erst nach `loadMonth()`. Gemessen an einer Schnittstelle mit
+realistischer Antwortzeit:
+
+| Zeitpunkt | Überschrift | Grundfarbe |
+|---|---|---|
+| 47 ms | Juli 2026 | Wechsel beginnt |
+| 455 ms | Juli 2026 | fast abgeschlossen |
+| **825 ms** | **August 2026** | bereits fertig |
+
+Die Farbe lief also vollständig durch, während in der Überschrift noch der alte Monat stand – der
+„synchrone Grundfarbe- und Monatswechsel" fand faktisch nicht statt. In allen früheren Testläufen ohne
+Backend scheiterte der Abruf sofort, weshalb der Versatz dort nie auftrat. Nach der Korrektur wechseln
+Überschrift und Palette im **selben Frame** (gemessen 55 ms bzw. 42 ms Versatz null).
+
+Möglich ist das, weil das Kalendergerüst eines Monats ohne Serverdaten feststeht: Tage, Wochentage,
+Feiertage und damit die gesamte Farbhierarchie. Für Nachbarmonate liegen dank Vorladen auch die
+Einteilungen bereits vor; bei einem weiten Sprung erscheint das korrekte Gerüst sofort und füllt sich,
+sobald die Antwort da ist. Der Status zeigt währenddessen „Lädt …".
+
+`tests/month-navigation.test.js` hält die Reihenfolge fest: Farbe, erster Renderdurchlauf und
+Einblendung liegen vor `await loadMonth(`, der zweite Renderdurchlauf danach.
+
 ### 13.1 Angefordert versus geladen
 
 `state.currentYear` und `state.currentMonth` bezeichnen den fertig geladenen Monat.

@@ -75,24 +75,46 @@ const EASE = [0.40, 0.00, 0.22, 1.00];
    Farbparsing und Farbraum
    ------------------------------------------------------------------------- */
 
-/** Akzeptiert `#rgb`, `#rrggbb`, `rgb(...)` und `rgba(...)` → [r, g, b, a] mit 0–255 / 0–1. */
+/**
+ * Liest `#rgb`, `#rrggbb`, `rgb()`, `rgba()` und `color(srgb …)` → [r, g, b, a].
+ *
+ * Gibt `null` zurück, wenn der Wert nicht sicher zu deuten ist. Das ist wichtig:
+ * Beim Auslesen bereits gesetzter Variablen kann eine Engine auch etwas
+ * liefern, das hier nicht vorgesehen ist – etwa den noch unaufgelösten
+ * `color-mix()`-Ausdruck aus dem Stylesheet oder die `color(srgb …)`-Notation.
+ * Früher entstanden daraus stillschweigend NaN-Werte, aus denen `rgb(NaN, …)`
+ * wurde; solche Deklarationen verwirft der Browser wortlos, und die Farbe blieb
+ * einfach stehen. Ein klares `null` erlaubt stattdessen einen sauberen Rückfall.
+ */
 export function parseColor(value) {
-  const input = String(value).trim();
+  const input = String(value ?? '').trim();
+  if (!input) return null;
+
   if (input.startsWith('#')) {
     const hex = input.slice(1);
+    if (!/^[0-9a-f]{3}$|^[0-9a-f]{6}$/i.test(hex)) return null;
     const full = hex.length === 3 ? hex.split('').map(c => c + c).join('') : hex;
-    return [
-      parseInt(full.slice(0, 2), 16),
-      parseInt(full.slice(2, 4), 16),
-      parseInt(full.slice(4, 6), 16),
-      1
-    ];
+    return [parseInt(full.slice(0, 2), 16), parseInt(full.slice(2, 4), 16), parseInt(full.slice(4, 6), 16), 1];
   }
-  const parts = input.replace(/^rgba?\(/i, '').replace(/\)$/, '').split(/[\s,/]+/).filter(Boolean);
-  return [Number(parts[0]), Number(parts[1]), Number(parts[2]), parts[3] === undefined ? 1 : Number(parts[3])];
+
+  // color(srgb 0.77 0.42 0.35 / 0.5) – Anteile 0–1
+  const srgb = input.match(/^color\(\s*srgb\s+([^)]+)\)$/i);
+  if (srgb) {
+    const teile = srgb[1].split(/[\s,/]+/).filter(Boolean).map(Number);
+    if (teile.length < 3 || teile.slice(0, 3).some(Number.isNaN)) return null;
+    return [teile[0] * 255, teile[1] * 255, teile[2] * 255, teile[3] === undefined || Number.isNaN(teile[3]) ? 1 : teile[3]];
+  }
+
+  const rgb = input.match(/^rgba?\(([^)]+)\)$/i);
+  if (!rgb) return null;
+  const teile = rgb[1].split(/[\s,/]+/).filter(Boolean).map(Number);
+  if (teile.length < 3 || teile.slice(0, 3).some(Number.isNaN)) return null;
+  return [teile[0], teile[1], teile[2], teile[3] === undefined || Number.isNaN(teile[3]) ? 1 : teile[3]];
 }
 
-function toCss([r, g, b, a]) {
+function toCss(color) {
+  if (!Array.isArray(color) || color.slice(0, 3).some(value => !Number.isFinite(value))) return null;
+  const [r, g, b, a] = color;
   const round = value => Math.max(0, Math.min(255, Math.round(value)));
   return a >= 1
     ? `rgb(${round(r)}, ${round(g)}, ${round(b)})`
@@ -228,7 +250,10 @@ export function paletteForMonth(month) {
 }
 
 function writeVariables(root, values) {
-  for (const [name, color] of Object.entries(values)) root.style.setProperty(name, toCss(color));
+  for (const [name, color] of Object.entries(values)) {
+    const css = toCss(color);
+    if (css) root.style.setProperty(name, css);
+  }
 }
 
 /** Liest die aktuell gesetzten Werte, damit ein laufender Wechsel weich weiterläuft. */
@@ -236,8 +261,8 @@ function readVariables(root, fallback) {
   const computed = getComputedStyle(root);
   const current = {};
   for (const name of Object.keys(fallback)) {
-    const raw = computed.getPropertyValue(name).trim();
-    current[name] = raw ? parseColor(raw) : fallback[name];
+    const gelesen = parseColor(computed.getPropertyValue(name));
+    current[name] = gelesen || fallback[name];
   }
   return current;
 }
