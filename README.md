@@ -52,7 +52,7 @@ diese Faktoren als Entscheidungshilfe, nicht als Autopilot.
 
 Eine Einteilung entsteht ausschließlich durch eine aktive Auswahl. Die Anwendung:
 
-- bewertet jede aktive Person für den konkreten Tag und die konkrete Rolle;
+- bewertet jede aktive planbare Person für den konkreten Tag und die konkrete Rolle;
 - zeigt die höchste ausgelöste Bewertungsstufe und zugleich alle Begründungen;
 - lässt grüne, gelbe und orange Einteilungen unmittelbar zu;
 - verlangt für rote Einteilungen eine ausdrückliche Bestätigung;
@@ -79,8 +79,9 @@ bleibt chronologisch; die Spalten behalten auf jedem Tag dieselbe Bedeutung.
 - **Sofortige Verteilungssicht:** BD, HG, Wochenend-Äquivalent, Soll und Rest stehen direkt unter dem Plan.
 - **Monatsidentität:** Jeder Monat besitzt eine eigene Palette; Farbe, Titel und Inhalt wechseln als
   zusammenhängende, richtungsbezogene Bewegung.
-- **Robuste Auslieferung:** Release-Token, Revalidierungsheader und aktive Bereinigung alter Worker
-  verhindern, dass eine Hosting-Adresse dauerhaft veraltete CSS- oder JavaScript-Dateien ausliefert.
+- **Robuste Auslieferung:** Release-Token, Revalidierungsheader und die gezielte, abgewartete Migration
+  des historischen `/sw.js` verhindern, dass eine Hosting-Adresse dauerhaft veraltete Anwendungsdateien
+  oder API-Antworten aus dem früheren Cache-First-Worker verwendet.
 
 ---
 
@@ -110,8 +111,8 @@ bleibt chronologisch; die Spalten behalten auf jedem Tag dieselbe Bedeutung.
 
 - additiver Mehrmonatsimport aus der bestehenden Excel-Arbeitsmappe;
 - Excel-Export des angezeigten Monats;
-- serverseitige oder lokale JSON-Vollsicherung;
-- validierte JSON-Wiederherstellung;
+- JSON-Sicherung des serverseitigen Exportzeitraums beziehungsweise des lokal geladenen Bestands;
+- syntaktisch und strukturell grundgeprüfter JSON-Import;
 - druckoptimierte A4-Ausgabe über den nativen Druckdialog.
 
 ---
@@ -133,11 +134,13 @@ bleibt chronologisch; die Spalten behalten auf jedem Tag dieselbe Bedeutung.
 Der Browser lädt die Dateien unmittelbar aus dem Repository. Das erleichtert Diagnose und Deployment:
 Die ausgelieferte Quelldatei entspricht der überprüften Quelldatei. Das Frontend hält DOM-Logik in
 `app.js`, Zustand und Persistenz in `state.js`, HTTP-Zugriffe in `api.js`, Regeln in `rules.js`,
-Kalenderlogik in `holidays.js`, Vorgaben in `defaults.js` und das Farbsystem in `theme.js`.
+Kalenderlogik in `holidays.js`, Vorgaben in `defaults.js`, die gezielte Migration des historischen
+Service Workers in `legacy-worker.js` und das Farbsystem in `theme.js`.
 
-`rules.js`, `defaults.js`, `holidays.js` und der rechnende Teil von `theme.js` sind DOM-frei. Dadurch
-laufen die fachlichen Tests direkt unter Node. Nur `applyMonthTheme()` schreibt Farbvariablen auf
-`document.documentElement`; `app.js` übernimmt Rendering und Ereignisse.
+`rules.js`, `defaults.js`, `holidays.js`, `legacy-worker.js` und der rechnende Teil von `theme.js` sind
+so aufgebaut, dass ihre Logik direkt unter Node getestet werden kann. Browserobjekte werden dem
+Migrationsmodul bei Tests als Abhängigkeiten übergeben. Nur `applyMonthTheme()` schreibt Farbvariablen
+auf `document.documentElement`; `app.js` übernimmt Rendering und Ereignisse.
 
 ### 3.1 Browseranforderungen
 
@@ -166,6 +169,7 @@ schreibt pro Frame konkrete `rgb()`- und `rgba()`-Werte.
 │   ├── api.js                       zentraler Fetch-Wrapper
 │   ├── defaults.js                  Monatsnamen, Personal, Typen und leeres Monatsschema
 │   ├── holidays.js                  Sachsen-Feiertage, Werktage und Feiertagsblöcke
+│   ├── legacy-worker.js             gezielte Migration des historischen /sw.js-Workers
 │   ├── rules.js                     Bewertung, Getter/Setter, Statistik und Sammelprüfung
 │   ├── state.js                     Laufzeitzustand, localStorage und Serverpersistenz
 │   └── theme.js                     zwölf Paletten, OKLCH-Mathematik und rAF-Animation
@@ -702,14 +706,20 @@ verändern.
 
 ### 14.1 Startkette
 
-1. Das Inline-Skript im `<head>` startet Legacy-Worker- und Cachebereinigung.
-2. Versionierte Styles und ES-Module werden geladen.
-3. `DOMContentLoaded` startet `init()`.
-4. DOM-Referenzen, Ereignisse und statische Auswahlfelder werden aufgebaut.
-5. `releaseLegacyServiceWorker()` wiederholt die Bereinigung defensiv.
-6. `bootstrapState()` lädt Server, lokalen Stand oder Vorgaben.
-7. Die Startpalette wird ohne Übergang gesetzt.
-8. Der aktuelle Monat wird geladen und die Nachbarmonate werden erwärmt.
+1. `index.html` lädt Manifest, Stylesheet und den ES-Modul-Einstieg mit dem gemeinsamen
+   Release-Token.
+2. `DOMContentLoaded` startet `init()`.
+3. DOM-Referenzen, Ereignisse und statische Auswahlfelder werden aufgebaut.
+4. `await neutralizeLegacyServiceWorker()` wartet bei einem historischen `/sw.js`-Worker bis zum
+   `controllerchange`, längstens fünf Sekunden, und setzt danach den Start fort.
+5. Erst danach lädt `bootstrapState()` Serverdaten, lokalen Stand oder Vorgaben.
+6. Die Startpalette wird ohne Übergang gesetzt.
+7. Der aktuelle Monat wird geladen und die Nachbarmonate werden erwärmt.
+
+Es gibt kein ungezieltes Bereinigungsskript im `<head>` und keine Funktion
+`releaseLegacyServiceWorker()` in `app.js`. Die Migration liegt als testbares Modul in
+`js/legacy-worker.js` und blockiert bewusst nur die Startphase vor den ersten Anwendungsdaten. Normale
+statische Browserressourcen wurden zu diesem Zeitpunkt bereits mit dem aktuellen Release-Token geladen.
 
 ### 14.2 Ladekaskade
 
@@ -775,7 +785,10 @@ Anwendungsfluss ruft diesen Status nicht auf.
 | GET | `/api/export` | Gesamtstand 2025–2030 |
 | POST | `/api/import` | Gesamt- oder Teilstand einspielen |
 
-Alle API-Antworten sind JSON mit UTF-8 und `Cache-Control: no-store`.
+Alle von den Functions regulär erzeugten JSON-Antworten verwenden UTF-8 und
+`Cache-Control: no-store`. Unbehandelte Plattformfehler, beispielsweise durch ein fehlendes KV-Binding,
+können außerhalb dieses Antworthelfers entstehen; der Client verarbeitet deshalb auch
+nicht-JSON-förmige Fehlerantworten.
 
 - `kv(context)` verlangt `DIENSTPLAN_KV`.
 - `getOrInit()` liest einen Schlüssel und initialisiert ihn bei Bedarf.
@@ -862,26 +875,40 @@ deshalb als Teil der Anwendung.
 Alle releasekritischen Shell- und Modulgraph-Assets verwenden denselben Token:
 
 ```text
-?v=20260729.1
+?v=20260729.2
 ```
 
 Das gilt für Manifest, Stylesheet, App-Einstieg und die internen Imports aus `app.js`, `state.js` und
-`rules.js`. Das Icon `/icons/icon.svg` bleibt davon unabhängig unversioniert. Ein alter Cacheeintrag
-ohne den Shell-/Modul-Query-String kann nicht irrtümlich als aktuelle Code- oder Style-Datei dienen. Bei
-einer zukünftigen Änderung muss der Token im gesamten Browser-Modulgraph gemeinsam erhöht werden;
-`tests/delivery.test.js` erzwingt genau einen einheitlichen Wert.
+`rules.js`; der Modulgraph schließt auch `legacy-worker.js` und die übrigen Imports ein. Das Icon
+`/icons/icon.svg` bleibt vom Query-Token unabhängig, wird aber über `_headers` revalidiert. Ein alter
+Cacheeintrag ohne den aktuellen Query-String kann nicht irrtümlich als aktuelle Code- oder Style-Datei
+dienen. Bei jeder Änderung eines releasekritischen Shell- oder Modulgraph-Assets muss der Token im
+gesamten Modulgraph gemeinsam erhöht werden; `tests/delivery.test.js` erzwingt genau einen einheitlichen
+Wert.
 
-### 17.3 Inline-Bereinigung
+### 17.3 Gezielte Migration in `js/legacy-worker.js`
 
-Vor Stylesheet und Modulscript startet `index.html`:
+Die Initialisierung wartet vor `bootstrapState()` auf `neutralizeLegacyServiceWorker()`. Die Funktion
+verändert nicht pauschal alle Service-Worker-Registrierungen derselben Origin. Ihr Ablauf ist:
 
-- `navigator.serviceWorker.getRegistrations()` und `unregister()` für Registrierungen des Origins;
-- `caches.keys()` und Löschen aller Cache-Namen mit Präfix `dienstplanrad`;
-- Ablage des Abschluss-Promises als `window.__dienstplanLegacyCleanup`.
+1. Alle Cache-Namen mit Präfix `dienstplanrad` werden vor dem Update gelöscht.
+2. `getRegistration()` fragt die Registrierung für den Standard-Scope der Anwendung ab.
+3. `installing`, `waiting` und `active` werden nur dann als historischer DienstplanRAD-Worker erkannt,
+   wenn Origin und Pfad der Script-URL exakt der historischen URL `/sw.js` entsprechen. Query-Strings
+   beeinflussen diesen Vergleich nicht.
+4. Nur bei einem solchen Treffer registriert die Anwendung `/sw.js` erneut, und zwar mit dem bereits
+   verwendeten Scope und `updateViaCache: "none"`. Dadurch muss der Browser den Tombstone ohne
+   zwischengeschalteten HTTP-Cache als Update beziehen.
+5. Die Anwendung wartet auf `controllerchange`, höchstens 5 Sekunden. Der neue Worker kann dem alten
+   Cache-First-Worker so den bereits geöffneten Tab abnehmen, bevor API-Bootstrap und Monatsabruf
+   beginnen.
+6. Die `dienstplanrad`-Caches werden nach dem Update erneut gelöscht, um auch während des Workerwechsels
+   entstandene Altbestände zu entfernen.
 
-Die Position im HTML ist absichtlich früh: Die Bereinigung hängt nicht von einem möglicherweise
-veralteten `app.js` ab. `releaseLegacyServiceWorker()` wiederholt sie während `init()` als defensive
-zweite Ebene.
+Registrierungen mit anderer Script-URL werden weder aktualisiert noch abgemeldet. Auch Caches anderer
+Produkte bleiben unangetastet. Nur wenn das gezielte Registrieren des Tombstones fehlschlägt, dient
+`registration.unregister()` für den erkannten historischen Worker als Rückfall. Ein bloßer Timeout beim
+Warten auf `controllerchange` löst diese Abmeldung nicht aus.
 
 ### 17.4 Tombstone unter `/sw.js`
 
@@ -893,27 +920,57 @@ ist, eine noch bekannte Registrierung unter der historischen URL zu neutralisier
 3. `clients.claim()`;
 4. `registration.unregister()`.
 
-Die Datei bleibt aus Migrationsgründen erreichbar und wird mit `no-store` ausgeliefert.
+Die Datei bleibt aus Migrationsgründen dauerhaft erreichbar. `skipWaiting()` überspringt die normale
+Wartephase; `clients.claim()` übergibt offene Clients an den Tombstone; dessen anschließendes
+`unregister()` entfernt die Registrierung. Ohne `fetch`-Handler fängt er keine Anwendungsanfragen ab.
 
 ### 17.5 Cloudflare-Header
 
 | Route | Cache-Control |
 |---|---|
-| `/` | `no-cache, no-store, must-revalidate` |
-| `/index.html` | `no-cache, no-store, must-revalidate` |
-| `/sw.js` | `no-cache, no-store, must-revalidate` |
-| `/styles.css` | `no-cache, must-revalidate` |
-| `/js/*` | `no-cache, must-revalidate` |
+| `/` | `no-cache` |
+| `/index.html` | `no-cache` |
+| `/sw.js` | `no-cache` |
+| `/manifest.webmanifest` | `no-cache` |
+| `/styles.css` | `no-cache` |
+| `/js/*` | `no-cache` |
+| `/icons/*` | `no-cache` |
 
-HTML und Worker dürfen nicht gespeichert wiederverwendet werden. CSS und JavaScript dürfen lokal
-vorliegen, müssen aber revalidiert werden. Release-Token und Header ergänzen sich: Der Token trennt
-Releases, die Header verhindern unkontrollierte Wiederverwendung.
+`no-cache` bedeutet nicht „niemals lokal speichern“. Der Browser darf eine Antwort ablegen, muss ihre
+Gültigkeit aber vor jeder normalen HTTP-Cache-Wiederverwendung beim Server revalidieren. Das ermöglicht
+effiziente `304 Not Modified`-Antworten und verhindert zugleich unkontrolliert alte Shell-, Worker-,
+Manifest-, Style-, Modul- oder Icon-Stände. Die Back/Forward-Cache-Historiennavigation kann dagegen
+einen vollständigen Seitensnapshot wiederherstellen, ohne dafür eine neue HTTP-Anfrage auszuführen.
+Jede statische Anwendungsklasse verwendet bewusst dieselbe unmissverständliche Direktive.
+
+Cloudflare Pages verarbeitet `_headers` nur für **statische Dateien**. Pages Functions werden davon
+nicht erfasst. Die API-Hilfsfunktion `json()` setzt deshalb für dynamische JSON-Antworten direkt im Code
+`Cache-Control: no-store`. Release-Token, statische Revalidierung und dynamisches `no-store` erfüllen
+unterschiedliche Aufgaben und ergänzen sich.
+
+### 17.6 Technische Referenzen
+
+- [Chrome for Developers: Remove buggy service workers](https://developer.chrome.com/docs/workbox/remove-buggy-service-workers/)
+- [web.dev: The service worker lifecycle](https://web.dev/articles/service-worker-lifecycle)
+- [MDN: `ServiceWorkerRegistration.unregister()`](https://developer.mozilla.org/en-US/docs/Web/API/ServiceWorkerRegistration/unregister)
+- [MDN: `Cache-Control`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cache-Control)
+- [Cloudflare Pages: Headers](https://developers.cloudflare.com/pages/configuration/headers/)
+- [W3C: CSS Color Module Level 4](https://www.w3.org/TR/css-color-4/)
+- [W3C WAI: Using `prefers-reduced-motion`](https://www.w3.org/WAI/WCAG21/Techniques/css/C39)
+
+Ergänzend wurden Praxisfälle aus spezialisierten Projekt- und Browserforen betrachtet. Sie dienen als
+Erfahrungsabgleich, während die technischen Aussagen oben auf Spezifikationen und Herstellerdokumentation
+beruhen:
+
+- [Chromium blink-network-dev: Verhalten nach `unregister()`](https://groups.google.com/a/chromium.org/g/blink-network-dev/c/t7MD9hkQU9g)
+- [Workbox #1995: Update derselben Worker-URL und `skipWaiting()`](https://github.com/GoogleChrome/workbox/issues/1995)
+- [W3C ServiceWorker #893: Cache- und Updateverhalten](https://github.com/w3c/ServiceWorker/issues/893)
 
 ---
 
 ## 18. Sicherheit und Datenschutz
 
-`_headers` setzt für alle Pfade:
+Der globale `/*`-Block in `_headers` setzt für die von Cloudflare Pages statisch ausgelieferten Pfade:
 
 | Header | Wert |
 |---|---|
@@ -921,6 +978,9 @@ Releases, die Header verhindern unkontrollierte Wiederverwendung.
 | `X-Content-Type-Options` | `nosniff` |
 | `Referrer-Policy` | `strict-origin-when-cross-origin` |
 | `Permissions-Policy` | `geolocation=(), microphone=(), camera=()` |
+
+Cloudflare wendet `_headers` nicht auf Pages-Functions-Antworten an. Die API kontrolliert ihre
+Antwortheader daher im Function-Code; insbesondere setzt `json()` dort `Cache-Control: no-store`.
 
 Pflegbare Namen, Rollenbezeichnungen, Feiertagsnamen und Bewertungsgründe werden vor Einbettung in
 `innerHTML` escaped. Die Anwendung enthält keine Analytik und kein Tracking. Die einzige
@@ -989,10 +1049,10 @@ npm test
 ```
 
 `npm run check` prüft laut aktuellem `package.json` die Syntax von `app.js`, `api.js`, `defaults.js`,
-`rules.js`, `state.js`, `theme.js` und `functions/_utils.js`. `npm test` führt alle Dateien unter
-`tests/*.test.js` aus.
+`holidays.js`, `legacy-worker.js`, `rules.js`, `state.js`, `theme.js` und `functions/_utils.js`.
+`npm test` führt alle Dateien unter `tests/*.test.js` aus.
 
-### 20.3 32 Regressionstests
+### 20.3 34 Regressionstests
 
 **`rules.test.js` – 5 Tests**
 
@@ -1029,11 +1089,13 @@ npm test
 - Alphakanal;
 - monotone, über die Dauer verteilte Zeitkurve.
 
-**`delivery.test.js` – 3 Tests**
+**`delivery.test.js` – 5 Tests**
 
-- Inline-Bereinigung vor Stylesheet und Modulgraph plus Tombstone-Verhalten;
+- Tombstone-Update vor dem Laden der Anwendungsdaten;
+- Ersatz des historischen Workers unter derselben URL und demselben Scope;
+- Schutz fremder Service-Worker-Registrierungen und fremder Caches;
 - ein gemeinsamer Release-Token für die releasekritischen Shell- und Modulgraph-Assets;
-- Cloudflare-Revalidierung für Shell, Worker, CSS und Module.
+- einheitliches `no-cache` für Shell, Worker, Manifest, CSS, Module und Icons.
 
 **`month-navigation.test.js` – 3 Tests**
 
@@ -1041,8 +1103,13 @@ npm test
 - Pfeile und beide Dropdowns verwenden dieselbe Pipeline;
 - schnelle Umkehr vergleicht gegen den zuletzt angeforderten Monat.
 
-Zusätzlich wurde der Ablauf real in Chromium geprüft: messbare Zwischenfarben, korrekte Zielpalette,
-richtige Inhaltsrichtung, schneller Vor-/Zurück-Wechsel und direkter Dropdown-Sprung.
+Zusätzlich wurde der vollständige Altbestand-zu-Neustand-Ablauf manuell in echtem Chromium geprüft. Die
+Verifikation startete mit einem kontrollierenden historischen Cache-First-Worker und einer nachweislich
+veralteten Bootstrap-Antwort. Danach wurden Workerwechsel, Übernahme des geöffneten Clients, Entfernung
+von Registrierung und Anwendungscaches sowie der aktuelle Netzwerk-Bootstrap geprüft. Im selben Lauf
+wurden messbare Farbzwischenwerte, Pfeilnavigation, Dropdown-Sprung, Inhaltsrichtung und schnelles
+Doppelklicken kontrolliert. Das ist ein realer Browserlauf, aber kein eingecheckter automatisierter
+E2E-Test und mangels veröffentlichter Zieladresse kein produktiver URL-Smoke-Test.
 
 Nicht automatisiert sind echte Browser-E2E- und visuelle Regressionstests, API-/KV-Integration,
 Excel-Import mit produktiven Arbeitsmappen, Accessibility-Audits sowie Last- und Mehrbenutzertests.
@@ -1061,15 +1128,18 @@ Excel-Import mit produktiven Arbeitsmappen, Accessibility-Audits sowie Last- und
 6. Zugriffsschutz konfigurieren.
 7. Deployment ausführen.
 
-Beim ersten API-Aufruf initialisiert `getOrInit()` fehlende Einstellungen, Personal- und RBN-Daten.
+Beim normalen Anwendungsstart initialisiert `/api/bootstrap` über `getOrInit()` fehlende Einstellungen,
+Personal- und RBN-Daten. Andere Endpunkte initialisieren nur die Schlüssel, die sie selbst lesen.
 
 ### 21.2 Release-Checkliste
 
 - `npm run check`;
 - `npm test`;
 - alle Browserimporte tragen denselben `?v=`-Token;
-- `_headers` enthält die Revalidierungsregeln;
+- `_headers` setzt für Shell, Worker, Manifest, CSS, Module und Icons exakt `no-cache`;
+- Pages-Functions-Antworten setzen im Code `Cache-Control: no-store`;
 - `sw.js` bleibt ohne `fetch`-Handler;
+- historische `/sw.js`-Migration in einem echten Browserprofil prüfen, ohne fremde Worker zu verändern;
 - Pfeile, Dropdowns und schnelle Umkehr im Browser prüfen;
 - KV-Binding und Zugriffsschutz prüfen;
 - JSON-Sicherung vor größeren Stammdatenänderungen erstellen.
@@ -1108,6 +1178,7 @@ ohne Netz garantiert ist.
 | Farbdauer/-kurve | `THEME_DURATION_MS` und `EASE` |
 | Datenmigration | `schemaVersion` und `ensureMonthShape()` |
 | Browserrelease | gemeinsamen `?v=`-Token im vollständigen Modulgraph erhöhen |
+| Legacy-Worker-Migration | `js/legacy-worker.js` und Tombstone `sw.js` |
 
 Bei bestehenden Installationen ist die KV-Kopie des Personals maßgeblich. Änderungen an
 `DEFAULT_STAFF` ersetzen `app:staff` nicht automatisch. Eine Administrationsoberfläche für Personal,
@@ -1125,7 +1196,7 @@ API beziehungsweise KV-Betrieb.
 | SheetJS fehlt | CDN-Erreichbarkeit prüfen |
 | keine Animation | `prefers-reduced-motion` prüfen |
 | falsche Monatsfarbe nach Deployment | `dataset.month`, `dataset.palette`, aktuellen `?v=`-Token und `_headers` prüfen |
-| alte Origin wirkt anders als neue | Inline-Bereinigung, `/sw.js`, Service-Worker-Registrierungen und `dienstplanrad`-Caches prüfen |
+| alte Origin wirkt anders als neue | aktuellen Token, `/sw.js`, erkannte historische Registrierung, `controllerchange` und `dienstplanrad`-Caches prüfen |
 | Änderung noch nicht am Server | 1100-ms-Debounce und Statusanzeige beachten |
 
 `document.documentElement.dataset.month` und `.dataset.palette` zeigen das aktive Theme-Ziel.
@@ -1150,6 +1221,7 @@ dass sie veraltete Assets selbst neutralisiert.
 | KV | Cloudflare Key-Value-Store |
 | Release-Token | einheitlicher Query-String der releasekritischen Shell- und Modulgraph-Assets |
 | Tombstone-Worker | Worker ohne Fetch-Logik, der alte Registrierungen und Caches neutralisiert |
+| Revalidierung | Prüfung einer gespeicherten Antwort beim Server vor ihrer erneuten Verwendung |
 
 ---
 

@@ -4,26 +4,108 @@ import { readFile } from 'node:fs/promises';
 
 const read = path => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
 
-test('legacy service workers are neutralized before versioned application assets load', async () => {
-  const [html, worker] = await Promise.all([
+test('legacy service workers are replaced by the no-op worker before application data loads', async () => {
+  const [html, app, migration, worker] = await Promise.all([
     read('index.html'),
+    read('js/app.js'),
+    read('js/legacy-worker.js').catch(() => ''),
     read('sw.js')
   ]);
 
-  const cleanupPosition = html.indexOf('dienstplanrad:legacy-cleanup');
-  const stylesheetPosition = html.indexOf('rel="stylesheet"');
-  const modulePosition = html.indexOf('type="module"');
-
-  assert.ok(cleanupPosition > 0, 'index.html needs an inline legacy-worker cleanup');
-  assert.ok(cleanupPosition < stylesheetPosition, 'cleanup must start before the stylesheet request');
-  assert.ok(cleanupPosition < modulePosition, 'cleanup must start before the module graph request');
-  assert.match(html, /navigator\.serviceWorker\.getRegistrations\(\)/);
-  assert.match(html, /caches\.keys\(\)/);
+  assert.ok(migration, 'the migration needs a dedicated, testable browser module');
+  assert.doesNotMatch(html, /getRegistrations\(\)/, 'index.html must not unregister unrelated origin workers');
+  assert.match(app, /import \{ neutralizeLegacyServiceWorker \} from '.\/legacy-worker\.js\?v=/);
+  const cleanupPosition = app.indexOf('await neutralizeLegacyServiceWorker()');
+  const bootstrapPosition = app.indexOf('await bootstrapState()');
+  assert.ok(cleanupPosition >= 0 && cleanupPosition < bootstrapPosition, 'legacy cleanup must settle before API bootstrap');
+  assert.match(migration, /updateViaCache:\s*'none'/);
+  assert.match(migration, /serviceWorker\.register\(/);
 
   assert.match(worker, /self\.skipWaiting\(\)/);
   assert.match(worker, /self\.clients\.claim\(\)/);
   assert.match(worker, /self\.registration\.unregister\(\)/);
   assert.match(worker, /caches\.delete\(/);
+  assert.doesNotMatch(worker, /addEventListener\(['"]fetch['"]/, 'the tombstone must never intercept application requests');
+});
+
+test('legacy cleanup upgrades the historical worker at its existing scope', async () => {
+  const migration = await read('js/legacy-worker.js').catch(() => '');
+  assert.ok(migration, 'the migration module is missing');
+  const { neutralizeLegacyServiceWorker } = await import('../js/legacy-worker.js');
+  const calls = [];
+  const listeners = new Map();
+  const registration = {
+    scope: 'https://app.test/',
+    active: { scriptURL: 'https://app.test/sw.js?legacy=v9' },
+    waiting: null,
+    installing: null,
+    unregister: async () => { calls.push(['unregister']); return true; }
+  };
+  const serviceWorker = {
+    getRegistration: async () => registration,
+    register: async (url, options) => {
+      calls.push(['register', url, options]);
+      queueMicrotask(() => listeners.get('controllerchange')?.());
+      return registration;
+    },
+    addEventListener: (name, listener) => listeners.set(name, listener),
+    removeEventListener: name => listeners.delete(name)
+  };
+  const cacheStorage = {
+    keys: async () => ['dienstplanrad-v6', 'other-product-v1'],
+    delete: async key => { calls.push(['delete', key]); return true; }
+  };
+
+  const result = await neutralizeLegacyServiceWorker({
+    baseUrl: 'https://app.test/',
+    serviceWorker,
+    cacheStorage,
+    settleTimeoutMs: 50
+  });
+
+  assert.equal(result.found, true);
+  assert.deepEqual(
+    calls.find(call => call[0] === 'register'),
+    ['register', 'https://app.test/sw.js', { scope: 'https://app.test/', updateViaCache: 'none' }]
+  );
+  const registerIndex = calls.findIndex(call => call[0] === 'register');
+  const legacyDeleteIndexes = calls
+    .map((call, index) => call[0] === 'delete' && call[1] === 'dienstplanrad-v6' ? index : -1)
+    .filter(index => index >= 0);
+  assert.ok(legacyDeleteIndexes.some(index => index < registerIndex), 'stale API entries must be removed before takeover');
+  assert.ok(legacyDeleteIndexes.some(index => index > registerIndex), 'entries created during takeover must be removed afterwards');
+  assert.ok(!calls.some(call => call[0] === 'delete' && call[1] === 'other-product-v1'));
+});
+
+test('legacy cleanup preserves unrelated service-worker registrations', async () => {
+  const migration = await read('js/legacy-worker.js').catch(() => '');
+  assert.ok(migration, 'the migration module is missing');
+  const { neutralizeLegacyServiceWorker } = await import('../js/legacy-worker.js');
+  let mutated = false;
+  const registration = {
+    scope: 'https://app.test/',
+    active: { scriptURL: 'https://app.test/other-worker.js' },
+    waiting: null,
+    installing: null,
+    unregister: async () => { mutated = true; return true; }
+  };
+  const serviceWorker = {
+    getRegistration: async () => registration,
+    register: async () => { mutated = true; return registration; }
+  };
+  const cacheStorage = {
+    keys: async () => ['other-product-v1'],
+    delete: async () => { mutated = true; return true; }
+  };
+
+  const result = await neutralizeLegacyServiceWorker({
+    baseUrl: 'https://app.test/',
+    serviceWorker,
+    cacheStorage
+  });
+
+  assert.equal(result.found, false);
+  assert.equal(mutated, false);
 });
 
 test('all release-critical shell and module assets share one cache-busting token', async () => {
@@ -43,20 +125,23 @@ test('all release-critical shell and module assets share one cache-busting token
 
 test('Cloudflare revalidates the app shell and application assets on every visit', async () => {
   const headers = await read('_headers');
+  const routeBlocks = new Map(
+    headers
+      .split(/\r?\n(?=\/)/)
+      .map(block => block.trim())
+      .filter(block => block.startsWith('/'))
+      .map(block => {
+        const [route, ...lines] = block.split(/\r?\n/);
+        const cacheControl = lines
+          .map(line => line.trim())
+          .find(line => line.toLowerCase().startsWith('cache-control:'))
+          ?.slice('cache-control:'.length)
+          .trim();
+        return [route, cacheControl];
+      })
+  );
 
-  for (const route of ['/', '/index.html', '/sw.js']) {
-    assert.match(
-      headers,
-      new RegExp(`${route.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\r?\\n\\s+Cache-Control: no-cache, no-store, must-revalidate`),
-      `${route} must never be reused without validation`
-    );
-  }
-
-  for (const route of ['/styles.css', '/js/*']) {
-    assert.match(
-      headers,
-      new RegExp(`${route.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\r?\\n\\s+Cache-Control: no-cache, must-revalidate`),
-      `${route} must be revalidated`
-    );
+  for (const route of ['/', '/index.html', '/sw.js', '/manifest.webmanifest', '/styles.css', '/js/*', '/icons/*']) {
+    assert.equal(routeBlocks.get(route), 'no-cache', `${route} must use one unambiguous revalidation directive`);
   }
 });

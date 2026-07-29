@@ -1,9 +1,10 @@
-import { ABSENCE_TYPES, MONTH_NAMES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, toIsoDate } from './defaults.js?v=20260729.1';
-import { state, bootstrapState, getMonthData, getMonthLabel, loadMonth, persistCurrentMonth, persistMonth, saveLocalBootstrap, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260729.1';
-import { api } from './api.js?v=20260729.1';
-import { applyMonthTheme, prefersReducedMotion } from './theme.js?v=20260729.1';
-import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260729.1';
-import { buildStats, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getPlanningStaff, getPreference, getStaffById, labelForAbsence, labelForPreference, setAbsence, setAssignment, setPreference, weekdayLabel } from './rules.js?v=20260729.1';
+import { ABSENCE_TYPES, MONTH_NAMES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, toIsoDate } from './defaults.js?v=20260729.2';
+import { state, bootstrapState, getMonthData, getMonthLabel, loadMonth, persistCurrentMonth, persistMonth, saveLocalBootstrap, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260729.2';
+import { api } from './api.js?v=20260729.2';
+import { applyMonthTheme, prefersReducedMotion } from './theme.js?v=20260729.2';
+import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260729.2';
+import { neutralizeLegacyServiceWorker } from './legacy-worker.js?v=20260729.2';
+import { buildStats, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getPlanningStaff, getPreference, getStaffById, labelForAbsence, labelForPreference, setAbsence, setAssignment, setPreference, weekdayLabel } from './rules.js?v=20260729.2';
 
 const $ = selector => document.querySelector(selector);
 
@@ -65,8 +66,8 @@ async function init() {
   cacheElements();
   bindEvents();
   buildStaticSelectors();
-  releaseLegacyServiceWorker();
   setStatus('loading', 'Lädt …');
+  await neutralizeLegacyServiceWorker();
   await bootstrapState();
   applyMonthTheme(state.currentMonth, { animate: false });
   populateSelectors();
@@ -601,40 +602,6 @@ function labelByLevel(level) {
   // "rot" war als Beschriftung die Farbe selbst und passte nicht zur Legende.
   return ({ green: 'geeignet', yellow: 'Hinweis', orange: 'Konflikt', red: 'Bestätigung', gray: 'inaktiv' })[level] || level;
 }
-
-/**
- * Meldet einen früher installierten Service Worker ab und räumt seine Caches weg.
- *
- * Die Anwendung hatte einen Service Worker, der eigenen Code Cache-First
- * auslieferte. Clients, die ihn einmal installiert hatten, bekamen dadurch
- * dauerhaft alte Fassungen von styles.css und den JS-Modulen – ausgerollte
- * Korrekturen erreichten sie nicht mehr. Der Worker ist entfernt; das bloße
- * Löschen der Datei genügt aber nicht: Eine bestehende Registrierung bleibt im
- * Browser aktiv und bedient weiter aus ihrem Cache. Deshalb wird hier aktiv
- * abgemeldet und geleert. Der Aufruf ist dauerhaft nötig, nicht nur einmalig –
- * es ist nicht absehbar, wann der letzte Client das nächste Mal vorbeikommt.
- */
-async function releaseLegacyServiceWorker() {
-  try {
-    if ('serviceWorker' in navigator) {
-      const registrations = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(registrations.map(registration => registration.unregister()));
-    }
-    if ('caches' in window) {
-      const keys = await caches.keys();
-      await Promise.all(keys.filter(key => key.startsWith('dienstplanrad')).map(key => caches.delete(key)));
-    }
-  } catch {
-    // Ohne Belang: Fehlt die Unterstützung oder verweigert der Browser den
-    // Zugriff, war auch nie ein Worker registriert, der stören könnte.
-  }
-}
-// Bewusst KEIN erzwungener Neustart nach dem Abmelden: Getestet bricht ein
-// location.reload() in dieser Situation die Seite: Nach dem Neuladen blieben
-// alle Anfragen hängen und die Anwendung stand dauerhaft bei "Lädt …" – sowohl
-// aus der laufenden Initialisierung heraus als auch nach dem load-Ereignis.
-// Die Abmeldung allein genügt: Sie wirkt dauerhaft, und spätestens der nächste
-// Aufruf lädt garantiert ungecachten Code.
 
 async function onExcelImport(event) {
   const file = event.target.files?.[0];
