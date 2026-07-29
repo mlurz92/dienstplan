@@ -1,0 +1,1 @@
+Compact Excel-like layout is implemented in compact.css; monthly statistics remain directly below the plan table.
