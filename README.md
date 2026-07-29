@@ -381,23 +381,60 @@ werden.
 
 ### 7.5 Kontingente und Urlaub
 
+Gezählt werden die Dienste des Monats **ohne den gerade bewerteten Tag**. Die Prüfung fragt damit
+„wie viele hat die Person außer an diesem Tag" – und meldet sich genau dann, wenn ein **weiterer**
+Dienst hinzukäme.
+
 - erreichtes `bdTarget`: gelb;
 - erreichtes `maxBd`: rot, ohne zusätzlichen Sollhinweis;
 - BD direkt vor einem Urlaubstag: orange.
 
+Zählte man den bewerteten Tag mit, meldete eine bereits eingetragene, völlig reguläre Einteilung sich
+selbst als Überschreitung: Der dritte von drei Soll-BD erschien gelb, und der zweite von zwei erlaubten
+BD sogar **rot als Regelverstoß** – samt Eintrag in den offenen Punkten. Die Bewertung ist jetzt
+identisch, ob die Einteilung schon existiert oder erst im Auswahldialog vorgeschlagen wird.
+
 ### 7.6 HG-Häufung
 
-- HG an drei aufeinanderfolgenden Tagen: orange;
-- erneuter HG innerhalb von drei Kalendertagen: gelb;
-- HG am Tag vor eigenem BD: orange;
-- Freitag-HG vor Samstag-BD bleibt als gewünschtes Wochenendmuster zulässig.
+Auch hier zählen beide Richtungen.
+
+- HG an drei aufeinanderfolgenden Tagen, unabhängig davon, ob der Tag die Kette beginnt, fortsetzt oder
+  abschließt: orange;
+- erneuter HG innerhalb von drei Kalendertagen davor oder danach: gelb;
+- HG am Tag vor eigenem BD: orange – und spiegelbildlich BD mit eigenem HG am Vortag ebenfalls orange;
+- Freitag-HG vor Samstag-BD bleibt als gewünschtes Wochenendmuster zulässig, in beiden Blickrichtungen.
 
 ### 7.7 Wochenenden
 
 Freitag, Samstag und Sonntag werden über den zugehörigen Freitag zu einer Wochenendeinheit gruppiert.
+Betrachtet wird das Wochenende davor **und** das danach.
 
-- BD an zwei unmittelbar aufeinanderfolgenden Wochenenden: rot.
-- sonstige Dienstwiederholung an aufeinanderfolgenden Wochenenden: orange.
+- BD an zwei unmittelbar benachbarten Wochenenden: rot;
+- sonstige Dienstwiederholung an benachbarten Wochenenden: orange.
+
+Zuvor zählte nur das vorhergehende Wochenende. Wer ein Wochenende **vor** einem bereits belegten
+besetzte, bekam gar keinen Hinweis, während dieselbe Paarung in umgekehrter Eingabereihenfolge rot
+erschien – die Belastung ist in beiden Fällen dieselbe.
+
+### 7.7a Zwei Invarianten über dem Regelwerk
+
+Die Einzelregeln oben werden je für sich geprüft. Zwei Zusagen gelten darüber hinaus für die Bewertung
+als Ganzes; sie sind in `tests/rule-matrix.test.js` festgehalten und haben nachweislich fünf Fehler
+gefunden, die keine Einzelregel bemerkt hätte.
+
+**Reihenfolgeunabhängigkeit.** Zwei Dienste, die zueinander in Beziehung stehen, werden gleich bewertet –
+gleichgültig, welcher zuerst eingetragen wurde. Der Test setzt jedes Paar in beiden Reihenfolgen und
+vergleicht die Stufen. Genau diese Zusage war viermal verletzt: beim BD-Tagesabstand, bei der
+Wochenendregel, bei der HG-Häufung und bei der HG/BD-Nachbarschaft. Der Plan bewertete dieselbe
+Dienstfolge je nach Eingabereihenfolge grün oder rot.
+
+**Selbstkonsistenz.** Eine bereits eingetragene Einteilung bekommt dieselbe Stufe wie dieselbe Person im
+Auswahldialog für denselben Tag. Der Test spielt für jede planbare Person die Belegung bis an ihr
+Kontingent durch und vergleicht beide Sichten. Verletzt hatte das die Kontingentprüfung (siehe 7.5).
+
+Beide Invarianten sind bewusst als Zusage über das Verhalten formuliert, nicht als weitere Einzelregel:
+Eine neue Regel, die nur in eine Richtung schaut, fällt dadurch sofort auf, ohne dass jemand daran denken
+muss, den Fall eigens zu testen.
 
 ### 7.8 Oster- und Pfingstblock
 
@@ -1044,10 +1081,10 @@ npm test
 ```
 
 `npm run check` prüft laut aktuellem `package.json` die Syntax von `app.js`, `api.js`, `defaults.js`,
-`rules.js`, `state.js`, `theme.js` und `functions/_utils.js`. `npm test` führt alle Dateien unter
+`rules.js`, `state.js`, `theme.js`, `holidays.js` und `functions/_utils.js`. `npm test` führt alle Dateien unter
 `tests/*.test.js` aus.
 
-### 20.3 32 Regressionstests
+### 20.3 57 Regressionstests
 
 **`rules.test.js` – 5 Tests**
 
@@ -1056,6 +1093,20 @@ npm test
 - Abwesenheit, Doppelrolle und persönliche Sperren;
 - Wochenend-Äquivalent;
 - Statistik, Aktivdatum und Restwert.
+
+**`rule-matrix.test.js` – 24 Tests unter `Europe/Berlin`**
+
+Die vollständige Abnahme der Eignungsbewertung, zweiteilig:
+
+- eine **Regelmatrix** mit 17 Fällen, die jede dokumentierte Regel einzeln ansteuert und Stufe *und*
+  Begründungstext prüft – Qualifikation, Beförderungsstichtag, Abwesenheit, Wünsche, Doppelrolle,
+  persönliche Sonderregeln, Kontingente, Urlaubsübergang, Feiertagsalternanz und der unbelastete
+  Normalfall;
+- die beiden **Invarianten** aus 7.7a: sechs Dienstpaare jeweils in beiden Eingabereihenfolgen sowie
+  die Selbstkonsistenz über alle planbaren Personen und Kontingentstufen.
+
+Gegen den Stand vor der Korrektur schlagen fünf dieser Tests fehl – sie sind also nachweislich
+wirksam und nicht bloß bestätigend.
 
 **`timezone.test.js` – 13 Tests unter `Europe/Berlin`**
 
