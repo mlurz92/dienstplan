@@ -1,9 +1,26 @@
 import { MONTH_NAMES, PREFERENCE_TYPES, STAFF_ORDER, toIsoDate, WEEKDAYS } from './defaults.js';
+import { holidayBlocks, isFirstRegularWorkdayAfter, isRegularWorkdayIso } from './holidays.js';
 
 function parseIso(date) { return new Date(`${date}T00:00:00`); }
 function addDays(date, days) { const d = new Date(date); d.setDate(d.getDate() + days); return d; }
 function fmtShort(date) { return `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth()+1).padStart(2, '0')}.${date.getFullYear()}`; }
-function isSameDay(a, b) { return a?.toISOString?.().slice(0,10) === b?.toISOString?.().slice(0,10); }
+
+/**
+ * Kalendertag eines Date-Objekts als ISO-Datum – in LOKALER Zeit.
+ *
+ * `toISOString()` darf hier nicht verwendet werden. Alle Datumsobjekte dieser
+ * Datei entstehen über `parseIso` als lokale Mitternacht. In jeder Zeitzone mit
+ * positivem UTC-Versatz – also ganzjährig in Deutschland – liegt diese
+ * Mitternacht in UTC noch am Vortag: Der 04.07.2026 wird zu "2026-07-03".
+ * Sämtliche Abstands-, Wochenend- und Feiertagsblockregeln haben dadurch den
+ * jeweils falschen Tag geprüft. In UTC, der Standardzeitzone von Testläufern,
+ * fällt das nicht auf – deshalb erzwingt tests/timezone.test.js Europe/Berlin.
+ */
+function toLocalIso(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function isSameDay(a, b) { return a && b ? toLocalIso(a) === toLocalIso(b) : false; }
 
 const severityRank = { green: 0, yellow: 1, orange: 2, red: 3, gray: -1 };
 
@@ -93,7 +110,7 @@ export function computeWeekendEquivalent(monthData, staffId) {
     if (![5,6,0].includes(weekday)) continue;
     const friday = new Date(date);
     friday.setDate(date.getDate() - ((weekday + 2) % 7));
-    const wk = friday.toISOString().slice(0,10);
+    const wk = toLocalIso(friday);
     weekends[wk] ||= { bd: false, hg: false };
     if (day.bd === staffId) weekends[wk].bd = true;
     if (day.hg === staffId) weekends[wk].hg = true;
@@ -111,39 +128,6 @@ function listOwnRoleDates(state, staffId, role) {
   return dates.sort();
 }
 
-function getHolidayDates(year) {
-  const easter = calcEaster(year);
-  const karfreitag = addDays(easter, -2);
-  const ostermontag = addDays(easter, 1);
-  const pfingstsamstag = addDays(easter, 48);
-  const pfingstsonntag = addDays(easter, 49);
-  const pfingstmontag = addDays(easter, 50);
-  return {
-    easterBlock: [karfreitag, addDays(karfreitag, 1), easter, ostermontag],
-    pentecostBlock: [pfingstsamstag, pfingstsonntag, pfingstmontag]
-  };
-}
-
-function calcEaster(year) {
-  const a = year % 19;
-  const b = Math.floor(year / 100);
-  const c = year % 100;
-  const d = Math.floor(b / 4);
-  const e = b % 4;
-  const f = Math.floor((b + 8) / 25);
-  const g = Math.floor((b - f + 1) / 3);
-  const h = (19 * a + b - d - g + 15) % 30;
-  const i = Math.floor(c / 4);
-  const k = c % 4;
-  const l = (32 + 2 * e + 2 * i - h - k) % 7;
-  const m = Math.floor((a + 11 * h + 22 * l) / 451);
-  const month = Math.floor((h + l - 7 * m + 114) / 31);
-  const day = ((h + l - 7 * m + 114) % 31) + 1;
-  return new Date(year, month - 1, day);
-}
-
-function inBlock(date, block) { return block.some(item => isSameDay(item, date)); }
-
 export function evaluateCandidate({ state, monthData, dateIso, role, staffId }) {
   const person = getStaffById(state.staff, staffId);
   if (!person) return { level: 'gray', reasons: ['Unbekannte Person'], canSelect: false };
@@ -151,9 +135,16 @@ export function evaluateCandidate({ state, monthData, dateIso, role, staffId }) 
   const date = parseIso(dateIso);
   const weekday = date.getDay();
   let level = 'green';
+  let blocked = false;
   const reasons = [];
   const push = (nextLevel, reason) => {
-    if (severityRank[nextLevel] > severityRank[level]) level = nextLevel;
+    // "gray" hat den Rang -1 und konnte den Ausgangswert "green" nie
+    // überschreiben: Eine Person außerhalb ihres Aktivzeitraums wurde dadurch
+    // als "geeignet" ausgewiesen, obwohl die Begründung das Gegenteil sagte.
+    // Grau ist kein Schweregrad, sondern ein Ausschluss und wird deshalb
+    // gesondert geführt.
+    if (nextLevel === 'gray') blocked = true;
+    else if (severityRank[nextLevel] > severityRank[level]) level = nextLevel;
     reasons.push(reason);
   };
   if (!person.includeInPlanning) push('gray', 'Nicht im aktiven Dienstpool');
@@ -179,9 +170,9 @@ export function evaluateCandidate({ state, monthData, dateIso, role, staffId }) 
   if (person.id === 'becker' && role === 'bd' && weekday === 6) push('orange', 'Samstags-BD für Dr. Becker nur nachrangig');
   if (person.id === 'dalitz' && role === 'hg' && [0,1].includes(weekday) && monthData.days[dateIso]?.bd === 'sebastian') push('orange', 'Dalitz-HG an So/Mo bei Sebastian-BD nur nachrangig');
 
-  const prevDateIso = addDays(date, -1).toISOString().slice(0,10);
-  const prev2DateIso = addDays(date, -2).toISOString().slice(0,10);
-  const prev3DateIso = addDays(date, -3).toISOString().slice(0,10);
+  const prevDateIso = toLocalIso(addDays(date, -1));
+  const prev2DateIso = toLocalIso(addDays(date, -2));
+  const prev3DateIso = toLocalIso(addDays(date, -3));
   if (role === 'bd') {
     const ownBdDates = listOwnRoleDates(state, staffId, 'bd').filter(iso => iso !== dateIso).concat(dateIso).sort();
     const idx = ownBdDates.indexOf(dateIso);
@@ -189,7 +180,7 @@ export function evaluateCandidate({ state, monthData, dateIso, role, staffId }) 
       const prevBd = parseIso(ownBdDates[idx - 1]);
       const diff = Math.round((date - prevBd) / 86400000);
       const fzaDate = addDays(date, -1);
-      const fzaIso = fzaDate.toISOString().slice(0,10);
+      const fzaIso = toLocalIso(fzaDate);
       const fzaMonthKey = `${fzaDate.getFullYear()}-${String(fzaDate.getMonth()+1).padStart(2,'0')}`;
       const fzaMonth = state.months.get(fzaMonthKey);
       const isWeekdayPattern = [prevBd, fzaDate, date].every(item => item.getDay() >= 1 && item.getDay() <= 5);
@@ -199,21 +190,33 @@ export function evaluateCandidate({ state, monthData, dateIso, role, staffId }) 
       else if (isBdFzaBd) push('yellow', 'BD–FZA–BD werktags');
       else if (diff > 1 && diff < 4) push('yellow', 'Kurzer Abstand zum letzten BD');
     }
+    // Auch nach vorn prüfen. Zuvor wurde ausschließlich der vorhergehende
+    // eigene BD betrachtet: Wer den Dienst am Tag VOR einem bereits
+    // eingetragenen eigenen BD besetzte, bekam überhaupt keinen Hinweis,
+    // während der umgekehrte Weg gewarnt hat – dieselbe Dienstfolge wurde je
+    // nach Eingabereihenfolge unterschiedlich bewertet.
+    if (idx >= 0 && idx < ownBdDates.length - 1) {
+      const nextBd = parseIso(ownBdDates[idx + 1]);
+      const diffForward = Math.round((nextBd - date) / 86400000);
+      if (diffForward === 1) push('yellow', 'BD bereits am Folgetag');
+      else if (diffForward > 1 && diffForward < 4) push('yellow', 'Kurzer Abstand zum nächsten BD');
+    }
     if (person.maxBd && currentBd >= person.maxBd) push('red', `Monatsmaximum von ${person.maxBd} BD bereits erreicht`);
     else if (person.bdTarget && currentBd >= person.bdTarget) push('yellow', `BD-Richtwert ${person.bdTarget} bereits erreicht`);
     const nextDay = addDays(date, 1);
-    const nextIso = nextDay.toISOString().slice(0,10);
+    const nextIso = toLocalIso(nextDay);
     const firstVacationDay = getAbsence(monthData, staffId, nextIso) === 'urlaub';
     if (firstVacationDay) push('orange', 'BD unmittelbar vor Urlaubsbeginn');
-    if (person.id === 'becker') {
-      for (let offset = 1; offset <= 3; offset++) {
-        const previous = addDays(date, -offset);
-        if (previous.getDay() === 6 && getAssignment(state, previous.toISOString().slice(0,10), 'bd') === 'becker') {
-          const intervening = Array.from({ length: offset - 1 }, (_, index) => addDays(previous, index + 1));
-          if (intervening.every(item => [0,6].includes(item.getDay()))) push('red', 'Nächster regulärer Werktag nach Samstags-BD für Dr. Becker für BD gesperrt');
-          break;
-        }
-      }
+    // Sperre für Dr. Becker am ersten regulären Werktag nach eigenem
+    // Samstags-BD. Die frühere Fassung kannte weder Feiertage noch den Begriff
+    // des Werktags: Sie schlug auch sonntags an und sperrte bei einem
+    // Feiertagsmontag den Feiertag statt des darauffolgenden Arbeitstags. Die
+    // Anzeige in der Tabelle rechnete dagegen bereits feiertagsbewusst – der
+    // Plan wies also einen anderen Tag als Freizeitausgleich aus als den, den
+    // die Regel sperrte. Beide nutzen jetzt dieselbe Funktion.
+    if (person.id === 'becker'
+      && isFirstRegularWorkdayAfter(dateIso, iso => parseIso(iso).getDay() === 6 && getAssignment(state, iso, 'bd') === 'becker')) {
+      push('red', 'Nächster regulärer Werktag nach Samstags-BD für Dr. Becker für BD gesperrt');
     }
     applyWeekendWarnings(state, staffId, date, 'bd', push);
     applyHolidayBlockWarnings(state, staffId, date, push);
@@ -225,13 +228,14 @@ export function evaluateCandidate({ state, monthData, dateIso, role, staffId }) 
     const prevHg3 = getAssignment(state, prev3DateIso, 'hg') === staffId;
     if (prevHg1 && prevHg2) push('orange', 'Dritter HG an drei aufeinanderfolgenden Tagen');
     else if (prevHg1 || prevHg2 || prevHg3) push('yellow', 'Erneuter HG innerhalb von 3 Kalendertagen');
-    const isFridayHgBeforeSaturdayBd = weekday === 5 && getAssignment(state, addDays(date,1).toISOString().slice(0,10), 'bd') === staffId;
-    if (getAssignment(state, addDays(date,1).toISOString().slice(0,10), 'bd') === staffId && !isFridayHgBeforeSaturdayBd) push('orange', 'HG am Tag vor eigenem BD');
+    const isFridayHgBeforeSaturdayBd = weekday === 5 && getAssignment(state, toLocalIso(addDays(date,1)), 'bd') === staffId;
+    if (getAssignment(state, toLocalIso(addDays(date,1)), 'bd') === staffId && !isFridayHgBeforeSaturdayBd) push('orange', 'HG am Tag vor eigenem BD');
     applyWeekendWarnings(state, staffId, date, 'hg', push);
     applyHolidayBlockWarnings(state, staffId, date, push);
   }
 
   if (level === 'green' && reasons.length === 0) reasons.push('Keine relevanten Konflikte');
+  if (blocked) return { level: 'gray', reasons, canSelect: false, meta: { currentBd, currentHg } };
   return { level, reasons, canSelect: true, meta: { currentBd, currentHg } };
 }
 
@@ -241,7 +245,7 @@ function applyWeekendWarnings(state, staffId, date, role, push) {
   const friday = new Date(date);
   friday.setDate(date.getDate() - ((weekday + 2) % 7));
   const prevWeekendFriday = addDays(friday, -7);
-  const prevWeekendDates = [0,1,2].map(i => addDays(prevWeekendFriday, i).toISOString().slice(0,10));
+  const prevWeekendDates = [0,1,2].map(i => toLocalIso(addDays(prevWeekendFriday, i)));
   const hadPrevWeekendBd = prevWeekendDates.some(iso => getAssignment(state, iso, 'bd') === staffId);
   const hadPrevWeekendHg = prevWeekendDates.some(iso => getAssignment(state, iso, 'hg') === staffId);
   if (hadPrevWeekendBd || hadPrevWeekendHg) {
@@ -251,13 +255,13 @@ function applyWeekendWarnings(state, staffId, date, role, push) {
 }
 
 function applyHolidayBlockWarnings(state, staffId, date, push) {
-  const { easterBlock, pentecostBlock } = getHolidayDates(date.getFullYear());
-  const inEaster = inBlock(date, easterBlock);
-  const inPentecost = inBlock(date, pentecostBlock);
+  const { easterBlock, pentecostBlock } = holidayBlocks(date.getFullYear());
+  const iso = toLocalIso(date);
+  const inEaster = easterBlock.includes(iso);
+  const inPentecost = pentecostBlock.includes(iso);
   if (!inEaster && !inPentecost) return;
   const targetBlock = inEaster ? pentecostBlock : easterBlock;
-  const blockDates = targetBlock.map(d => d.toISOString().slice(0,10));
-  const hadOtherBlock = blockDates.some(iso => getAssignment(state, iso, 'bd') === staffId || getAssignment(state, iso, 'hg') === staffId);
+  const hadOtherBlock = targetBlock.some(day => getAssignment(state, day, 'bd') === staffId || getAssignment(state, day, 'hg') === staffId);
   if (hadOtherBlock) push('orange', 'Bereits Dienst im alternierenden Oster-/Pfingstblock');
 }
 
@@ -277,17 +281,17 @@ export function collectIssues(state, monthData) {
       });
     }
   }
-  for (const [staffId, absMap] of Object.entries(monthData.absences || {})) {
-    if (staffId !== 'becker' && staffId !== 'martin') continue;
-    for (const [iso, type] of Object.entries(absMap)) {
-      const other = staffId === 'becker' ? 'martin' : 'becker';
-      const isWorkday = ![0,6].includes(parseIso(iso).getDay());
-      if (isWorkday && getAbsence(monthData, other, iso)) issues.push({
-        level: 'red',
-        title: `${fmtGermanDate(iso)} · Becker/Martin gleichzeitig abwesend`,
-        details: 'CT-Leitungsbesetzung prüfen.'
-      });
-    }
+  // Nur über EINE der beiden Personen laufen. Die frühere Fassung iterierte
+  // über beide und meldete denselben Tag deshalb zweimal. Feiertage zählen
+  // zudem nicht als Arbeitstag – an ihnen ist ohnehin niemand in der Regelbesetzung.
+  for (const iso of Object.keys(monthData.absences?.becker || {})) {
+    if (!isRegularWorkdayIso(iso)) continue;
+    if (!getAbsence(monthData, 'martin', iso)) continue;
+    issues.push({
+      level: 'red',
+      title: `${fmtGermanDate(iso)} · Becker/Martin gleichzeitig abwesend`,
+      details: 'CT-Leitungsbesetzung prüfen.'
+    });
   }
   return issues.sort((a,b) => severityRank[b.level]-severityRank[a.level]);
 }
