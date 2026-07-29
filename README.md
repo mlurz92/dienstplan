@@ -2,7 +2,7 @@
 
 **Manuelle Bereitschafts- und Hintergrunddienstplanung für die Klinik für Radiologie und Nuklearmedizin.**
 
-DienstplanRAD ist eine installierbare, offlinefähige Web-Anwendung (PWA) zur monatsweisen Planung von
+DienstplanRAD ist eine installierbare Web-Anwendung zur monatsweisen Planung von
 Bereitschaftsdiensten (BD) und Hintergrunddiensten (HG). Die Anwendung plant **nicht automatisch** – sie
 lässt die Planerin bzw. den Planer jede Entscheidung selbst treffen und legt daneben in Echtzeit eine
 vollständige, farbkodierte Regelbewertung, eine Verteilungsstatistik und eine lückenlose
@@ -31,7 +31,7 @@ den Betrieb. Sie ist kein Changelog, sondern die vollständige Referenz.
 13. [Backend-API](#13-backend-api)
 14. [Import und Export](#14-import-und-export)
 15. [Drucken und PDF](#15-drucken-und-pdf)
-16. [PWA, Service Worker und Caching](#16-pwa-service-worker-und-caching)
+16. [Installation, Manifest und Auslieferung](#16-installation-manifest-und-auslieferung)
 17. [Sicherheit und Datenschutz](#17-sicherheit-und-datenschutz)
 18. [Barrierefreiheit und Responsivität](#18-barrierefreiheit-und-responsivität)
 19. [Entwicklung, Tests und Deployment](#19-entwicklung-tests-und-deployment)
@@ -107,7 +107,7 @@ Was die Anwendung für genau diesen Einsatzzweck auszeichnet:
 | Backend | Cloudflare Pages Functions (serverless, Edge) |
 | Datenhaltung | Cloudflare KV (Key-Value-Store), Binding `DIENSTPLAN_KV` |
 | Lokale Persistenz | `localStorage` (Bootstrap-Stammdaten und jeder geladene Monat) |
-| Offline-Fähigkeit | Service Worker (Network-First für Anwendungscode, Cache-First für Assets) |
+| Offline-Fähigkeit | `localStorage` – jeder geladene Monat und die Stammdaten bleiben lokal verfügbar |
 | Excel | SheetJS (`xlsx` 0.20.3) via CDN, `defer` geladen |
 | Tests | `node:test` aus der Node-Standardbibliothek, keine externen Test-Abhängigkeiten |
 
@@ -134,7 +134,7 @@ Genutzte moderne Web-Plattform-Features:
 * **`color-mix(in srgb, …)`** für die gesamte abgeleitete Farbhierarchie.
 * **`backdrop-filter`** für die Glas-Optik der Panels.
 * **`structuredClone`** für tiefe Kopien der Vorgabedaten.
-* **`localStorage`**, **`fetch`**, **Service Worker**, **Web App Manifest**.
+* **`localStorage`**, **`fetch`**, **Web App Manifest**.
 
 Zielbrowser sind aktuelle Chromium-, Firefox- und Safari-Versionen. Da der Farbverlauf in JavaScript
 gerechnet und als fertige `rgb()`-Werte geschrieben wird, ist er von `@property`- und
@@ -148,8 +148,7 @@ gerechnet und als fertige `rgb()`-Werte geschrieben wird, ist er von `@property`
 .
 ├── index.html                     Vollständiges statisches Markup: Shell, Tabellengerüst, alle 4 Dialoge
 ├── styles.css                     Gesamtes Design: Layout, Glas-Optik, Monatsfarben, Animationen, Druck
-├── manifest.webmanifest           PWA-Manifest (Name, Icon, Farben, standalone)
-├── sw.js                          Service Worker: Precache und Laufzeit-Cache
+├── manifest.webmanifest           Web-App-Manifest (Name, Icon, Farben, standalone)
 ├── _headers                       Cloudflare-Pages-Sicherheitsheader
 ├── package.json                   Skripte: check, test, deploy-note
 ├── icons/
@@ -157,6 +156,7 @@ gerechnet und als fertige `rgb()`-Werte geschrieben wird, ist er von `@property`
 ├── js/
 │   ├── app.js                     Anwendungslogik: Rendering, Ereignisse, Dialoge, Import/Export
 │   ├── theme.js                   Monatsfarbsystem: Paletten, OKLCH-Farbmathematik, Übergangsschleife
+│   ├── holidays.js                Feiertage in Sachsen, Werktagsbegriff, Feiertagsblöcke
 │   ├── state.js                   Zustandsobjekt, Lade-/Speicherpfade, localStorage, Monats-Cache
 │   ├── rules.js                   Regelwerk: Bewertung, Statistik, Selektoren, Datumsutilities
 │   ├── defaults.js                Vorgabedaten: Personal, Abwesenheits-/Wunschtypen, Monatsnamen
@@ -173,6 +173,7 @@ gerechnet und als fertige `rgb()`-Werte geschrieben wird, ist er von `@property`
 │       └── month/[year]/[month].js   GET/PUT /api/month/:year/:month
 └── tests/
     ├── rules.test.js              Regressionstests für Kernregeln und Statistik
+    ├── timezone.test.js           Regelprüfung unter deutscher Zeitzone
     └── theme.test.js              Regressionstests für Farbmathematik, Kontrast und Zeitverlauf
 ```
 
@@ -180,6 +181,7 @@ gerechnet und als fertige `rgb()`-Werte geschrieben wird, ist er von `@property`
 
 ```
 defaults.js   (keine Abhängigkeiten – reine Daten und Datums-Helfer)
+holidays.js   (Feiertage und Werktagsbegriff – eine Quelle für Anzeige und Regelwerk)
      ▲
      ├── rules.js    (reine Funktionen: Bewertung, Statistik, Getter/Setter – kein DOM)
      ├── state.js    (Zustand, Persistenz, Netzwerk – kein DOM)
@@ -385,6 +387,17 @@ Herzstück ist `evaluateCandidate({ state, monthData, dateIso, role, staffId })`
 Funktion wird für **jede Person in jeder geöffneten Auswahlliste** und zusätzlich für **jede bereits
 gesetzte Einteilung bei jedem Rendering** aufgerufen. Sie ist frei von Seiteneffekten.
 
+### 6.0 Kalendertage und Zeitzone
+
+Alle Regeln rechnen mit **lokalen Kalendertagen**. Datumsobjekte entstehen als lokale Mitternacht; für den
+Rückweg zum ISO-Datum ist `toISOString()` ausdrücklich verboten. In jeder Zeitzone mit positivem
+UTC-Versatz – ganzjährig in Deutschland – liegt lokale Mitternacht in UTC noch am Vortag, aus dem
+04.07.2026 wird `2026-07-03`.
+
+Genau darauf fußten sämtliche Abstands-, Wochenend- und Feiertagsblockregeln, und sie haben deshalb den
+jeweils falschen Tag geprüft. In UTC – der Standardzeitzone von Testläufern – fällt das nicht auf.
+`tests/timezone.test.js` erzwingt daher `Europe/Berlin`.
+
 ### 6.1 Severity-Modell
 
 ```js
@@ -401,7 +414,12 @@ unterdrückt: Wer eine rote Einteilung bestätigt, sieht dabei auch die gelben N
 | **gelb** | Hinweis, planerisch vertretbar | Direkt wählbar |
 | **orange** | Konflikt, nachrangig wählen | Direkt wählbar, deutlich markiert |
 | **rot** | Regelverstoß | Bestätigungsdialog und Protokolleintrag |
-| **grau** | Person zu diesem Zeitpunkt nicht aktiv / nicht im Pool | Erscheint gar nicht erst in der Liste |
+| **grau** | Person zu diesem Zeitpunkt nicht aktiv / nicht im Pool | Ausschluss: nicht auswählbar |
+
+**Grau ist kein Schweregrad, sondern ein Ausschluss** und wird getrennt geführt. Zuvor lief es über
+dieselbe Rangfolge und trug den Rang −1 – es konnte den Ausgangswert „grün" damit nie überschreiben. Eine
+Person außerhalb ihres Aktivzeitraums wurde dadurch als **„geeignet"** ausgewiesen, während die Begründung
+darunter das Gegenteil sagte. Graue Einträge sind jetzt sichtbar abgesetzt und nicht anklickbar.
 
 Ist am Ende `level === 'green'` und keine Begründung gesetzt, ergänzt die Funktion „Keine relevanten
 Konflikte", damit der Tooltip nie leer bleibt.
@@ -440,9 +458,15 @@ Fest kodierte Hausabsprachen:
 | **Fr. Dalitz** HG an Sonntag/Montag, wenn am selben Tag Hr. Sebastian BD hat, nur nachrangig | orange |
 | **Dr. Becker** BD am nächsten regulären Werktag nach eigenem Samstags-BD gesperrt | **rot** |
 
-Die letzte Regel prüft rückwärts bis zu drei Tage: Liegt in diesem Fenster ein Samstag mit Becker-BD und
-sind alle Tage dazwischen Wochenendtage, ist der betrachtete Tag der erste reguläre Werktag danach und für
-BD gesperrt.
+Die letzte Regel sucht rückwärts nach einem Samstag mit Becker-BD und bricht ab, sobald ein regulärer
+Werktag dazwischenliegt. **Regulärer Werktag heißt: Montag bis Freitag und kein gesetzlicher Feiertag.**
+
+Die frühere Fassung kannte weder Feiertage noch den Werktagsbegriff. Sie schlug auch **sonntags** an und
+sperrte bei einem Feiertagsmontag den Feiertag statt des darauffolgenden Arbeitstags. Die Anzeige in der
+Tabelle rechnete dagegen bereits feiertagsbewusst – der Plan wies also einen anderen Tag als
+Freizeitausgleich aus als den, den die Regel sperrte. Beide nutzen jetzt dieselbe Funktion aus
+`js/holidays.js`. Beispiel Pfingsten 2026: Nach Becker-BD am Samstag 23.05. sind Pfingstsonntag und
+Pfingstmontag frei, gesperrt ist Dienstag der 26.05.
 
 ### 6.5 BD-Abstandsregeln
 
@@ -452,9 +476,16 @@ vorhergehende BD gesucht:
 
 | Situation | Stufe | Begründungstext |
 |---|---|---|
-| Abstand = 1 Tag | gelb | „BD bereits am Vortag" |
+| Abstand = 1 Tag rückwärts | gelb | „BD bereits am Vortag" |
 | Abstand = 2 Tage, Muster BD–FZA–BD, alle drei Tage Mo–Fr, am Zwischentag `fza` eingetragen | gelb | „BD–FZA–BD werktags" |
-| Abstand 2–3 Tage (sonstige Fälle) | gelb | „Kurzer Abstand zum letzten BD" |
+| Abstand 2–3 Tage rückwärts (sonstige Fälle) | gelb | „Kurzer Abstand zum letzten BD" |
+| Abstand = 1 Tag vorwärts | gelb | „BD bereits am Folgetag" |
+| Abstand 2–3 Tage vorwärts | gelb | „Kurzer Abstand zum nächsten BD" |
+
+Die Prüfung läuft **in beide Richtungen**. Zuvor wurde ausschließlich der vorhergehende eigene BD
+betrachtet: Wer den Dienst am Tag *vor* einem bereits eingetragenen eigenen BD besetzte, bekam überhaupt
+keinen Hinweis, während der umgekehrte Weg gewarnt hat – dieselbe Dienstfolge wurde je nach
+Eingabereihenfolge unterschiedlich bewertet.
 
 Die BD-FZA-BD-Erkennung liest den Zwischentag aus dem **richtigen** Monatsobjekt – auch wenn dieser Tag im
 Vormonat liegt.
@@ -516,8 +547,9 @@ Zusätzlich zur Einzelbewertung existiert eine Monatsprüfung, die zusammenträg
 
 * jeden Tag ohne BD und jeden Tag ohne HG als gelben Punkt,
 * jede gesetzte Einteilung, deren Bewertung orange oder rot ist,
-* **Becker/Martin gleichzeitig an einem Werktag abwesend** als roten Punkt mit dem Hinweis
-  „CT-Leitungsbesetzung prüfen".
+* **Becker/Martin gleichzeitig an einem regulären Werktag abwesend** als roten Punkt mit dem Hinweis
+  „CT-Leitungsbesetzung prüfen" – genau einmal je Tag. Zuvor lief die Prüfung über beide Personen und
+  meldete denselben Tag doppelt; Feiertage zählten als Arbeitstag.
 
 Das Ergebnis ist nach Schweregrad absteigend sortiert.
 
@@ -542,9 +574,12 @@ und HG am 10.07.2026 ergeben 1,5.
 
 ### 7.1 Berechnung
 
-Feiertage werden vollständig lokal berechnet – kein externer Dienst, kein Netzzugriff, dadurch auch offline
-korrekt. Grundlage ist die **Gaußsche Osterformel** (`calculateEasterUtc`), aus der alle beweglichen
-Feiertage abgeleitet werden.
+Feiertage werden vollständig lokal berechnet – kein externer Dienst, kein Netzzugriff. Grundlage ist die
+**Gaußsche Osterformel**, aus der alle beweglichen Feiertage abgeleitet werden.
+
+Die Berechnung liegt in `js/holidays.js` und ist die **einzige** Quelle für Anzeige und Regelwerk. Zuvor
+existierten zwei Osterformeln und zwei Werktagsprüfungen – eine in `app.js` für die Darstellung, eine in
+`rules.js` für die Bewertung – die sich widersprachen.
 
 ### 7.2 Berücksichtigte Feiertage (Sachsen, `holidayRegion: "SN"`)
 
@@ -574,10 +609,9 @@ zurückgegangen). Sachsen ist das einzige Bundesland mit diesem gesetzlichen Fei
 
 ### 7.3 Zwischenspeicherung und Zeitzonensicherheit
 
-Berechnete Feiertage werden pro Jahr in einer `Map` gecacht. Sämtliche Feiertagsberechnungen laufen
-**vollständig in UTC** (`Date.UTC`, `getUTC*`), damit keine Sommer-/Winterzeitverschiebung ein Datum um
-einen Tag verrutschen lässt. Die Anzeige-Datumsfunktionen arbeiten dagegen bewusst lokal
-(`new Date("2026-07-01T00:00:00")`), da sie ausschließlich formatieren.
+Berechnete Feiertage werden pro Jahr in einer `Map` gecacht. Gerechnet wird durchgehend mit **lokalen
+Kalendertagen** (siehe 6.0); `toISOString()` kommt nirgends zum Einsatz, weil es das Datum in deutscher
+Zeitzone um einen Tag nach hinten verschieben würde.
 
 ### 7.4 Wirkung in der Oberfläche
 
@@ -915,7 +949,7 @@ also permanent mit sichtbarer Verteilung, statt am Ende nachzuzählen.
 
 ### 11.1 Gestaltungsidee
 
-Die Oberfläche folgt einer **Liquid-Glass-/Aero-Peak-Ästhetik**: geschichtete, halbtransparente
+Die Oberfläche folgt einer **Liquid-Glass-/Aero-Milchglas-Ästhetik**: geschichtete, halbtransparente
 Glasflächen über einem dunklen, leicht bewegten Farbraum. Das ist kein Selbstzweck. Der dunkle Hintergrund
 lässt die eigentliche Arbeitsfläche – die weiße, streng gerasterte Tabelle – wie ein physisches Blatt
 Papier auf einem Tisch wirken. Alles Bedienende (Panels, Leisten, Dialoge) liegt sichtbar *darüber*, alles
@@ -924,6 +958,32 @@ Inhaltliche liegt *darin*. Diese Ebenentrennung macht die Anwendung auch nach St
 Das Farbsystem hält sich strikt an eine Regel: **Chrom ist neutral, Inhalt trägt Farbe.** Farbe erscheint
 nur dort, wo sie Information transportiert – Wochenend- und Feiertagshierarchie, Ampelbewertung,
 Speicherstatus, Monatsidentität.
+
+#### Milchglas ist dosiert, nicht flächendeckend
+
+Echtes `backdrop-filter` kostet **Fläche × Radius**: Der Compositor liest in jedem Frame die Pixel hinter
+dem Element, faltet sie mit dem Weichzeichner und setzt das Ergebnis wieder zusammen. Zuvor lag derselbe
+`blur(25px)` auf allen Panels – auch auf der großen Arbeitsfläche, dem mit Abstand größten Element der
+Seite. Gemessen an dieser Oberfläche:
+
+| Zustand | Bilder pro Sekunde |
+|---|---|
+| vorher, Weichzeichner auf allen Panels | 9 |
+| ohne Weichzeichner auf der Arbeitsfläche | 16 |
+| zusätzlich ohne `filter` auf den Hintergrund-Orbs | 22 |
+
+Daraus folgt die heutige Aufteilung:
+
+* **Echtes Milchglas** tragen nur die kleinen, schwebenden Elemente, hinter denen sich tatsächlich etwas
+  bewegt: Kopfleiste, Werkzeugleiste, Dialoge, Glas-Einfassungen und das Farb-Badge. Genau dafür ist der
+  Effekt gedacht.
+* **Die große Arbeitsfläche** bekommt stattdessen eine geschichtete Glasoptik *ohne* Weichzeichner:
+  Lichtkante oben, feine Brechung an der Unterkante, Monatstönung, tiefer weicher Schlagschatten. Sie
+  wirkt dadurch dichter, ist hinter einer engen Datentabelle deutlich besser lesbar und kostet nichts.
+* **Die Hintergrund-Orbs** kommen ohne `filter: blur()` aus. Ein radialer Verlauf ist bereits weich; die
+  Weichheit übernehmen die Verlaufsstopps.
+* `contain: paint` grenzt das Neuzeichnen auf die jeweilige Fläche ein, `@supports` liefert eine
+  Rückfallebene für Browser ohne `backdrop-filter`.
 
 ### 11.2 Die zwölf Monatspaletten
 
@@ -1098,7 +1158,7 @@ DOMContentLoaded
        ├─ cacheElements()          DOM-Referenzen einsammeln
        ├─ bindEvents()             alle Ereignisse registrieren
        ├─ buildStaticSelectors()   Monats- und Jahresliste aufbauen
-       ├─ registerServiceWorker()  PWA-Registrierung (Fehler werden verschluckt)
+       ├─ releaseLegacyServiceWorker()  alten Worker abmelden, Caches leeren
        ├─ setStatus('loading')
        ├─ bootstrapState()         Stammdaten: Server → localStorage → Vorgaben
        ├─ applyMonthTheme(…, ohne Animation)
@@ -1321,7 +1381,7 @@ Ein ganzer Monat passt so auf ein einziges A4-Blatt, inklusive Statistik.
 
 ---
 
-## 16. PWA, Service Worker und Caching
+## 16. Installation, Manifest und Auslieferung
 
 ### 16.1 Manifest
 
@@ -1334,38 +1394,42 @@ Ein ganzer Monat passt so auf ein einziges A4-Blatt, inklusive Statistik.
 | `theme_color` | `#111820` |
 | `icons` | `/icons/icon.svg`, `sizes: any`, `purpose: any maskable` |
 
-Ein einzelnes SVG deckt alle Größen ab – es gibt keine Bitmap-Icon-Matrix zu pflegen.
+Ein einzelnes SVG deckt alle Größen ab – es gibt keine Bitmap-Icon-Matrix zu pflegen. Die Anwendung lässt
+sich damit als eigenständiges Fenster installieren.
 
-### 16.2 Service Worker
+### 16.2 Kein Service Worker – und warum
 
-**Cache-Name:** `dienstplanrad-v9`.
+Die Anwendung hatte einen Service Worker. Er ist **entfernt**, und das ist eine bewusste Entscheidung.
 
-**Vorgeladene Kerndateien:** `/`, `/index.html`, `/styles.css`, alle sechs JS-Module,
-`/manifest.webmanifest`, `/icons/icon.svg`.
+Der Worker lieferte eigenen Anwendungscode zunächst Cache-First aus. Ein Client, der ihn einmal installiert
+hatte, bekam damit dauerhaft alte Fassungen von `styles.css` und den JS-Modulen: Ausgerollte Korrekturen
+erreichten ihn nicht mehr, solange der Cache-Name unverändert blieb. Genau daran ist eine bereits behobene
+und deployte Fassung des Monatsfarbwechsels gescheitert – der Fehler war weg, kam beim Nutzer aber nie an.
+Eine spätere Fassung stellte auf Network-First um, doch damit blieb vom Worker im Wesentlichen nur noch
+seine Fehleranfälligkeit übrig: Für eine Anwendung, die ohnehin an einem Server hängt, war der Gewinn
+gering und das Risiko hoch.
 
-**Lebenszyklus:**
-* `install` → Kerndateien cachen, danach `skipWaiting()` – eine neue Version übernimmt sofort.
-* `activate` → alle Caches mit abweichendem Namen löschen, danach `clients.claim()`.
+**Was das praktisch bedeutet:**
 
-**Abrufstrategie:**
-* Nicht-`GET`-Anfragen (also alle `PUT`/`POST` an die API) werden **nicht** angefasst und gehen immer ans
-  Netz. Schreibvorgänge können damit niemals aus einem Cache beantwortet werden.
-* Navigationsanfragen: **Network-First** mit Aktualisierung des gecachten `/index.html`; bei Netzfehler wird
-  die gecachte Fassung ausgeliefert.
-* **Eigener Anwendungscode** (`.html`, `.css`, `.js` gleicher Herkunft): ebenfalls **Network-First**.
-* Alle übrigen `GET`-Anfragen (Icons, Manifest, Fremdressourcen): **Cache-First**.
+* Es gibt **kein Asset-Caching** mehr. Jede Änderung erreicht die Clients über das normale HTTP-Caching,
+  ohne Versionspflege und ohne Sonderfälle.
+* Der **Datenteil bleibt offlinefähig**: Stammdaten und jeder geladene Monat liegen weiterhin in
+  `localStorage`, die dreistufige Ladekette (Server → `localStorage` → leerer Monat) ist unverändert. Bei
+  einem Netzausfall im laufenden Betrieb wird also weitergearbeitet und lokal gespeichert.
+* Ein **Kaltstart ohne Netz** lädt die Anwendung dagegen nicht mehr, weil die Dateien nicht vorgehalten
+  werden. Für eine Klinikarbeitsplatz-Anwendung mit ständiger Netzanbindung ist das der richtige Tausch.
 
-Die Network-First-Regel für Anwendungscode ist eine bewusste Korrektur. Vorher galt Cache-First für alles
-außer der Navigation: Ein bereits installierter Client hat `styles.css` und die JS-Module dauerhaft aus dem
-alten Cache bedient, solange der Cache-Name unverändert blieb – **eine ausgerollte Korrektur konnte ihn nie
-erreichen**. Genau dadurch blieb eine bereits deployte Behebung des Monatsfarbwechsels beim Nutzer
-wirkungslos. Jetzt ist der Cache reine Offline-Rückfallebene, und eine Änderung am Anwendungscode kommt
-beim nächsten Aufruf an, auch ohne Versionswechsel.
+### 16.3 Befreiung bereits installierter Clients
 
-Die Registrierung schlägt bewusst still fehl (`.catch(() => {})`) – eine Umgebung ohne
-Service-Worker-Unterstützung soll keine sichtbaren Fehler erzeugen.
+Das Löschen der Datei allein genügt nicht: Eine bestehende Registrierung bleibt im Browser aktiv und
+bedient weiter aus ihrem Cache. `releaseLegacyServiceWorker()` meldet deshalb bei jedem Start alle
+Registrierungen ab und löscht alle Caches mit dem Präfix `dienstplanrad`. Der Aufruf bleibt dauerhaft
+bestehen – es ist nicht absehbar, wann der letzte betroffene Client das nächste Mal vorbeikommt.
 
----
+Ein **erzwungenes Neuladen** nach dem Abmelden wurde erprobt und wieder verworfen: In beiden Varianten –
+aus der laufenden Initialisierung heraus wie auch nach dem `load`-Ereignis – blieb die Seite danach
+reproduzierbar bei „Lädt …" stehen, weil die abgebrochenen Anfragen nie wieder aufgesetzt wurden. Die
+Abmeldung allein wirkt dauerhaft; spätestens der nächste Aufruf lädt garantiert ungecachten Code.
 
 ## 17. Sicherheit und Datenschutz
 
@@ -1451,16 +1515,16 @@ npx wrangler pages dev . --kv DIENSTPLAN_KV
 ### 19.2 Prüfungen
 
 ```bash
-npm run check          # Syntaxprüfung aller JS-Module inkl. Service Worker und Backend-Utils
+npm run check          # Syntaxprüfung aller JS-Module und der Backend-Utils
 npm test               # Regressionstests des Regelwerks
 ```
 
 `npm run check` prüft `js/app.js`, `js/api.js`, `js/defaults.js`, `js/rules.js`, `js/state.js`,
-`js/theme.js`, `functions/_utils.js` und `sw.js` mit `node --check`.
+`js/theme.js`, `js/holidays.js` und `functions/_utils.js` mit `node --check`.
 
 ### 19.3 Testabdeckung
 
-Insgesamt 13 Tests, alle ohne DOM, ohne Netzwerk und ohne externe Abhängigkeiten.
+Insgesamt 26 Tests, alle ohne DOM, ohne Netzwerk und ohne externe Abhängigkeiten.
 
 **Regelwerk (`tests/rules.test.js`)**
 
@@ -1471,6 +1535,26 @@ Insgesamt 13 Tests, alle ohne DOM, ohne Netzwerk und ohne externe Abhängigkeite
 | `absence, same-day double assignment and personal restrictions become red conflicts` | Urlaub → rot, BD+HG am selben Tag → rot, Polednia sonntags → rot |
 | `weekend equivalent counts BD weekends once and HG-only weekends as half` | Ergebnis 1,5 für BD-Wochenende plus reines HG-Wochenende |
 | `statistics honor activation dates and calculate remaining targets` | Hellmann fehlt im September 2026, erscheint im Oktober; Restwert korrekt |
+
+**Regelwerk unter deutscher Zeitzone (`tests/timezone.test.js`)**
+
+Diese Datei erzwingt `Europe/Berlin` und deckt genau die Regeln ab, die zuvor am falschen Kalendertag
+gerechnet haben – unter UTC waren alle davon unauffällig.
+
+| Test | Prüft |
+|---|---|
+| BD am Vortag | Der unmittelbar vorhergehende eigene BD wird erkannt |
+| HG an drei Tagen | Drei aufeinanderfolgende HG ergeben orange |
+| HG vor eigenem BD | Wird erkannt; Freitag-HG vor Samstags-BD bleibt zulässig |
+| BD vor Urlaubsbeginn | Der Folgetag mit Urlaub wird erkannt |
+| Aufeinanderfolgende Wochenenden | BD-Wochenende nach BD-Wochenende ergibt rot |
+| Oster-/Pfingst-Alternanz | Dienst im einen Block meldet sich im anderen |
+| BD–FZA–BD | Wird als solches erkannt, nicht als kurzer Abstand |
+| Monatsübergreifend | BD am 31. des Vormonats wirkt auf den 1. |
+| Ausschluss | Eine nicht aktive Person ist grau und nicht wählbar, nicht „geeignet" |
+| Symmetrie | BD am Tag davor und danach werden gleich bewertet |
+| Becker-Sperre | Trifft den ersten regulären Werktag, nicht Wochenende oder Feiertag |
+| Doppelmeldung | Becker/Martin gleichzeitig abwesend erscheint genau einmal |
 
 **Farbsystem (`tests/theme.test.js`)**
 
@@ -1498,9 +1582,9 @@ sind sie eine harte Zusage über alle zwölf Paletten hinweg.
 4. Deployen. Der erste Aufruf initialisiert Einstellungen, Personalstamm und RBN-Liste selbständig.
 5. Zugriffsschutz konfigurieren (siehe 17.2).
 
-Ein Push auf den Standardbranch löst das Deployment aus. Wird eine der vorgeladenen Kerndateien geändert,
-sollte die Versionsnummer in `sw.js` (`dienstplanrad-v8`) erhöht werden, damit alle Clients den alten Cache
-sicher verwerfen.
+Ein Push auf den Standardbranch löst das Deployment aus. Eine Cache-Version ist nicht mehr zu pflegen –
+ohne Service Worker gilt ausschließlich das normale HTTP-Caching, eine Änderung erreicht die Clients also
+von selbst.
 
 ---
 
@@ -1538,8 +1622,7 @@ Datei. Änderungen an `DEFAULT_STAFF` wirken auf bestehende Installationen erst,
 | Import überschreibt keine Dienste | Beabsichtigt – die Zusammenführung ist rein additiv | Zielfelder gegebenenfalls vorher leeren |
 | „Excel-Bibliothek noch nicht geladen." | SheetJS-CDN noch nicht bereit oder nicht erreichbar | Kurz warten; bei dauerhaftem Fehler Netzzugang zum CDN prüfen |
 | Farbwechsel springt ohne Übergang | Betriebssystem meldet „Bewegung reduzieren" oder Browser kennt `@property` nicht | Beabsichtigtes Verhalten |
-| Alte Version nach Deployment | Service-Worker-Cache | Seit v9 wird Anwendungscode Network-First geladen, das erledigt sich von selbst. Bei einem Client, der noch auf einer Fassung vor v9 steht: Seite hart neu laden oder den Service Worker in den Entwicklerwerkzeugen abmelden |
-| Farbwechsel bleibt trotz Deployment aus | Client läuft noch auf altem, Cache-First ausgeliefertem Code | Siehe Zeile darüber – das war die Ursache, warum eine bereits behobene Fassung beim Nutzer nicht ankam |
+| Alte Version nach Deployment | HTTP-Cache des Browsers | Einmal hart neu laden. Der frühere Service Worker, der alten Code dauerhaft festhielt, ist entfernt und wird beim nächsten Aufruf automatisch abgemeldet |
 | Änderung scheint verloren | Debounce von 1100 ms noch nicht abgelaufen | Kurz warten; Monatswechsel und Seitenverlassen erzwingen die Speicherung ohnehin |
 
 **Diagnosehilfen:** `document.documentElement.dataset.month` und `.dataset.palette` zeigen den aktuell
@@ -1565,7 +1648,7 @@ bestätigte rote Einteilung mit Zeitpunkt, Gründen und Kommentar.
 | **Monatspalette** | Die zwölf jahreszeitlich abgestimmten Grundfarben, je Monat eine |
 | **Bootstrap** | Der erste Ladevorgang: Einstellungen, Personal und RBN-Namen in einem Aufruf |
 | **KV** | Cloudflare Key-Value-Store – die serverseitige Datenhaltung |
-| **PWA** | Progressive Web App – installierbar, offlinefähig, eigenes Fenster |
+| **Manifest** | Web App Manifest – macht die Anwendung installierbar, mit eigenem Fenster und Icon |
 
 ---
 

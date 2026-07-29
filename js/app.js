@@ -2,71 +2,23 @@ import { ABSENCE_TYPES, MONTH_NAMES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyM
 import { state, bootstrapState, getMonthData, getMonthLabel, loadMonth, persistCurrentMonth, persistMonth, saveLocalBootstrap, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js';
 import { api } from './api.js';
 import { applyMonthTheme, prefersReducedMotion } from './theme.js';
+import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js';
 import { buildStats, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getPlanningStaff, getPreference, getStaffById, labelForAbsence, labelForPreference, setAbsence, setAssignment, setPreference, weekdayLabel } from './rules.js';
 
 const $ = selector => document.querySelector(selector);
+
+/**
+ * Text für die Einbettung in innerHTML entschärfen. Personalnamen und
+ * Funktionsbezeichnungen stammen aus dem KV-Store und sind damit von außen
+ * pflegbar; ein Name mit spitzer Klammer hätte das Markup zerlegt.
+ */
+const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
 const els = {};
 let pendingConflict = null;
 let monthRequestId = 0;
 const monthNameBySheet = Object.fromEntries(SHEET_NAMES.map((name, idx) => [name, idx + 1]));
 
 
-
-const holidayCache = new Map();
-
-function formatUtcIso(date) {
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
-}
-
-function addUtcDays(date, days) {
-  const next = new Date(date.getTime());
-  next.setUTCDate(next.getUTCDate() + days);
-  return next;
-}
-
-function calculateEasterUtc(year) {
-  const a = year % 19;
-  const b = Math.floor(year / 100);
-  const c = year % 100;
-  const d = Math.floor(b / 4);
-  const e = b % 4;
-  const f = Math.floor((b + 8) / 25);
-  const g = Math.floor((b - f + 1) / 3);
-  const h = (19 * a + b - d - g + 15) % 30;
-  const i = Math.floor(c / 4);
-  const k = c % 4;
-  const l = (32 + 2 * e + 2 * i - h - k) % 7;
-  const m = Math.floor((a + 11 * h + 22 * l) / 451);
-  const month = Math.floor((h + l - 7 * m + 114) / 31);
-  const day = ((h + l - 7 * m + 114) % 31) + 1;
-  return new Date(Date.UTC(year, month - 1, day));
-}
-
-function getSaxonyHolidays(year) {
-  if (holidayCache.has(year)) return holidayCache.get(year);
-  const holidays = new Map([
-    [`${year}-01-01`, 'Neujahr'],
-    [`${year}-05-01`, 'Tag der Arbeit'],
-    [`${year}-10-03`, 'Tag der Deutschen Einheit'],
-    [`${year}-10-31`, 'Reformationstag'],
-    [`${year}-12-25`, '1. Weihnachtsfeiertag'],
-    [`${year}-12-26`, '2. Weihnachtsfeiertag']
-  ]);
-  const easter = calculateEasterUtc(year);
-  holidays.set(formatUtcIso(addUtcDays(easter, -2)), 'Karfreitag');
-  holidays.set(formatUtcIso(addUtcDays(easter, 1)), 'Ostermontag');
-  holidays.set(formatUtcIso(addUtcDays(easter, 39)), 'Christi Himmelfahrt');
-  holidays.set(formatUtcIso(addUtcDays(easter, 50)), 'Pfingstmontag');
-  const november23 = new Date(Date.UTC(year, 10, 23));
-  const weekdayOffset = (november23.getUTCDay() - 3 + 7) % 7 || 7;
-  holidays.set(formatUtcIso(addUtcDays(november23, -weekdayOffset)), 'Buß- und Bettag');
-  holidayCache.set(year, holidays);
-  return holidays;
-}
-
-function getSaxonyHolidayName(dateIso) {
-  return getSaxonyHolidays(Number(dateIso.slice(0, 4))).get(dateIso) || '';
-}
 
 let contentTransitionTimer = null;
 
@@ -111,7 +63,7 @@ async function init() {
   cacheElements();
   bindEvents();
   buildStaticSelectors();
-  registerServiceWorker();
+  releaseLegacyServiceWorker();
   setStatus('loading', 'Lädt …');
   await bootstrapState();
   applyMonthTheme(state.currentMonth, { animate: false });
@@ -228,7 +180,7 @@ function renderPlanTable(monthData) {
       tr.title = holidayName;
     }
     const weekdayMarkup = holidayName
-      ? `<span class="weekday-name">${weekdayLabelLong(weekday)}</span><span class="holiday-name">${holidayName}</span>`
+      ? `<span class="weekday-name">${weekdayLabelLong(weekday)}</span><span class="holiday-name">${esc(holidayName)}</span>`
       : `<span class="weekday-name">${weekdayLabelLong(weekday)}</span>`;
     tr.innerHTML = `
       <td class="date-cell">${Number(iso.slice(-2))}</td>
@@ -261,7 +213,7 @@ function buildAssignmentButton(dateIso, role, staffId, monthData) {
   const name = person?.name || '—';
   const evaluation = staffId ? evaluateCandidate({ state, monthData, dateIso, role, staffId }) : { level: 'green', reasons: [] };
   button.innerHTML = `
-    <span class="assignment-name">${name}</span>
+    <span class="assignment-name">${esc(name)}</span>
     <span class="assignment-badges">${staffId ? `<span class="small-chip ${evaluation.level}">${labelByLevel(evaluation.level)}</span>` : '<span class="small-chip">offen</span>'}</span>`;
   button.title = staffId ? evaluation.reasons.join('\n') : `${role.toUpperCase()} eintragen`;
   button.addEventListener('click', () => openPicker(dateIso, role));
@@ -303,67 +255,18 @@ function buildRbnInput(dateIso, field, value) {
   return wrapper;
 }
 
-function parseIsoLocal(dateIso) {
-  const [year, month, day] = dateIso.split('-').map(Number);
-  return new Date(year, month - 1, day);
-}
-
-function toIsoLocal(date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
-
-function isRegularWorkday(date) {
-  const weekday = date.getDay();
-  if (weekday === 0 || weekday === 6) return false;
-  return !getSaxonyHolidayName(toIsoLocal(date));
-}
-
+/**
+ * Erster regulärer Werktag nach einem eigenen BD bzw. nach einem Samstags-BD
+ * von Dr. Becker. Beide Prüfungen teilen sich mit der Regelbewertung dieselbe
+ * Implementierung aus js/holidays.js – vorher lagen hier eigene Fassungen, die
+ * sich mit rules.js widersprachen.
+ */
 function isFirstRegularWorkdayAfterOwnBd(personId, dateIso) {
-  const target = parseIsoLocal(dateIso);
-  if (!isRegularWorkday(target)) return false;
-
-  for (let offset = 1; offset <= 7; offset += 1) {
-    const candidate = new Date(target);
-    candidate.setDate(target.getDate() - offset);
-    const candidateIso = toIsoLocal(candidate);
-
-    if (getAssignment(state, candidateIso, 'bd') === personId) {
-      for (let gap = offset - 1; gap >= 1; gap -= 1) {
-        const between = new Date(target);
-        between.setDate(target.getDate() - gap);
-        if (isRegularWorkday(between)) return false;
-      }
-      return true;
-    }
-
-    if (isRegularWorkday(candidate)) return false;
-  }
-
-  return false;
+  return isFirstRegularWorkdayAfter(dateIso, iso => getAssignment(state, iso, 'bd') === personId);
 }
 
 function isBeckerFzaAfterSaturdayBd(dateIso) {
-  const target = parseIsoLocal(dateIso);
-  if (!isRegularWorkday(target)) return false;
-
-  for (let offset = 1; offset <= 7; offset += 1) {
-    const candidate = new Date(target);
-    candidate.setDate(target.getDate() - offset);
-    const candidateIso = toIsoLocal(candidate);
-
-    if (candidate.getDay() === 6 && getAssignment(state, candidateIso, 'bd') === 'becker') {
-      for (let gap = offset - 1; gap >= 1; gap -= 1) {
-        const between = new Date(target);
-        between.setDate(target.getDate() - gap);
-        if (isRegularWorkday(between)) return false;
-      }
-      return true;
-    }
-
-    if (isRegularWorkday(candidate)) return false;
-  }
-
-  return false;
+  return isFirstRegularWorkdayAfter(dateIso, iso => parseIsoLocal(iso).getDay() === 6 && getAssignment(state, iso, 'bd') === 'becker');
 }
 
 function buildAbsenceSummary(dateIso, monthData) {
@@ -455,7 +358,7 @@ function renderStats(monthData) {
     const row = document.createElement('tr');
     const remaining = stat.bdRemaining ?? '';
     row.innerHTML = `
-      <td>${stat.name}</td>
+      <td>${esc(stat.name)}</td>
       <td>${stat.bd}</td>
       <td>${stat.hg}</td>
       <td>${stat.weekendEq}</td>
@@ -484,8 +387,13 @@ function openPicker(dateIso, role) {
     button.type = 'button';
     button.className = `picker-item ${evaluation.level}`;
     button.title = evaluation.reasons.join('\n');
-    button.innerHTML = `<div class="topline"><span class="name">${person.name}</span><span class="small-chip ${evaluation.level}">${labelByLevel(evaluation.level)}</span></div><div class="reasons">${evaluation.reasons.map(r => `<span>${r}</span>`).join('')}</div>`;
-    button.addEventListener('click', () => onPickStaff(person.id, evaluation));
+    button.innerHTML = `<div class="topline"><span class="name">${esc(person.name)}</span><span class="small-chip ${evaluation.level}">${labelByLevel(evaluation.level)}</span></div><div class="reasons">${evaluation.reasons.map(reason => `<span>${esc(reason)}</span>`).join('')}</div>`;
+    if (evaluation.canSelect === false) {
+      button.disabled = true;
+      button.setAttribute('aria-disabled', 'true');
+    } else {
+      button.addEventListener('click', () => onPickStaff(person.id, evaluation));
+    }
     $('#pickerList').appendChild(button);
   });
   $('#pickerDialog').showModal();
@@ -496,7 +404,7 @@ async function onPickStaff(staffId, evaluation) {
   if (evaluation.level === 'red') {
     pendingConflict = { staffId, evaluation, dateIso, role };
     $('#conflictDialogText').textContent = `${getStaffById(state.staff, staffId)?.name} wird für ${role.toUpperCase()} am ${fmtGermanDate(dateIso)} mit rotem Konflikt eingetragen.`;
-    $('#conflictReasons').innerHTML = evaluation.reasons.map(reason => `<div class="small-chip red">${reason}</div>`).join('');
+    $('#conflictReasons').innerHTML = evaluation.reasons.map(reason => `<div class="small-chip red">${esc(reason)}</div>`).join('');
     $('#conflictComment').value = '';
     $('#conflictDialog').showModal();
     return;
@@ -549,7 +457,7 @@ function openDayMetaDialog(dateIso) {
     row.className = 'day-meta-row';
     const absence = getAbsence(monthData, person.id, dateIso);
     const pref = getPreference(monthData, person.id, dateIso);
-    row.innerHTML = `<div class="row-title"><strong>${person.name}</strong><span class="small-chip">${person.roleLabel || ''}</span></div>`;
+    row.innerHTML = `<div class="row-title"><strong>${esc(person.name)}</strong><span class="small-chip">${esc(person.roleLabel || '')}</span></div>`;
     const absGroup = document.createElement('div');
     absGroup.className = 'meta-group';
     ABSENCE_TYPES.forEach(type => absGroup.appendChild(buildMetaChip({ kind:'absence', dateIso, staffId: person.id, typeId: type.id, active: absence === type.id, label: type.label })));
@@ -633,7 +541,7 @@ function buildBatchGrid() {
     if (current === currentType) button.classList.add('selected');
     button.dataset.dateIso = iso;
     button.title = holidayName || '';
-    button.innerHTML = `<strong>${String(date.getDate()).padStart(2,'0')}</strong><small>${weekdayLabel(iso)}</small>${holidayName ? `<small class="batch-holiday-name">${holidayName}</small>` : ''}<small>${current ? (state.currentBatchMode === 'absence' ? labelForAbsence(current) : labelForPreference(current)) : '—'}</small>`;
+    button.innerHTML = `<strong>${String(date.getDate()).padStart(2,'0')}</strong><small>${weekdayLabel(iso)}</small>${holidayName ? `<small class="batch-holiday-name">${esc(holidayName)}</small>` : ''}<small>${current ? (state.currentBatchMode === 'absence' ? labelForAbsence(current) : labelForPreference(current)) : '—'}</small>`;
     button.addEventListener('click', () => button.classList.toggle('selected'));
     $('#batchDayGrid').appendChild(button);
   });
@@ -681,12 +589,43 @@ function setStatus(mode, text) {
 }
 
 function labelByLevel(level) {
-  return ({ green: 'geeignet', yellow: 'Hinweis', orange: 'Konflikt', red: 'rot', gray: 'inaktiv' })[level] || level;
+  // "rot" war als Beschriftung die Farbe selbst und passte nicht zur Legende.
+  return ({ green: 'geeignet', yellow: 'Hinweis', orange: 'Konflikt', red: 'Bestätigung', gray: 'inaktiv' })[level] || level;
 }
 
-function registerServiceWorker() {
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+/**
+ * Meldet einen früher installierten Service Worker ab und räumt seine Caches weg.
+ *
+ * Die Anwendung hatte einen Service Worker, der eigenen Code Cache-First
+ * auslieferte. Clients, die ihn einmal installiert hatten, bekamen dadurch
+ * dauerhaft alte Fassungen von styles.css und den JS-Modulen – ausgerollte
+ * Korrekturen erreichten sie nicht mehr. Der Worker ist entfernt; das bloße
+ * Löschen der Datei genügt aber nicht: Eine bestehende Registrierung bleibt im
+ * Browser aktiv und bedient weiter aus ihrem Cache. Deshalb wird hier aktiv
+ * abgemeldet und geleert. Der Aufruf ist dauerhaft nötig, nicht nur einmalig –
+ * es ist nicht absehbar, wann der letzte Client das nächste Mal vorbeikommt.
+ */
+async function releaseLegacyServiceWorker() {
+  try {
+    if ('serviceWorker' in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations.map(registration => registration.unregister()));
+    }
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.filter(key => key.startsWith('dienstplanrad')).map(key => caches.delete(key)));
+    }
+  } catch {
+    // Ohne Belang: Fehlt die Unterstützung oder verweigert der Browser den
+    // Zugriff, war auch nie ein Worker registriert, der stören könnte.
+  }
 }
+// Bewusst KEIN erzwungener Neustart nach dem Abmelden: Getestet bricht ein
+// location.reload() in dieser Situation die Seite: Nach dem Neuladen blieben
+// alle Anfragen hängen und die Anwendung stand dauerhaft bei "Lädt …" – sowohl
+// aus der laufenden Initialisierung heraus als auch nach dem load-Ereignis.
+// Die Abmeldung allein genügt: Sie wirkt dauerhaft, und spätestens der nächste
+// Aufruf lädt garantiert ungecachten Code.
 
 async function onExcelImport(event) {
   const file = event.target.files?.[0];
