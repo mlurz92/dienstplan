@@ -4,34 +4,186 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>DienstplanRAD</title>
-  <meta name="theme-color" content="#f3f4f6" />
+  <meta name="theme-color" content="#0b0c0e" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="stylesheet" href="/styles.css" />
-  <link rel="stylesheet" href="/compact.css" />
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" defer></script>
   <script type="module" src="/js/app.js"></script>
-  <script type="module" src="/js/planning-overview.js"></script>
 </head>
-<body class="excel-mode">
+<body>
   <div class="app-shell">
-    <header class="topbar compact-topbar">
-      <div class="brand-block"><div class="brand-mark">DR</div><div><div class="eyebrow">Klinik für Radiologie und Nuklearmedizin</div><h1>DienstplanRAD</h1></div></div>
-      <div class="topbar-controls"><div class="month-selector"><button id="prevMonthBtn" class="icon-btn" title="Vormonat">‹</button><select id="monthSelect"></select><select id="yearSelect"></select><button id="nextMonthBtn" class="icon-btn" title="Folgemonat">›</button></div><div class="status-wrap"><span class="status-dot" id="statusDot"></span><span id="saveStatus">Lädt …</span></div></div>
+    <header class="topbar glass-panel">
+      <div class="brand-block">
+        <div class="brand-mark">DR</div>
+        <div>
+          <div class="eyebrow">Klinik für Radiologie und Nuklearmedizin</div>
+          <h1>DienstplanRAD</h1>
+          <div class="subline">Manuelle Dienstplanung · Cloud-Synchronisierung · Live-Validierung</div>
+        </div>
+      </div>
+      <div class="topbar-controls">
+        <div class="month-selector glass-inset">
+          <button id="prevMonthBtn" class="icon-btn" title="Vormonat">‹</button>
+          <select id="monthSelect"></select>
+          <select id="yearSelect"></select>
+          <button id="nextMonthBtn" class="icon-btn" title="Folgemonat">›</button>
+        </div>
+        <div class="status-wrap glass-inset">
+          <span class="status-dot" id="statusDot"></span>
+          <span id="saveStatus">Lädt …</span>
+        </div>
+      </div>
     </header>
-    <section class="toolbar compact-toolbar">
-      <div class="toolbar-group"><button id="todayBtn">Aktueller Monat</button><button id="absenceManagerBtn">Abwesenheiten</button><button id="preferenceManagerBtn">Dienstwünsche</button><button id="reloadBtn">Neu laden</button></div>
-      <div class="toolbar-group"><label class="file-btn">Excel importieren<input id="excelImportInput" type="file" accept=".xlsx,.xls" hidden /></label><button id="exportExcelBtn">Excel</button><button id="exportPdfBtn">PDF</button><button id="exportJsonBtn">JSON sichern</button><label class="file-btn secondary">JSON laden<input id="jsonImportInput" type="file" accept="application/json" hidden /></label></div>
+
+    <section class="toolbar glass-panel">
+      <div class="toolbar-group">
+        <button id="todayBtn">Aktueller Monat</button>
+        <button id="absenceManagerBtn">Abwesenheiten</button>
+        <button id="preferenceManagerBtn">Dienstwünsche</button>
+        <button id="reloadBtn">Serverstand neu laden</button>
+      </div>
+      <div class="toolbar-group">
+        <label class="file-btn">
+          Excel importieren
+          <input id="excelImportInput" type="file" accept=".xlsx,.xls" hidden />
+        </label>
+        <button id="exportExcelBtn">Excel exportieren</button>
+        <button id="exportPdfBtn">PDF exportieren</button>
+        <button id="exportJsonBtn">JSON sichern</button>
+        <label class="file-btn secondary">
+          JSON laden
+          <input id="jsonImportInput" type="file" accept="application/json" hidden />
+        </label>
+      </div>
     </section>
-    <main class="excel-workspace"><section class="sheet-panel">
-      <div class="sheet-title-row"><div><div class="eyebrow">Bereitschaftsdienstplan</div><h2 id="monthTitle">Monat</h2></div><div class="legend compact-legend"><span><i class="legend-swatch green"></i> geeignet</span><span><i class="legend-swatch yellow"></i> Hinweis</span><span><i class="legend-swatch orange"></i> Konflikt</span><span><i class="legend-swatch red"></i> rot</span></div></div>
-      <div class="plan-table-wrap" id="printArea"><table class="plan-table excel-table" id="planTable"><thead><tr><th>Tag</th><th>Wochentag</th><th>BD</th><th>HG</th><th>1. RBN</th><th>2. RBN</th><th>Urlaub / Frei / Wünsche</th></tr></thead><tbody id="planTableBody"></tbody></table></div>
-      <section class="sheet-subsection statistics-section"><div class="subsection-title-row"><div><div class="eyebrow">Verteilung</div><h3>Monatsstatistik</h3></div></div><div id="statsGrid" class="stats-grid compact-stats-grid"></div></section>
-      <section class="sheet-subsection issues-section"><div class="subsection-title-row"><div><div class="eyebrow">Prüfprotokoll</div><h3>Konflikte & Hinweise</h3></div></div><div id="issuesList" class="issues-list compact-issues-list"></div></section>
-    </section></main>
+
+    <main class="sheet-layout">
+      <section class="sheet-panel glass-panel">
+        <div class="sheet-heading">
+          <div>
+            <div class="eyebrow">Bereitschaftsdienstplan</div>
+            <h2 id="monthTitle">Monat</h2>
+          </div>
+          <div class="legend compact-legend">
+            <span><i class="legend-swatch green"></i> geeignet</span>
+            <span><i class="legend-swatch yellow"></i> Hinweis</span>
+            <span><i class="legend-swatch orange"></i> Konflikt</span>
+            <span><i class="legend-swatch red"></i> Bestätigung nötig</span>
+          </div>
+        </div>
+
+        <div class="plan-table-wrap" id="printArea">
+          <table class="plan-table excel-plan" id="planTable">
+            <thead>
+              <tr>
+                <th class="day-number-col">Tag</th>
+                <th class="weekday-col">Wochentag</th>
+                <th>BD</th>
+                <th>HG</th>
+                <th>RBN</th>
+                <th>2. RBN</th>
+                <th class="absence-col">Urlaub / FZA</th>
+                <th class="preference-col">Kein Dienst / Wünsche</th>
+              </tr>
+            </thead>
+            <tbody id="planTableBody"></tbody>
+          </table>
+        </div>
+
+        <section class="below-plan">
+          <div class="section-title-row">
+            <div>
+              <div class="eyebrow">Verteilung</div>
+              <h3>Statistik</h3>
+            </div>
+            <span class="section-note">Direkt aus dem Monatsplan berechnet</span>
+          </div>
+          <div id="statsGrid" class="stats-grid excel-stats"></div>
+        </section>
+      </section>
+    </main>
   </div>
-  <dialog id="pickerDialog" class="app-dialog picker-dialog"><form method="dialog" class="dialog-card"><div class="dialog-header"><div><div class="eyebrow" id="pickerEyebrow"></div><h3 id="pickerTitle">Auswahl</h3><p id="pickerSubtitle"></p></div><button class="icon-btn close-btn" value="cancel">✕</button></div><div id="pickerList" class="picker-list"></div><menu class="dialog-actions"><button value="cancel" class="secondary">Abbrechen</button><button id="clearAssignmentBtn" value="clear" class="secondary">Eintrag löschen</button></menu></form></dialog>
-  <dialog id="dayMetaDialog" class="app-dialog"><form method="dialog" class="dialog-card wide"><div class="dialog-header"><div><div class="eyebrow">Tagesbezogene Markierungen</div><h3 id="dayMetaTitle">Abwesenheiten und Wünsche</h3><p>Mehrfachauswahl pro Datum. Änderungen werden automatisch gespeichert.</p></div><button class="icon-btn close-btn" value="cancel">✕</button></div><div id="dayMetaList" class="day-meta-list"></div><menu class="dialog-actions"><button value="cancel" class="secondary">Schließen</button></menu></form></dialog>
-  <dialog id="batchDialog" class="app-dialog"><form method="dialog" class="dialog-card wide"><div class="dialog-header"><div><div class="eyebrow" id="batchEyebrow">Komforteingabe</div><h3 id="batchTitle">Mehrere Tage markieren</h3><p id="batchSubtitle"></p></div><button class="icon-btn close-btn" value="cancel">✕</button></div><div class="batch-controls"><label>Mitarbeitende<select id="batchStaffSelect"></select></label><label>Typ<select id="batchTypeSelect"></select></label></div><div id="batchDayGrid" class="batch-day-grid"></div><menu class="dialog-actions"><button type="button" id="batchClearSelectionBtn" class="secondary">Auswahl zurücksetzen</button><button type="button" id="batchApplyBtn">Übernehmen</button></menu></form></dialog>
-  <dialog id="conflictDialog" class="app-dialog"><form method="dialog" class="dialog-card"><div class="dialog-header"><div><div class="eyebrow">Bestätigung erforderlich</div><h3>Roter Konflikt</h3><p id="conflictDialogText"></p></div><button class="icon-btn close-btn" value="cancel">✕</button></div><div class="conflict-reasons" id="conflictReasons"></div><label>Kommentar, optional<textarea id="conflictComment" rows="3" placeholder="z. B. mit Mitarbeitendem abgestimmt"></textarea></label><menu class="dialog-actions"><button value="cancel" class="secondary">Abbrechen</button><button type="button" id="confirmConflictBtn">Trotzdem eintragen</button></menu></form></dialog>
+
+  <dialog id="pickerDialog" class="app-dialog picker-dialog">
+    <form method="dialog" class="dialog-card">
+      <div class="dialog-header">
+        <div>
+          <div class="eyebrow" id="pickerEyebrow"></div>
+          <h3 id="pickerTitle">Auswahl</h3>
+          <p id="pickerSubtitle"></p>
+        </div>
+        <button class="icon-btn close-btn" value="cancel">✕</button>
+      </div>
+      <div id="pickerList" class="picker-list"></div>
+      <menu class="dialog-actions">
+        <button value="cancel" class="secondary">Abbrechen</button>
+        <button id="clearAssignmentBtn" value="clear" class="secondary">Eintrag löschen</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <dialog id="dayMetaDialog" class="app-dialog">
+    <form method="dialog" class="dialog-card wide">
+      <div class="dialog-header">
+        <div>
+          <div class="eyebrow">Tagesbezogene Markierungen</div>
+          <h3 id="dayMetaTitle">Abwesenheiten und Wünsche</h3>
+          <p>Mehrfachauswahl pro Datum. Änderungen werden automatisch gespeichert.</p>
+        </div>
+        <button class="icon-btn close-btn" value="cancel">✕</button>
+      </div>
+      <div id="dayMetaList" class="day-meta-list"></div>
+      <menu class="dialog-actions">
+        <button value="cancel" class="secondary">Schließen</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <dialog id="batchDialog" class="app-dialog">
+    <form method="dialog" class="dialog-card wide">
+      <div class="dialog-header">
+        <div>
+          <div class="eyebrow" id="batchEyebrow">Komforteingabe</div>
+          <h3 id="batchTitle">Mehrere Tage markieren</h3>
+          <p id="batchSubtitle"></p>
+        </div>
+        <button class="icon-btn close-btn" value="cancel">✕</button>
+      </div>
+      <div class="batch-controls">
+        <label>Mitarbeitende
+          <select id="batchStaffSelect"></select>
+        </label>
+        <label>Typ
+          <select id="batchTypeSelect"></select>
+        </label>
+      </div>
+      <div id="batchDayGrid" class="batch-day-grid"></div>
+      <menu class="dialog-actions">
+        <button type="button" id="batchClearSelectionBtn" class="secondary">Auswahl zurücksetzen</button>
+        <button type="button" id="batchApplyBtn">Übernehmen</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <dialog id="conflictDialog" class="app-dialog">
+    <form method="dialog" class="dialog-card">
+      <div class="dialog-header">
+        <div>
+          <div class="eyebrow">Bestätigung erforderlich</div>
+          <h3>Roter Konflikt</h3>
+          <p id="conflictDialogText"></p>
+        </div>
+        <button class="icon-btn close-btn" value="cancel">✕</button>
+      </div>
+      <div class="conflict-reasons" id="conflictReasons"></div>
+      <label>Kommentar, optional
+        <textarea id="conflictComment" rows="3" placeholder="z. B. mit Mitarbeitendem abgestimmt"></textarea>
+      </label>
+      <menu class="dialog-actions">
+        <button value="cancel" class="secondary">Abbrechen</button>
+        <button type="button" id="confirmConflictBtn">Trotzdem eintragen</button>
+      </menu>
+    </form>
+  </dialog>
 </body>
 </html>
