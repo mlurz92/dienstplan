@@ -81,18 +81,30 @@ function getSaxonyHolidayName(dateIso) {
   return getSaxonyHolidays(Number(dateIso.slice(0, 4))).get(dateIso) || '';
 }
 
-function applyMonthTheme(month, animate = true) {
-  const palette = MONTH_PALETTES[month - 1] || MONTH_PALETTES[0];
+let themeTransitionTimer = null;
+let contentTransitionTimer = null;
+
+function prefersReducedMotion() {
+  return typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+/**
+ * Setzt die Monatspalette auf :root. Der Farbverlauf selbst wird von CSS
+ * animiert (registrierte @property-Variablen). Die Transition-Klasse bleibt
+ * nach dem ersten Aufruf dauerhaft aktiv, damit jede spätere Wertänderung
+ * zuverlässig interpoliert wird – auch wenn sie im selben Frame wie ein
+ * Klassenwechsel passiert.
+ */
+function applyMonthTheme(month, { animate = true } = {}) {
+  const normalized = ((Number(month) - 1) % 12 + 12) % 12;
+  const palette = MONTH_PALETTES[normalized] || MONTH_PALETTES[0];
   const root = document.documentElement;
-  if (animate && root.dataset.month && root.dataset.month !== String(month)) {
-    root.classList.add('month-theme-transition');
-    document.body?.classList.add('month-content-transition');
-    clearTimeout(themeTransitionTimer);
-    themeTransitionTimer = setTimeout(() => {
-      root.classList.remove('month-theme-transition');
-      document.body?.classList.remove('month-content-transition');
-    }, 720);
-  }
+  const previous = root.dataset.month;
+  const changed = previous !== String(normalized + 1);
+  const shouldAnimate = animate && !prefersReducedMotion();
+
+  if (!shouldAnimate) root.classList.add('month-theme-instant');
+
   const values = {
     '--month-accent': palette.accent,
     '--month-accent-strong': palette.accentStrong,
@@ -100,9 +112,56 @@ function applyMonthTheme(month, animate = true) {
     '--month-panel-tint': palette.panelTint
   };
   Object.entries(values).forEach(([key, value]) => root.style.setProperty(key, value));
-  root.dataset.month = String(month);
+  root.dataset.month = String(normalized + 1);
+  root.dataset.palette = palette.name;
+
+  if (!shouldAnimate) {
+    // Werte ohne Übergang übernehmen, danach Transitions wieder freigeben.
+    void root.offsetWidth;
+    root.classList.remove('month-theme-instant');
+  }
+  root.classList.add('month-theme-transition');
+
   const label = document.getElementById('monthPaletteLabel');
   if (label) label.textContent = `Monatskontrast · ${palette.name}`;
+
+  if (shouldAnimate && previous && changed) {
+    document.body?.classList.add('month-content-transition');
+    clearTimeout(themeTransitionTimer);
+    themeTransitionTimer = setTimeout(() => {
+      document.body?.classList.remove('month-content-transition');
+    }, 760);
+  }
+}
+
+/**
+ * Richtungsabhängige Ein-/Ausblende-Animation der Planinhalte beim Monatswechsel.
+ */
+function animateMonthContent(direction) {
+  const wrap = document.getElementById('printArea');
+  const stats = document.getElementById('statsGrid');
+  const title = document.getElementById('monthTitle');
+  const targets = [wrap, stats, title].filter(Boolean);
+  if (!targets.length || prefersReducedMotion()) return;
+  const className = direction < 0 ? 'month-enter-prev' : 'month-enter-next';
+  clearTimeout(contentTransitionTimer);
+  targets.forEach(el => {
+    el.classList.remove('month-enter-prev', 'month-enter-next');
+    void el.offsetWidth;
+    el.classList.add(className);
+  });
+  contentTransitionTimer = setTimeout(() => {
+    targets.forEach(el => el.classList.remove('month-enter-prev', 'month-enter-next'));
+  }, 620);
+}
+
+function nextAnimationFrame() {
+  if (typeof requestAnimationFrame !== 'function') return Promise.resolve();
+  return new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+}
+
+function monthOrdinal(year, month) {
+  return year * 12 + (month - 1);
 }
 
 window.addEventListener('DOMContentLoaded', init);
@@ -115,6 +174,7 @@ async function init() {
   registerServiceWorker();
   setStatus('loading', 'Lädt …');
   await bootstrapState();
+  applyMonthTheme(state.currentMonth, { animate: false });
   populateSelectors();
   await openCurrentMonth(state.currentYear, state.currentMonth, true);
 }
@@ -175,6 +235,15 @@ async function openCurrentMonth(year, month, forceServer = false) {
   const requestId = ++monthRequestId;
   const previousYear = state.currentYear;
   const previousMonth = state.currentMonth;
+  // Farbwechsel sofort auslösen – unabhängig von Ladezeit oder Datenquelle.
+  const direction = Math.sign(monthOrdinal(year, month) - monthOrdinal(previousYear, previousMonth)) || 1;
+  if (month !== previousMonth || year !== previousYear) {
+    applyMonthTheme(month);
+    animateMonthContent(direction);
+    // Zwei Frames abwarten, damit der Farbübergang tatsächlich startet, bevor
+    // das (potenziell blockierende) Laden und Rendern des Monats beginnt.
+    await nextAnimationFrame();
+  }
   if (state.dirty) {
     clearTimeout(state.saveTimer);
     state.saveTimer = null;
@@ -193,6 +262,8 @@ async function openCurrentMonth(year, month, forceServer = false) {
 }
 
 function render() {
+  // Sicherheitsnetz: Palette bleibt garantiert mit dem gerenderten Monat synchron.
+  applyMonthTheme(state.currentMonth);
   const monthData = getMonthData(state.currentYear, state.currentMonth);
   $('#monthTitle').textContent = getMonthLabel();
   renderPlanTable(monthData);

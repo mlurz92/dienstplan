@@ -36,8 +36,12 @@ html.month-theme-transition {
     --month-panel-tint 680ms cubic-bezier(.22, 1, .36, 1);
 }
 
+/* Erstanwendung bzw. reduzierte Bewegung: Farben ohne Interpolation setzen. */
+html.month-theme-instant, html.month-theme-instant * { transition: none !important; }
+
 body.month-content-transition .plan-table-wrap,
-body.month-content-transition .month-palette-label {
+body.month-content-transition .month-palette-label,
+body.month-content-transition .excel-stats {
   animation: month-content-breathe 680ms cubic-bezier(.22, 1, .36, 1);
 }
 
@@ -45,6 +49,34 @@ body.month-content-transition .month-palette-label {
   0% { filter: saturate(.92) brightness(.99); }
   45% { filter: saturate(1.08) brightness(1.015); }
   100% { filter: saturate(1) brightness(1); }
+}
+
+/* Richtungsabhängiger Monatswechsel: Inhalte gleiten sanft in Leserichtung ein. */
+.month-enter-next { animation: month-slide-in-next 520ms cubic-bezier(.22, 1, .36, 1) both; }
+.month-enter-prev { animation: month-slide-in-prev 520ms cubic-bezier(.22, 1, .36, 1) both; }
+
+@keyframes month-slide-in-next {
+  0% { opacity: 0; transform: translate3d(22px, 0, 0); }
+  100% { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes month-slide-in-prev {
+  0% { opacity: 0; transform: translate3d(-22px, 0, 0); }
+  100% { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+#monthTitle.month-enter-next, #monthTitle.month-enter-prev { will-change: transform, opacity; }
+
+@media (prefers-reduced-motion: reduce) {
+  html.month-theme-transition { transition: none; }
+  .month-enter-next, .month-enter-prev,
+  body.month-content-transition .plan-table-wrap,
+  body.month-content-transition .month-palette-label,
+  body.month-content-transition .excel-stats { animation: none; }
+}
+
+@media print {
+  .month-enter-next, .month-enter-prev { animation: none !important; opacity: 1 !important; transform: none !important; }
 }
 
 * { box-sizing: border-box; }
