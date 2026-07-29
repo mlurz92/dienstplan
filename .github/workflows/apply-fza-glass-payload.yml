@@ -1,0 +1,61 @@
+name: Apply validated FZA glass payload
+
+on:
+  push:
+    branches:
+      - agent/fza-spacing-glass-readme
+    paths:
+      - '.github/workflows/apply-fza-glass-payload.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: agent/fza-spacing-glass-readme
+          fetch-depth: 0
+
+      - name: Decode, apply and validate payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat \
+            .payload-fza-glass/part-00 \
+            .payload-fza-glass/part-01 \
+            .payload-fza-glass/part-01b \
+            .payload-fza-glass/part-02 \
+            .payload-fza-glass/part-03 \
+            .payload-fza-glass/part-04 \
+            .payload-fza-glass/part-05 \
+            .payload-fza-glass/part-06 \
+            | base64 --decode > /tmp/fza-glass.zip
+
+          unzip -o /tmp/fza-glass.zip -d .
+
+          node --check js/app.js
+          node --check js/rules.js
+          node --check js/defaults.js
+          node --check js/state.js
+          node --check sw.js
+
+          grep -q "isBeckerFzaAfterSaturdayBd" js/app.js
+          grep -q "getAbsenceSource" js/app.js
+          grep -q "Kurzer Abstand zum letzten BD" js/rules.js
+          grep -q "push('yellow', 'BD bereits am Vortag')" js/rules.js
+          grep -q "dienstplanrad-v6" sw.js
+          grep -q "Becker: FZA" README.md
+          grep -q "kein allgemeines automatisches FZA" README.md
+
+          rm -rf .payload-fza-glass
+          rm -f .github/workflows/apply-fza-glass-payload.yml
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Refine FZA rules, spacing guidance, glass UI and documentation"
+          git push origin HEAD:agent/fza-spacing-glass-readme
