@@ -1,4 +1,4 @@
-import { ABSENCE_TYPES, MONTH_NAMES, PREFERENCE_TYPES, SHEET_NAMES, toIsoDate } from './defaults.js';
+import { ABSENCE_TYPES, MONTH_NAMES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, toIsoDate } from './defaults.js';
 import { state, bootstrapState, getMonthData, getMonthLabel, loadMonth, persistCurrentMonth, saveLocalBootstrap, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js';
 import { api } from './api.js';
 import { buildStats, evaluateCandidate, fmtGermanDate, getAbsence, getAssignment, getPlanningStaff, getPreference, getStaffById, labelForAbsence, labelForPreference, setAbsence, setAssignment, setPreference, weekdayLabel } from './rules.js';
@@ -7,6 +7,104 @@ const $ = selector => document.querySelector(selector);
 const els = {};
 let pendingConflict = null;
 const monthNameBySheet = Object.fromEntries(SHEET_NAMES.map((name, idx) => [name, idx + 1]));
+
+
+const MONTH_PALETTES = [
+  { name: 'Eisblau', accent: '#4f8fbd', accentStrong: '#1f5f8f', glow: 'rgba(78, 151, 205, .34)', panelTint: 'rgba(211, 235, 250, .24)', saturdayBg: 'rgba(174, 218, 246, .42)', saturdayEdge: '#5b9dcc', saturdayText: '#16496f', sundayBg: 'rgba(111, 176, 222, .42)', sundayEdge: '#2f78ad', sundayText: '#103d61', holidayBg: 'rgba(103, 126, 190, .42)', holidayEdge: '#425aa5', holidayText: '#293c78' },
+  { name: 'Rubinrose', accent: '#b46483', accentStrong: '#8d365d', glow: 'rgba(190, 91, 132, .30)', panelTint: 'rgba(249, 219, 232, .24)', saturdayBg: 'rgba(244, 193, 214, .42)', saturdayEdge: '#c76f96', saturdayText: '#71304f', sundayBg: 'rgba(229, 143, 177, .42)', sundayEdge: '#aa4e77', sundayText: '#63213f', holidayBg: 'rgba(185, 99, 143, .42)', holidayEdge: '#8f3967', holidayText: '#54203d' },
+  { name: 'Salbeigrün', accent: '#5d9476', accentStrong: '#377057', glow: 'rgba(76, 151, 112, .30)', panelTint: 'rgba(218, 239, 226, .24)', saturdayBg: 'rgba(189, 226, 202, .44)', saturdayEdge: '#66a47c', saturdayText: '#285a3d', sundayBg: 'rgba(132, 195, 157, .42)', sundayEdge: '#4b8b65', sundayText: '#1f4d33', holidayBg: 'rgba(86, 158, 124, .42)', holidayEdge: '#337354', holidayText: '#183f2b' },
+  { name: 'Lavendel', accent: '#8273bd', accentStrong: '#5b4a9c', glow: 'rgba(129, 105, 196, .31)', panelTint: 'rgba(232, 226, 250, .25)', saturdayBg: 'rgba(213, 203, 244, .44)', saturdayEdge: '#8d7dcc', saturdayText: '#4c407f', sundayBg: 'rgba(171, 154, 222, .43)', sundayEdge: '#7160b1', sundayText: '#3e3178', holidayBg: 'rgba(132, 112, 190, .44)', holidayEdge: '#58469b', holidayText: '#33275f' },
+  { name: 'Frühlingsgrün', accent: '#4d9b62', accentStrong: '#2f743f', glow: 'rgba(73, 164, 95, .30)', panelTint: 'rgba(214, 242, 220, .24)', saturdayBg: 'rgba(184, 230, 194, .44)', saturdayEdge: '#5bad70', saturdayText: '#235d35', sundayBg: 'rgba(125, 203, 145, .43)', sundayEdge: '#3f9156', sundayText: '#174d29', holidayBg: 'rgba(78, 165, 103, .43)', holidayEdge: '#2e773f', holidayText: '#123b20' },
+  { name: 'Türkis', accent: '#3c9b9b', accentStrong: '#1f7476', glow: 'rgba(55, 171, 171, .30)', panelTint: 'rgba(207, 242, 241, .24)', saturdayBg: 'rgba(174, 228, 227, .44)', saturdayEdge: '#51a9a8', saturdayText: '#1e5b5c', sundayBg: 'rgba(113, 201, 201, .43)', sundayEdge: '#328e8f', sundayText: '#134d4f', holidayBg: 'rgba(54, 160, 164, .43)', holidayEdge: '#24767a', holidayText: '#0f3f42' },
+  { name: 'Koralle', accent: '#c66c5a', accentStrong: '#9b4437', glow: 'rgba(211, 99, 79, .31)', panelTint: 'rgba(252, 223, 215, .24)', saturdayBg: 'rgba(247, 199, 187, .44)', saturdayEdge: '#d47c68', saturdayText: '#7c362c', sundayBg: 'rgba(233, 150, 132, .43)', sundayEdge: '#b85e4c', sundayText: '#682b23', holidayBg: 'rgba(198, 103, 85, .44)', holidayEdge: '#9d4638', holidayText: '#54231d' },
+  { name: 'Bernstein', accent: '#bd812d', accentStrong: '#8c5b16', glow: 'rgba(213, 151, 49, .31)', panelTint: 'rgba(252, 236, 205, .24)', saturdayBg: 'rgba(246, 220, 166, .46)', saturdayEdge: '#cf963e', saturdayText: '#704814', sundayBg: 'rgba(231, 188, 108, .44)', sundayEdge: '#b97822', sundayText: '#5d3a0e', holidayBg: 'rgba(196, 135, 45, .44)', holidayEdge: '#8f5d18', holidayText: '#4b2f09' },
+  { name: 'Pflaume', accent: '#94618f', accentStrong: '#6f3d6b', glow: 'rgba(157, 87, 151, .30)', panelTint: 'rgba(239, 220, 238, .24)', saturdayBg: 'rgba(224, 193, 222, .44)', saturdayEdge: '#a76aa1', saturdayText: '#60375d', sundayBg: 'rgba(198, 143, 193, .43)', sundayEdge: '#884d82', sundayText: '#512a4e', holidayBg: 'rgba(156, 96, 151, .44)', holidayEdge: '#713c6d', holidayText: '#41223f' },
+  { name: 'Kupfer', accent: '#aa6f45', accentStrong: '#7d4c2b', glow: 'rgba(182, 111, 60, .31)', panelTint: 'rgba(244, 225, 211, .24)', saturdayBg: 'rgba(235, 205, 181, .44)', saturdayEdge: '#bd7f51', saturdayText: '#673d23', sundayBg: 'rgba(213, 165, 128, .43)', sundayEdge: '#985f38', sundayText: '#55301b', holidayBg: 'rgba(174, 111, 70, .44)', holidayEdge: '#7c4b2b', holidayText: '#422617' },
+  { name: 'Schieferblau', accent: '#657b9d', accentStrong: '#455b7c', glow: 'rgba(92, 118, 159, .31)', panelTint: 'rgba(222, 229, 240, .24)', saturdayBg: 'rgba(202, 214, 233, .44)', saturdayEdge: '#7188ac', saturdayText: '#3a4d6d', sundayBg: 'rgba(157, 177, 209, .43)', sundayEdge: '#566f98', sundayText: '#2b3f60', holidayBg: 'rgba(107, 132, 174, .44)', holidayEdge: '#405a84', holidayText: '#223653' },
+  { name: 'Tannengrün & Rubin', accent: '#416f62', accentStrong: '#285247', glow: 'rgba(43, 115, 92, .30)', panelTint: 'rgba(214, 234, 226, .24)', saturdayBg: 'rgba(188, 220, 208, .44)', saturdayEdge: '#568474', saturdayText: '#244f43', sundayBg: 'rgba(128, 183, 163, .43)', sundayEdge: '#3b6d5d', sundayText: '#193f35', holidayBg: 'rgba(164, 63, 72, .44)', holidayEdge: '#8d303a', holidayText: '#5f1e27' }
+];
+
+const holidayCache = new Map();
+
+function formatUtcIso(date) {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
+}
+
+function addUtcDays(date, days) {
+  const next = new Date(date.getTime());
+  next.setUTCDate(next.getUTCDate() + days);
+  return next;
+}
+
+function calculateEasterUtc(year) {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+function getSaxonyHolidays(year) {
+  if (holidayCache.has(year)) return holidayCache.get(year);
+  const holidays = new Map([
+    [`${year}-01-01`, 'Neujahr'],
+    [`${year}-05-01`, 'Tag der Arbeit'],
+    [`${year}-10-03`, 'Tag der Deutschen Einheit'],
+    [`${year}-10-31`, 'Reformationstag'],
+    [`${year}-12-25`, '1. Weihnachtsfeiertag'],
+    [`${year}-12-26`, '2. Weihnachtsfeiertag']
+  ]);
+  const easter = calculateEasterUtc(year);
+  holidays.set(formatUtcIso(addUtcDays(easter, -2)), 'Karfreitag');
+  holidays.set(formatUtcIso(addUtcDays(easter, 1)), 'Ostermontag');
+  holidays.set(formatUtcIso(addUtcDays(easter, 39)), 'Christi Himmelfahrt');
+  holidays.set(formatUtcIso(addUtcDays(easter, 50)), 'Pfingstmontag');
+  const november23 = new Date(Date.UTC(year, 10, 23));
+  const weekdayOffset = (november23.getUTCDay() - 3 + 7) % 7 || 7;
+  holidays.set(formatUtcIso(addUtcDays(november23, -weekdayOffset)), 'Buß- und Bettag');
+  holidayCache.set(year, holidays);
+  return holidays;
+}
+
+function getSaxonyHolidayName(dateIso) {
+  return getSaxonyHolidays(Number(dateIso.slice(0, 4))).get(dateIso) || '';
+}
+
+function applyMonthTheme(month) {
+  const palette = MONTH_PALETTES[month - 1] || MONTH_PALETTES[0];
+  const root = document.documentElement;
+  const values = {
+    '--month-accent': palette.accent,
+    '--month-accent-strong': palette.accentStrong,
+    '--month-glow': palette.glow,
+    '--month-panel-tint': palette.panelTint,
+    '--saturday-bg': palette.saturdayBg,
+    '--saturday-edge': palette.saturdayEdge,
+    '--saturday-text': palette.saturdayText,
+    '--sunday-bg': palette.sundayBg,
+    '--sunday-edge': palette.sundayEdge,
+    '--sunday-text': palette.sundayText,
+    '--holiday-bg': palette.holidayBg,
+    '--holiday-edge': palette.holidayEdge,
+    '--holiday-text': palette.holidayText
+  };
+  Object.entries(values).forEach(([key, value]) => root.style.setProperty(key, value));
+  root.dataset.month = String(month);
+  const label = document.getElementById('monthPaletteLabel');
+  if (label) label.textContent = `Monatskontrast · ${palette.name}`;
+  const themeMeta = document.getElementById('themeColorMeta');
+  if (themeMeta) themeMeta.setAttribute('content', palette.accentStrong);
+}
 
 window.addEventListener('DOMContentLoaded', init);
 window.addEventListener('beforeunload', async () => { if (state.dirty) await persistCurrentMonth(); });
@@ -79,6 +177,7 @@ async function openCurrentMonth(year, month, forceServer = false) {
   await warmAdjacentMonths(year, month);
   setStatus(state.serverReady ? 'saved' : 'offline', state.serverReady ? 'Gespeichert' : 'Offline – lokaler Stand');
   populateSelectors();
+  applyMonthTheme(month);
   render();
 }
 
@@ -95,11 +194,20 @@ function renderPlanTable(monthData) {
   for (const [iso, day] of Object.entries(monthData.days)) {
     const tr = document.createElement('tr');
     const weekday = weekdayLabel(iso);
-    const isWeekend = ['Sa', 'So'].includes(weekday);
-    if (isWeekend) tr.classList.add('weekend-row');
+    const holidayName = getSaxonyHolidayName(iso);
+    if (weekday === 'Sa') tr.classList.add('saturday-row');
+    if (weekday === 'So') tr.classList.add('sunday-row');
+    if (holidayName) {
+      tr.classList.add('holiday-row');
+      tr.dataset.holiday = holidayName;
+      tr.title = holidayName;
+    }
+    const weekdayMarkup = holidayName
+      ? `<span class="weekday-name">${weekdayLabelLong(weekday)}</span><span class="holiday-name">${holidayName}</span>`
+      : `<span class="weekday-name">${weekdayLabelLong(weekday)}</span>`;
     tr.innerHTML = `
       <td class="date-cell">${Number(iso.slice(-2))}</td>
-      <td class="weekday-cell">${weekdayLabelLong(weekday)}</td>
+      <td class="weekday-cell">${weekdayMarkup}</td>
       <td></td>
       <td></td>
       <td></td>
@@ -416,11 +524,16 @@ function buildBatchGrid() {
     const date = new Date(`${iso}T00:00:00`);
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = `batch-day ${[0,6].includes(date.getDay()) ? 'weekend' : ''}`;
+    const holidayName = getSaxonyHolidayName(iso);
+    button.className = 'batch-day';
+    if (date.getDay() === 6) button.classList.add('saturday');
+    if (date.getDay() === 0) button.classList.add('sunday');
+    if (holidayName) button.classList.add('holiday');
     const current = state.currentBatchMode === 'absence' ? getAbsence(monthData, staffId, iso) : getPreference(monthData, staffId, iso);
     if (current === currentType) button.classList.add('selected');
     button.dataset.dateIso = iso;
-    button.innerHTML = `<strong>${String(date.getDate()).padStart(2,'0')}</strong><small>${weekdayLabel(iso)}</small><small>${current ? (state.currentBatchMode === 'absence' ? labelForAbsence(current) : labelForPreference(current)) : '—'}</small>`;
+    button.title = holidayName || '';
+    button.innerHTML = `<strong>${String(date.getDate()).padStart(2,'0')}</strong><small>${weekdayLabel(iso)}</small>${holidayName ? `<small class="batch-holiday-name">${holidayName}</small>` : ''}<small>${current ? (state.currentBatchMode === 'absence' ? labelForAbsence(current) : labelForPreference(current)) : '—'}</small>`;
     button.addEventListener('click', () => button.classList.toggle('selected'));
     $('#batchDayGrid').appendChild(button);
   });
@@ -507,7 +620,7 @@ function importMonthSheet(sheetName, sheet) {
   const yearCell = String(rows[0]?.[0] || rows[1]?.[0] || '').match(/20\d{2}/);
   const year = yearCell ? Number(yearCell[0]) : state.currentYear;
   const month = monthNameBySheet[sheetName];
-  const monthData = getMonthData(year, month);
+  const monthData = createEmptyMonth(year, month);
   const log = [];
 
   const dayCols = [];

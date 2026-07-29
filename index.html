@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>DienstplanRAD</title>
-  <meta name="theme-color" content="#0b0c0e" />
+  <meta id="themeColorMeta" name="theme-color" content="#111820" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="stylesheet" href="/styles.css" />
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" defer></script>
@@ -64,11 +64,19 @@
             <div class="eyebrow">Bereitschaftsdienstplan</div>
             <h2 id="monthTitle">Monat</h2>
           </div>
-          <div class="legend compact-legend">
-            <span><i class="legend-swatch green"></i> geeignet</span>
-            <span><i class="legend-swatch yellow"></i> Hinweis</span>
-            <span><i class="legend-swatch orange"></i> Konflikt</span>
-            <span><i class="legend-swatch red"></i> Bestätigung nötig</span>
+          <div class="legend-stack">
+            <div class="calendar-legend" aria-label="Monatliche Kalendertagsfarben">
+              <span id="monthPaletteLabel" class="month-palette-label">Monatskontrast</span>
+              <span><i class="calendar-swatch saturday"></i> Samstag</span>
+              <span><i class="calendar-swatch sunday"></i> Sonntag</span>
+              <span><i class="calendar-swatch holiday"></i> Feiertag</span>
+            </div>
+            <div class="rule-legend" aria-label="Regelbewertung">
+              <span><i class="legend-swatch green"></i> geeignet</span>
+              <span><i class="legend-swatch yellow"></i> Hinweis</span>
+              <span><i class="legend-swatch orange"></i> Konflikt</span>
+              <span><i class="legend-swatch red"></i> Bestätigung nötig</span>
+            </div>
           </div>
         </div>
 
