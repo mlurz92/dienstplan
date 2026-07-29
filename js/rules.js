@@ -1,5 +1,5 @@
-import { MONTH_NAMES, PREFERENCE_TYPES, STAFF_ORDER, toIsoDate, WEEKDAYS } from './defaults.js?v=20260729.2';
-import { holidayBlocks, isFirstRegularWorkdayAfter, isRegularWorkdayIso } from './holidays.js?v=20260729.2';
+import { MONTH_NAMES, PREFERENCE_TYPES, STAFF_ORDER, toIsoDate, WEEKDAYS } from './defaults.js?v=20260729.3';
+import { holidayBlocks, isFirstRegularWorkdayAfter, isRegularWorkdayIso } from './holidays.js?v=20260729.3';
 
 function parseIso(date) { return new Date(`${date}T00:00:00`); }
 function addDays(date, days) { const d = new Date(date); d.setDate(d.getDate() + days); return d; }
@@ -102,6 +102,21 @@ export function countRoleInMonth(monthData, staffId, role) {
   return Object.values(monthData.days || {}).filter(day => day?.[role] === staffId).length;
 }
 
+/**
+ * Zählt die Dienste einer Person im Monat OHNE einen bestimmten Tag.
+ *
+ * Die Kontingentprüfung fragt: „Wie viele hat die Person außer an diesem Tag?"
+ * Zählte man den bewerteten Tag mit, meldete die bereits eingetragene, völlig
+ * reguläre Einteilung sich selbst als Überschreitung – der dritte von drei
+ * Soll-BD wurde gelb gewarnt, der zweite von zwei erlaubten BD sogar rot als
+ * Regelverstoß. Ohne den eigenen Tag ist die Bewertung identisch, egal ob die
+ * Einteilung schon existiert oder gerade erst gewählt wird.
+ */
+export function countRoleInMonthExcept(monthData, staffId, role, exceptIso) {
+  return Object.entries(monthData.days || {})
+    .filter(([iso, day]) => iso !== exceptIso && day?.[role] === staffId).length;
+}
+
 export function computeWeekendEquivalent(monthData, staffId) {
   const weekends = {};
   for (const [iso, day] of Object.entries(monthData.days || {})) {
@@ -149,8 +164,8 @@ export function evaluateCandidate({ state, monthData, dateIso, role, staffId }) 
   };
   if (!person.includeInPlanning) push('gray', 'Nicht im aktiven Dienstpool');
   if (!isStaffActiveOn(person, dateIso)) push('gray', 'Zu diesem Zeitpunkt noch nicht bzw. nicht mehr aktiv');
-  const currentBd = countRoleInMonth(monthData, staffId, 'bd');
-  const currentHg = countRoleInMonth(monthData, staffId, 'hg');
+  const currentBd = countRoleInMonthExcept(monthData, staffId, 'bd', dateIso);
+  const currentHg = countRoleInMonthExcept(monthData, staffId, 'hg', dateIso);
   if (role === 'bd' && monthData.days[dateIso]?.hg === staffId) push('red', 'Gleichzeitige Einteilung in HG und BD am selben Tag');
   if (role === 'hg' && monthData.days[dateIso]?.bd === staffId) push('red', 'Gleichzeitige Einteilung in BD und HG am selben Tag');
   const absence = getAbsence(monthData, staffId, dateIso);
@@ -218,16 +233,27 @@ export function evaluateCandidate({ state, monthData, dateIso, role, staffId }) 
       && isFirstRegularWorkdayAfter(dateIso, iso => parseIso(iso).getDay() === 6 && getAssignment(state, iso, 'bd') === 'becker')) {
       push('red', 'Nächster regulärer Werktag nach Samstags-BD für Dr. Becker für BD gesperrt');
     }
+    // Gegenstück zur HG-Regel: Ein eigener HG am Vortag ist dieselbe Belastung,
+    // egal von welcher Seite sie eingetragen wird. Ausgenommen bleibt das
+    // eingespielte Muster Freitag-HG vor Samstags-BD.
+    if (getAssignment(state, prevDateIso, 'hg') === staffId && weekday !== 6) {
+      push('orange', 'Eigener HG am Vortag');
+    }
     applyWeekendWarnings(state, staffId, date, 'bd', push);
     applyHolidayBlockWarnings(state, staffId, date, push);
   }
 
   if (role === 'hg') {
-    const prevHg1 = getAssignment(state, prevDateIso, 'hg') === staffId;
-    const prevHg2 = getAssignment(state, prev2DateIso, 'hg') === staffId;
-    const prevHg3 = getAssignment(state, prev3DateIso, 'hg') === staffId;
-    if (prevHg1 && prevHg2) push('orange', 'Dritter HG an drei aufeinanderfolgenden Tagen');
-    else if (prevHg1 || prevHg2 || prevHg3) push('yellow', 'Erneuter HG innerhalb von 3 Kalendertagen');
+    // Die Häufung wird in BEIDE Richtungen betrachtet. Zuvor zählten nur die
+    // Vortage: Ein HG, der eine bestehende Kette von vorn verlängerte, blieb
+    // ohne Hinweis, während derselbe Dienst von hinten angehängt gemeldet
+    // wurde – dieselbe Dienstfolge war je nach Eingabereihenfolge grün oder
+    // orange.
+    const hgAt = offset => getAssignment(state, toLocalIso(addDays(date, offset)), 'hg') === staffId;
+    const nachbarn = [-3, -2, -1, 1, 2, 3].filter(hgAt);
+    const dreiInFolge = (hgAt(-2) && hgAt(-1)) || (hgAt(-1) && hgAt(1)) || (hgAt(1) && hgAt(2));
+    if (dreiInFolge) push('orange', 'Dritter HG an drei aufeinanderfolgenden Tagen');
+    else if (nachbarn.length) push('yellow', 'Erneuter HG innerhalb von 3 Kalendertagen');
     const isFridayHgBeforeSaturdayBd = weekday === 5 && getAssignment(state, toLocalIso(addDays(date,1)), 'bd') === staffId;
     if (getAssignment(state, toLocalIso(addDays(date,1)), 'bd') === staffId && !isFridayHgBeforeSaturdayBd) push('orange', 'HG am Tag vor eigenem BD');
     applyWeekendWarnings(state, staffId, date, 'hg', push);
@@ -239,19 +265,36 @@ export function evaluateCandidate({ state, monthData, dateIso, role, staffId }) 
   return { level, reasons, canSelect: true, meta: { currentBd, currentHg } };
 }
 
+/**
+ * Wochenenddienste an unmittelbar benachbarten Wochenenden.
+ *
+ * Geprüft wird das Wochenende davor UND das danach. Zuvor zählte nur das
+ * vorhergehende: Wer ein Wochenende vor einem bereits belegten Wochenende
+ * besetzte, bekam gar keinen Hinweis, während dieselbe Paarung in umgekehrter
+ * Eingabereihenfolge als roter Konflikt erschien. Die Belastung ist in beiden
+ * Fällen dieselbe.
+ */
 function applyWeekendWarnings(state, staffId, date, role, push) {
   const weekday = date.getDay();
   if (![5,6,0].includes(weekday)) return;
   const friday = new Date(date);
   friday.setDate(date.getDate() - ((weekday + 2) % 7));
-  const prevWeekendFriday = addDays(friday, -7);
-  const prevWeekendDates = [0,1,2].map(i => toLocalIso(addDays(prevWeekendFriday, i)));
-  const hadPrevWeekendBd = prevWeekendDates.some(iso => getAssignment(state, iso, 'bd') === staffId);
-  const hadPrevWeekendHg = prevWeekendDates.some(iso => getAssignment(state, iso, 'hg') === staffId);
-  if (hadPrevWeekendBd || hadPrevWeekendHg) {
-    if (role === 'bd' && hadPrevWeekendBd) push('red', 'BD-Wochenende direkt nach BD-Wochenende');
-    else push('orange', 'Dienst an aufeinanderfolgenden Wochenenden');
-  }
+
+  const wochenende = versatz => {
+    const start = addDays(friday, versatz);
+    const tage = [0, 1, 2].map(i => toLocalIso(addDays(start, i)));
+    return {
+      bd: tage.some(iso => getAssignment(state, iso, 'bd') === staffId),
+      hg: tage.some(iso => getAssignment(state, iso, 'hg') === staffId)
+    };
+  };
+
+  const nachbarn = [wochenende(-7), wochenende(7)];
+  const angrenzenderBd = nachbarn.some(item => item.bd);
+  const angrenzenderDienst = nachbarn.some(item => item.bd || item.hg);
+  if (!angrenzenderDienst) return;
+  if (role === 'bd' && angrenzenderBd) push('red', 'BD-Wochenende direkt neben BD-Wochenende');
+  else push('orange', 'Dienst an aufeinanderfolgenden Wochenenden');
 }
 
 function applyHolidayBlockWarnings(state, staffId, date, push) {

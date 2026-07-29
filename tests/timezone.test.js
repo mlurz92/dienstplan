@@ -72,13 +72,17 @@ test('BD unmittelbar vor Urlaubsbeginn wird erkannt', () => {
   assert.ok(bewertung.reasons.includes('BD unmittelbar vor Urlaubsbeginn'), `Gründe: ${bewertung.reasons.join(' | ')}`);
 });
 
-test('BD an aufeinanderfolgenden Wochenenden wird als roter Konflikt erkannt', () => {
-  const state = planungszustand();
-  const juli = monat(state, 2026, 7);
-  setAssignment(juli, '2026-07-04', 'bd', 'lurz');            // Samstag
-  const folgendesWochenende = evaluateCandidate({ state, monthData: juli, dateIso: '2026-07-11', role: 'bd', staffId: 'lurz' });
-  assert.equal(folgendesWochenende.level, 'red');
-  assert.ok(folgendesWochenende.reasons.includes('BD-Wochenende direkt nach BD-Wochenende'), `Gründe: ${folgendesWochenende.reasons.join(' | ')}`);
+test('BD an benachbarten Wochenenden wird in beide Richtungen als roter Konflikt erkannt', () => {
+  const rueckwaerts = planungszustand();
+  setAssignment(monat(rueckwaerts, 2026, 7), '2026-07-04', 'bd', 'lurz');   // Samstag davor
+  const spaeter = evaluateCandidate({ state: rueckwaerts, monthData: monat(rueckwaerts, 2026, 7), dateIso: '2026-07-11', role: 'bd', staffId: 'lurz' });
+  assert.equal(spaeter.level, 'red');
+  assert.ok(spaeter.reasons.includes('BD-Wochenende direkt neben BD-Wochenende'), `Gründe: ${spaeter.reasons.join(' | ')}`);
+
+  const vorwaerts = planungszustand();
+  setAssignment(monat(vorwaerts, 2026, 7), '2026-07-11', 'bd', 'lurz');     // Samstag danach
+  const frueher = evaluateCandidate({ state: vorwaerts, monthData: monat(vorwaerts, 2026, 7), dateIso: '2026-07-04', role: 'bd', staffId: 'lurz' });
+  assert.equal(frueher.level, 'red', 'das frühere Wochenende ist genauso belastet');
 });
 
 test('Oster- und Pfingstblock alternieren', () => {
