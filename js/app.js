@@ -81,9 +81,18 @@ function getSaxonyHolidayName(dateIso) {
   return getSaxonyHolidays(Number(dateIso.slice(0, 4))).get(dateIso) || '';
 }
 
-function applyMonthTheme(month) {
+function applyMonthTheme(month, animate = true) {
   const palette = MONTH_PALETTES[month - 1] || MONTH_PALETTES[0];
   const root = document.documentElement;
+  if (animate && root.dataset.month && root.dataset.month !== String(month)) {
+    root.classList.add('month-theme-transition');
+    document.body?.classList.add('month-content-transition');
+    clearTimeout(themeTransitionTimer);
+    themeTransitionTimer = setTimeout(() => {
+      root.classList.remove('month-theme-transition');
+      document.body?.classList.remove('month-content-transition');
+    }, 720);
+  }
   const values = {
     '--month-accent': palette.accent,
     '--month-accent-strong': palette.accentStrong,
@@ -180,7 +189,6 @@ async function openCurrentMonth(year, month, forceServer = false) {
   if (requestId !== monthRequestId) return;
   setStatus(state.serverReady ? 'saved' : 'offline', state.serverReady ? 'Gespeichert' : 'Offline – lokaler Stand');
   populateSelectors();
-  applyMonthTheme(month);
   render();
 }
 
@@ -636,7 +644,9 @@ function onApplyBatch() {
 }
 
 function shiftMonth(delta) {
-  const next = new Date(state.currentYear, state.currentMonth - 1 + delta, 1);
+  const selectedYear = Number($('#yearSelect').value) || state.currentYear;
+  const selectedMonth = Number($('#monthSelect').value) || state.currentMonth;
+  const next = new Date(selectedYear, selectedMonth - 1 + delta, 1);
   $('#yearSelect').value = String(next.getFullYear());
   $('#monthSelect').value = String(next.getMonth() + 1);
   openCurrentMonth(next.getFullYear(), next.getMonth() + 1);

@@ -182,6 +182,7 @@ Innerhalb des Tabellenrasters werden die Glaseffekte bewusst reduziert. Die Zell
 
 - **Fensteraufbau:** Kopfbereich, Toolbar und Monatsblatt erscheinen mit einer kurzen vertikalen Einblendung.
 - **Zeilenaufbau:** Die Kalendertage erscheinen mit sehr kurzem, gestaffeltem Versatz.
+- **Monatsfarbwechsel:** Beim Wechsel über Pfeile oder Dropdowns interpoliert der Browser den alten und neuen Monatsakzent über 620 bis 680 Millisekunden mit einer sanft auslaufenden Kurve. Tabellenblatt, Lichtkörper, Glasreflexe, Fokusfarben und Kalendernuancen wechseln dadurch gemeinsam statt sprunghaft. Ein dezenter Sättigungs- und Helligkeitsimpuls verbindet den Farbwechsel mit dem Neuaufbau des Monatsblatts.
 - **Hintergrundbewegung:** Die drei Lichtkörper driften langsam und unabhängig voneinander.
 - **Reflexionsbewegung:** Eine diffuse Lichtreflexion bewegt sich sehr langsam über Glasflächen.
 - **Speicherstatus:** Der Statuspunkt pulsiert dezent.

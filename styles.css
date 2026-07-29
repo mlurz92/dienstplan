@@ -23,6 +23,30 @@
   color-scheme: light;
 }
 
+@property --month-accent { syntax: '<color>'; inherits: true; initial-value: #4f8fbd; }
+@property --month-accent-strong { syntax: '<color>'; inherits: true; initial-value: #1f5f8f; }
+@property --month-glow { syntax: '<color>'; inherits: true; initial-value: rgba(78,151,205,.34); }
+@property --month-panel-tint { syntax: '<color>'; inherits: true; initial-value: rgba(211,235,250,.24); }
+
+html.month-theme-transition {
+  transition:
+    --month-accent 620ms cubic-bezier(.22, 1, .36, 1),
+    --month-accent-strong 620ms cubic-bezier(.22, 1, .36, 1),
+    --month-glow 680ms cubic-bezier(.22, 1, .36, 1),
+    --month-panel-tint 680ms cubic-bezier(.22, 1, .36, 1);
+}
+
+body.month-content-transition .plan-table-wrap,
+body.month-content-transition .month-palette-label {
+  animation: month-content-breathe 680ms cubic-bezier(.22, 1, .36, 1);
+}
+
+@keyframes month-content-breathe {
+  0% { filter: saturate(.92) brightness(.99); }
+  45% { filter: saturate(1.08) brightness(1.015); }
+  100% { filter: saturate(1) brightness(1); }
+}
+
 * { box-sizing: border-box; }
 html, body { margin: 0; min-height: 100%; font-family: var(--font); }
 html {
