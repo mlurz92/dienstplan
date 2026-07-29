@@ -1,4 +1,4 @@
-const CACHE = 'dienstplanrad-v2';
+const CACHE = 'dienstplanrad-v3';
 const CORE = [
   '/',
   '/index.html',
@@ -8,16 +8,12 @@ const CORE = [
   '/js/defaults.js',
   '/js/rules.js',
   '/js/state.js',
-  '/js/planning-overview.js',
+  '/js/planning-overview.js?v=3',
   '/manifest.webmanifest'
 ];
 
 self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE)
-      .then(cache => cache.addAll(CORE))
-      .then(() => self.skipWaiting())
-  );
+  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(CORE)).then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', event => {
@@ -30,30 +26,27 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
+  const request = event.request;
+  const isNavigation = request.mode === 'navigate';
 
-  if (event.request.mode === 'navigate') {
+  if (isNavigation) {
     event.respondWith(
-      fetch(event.request)
+      fetch(request)
         .then(response => {
           const clone = response.clone();
-          caches.open(CACHE).then(cache => cache.put('/index.html', clone)).catch(() => {});
+          caches.open(CACHE).then(cache => cache.put(request, clone)).catch(() => {});
           return response;
         })
-        .catch(() => caches.match('/index.html'))
+        .catch(() => caches.match(request).then(hit => hit || caches.match('/index.html')))
     );
     return;
   }
 
   event.respondWith(
-    caches.match(event.request).then(cached => {
-      const network = fetch(event.request)
-        .then(response => {
-          const clone = response.clone();
-          caches.open(CACHE).then(cache => cache.put(event.request, clone)).catch(() => {});
-          return response;
-        })
-        .catch(() => cached);
-      return cached || network;
-    })
+    caches.match(request).then(hit => hit || fetch(request).then(response => {
+      const clone = response.clone();
+      caches.open(CACHE).then(cache => cache.put(request, clone)).catch(() => {});
+      return response;
+    }))
   );
 });
