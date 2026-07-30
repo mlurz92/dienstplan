@@ -1,12 +1,25 @@
 {
   "name": "DienstplanRAD",
   "short_name": "DienstplanRAD",
+  "id": "/",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#0d1117",
   "theme_color": "#111820",
   "description": "Manueller Radiologie-Dienstplaner mit Cloudflare-KV-Speicherung",
   "icons": [
-    { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    {
+      "src": "/icons/icon.svg?icon=glass-spectrum-1",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon.svg?icon=glass-spectrum-1",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
   ]
 }
