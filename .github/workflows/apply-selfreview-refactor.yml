@@ -7,18 +7,25 @@ on:
     paths:
       - '.github/refactor-payload/**'
       - '.github/workflows/apply-selfreview-refactor.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/refactor-payload/**'
+      - '.github/workflows/apply-selfreview-refactor.yml'
 
 permissions:
   contents: write
 
 jobs:
   apply:
-    if: ${{ !contains(github.event.head_commit.message, '[selfreview-applied]') }}
+    if: ${{ github.event_name == 'pull_request' || !contains(github.event.head_commit.message, '[selfreview-applied]') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.head_ref || github.ref_name }}
       - name: Reconstruct reviewed source
         shell: bash
         run: |
@@ -41,4 +48,4 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -m "RBN-Rendering konsolidieren und Release bereinigen [selfreview-applied]"
-          git push
+          git push origin HEAD:${{ github.head_ref || github.ref_name }}
