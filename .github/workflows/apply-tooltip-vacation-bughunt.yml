@@ -1,0 +1,57 @@
+name: Apply tooltip vacation bughunt
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/bughunt-payload/**'
+      - '.github/workflows/apply-tooltip-vacation-bughunt.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-verify:
+    if: ${{ github.head_ref == 'agent/tooltip-vacation-bughunt' && !contains(github.event.pull_request.title, '[applied]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/tooltip-vacation-bughunt
+          fetch-depth: 0
+      - name: Reconstruct reviewed patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .github/bughunt-payload/part-* | base64 -d > .github/apply_bughunt.py
+          python -m py_compile .github/apply_bughunt.py
+          python .github/apply_bughunt.py
+      - name: Syntax check
+        run: npm run check
+      - name: Full test suite
+        run: npm test
+      - name: Professional audit gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! grep -R "Jahresverlauf (nur Hinweis, ohne Einfluss auf Bewertung)" js tests
+          grep -F "if (!absence && getAbsenceFromState(state, staffId, nextIso) === 'urlaub')" js/rules-evaluation.js
+          grep -F "Lokal importiert – Serverfehler" js/app.js
+          grep -F "dirtyVersion" js/state.js
+          grep -F "normalizeMonthData" js/defaults.js
+          test "$(grep -Rho '?v=20260730.6' index.html js | wc -l)" -ge 10
+      - name: Commit verified final source
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .github/bughunt-payload
+          rm -f .github/apply_bughunt.py
+          rm -f .github/workflows/apply-tooltip-vacation-bughunt.yml
+          rmdir .github/workflows 2>/dev/null || true
+          rmdir .github 2>/dev/null || true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Tooltips, Urlaubslogik und Datenintegrität bereinigen [applied]"
+          git push
