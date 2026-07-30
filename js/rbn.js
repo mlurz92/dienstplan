@@ -1,0 +1,57 @@
+/**
+ * Verbindliche Auswahllisten für die beiden Rufbereitschaften Nuklearmedizin.
+ *
+ * Die Werte werden bewusst nicht aus dem frei veränderlichen RBN-Namensspeicher
+ * bezogen: RBN und 2. RBN haben unterschiedliche, fachlich festgelegte Pools.
+ */
+export const HELLMANN_RBN_ACTIVE_FROM = '2026-10-01';
+
+export const RBN1_OPTIONS = Object.freeze([
+  Object.freeze({ value: 'Prof. Schob' }),
+  Object.freeze({ value: 'Dr. Bailis' }),
+  Object.freeze({ value: 'Dr. Maybaum' }),
+  Object.freeze({ value: 'Dr. Schüngel' }),
+  Object.freeze({ value: 'Fr. Dalitz' }),
+  Object.freeze({ value: 'Dr. Martin' }),
+  Object.freeze({ value: 'Hr. El Houba' }),
+  Object.freeze({ value: 'Fr. Hellmann', activeFrom: HELLMANN_RBN_ACTIVE_FROM })
+]);
+
+export const RBN2_OPTIONS = Object.freeze([
+  Object.freeze({ value: 'Prof. Schob' }),
+  Object.freeze({ value: 'Dr. Bailis' }),
+  Object.freeze({ value: 'Dr. Maybaum' })
+]);
+
+const OPTIONS_BY_FIELD = Object.freeze({ rbn1: RBN1_OPTIONS, rbn2: RBN2_OPTIONS });
+const ISO_DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+function isValidIsoDay(value) {
+  const match = ISO_DAY.exec(String(value || ''));
+  if (!match) return false;
+  const [, yearText, monthText, dayText] = match;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year
+    && date.getUTCMonth() === month - 1
+    && date.getUTCDate() === day;
+}
+
+/**
+ * Liefert ausschließlich die am konkreten Tag zulässigen Namen.
+ * ISO-Datumsstrings können lexikographisch verglichen werden.
+ */
+export function getRbnOptions(field, dateIso) {
+  const definitions = OPTIONS_BY_FIELD[field];
+  if (!definitions || !isValidIsoDay(dateIso)) return [];
+  return definitions
+    .filter(option => !option.activeFrom || dateIso >= option.activeFrom)
+    .map(option => option.value);
+}
+
+export function isRbnValueAllowed(field, dateIso, value) {
+  const normalized = String(value ?? '').trim();
+  return normalized === '' || getRbnOptions(field, dateIso).includes(normalized);
+}
