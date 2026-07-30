@@ -1,9 +1,10 @@
-import { ABSENCE_TYPES, MONTH_NAMES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, toIsoDate } from './defaults.js?v=20260730.3';
-import { state, bootstrapState, getMonthData, getMonthLabel, loadMonth, persistCurrentMonth, persistMonth, saveLocalBootstrap, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260730.3';
-import { api } from './api.js?v=20260730.3';
-import { applyMonthTheme, prefersReducedMotion } from './theme.js?v=20260730.3';
-import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260730.3';
-import { buildStats, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getPlanningStaff, getPreference, getStaffById, labelForAbsence, labelForPreference, setAbsence, setAssignment, setPreference, weekdayLabel } from './rules.js?v=20260730.3';
+import { ABSENCE_TYPES, MONTH_NAMES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, toIsoDate } from './defaults.js?v=20260730.4';
+import { state, bootstrapState, getMonthData, getMonthLabel, loadMonth, persistCurrentMonth, persistMonth, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260730.4';
+import { api } from './api.js?v=20260730.4';
+import { applyMonthTheme, prefersReducedMotion } from './theme.js?v=20260730.4';
+import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260730.4';
+import { buildStats, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getPlanningStaff, getPreference, getStaffById, labelForAbsence, labelForPreference, setAbsence, setAssignment, setPreference, weekdayLabel } from './rules.js?v=20260730.4';
+import { getRbnOptions, isRbnValueAllowed, isSecondRbnAvailable } from './rbn.js?v=20260730.4';
 
 const $ = selector => document.querySelector(selector);
 
@@ -240,8 +241,14 @@ function renderPlanTable(monthData) {
       <td class="preference-summary-cell"></td>`;
     tr.children[2].appendChild(buildAssignmentButton(iso, 'bd', day.bd, monthData));
     tr.children[3].appendChild(buildAssignmentButton(iso, 'hg', day.hg, monthData));
-    tr.children[4].appendChild(buildRbnInput(iso, 'rbn1', day.rbn1 || ''));
-    tr.children[5].appendChild(buildRbnInput(iso, 'rbn2', day.rbn2 || ''));
+    const firstRbn = buildRbnSelect(iso, 'rbn1', day.rbn1 || '');
+    const secondRbn = buildRbnSelect(iso, 'rbn2', day.rbn2 || '');
+    tr.children[4].appendChild(firstRbn.wrapper);
+    tr.children[5].appendChild(secondRbn.wrapper);
+    firstRbn.select.addEventListener('change', () => {
+      syncSecondRbnControl(iso, firstRbn.select, secondRbn, { clearWhenUnavailable: true });
+    });
+    syncSecondRbnControl(iso, firstRbn.select, secondRbn);
     tr.children[6].appendChild(buildAbsenceSummary(iso, monthData));
     tr.children[7].appendChild(buildPreferenceSummary(iso, monthData));
     tbody.appendChild(tr);
@@ -267,39 +274,58 @@ function buildAssignmentButton(dateIso, role, staffId, monthData) {
   return button;
 }
 
-function buildRbnInput(dateIso, field, value) {
+function setRbnValue(dateIso, field, value) {
+  const normalized = String(value ?? '').trim();
+  const monthData = getMonthData(state.currentYear, state.currentMonth);
+  const day = monthData.days[dateIso];
+  if (!day || day[field] === normalized) return false;
+  day[field] = normalized;
+  markDirty();
+  return true;
+}
+
+function buildRbnSelect(dateIso, field, value) {
   const wrapper = document.createElement('div');
-  const input = document.createElement('input');
-  const listId = `rbnSuggestions`;
-  input.className = 'rbn-input';
-  input.value = value;
-  input.setAttribute('list', listId);
-  input.placeholder = 'manuell';
-  input.addEventListener('change', async () => {
-    const monthData = getMonthData(state.currentYear, state.currentMonth);
-    monthData.days[dateIso][field] = input.value.trim();
-    if (input.value.trim() && !state.rbnNames.includes(input.value.trim())) {
-      state.rbnNames.push(input.value.trim());
-      state.rbnNames = [...new Set(state.rbnNames)].sort((a,b)=>a.localeCompare(b,'de'));
-      saveLocalBootstrap();
-      try { await api.saveRbnNames(state.rbnNames); } catch {}
-    }
-    markDirty();
-  });
-  wrapper.appendChild(input);
-  let datalist = document.getElementById(listId);
-  if (!datalist) {
-    datalist = document.createElement('datalist');
-    datalist.id = listId;
-    document.body.appendChild(datalist);
+  wrapper.className = 'rbn-field';
+  const select = document.createElement('select');
+  select.className = 'rbn-input';
+  select.dataset.rbnField = field;
+  select.setAttribute('aria-label', `${field === 'rbn1' ? 'RBN' : '2. RBN'} am ${dateIso}`);
+  select.appendChild(new Option('— auswählen —', ''));
+
+  const currentValue = String(value ?? '').trim();
+  if (currentValue && !isRbnValueAllowed(field, dateIso, currentValue)) {
+    const legacyOption = new Option(`${currentValue} (Altwert)`, currentValue, true, true);
+    legacyOption.disabled = true;
+    select.appendChild(legacyOption);
   }
-  datalist.innerHTML = '';
-  state.rbnNames.forEach(name => {
-    const opt = document.createElement('option');
-    opt.value = name;
-    datalist.appendChild(opt);
-  });
-  return wrapper;
+  for (const name of getRbnOptions(field, dateIso)) {
+    select.appendChild(new Option(name, name, false, name === currentValue));
+  }
+  select.value = currentValue;
+  select.addEventListener('change', () => setRbnValue(dateIso, field, select.value));
+
+  const inactiveNote = document.createElement('span');
+  inactiveNote.className = 'rbn2-inactive-note';
+  inactiveNote.hidden = true;
+  wrapper.append(select, inactiveNote);
+  return { wrapper, select, inactiveNote };
+}
+
+function syncSecondRbnControl(dateIso, firstSelect, secondControl, { clearWhenUnavailable = false } = {}) {
+  const available = isSecondRbnAvailable(dateIso, firstSelect.value);
+  if (!available && clearWhenUnavailable && secondControl.select.value) {
+    secondControl.select.value = '';
+    setRbnValue(dateIso, 'rbn2', '');
+  }
+
+  secondControl.select.hidden = !available;
+  secondControl.select.disabled = !available;
+  secondControl.wrapper.toggleAttribute('data-rbn2-available', available);
+
+  const storedValue = String(getMonthData(state.currentYear, state.currentMonth).days[dateIso]?.rbn2 ?? '').trim();
+  secondControl.inactiveNote.textContent = !available && storedValue ? `${storedValue} (Altwert)` : '';
+  secondControl.inactiveNote.hidden = available || !storedValue;
 }
 
 /**
@@ -316,6 +342,17 @@ function isBeckerFzaAfterSaturdayBd(dateIso) {
   return isFirstRegularWorkdayAfter(dateIso, iso => parseIsoLocal(iso).getDay() === 6 && getAssignment(state, iso, 'bd') === 'becker');
 }
 
+function appendAbsenceSummaryEntry(wrapper, name, detail, index) {
+  if (index > 0) wrapper.appendChild(document.createTextNode(', '));
+  const nameSpan = document.createElement('span');
+  nameSpan.className = 'absence-summary-name';
+  nameSpan.textContent = name;
+  const detailSpan = document.createElement('span');
+  detailSpan.className = 'absence-summary-detail';
+  detailSpan.textContent = `: ${detail}`;
+  wrapper.append(nameSpan, detailSpan);
+}
+
 function buildAbsenceSummary(dateIso, monthData) {
   const wrapper = document.createElement('button');
   wrapper.type = 'button';
@@ -326,7 +363,7 @@ function buildAbsenceSummary(dateIso, monthData) {
   const beckerAbsence = getAbsence(monthData, 'becker', dateIso);
   const derivedBeckerFza = isBeckerFzaAfterSaturdayBd(dateIso);
   if (derivedBeckerFza && (!beckerAbsence || beckerAbsence === 'fza')) {
-    entries.push('Becker: FZA');
+    entries.push({ name: 'Becker', detail: 'FZA' });
     details.push('Becker: FZA – automatisch aus Samstags-BD für den nächsten regulären Werktag abgeleitet');
   }
 
@@ -340,12 +377,12 @@ function buildAbsenceSummary(dateIso, monthData) {
       continue;
     }
 
-    const label = `${person.short}: ${shortAbsenceLabel(absence)}`;
-    entries.push(label);
-    details.push(label);
+    const detail = shortAbsenceLabel(absence);
+    entries.push({ name: person.short, detail });
+    details.push(`${person.short}: ${detail}`);
   }
 
-  wrapper.textContent = entries.join(', ');
+  entries.forEach((entry, index) => appendAbsenceSummaryEntry(wrapper, entry.name, entry.detail, index));
   wrapper.title = details.length ? details.join('\n') : 'Abwesenheiten bearbeiten';
   wrapper.addEventListener('click', () => openDayMetaDialog(dateIso));
   return wrapper;

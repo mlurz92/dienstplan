@@ -23,6 +23,7 @@ export const RBN2_OPTIONS = Object.freeze([
   Object.freeze({ value: 'Dr. Maybaum' })
 ]);
 
+
 /**
  * Nur bei diesen Erstbesetzungen ist eine zweite RBN fachlich vorgesehen.
  * Fr. Hellmann zählt erst ab ihrem regulären Aktivierungsdatum als zulässige
@@ -36,6 +37,7 @@ export const RBN2_TRIGGER_NAMES = Object.freeze([
 ]);
 
 const RBN2_TRIGGER_SET = new Set(RBN2_TRIGGER_NAMES);
+
 const OPTIONS_BY_FIELD = Object.freeze({ rbn1: RBN1_OPTIONS, rbn2: RBN2_OPTIONS });
 const ISO_DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
 
@@ -69,9 +71,10 @@ export function isRbnValueAllowed(field, dateIso, value) {
   return normalized === '' || getRbnOptions(field, dateIso).includes(normalized);
 }
 
+
 /**
- * Die zweite RBN darf nur sichtbar bzw. bearbeitbar sein, wenn die erste RBN
- * am konkreten Datum durch eine der vier festgelegten Personen besetzt ist.
+ * Die zweite RBN darf nur bearbeitbar sein, wenn die erste RBN am konkreten
+ * Datum durch eine der vier festgelegten Personen besetzt ist.
  */
 export function isSecondRbnAvailable(dateIso, firstRbnValue) {
   const normalized = String(firstRbnValue ?? '').trim();

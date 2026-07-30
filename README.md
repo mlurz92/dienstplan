@@ -93,7 +93,8 @@ bleibt chronologisch; die Spalten behalten auf jedem Tag dieselbe Bedeutung.
 - je Kalendertag genau ein Feld für BD, HG, RBN und 2. RBN;
 - personengebundene BD-/HG-Auswahl mit Live-Eignungsbewertung;
 - Löschen einer Einteilung im selben Auswahldialog;
-- freie RBN-Namen mit lernender Vorschlagsliste;
+- verbindliche, getrennte RBN-Auswahllisten; Fr. Hellmann ist im ersten RBN-Feld ab 01.10.2026 verfügbar;
+- 2. RBN wird nur angeboten, wenn RBN durch Dr. Schüngel, Fr. Hellmann, Dr. Martin oder Hr. El Houba belegt ist;
 - Einzel- und Sammelerfassung von Abwesenheiten und Dienstwünschen;
 - automatische Speicherung mit Statusanzeige;
 - monatsübergreifende Prüfung geladener Dienste.
@@ -133,10 +134,12 @@ bleibt chronologisch; die Spalten behalten auf jedem Tag dieselbe Bedeutung.
 
 Der Browser lädt die Dateien unmittelbar aus dem Repository. Das erleichtert Diagnose und Deployment:
 Die ausgelieferte Quelldatei entspricht der überprüften Quelldatei. Das Frontend hält DOM-Logik in
-`app.js`, Zustand und Persistenz in `state.js`, HTTP-Zugriffe in `api.js`, Regeln in `rules.js`,
-Kalenderlogik in `holidays.js`, Vorgaben in `defaults.js` und das Farbsystem in `theme.js`.
+`app.js`, Zustand und Persistenz in `state.js`, HTTP-Zugriffe in `api.js`, die RBN-Fachvorgaben in
+`rbn.js`, die Regel-Fassade in `rules.js`, Kalenderlogik in `holidays.js`, Vorgaben in `defaults.js` und
+das Farbsystem in `theme.js`.
 
-`rules.js`, `defaults.js`, `holidays.js` und der rechnende Teil von `theme.js` sind DOM-frei. Dadurch
+`rbn.js`, `rules.js`, `rules-core.js`, `rules-evaluation.js`, `rules-reporting.js`, `defaults.js`,
+`holidays.js` und der rechnende Teil von `theme.js` sind DOM-frei. Dadurch
 laufen die fachlichen Tests direkt unter Node. Nur `applyMonthTheme()` schreibt Farbvariablen auf
 `document.documentElement`; `app.js` übernimmt Rendering und Ereignisse.
 
@@ -166,7 +169,11 @@ schreibt pro Frame konkrete `rgb()`- und `rgba()`-Werte.
 │   ├── api.js                       zentraler Fetch-Wrapper
 │   ├── defaults.js                  Monatsnamen, Personal, Typen und leeres Monatsschema
 │   ├── holidays.js                  Sachsen-Feiertage, Werktage und Feiertagsblöcke
-│   ├── rules.js                     Bewertung, Getter/Setter, Statistik und Sammelprüfung
+│   ├── rbn.js                       feste RBN-Pools, Datumsgrenzen und 2.-RBN-Freigabe
+│   ├── rules.js                     DOM-freie Fassade der Regelmodule
+│   ├── rules-core.js                Getter, Setter und gemeinsame Regelhilfen
+│   ├── rules-evaluation.js          Kandidatenbewertung und Empfehlungslogik
+│   ├── rules-reporting.js           Statistik und Sammelprüfung
 │   ├── state.js                     Laufzeitzustand, localStorage und Serverpersistenz
 │   └── theme.js                     zwölf Paletten, OKLCH-Mathematik und rAF-Animation
 ├── functions/
@@ -182,6 +189,9 @@ schreibt pro Frame konkrete `rgb()`- und `rgba()`-Werte.
 └── tests/
     ├── delivery.test.js             Cache-, Asset- und Legacy-Worker-Garantien
     ├── month-navigation.test.js     Navigations- und Animationsreihenfolge
+    ├── rbn.test.js                  feste Pools, Datumsgrenzen und UI-Verkabelung
+    ├── recommendation-rules.test.js Empfehlungs- und Fairnesslogik
+    ├── rule-matrix.test.js          Reihenfolge- und Selbstkonsistenz
     ├── rules.test.js                Kernregeln und Statistik
     ├── theme.test.js                Paletten, Kontrast, Farbraum und Zeitkurve
     └── timezone.test.js             Regeln unter Europe/Berlin
@@ -206,8 +216,8 @@ Jeder Monat ist ein selbstständiger Datensatz:
     "2026-07-01": {
       "bd": "lurz",
       "hg": "dalitz",
-      "rbn1": "Meyer",
-      "rbn2": "",
+      "rbn1": "Dr. Martin",
+      "rbn2": "Prof. Schob",
       "notes": ""
     }
   },
@@ -246,7 +256,10 @@ Schreiben ergänzt.
 - `revision`: steigt bei jedem Speichern um eins.
 - `updatedAt`: ISO-Zeitpunkt der letzten Speicherung.
 - `days[iso].bd`, `days[iso].hg`: stabile Personal-ID oder leerer String.
-- `days[iso].rbn1`, `days[iso].rbn2`: freier Text.
+- `days[iso].rbn1`: einer der tagesgültigen Werte aus dem festen ersten RBN-Pool oder leer.
+- `days[iso].rbn2`: einer der drei festen Werte Prof. Schob, Dr. Bailis oder Dr. Maybaum oder leer; die
+  Bearbeitung ist nur bei einer hierfür freigebenden Erstbesetzung sichtbar. Historische Freitextwerte
+  bleiben als gekennzeichnete Altwerte lesbar, bis sie bewusst ersetzt oder entfernt werden.
 - `days[iso].notes`: im Schema vorhanden, derzeit ohne sichtbare Tabellenspalte.
 - `absences[staffId][iso]`: Abwesenheitstyp.
 - `absenceSources[staffId][iso]`: `manual` oder `import`.
@@ -260,11 +273,13 @@ Schreiben ergänzt.
 |---|---|---|
 | Einstellungen | `app:settings` | Bestandteil von `dienstplanrad:bootstrap` |
 | Personal | `app:staff` | Bestandteil von `dienstplanrad:bootstrap` |
-| RBN-Namen | `app:rbn-names` | Bestandteil von `dienstplanrad:bootstrap` |
+| RBN-Namen (Legacy) | `app:rbn-names` | Bestandteil von `dienstplanrad:bootstrap` |
 | Monat | `year:2026:month:07` | `dienstplanrad:month:2026-07` |
 
-Der Laufzeitzustand hält `settings`, `staff`, `rbnNames`, eine `Map` geladener Monate, angezeigtes Jahr
-und Monat, Speicherstatus, Dirty-Flag, Debounce-Timer und den letzten Serverzustand.
+Der Laufzeitzustand hält `settings`, `staff`, eine aus älteren Sicherungen weiterhin mitgeführte
+`rbnNames`-Kompatibilitätsliste, eine `Map` geladener Monate, angezeigtes Jahr und Monat, Speicherstatus,
+Dirty-Flag, Debounce-Timer und den letzten Serverzustand. Die aktuelle Oberfläche bezieht ihre RBN-Werte
+ausschließlich aus `rbn.js`; `rbnNames` steuert keine Auswahl mehr.
 
 ---
 
@@ -546,8 +561,8 @@ Bestätigung.
 | Wochentag | ausgeschriebener Wochentag und gegebenenfalls Feiertag |
 | BD | bewertete Personenauswahl |
 | HG | bewertete Personenauswahl |
-| RBN | lernendes Freitextfeld |
-| 2. RBN | zweites lernendes Freitextfeld |
+| RBN | tagesabhängige feste Auswahlliste; Fr. Hellmann ab 01.10.2026 |
+| 2. RBN | feste Auswahlliste mit Prof. Schob, Dr. Bailis und Dr. Maybaum; nur bei freigebender RBN-Erstbesetzung sichtbar |
 | Urlaub / FZA | Tageszusammenfassung und Detaildialog |
 | Kein Dienst / Wünsche | Tageszusammenfassung und Detaildialog |
 
@@ -567,11 +582,21 @@ ausgeblendet.
 BD-/HG-Schaltflächen zeigen Namen, Stufenchip und alle Gründe im Tooltip. Offene Felder zeigen `—` und
 „offen“. Nach jeder Änderung werden auch bestehende Einteilungen neu bewertet.
 
-### 9.7 RBN-Namen
+### 9.7 RBN-Auswahl und Abhängigkeit von 2. RBN
 
-Beim Verlassen eines RBN-Feldes wird der Wert getrimmt und gespeichert. Neue Namen werden dedupliziert,
-mit deutscher Sortierung in `state.rbnNames` aufgenommen, lokal gesichert und nach Möglichkeit an
-`/api/rbn-names` übertragen. Beide RBN-Spalten teilen dieselbe `<datalist>`.
+Beide RBN-Felder sind native `<select>`-Elemente und werden direkt durch `app.js` erzeugt; es gibt kein
+verdecktes Freitextfeld, keine gemeinsame `<datalist>` und keine nachgelagerte DOM-Nachbearbeitung.
+
+**RBN** bietet grundsätzlich Prof. Schob, Dr. Bailis, Dr. Maybaum, Dr. Schüngel, Fr. Dalitz, Dr. Martin
+und Hr. El Houba. Fr. Hellmann kommt ab dem **01.10.2026** hinzu.
+
+**2. RBN** bietet ausschließlich Prof. Schob, Dr. Bailis und Dr. Maybaum. Die Auswahl erscheint nur,
+wenn RBN am selben Tag durch **Dr. Schüngel, Fr. Hellmann, Dr. Martin oder Hr. El Houba** belegt ist.
+Fr. Hellmann kann diese Freigabe erst ab ihrem Aktivierungsdatum auslösen. Wird eine freigebende
+Erstbesetzung bewusst durch eine andere Person oder einen Leerwert ersetzt, wird ein vorhandener Wert in
+2. RBN entfernt und der Monat als geändert gespeichert. Ein historisch bereits gespeicherter, aber aktuell
+nicht bearbeitbarer Wert wird beim bloßen Laden nicht stillschweigend vernichtet, sondern als
+„(Altwert)“ lesbar gehalten.
 
 ### 9.8 FZA-Darstellung
 
@@ -580,6 +605,8 @@ mit deutscher Sortierung in `state.rbnNames` aufgenommen, lokal gesichert und na
 - Importierte, nicht manuelle FZA-Einträge können unterdrückt werden, wenn sie exakt dem automatisch
   ableitbaren ersten Werktag nach eigenem BD entsprechen.
 - Manuelle FZA-Einträge bleiben immer sichtbar.
+- In der kompakten Zelle wird ausschließlich der Name mit `font-weight: 700` dargestellt; Doppelpunkt und
+  Kürzel beziehungsweise Ausführung bleiben ausdrücklich bei `font-weight: 400`.
 
 ---
 
@@ -928,12 +955,12 @@ Anwendungsfluss ruft diesen Status nicht auf.
 
 | Methode | Pfad | Zweck |
 |---|---|---|
-| GET | `/api/bootstrap` | Einstellungen, Personal und RBN-Namen |
+| GET | `/api/bootstrap` | Einstellungen, Personal und Legacy-RBN-Namen |
 | GET | `/api/month/:year/:month` | normalisierten Monat lesen |
 | PUT | `/api/month/:year/:month` | normalisierten Monat schreiben |
 | GET/PUT | `/api/settings` | Einstellungen |
 | GET/PUT | `/api/staff` | Personal |
-| GET/PUT | `/api/rbn-names` | RBN-Vorschläge |
+| GET/PUT | `/api/rbn-names` | Legacy-Kompatibilität für ältere Sicherungen; keine Quelle der aktuellen Auswahl |
 | GET | `/api/export` | Gesamtstand 2025–2030 |
 | POST | `/api/import` | Gesamt- oder Teilstand einspielen |
 
@@ -1407,13 +1434,14 @@ ausgelieferte Stand der erwartete ist.
 6. Zugriffsschutz konfigurieren.
 7. Deployment ausführen.
 
-Beim ersten API-Aufruf initialisiert `getOrInit()` fehlende Einstellungen, Personal- und RBN-Daten.
+Beim ersten API-Aufruf initialisiert `getOrInit()` fehlende Einstellungen, Personal- und Legacy-RBN-Daten.
+Die sichtbaren RBN-Auswahllisten sind dagegen als versionierte Fachvorgabe in `js/rbn.js` definiert.
 
 ### 21.2 Release-Checkliste
 
 - `npm run check`;
 - `npm test`;
-- alle Browserimporte tragen denselben `?v=`-Token;
+- alle Browserimporte tragen denselben `?v=`-Token; der Token wird bei jedem funktionalen Release erhöht;
 - `_headers` enthält die Revalidierungsregeln;
 - es existiert kein Service Worker und keine Registrierung;
 - Pfeile, Dropdowns und schnelle Umkehr im Browser prüfen;

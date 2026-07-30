@@ -112,6 +112,25 @@ test('all release-critical shell and module assets share one cache-busting token
   }
 });
 
+test('every relative browser-module import resolves after removing its release token', async () => {
+  const { readdir } = await import('node:fs/promises');
+  const { resolve, dirname } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+  const jsDir = resolve(root, 'js');
+
+  for (const entry of await readdir(jsDir, { withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith('.js')) continue;
+    const sourcePath = resolve(jsDir, entry.name);
+    const source = await read(`js/${entry.name}`);
+    const specifiers = [...source.matchAll(/(?:from\s+|import\s*)['"](\.\/[^'"]+)['"]/g)].map(match => match[1]);
+    for (const specifier of specifiers) {
+      const clean = specifier.replace(/\?v=[^#]+$/, '');
+      await access(resolve(dirname(sourcePath), clean));
+    }
+  }
+});
+
 test('Cloudflare revalidates the app shell and application assets on every visit', async () => {
   const headers = await read('_headers');
 

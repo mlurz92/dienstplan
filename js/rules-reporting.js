@@ -1,9 +1,9 @@
-import { isRegularWorkdayIso } from './holidays.js?v=20260730.3';
+import { isRegularWorkdayIso } from './holidays.js?v=20260730.4';
 import {
   ABSENCE_FOR_CT_LEADERSHIP, computeWeekendEquivalent, countRoleInMonth, dayIso,
   fmtGermanDate, getAbsence, getRoleProperties, getStaffById, isStaffActiveOn, severityRank
-} from './rules-core.js?v=20260730.3';
-import { evaluateCandidate } from './rules-evaluation.js?v=20260730.3';
+} from './rules-core.js?v=20260730.4';
+import { evaluateCandidate } from './rules-evaluation.js?v=20260730.4';
 
 export function collectIssues(state, monthData) {
   const issues = [];
@@ -46,3 +46,4 @@ export function buildStats(state, monthData) {
       bdRemaining: person.bdTarget ? person.bdTarget - countRoleInMonth(monthData, person.id, 'bd') : null
     }));
 }
+

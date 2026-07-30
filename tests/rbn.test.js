@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { access } from 'node:fs/promises';
 import {
   HELLMANN_RBN_ACTIVE_FROM, RBN2_TRIGGER_NAMES, getRbnOptions,
   isRbnValueAllowed, isSecondRbnAvailable
 } from '../js/rbn.js';
-import { parseAbsenceSummaryText } from '../js/rbn-ui.js';
 
 const RBN1_BEFORE_OCTOBER = [
   'Prof. Schob',
@@ -18,6 +18,15 @@ const RBN1_BEFORE_OCTOBER = [
 ];
 const RBN2 = ['Prof. Schob', 'Dr. Bailis', 'Dr. Maybaum'];
 const RBN2_TRIGGERS = ['Dr. Schüngel', 'Fr. Hellmann', 'Dr. Martin', 'Hr. El Houba'];
+
+const exists = async path => {
+  try {
+    await access(new URL(`../${path}`, import.meta.url));
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 test('RBN bietet bis einschließlich September exakt den vorgesehenen Pool', () => {
   assert.deepEqual(getRbnOptions('rbn1', '2026-09-30'), RBN1_BEFORE_OCTOBER);
@@ -68,38 +77,32 @@ test('Zulässigkeitsprüfung akzeptiert leer und nur feld-/datumsrichtige Namen'
   assert.equal(isRbnValueAllowed('rbn2', '2026-10-01', 'Dr. Bailis'), true);
 });
 
-test('U/FZA-Text wird in Namen und normal gewichtete Ausführung zerlegt', () => {
-  assert.deepEqual(parseAbsenceSummaryText('Becker: FZA, Martin: U'), [
-    { name: 'Becker', detail: 'FZA' },
-    { name: 'Martin', detail: 'U' }
-  ]);
-  assert.deepEqual(parseAbsenceSummaryText(''), []);
-  assert.deepEqual(parseAbsenceSummaryText('Freitext ohne Doppelpunkt'), [
-    { name: '', detail: 'Freitext ohne Doppelpunkt' }
-  ]);
-});
-
-test('Oberfläche koppelt 2. RBN an RBN und formatiert U/FZA semantisch', () => {
-  const ui = fs.readFileSync(new URL('../js/rbn-ui.js', import.meta.url), 'utf8');
+test('app.js rendert die RBN-Selects direkt und koppelt 2. RBN ohne DOM-Nachbearbeitung', async () => {
+  const app = fs.readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
   const rulesFacade = fs.readFileSync(new URL('../js/rules.js', import.meta.url), 'utf8');
 
-  assert.match(rulesFacade, /import '\.\/rbn-ui\.js\?v=20260730\.3'/);
-  assert.match(ui, /row\.cells\[4\].*input\.rbn-input/);
-  assert.match(ui, /row\.cells\[5\].*input\.rbn-input/);
-  assert.match(ui, /isSecondRbnAvailable\(dateIso, firstSelect\.value\)/);
-  assert.match(ui, /secondSelect\.hidden = !available/);
-  assert.match(ui, /secondSelect\.disabled = !available/);
-  assert.match(ui, /clearWhenUnavailable: true/);
-  assert.match(ui, /writeThrough\(secondInput, ''\)/);
-  assert.match(ui, /rbn2-inactive-note/);
-  assert.match(ui, /createElement\('select'\)/);
-  assert.match(ui, /legacyOption\.disabled = true/);
-  assert.match(ui, /input\.hidden = true/);
-  assert.match(ui, /input\.dispatchEvent\(new Event\('change'/);
-  assert.match(ui, /createElement\('strong'\)/);
-  assert.match(ui, /absence-summary-name/);
-  assert.match(ui, /absence-summary-detail/);
-  assert.match(ui, /detail\.textContent = `: \$\{entry\.detail\}`/);
-  assert.match(ui, /saveLocalBootstrap\(\)/);
-  assert.doesNotMatch(ui, /contenteditable|prompt\(|createElement\('input'\)/);
+  assert.equal(await exists('js/rbn-ui.js'), false, 'kein nachgelagerter DOM-Postprozessor');
+  assert.match(app, /from '\.\/rbn\.js\?v=20260730\.4'/);
+  assert.match(app, /function buildRbnSelect/);
+  assert.match(app, /createElement\('select'\)/);
+  assert.match(app, /isSecondRbnAvailable\(dateIso, firstSelect\.value\)/);
+  assert.match(app, /secondControl\.select\.hidden = !available/);
+  assert.match(app, /secondControl\.select\.disabled = !available/);
+  assert.match(app, /clearWhenUnavailable: true/);
+  assert.match(app, /setRbnValue\(dateIso, 'rbn2', ''\)/);
+  assert.match(app, /legacyOption\.disabled = true/);
+  assert.doesNotMatch(app, /rbnSuggestions|saveRbnNames|createElement\('datalist'\)/);
+  assert.doesNotMatch(rulesFacade, /rbn-ui|document|window/);
+});
+
+test('U/FZA wird direkt als fetter Name und normal gewichtete Ausführung erzeugt', () => {
+  const app = fs.readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
+  const css = fs.readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
+
+  assert.match(app, /function appendAbsenceSummaryEntry/);
+  assert.match(app, /nameSpan\.className = 'absence-summary-name'/);
+  assert.match(app, /detailSpan\.className = 'absence-summary-detail'/);
+  assert.match(app, /detailSpan\.textContent = `: \$\{detail\}`/);
+  assert.match(css, /\.absence-summary-name\s*\{\s*font-weight:\s*700;/);
+  assert.match(css, /\.absence-summary-detail\s*\{\s*font-weight:\s*400;/);
 });

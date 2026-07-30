@@ -496,9 +496,13 @@ h3 { font-size: 1.05rem; }
 .small-chip.orange { color: var(--orange); border-color: #e8a46d; background: rgba(255,240,228,.90); }
 .small-chip.red { color: var(--red); border-color: #e08e88; background: rgba(255,240,239,.90); }
 .small-chip.gray { color: #6b7480; border-color: #c3c9d1; background: rgba(244,246,249,.90); }
+.rbn-field { width: 100%; min-height: 29px; display: flex; align-items: center; }
 .rbn-input { width: 100%; height: 29px; border: none; border-radius: 0; background: transparent; padding: 3px 5px; box-shadow: none; }
+.rbn2-inactive-note { width: 100%; padding: 3px 5px; color: var(--muted); font-size: .72rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rbn-input:focus { outline: 2px solid color-mix(in srgb, var(--month-accent) 75%, white); outline-offset: -2px; background: rgba(255,255,255,.88); }
-.cell-summary-button { width: 100%; min-height: 29px; border: none; border-radius: 0; background: transparent; padding: 3px 5px; text-align: left; color: #30363d; font-size: .8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; box-shadow: none; }
+.cell-summary-button { width: 100%; min-height: 29px; border: none; border-radius: 0; background: transparent; padding: 3px 5px; text-align: left; color: #30363d; font-size: .8rem; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; box-shadow: none; }
+.absence-summary-name { font-weight: 700; }
+.absence-summary-detail { font-weight: 400; }
 
 .below-plan { margin-top: 12px; max-width: 920px; }
 .section-title-row { display: flex; justify-content: space-between; align-items: end; gap: 12px; margin-bottom: 5px; }
@@ -595,7 +599,7 @@ h3 { font-size: 1.05rem; }
   .plan-table-wrap, .excel-stats { box-shadow: none; border-color: #000; border-radius: 0; }
   .plan-table { min-width: 0; font-size: 8.3px; }
   .plan-table th, .plan-table td { height: 18px; border-color: #000; }
-  .assignment-btn, .rbn-input, .cell-summary-button { min-height: 17px; height: 17px; font-size: 8px; }
+  .assignment-btn, .rbn-field, .rbn-input, .cell-summary-button { min-height: 17px; height: 17px; font-size: 8px; }
   .small-chip { display: none; }
   .below-plan { margin-top: 5mm; max-width: 120mm; }
   .holiday-name { font-size: 5.5px; }

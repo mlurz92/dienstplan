@@ -1,4 +1,4 @@
-import { holidayBlocks, isFirstRegularWorkdayAfter, isHoliday } from './holidays.js?v=20260730.3';
+import { holidayBlocks, isFirstRegularWorkdayAfter, isHoliday } from './holidays.js?v=20260730.4';
 import {
   addDays, basicallyEligiblePeers, countHgForAaBdExcept, countRoleInMonthExcept,
   countSaturdayBdExcept, countServicesInLoadedYearExcept, getAbsence, getAbsenceFromState,
@@ -6,7 +6,7 @@ import {
   hasCompleteLoadedHistory, hasVacationInFollowingWeek, isAaOn, isFaOn, isPositivePreference,
   isStaffActiveOn, labelForAbsence, listOwnRoleDates, monthForIso, parseIso,
   projectedWeekendEquivalent, severityRank, toLocalIso, weekendEquivalentFromMap, weekendMap
-} from './rules-core.js?v=20260730.3';
+} from './rules-core.js?v=20260730.4';
 
 function applyBundlingRules({ state, dateIso, role, staffId, push, recommend }) {
   const date = parseIso(dateIso);
@@ -331,3 +331,4 @@ function applyHolidayBlockWarnings(state, staffId, date, push) {
     push('orange', 'Bereits Dienst im alternierenden Oster-/Pfingstblock');
   }
 }
+
