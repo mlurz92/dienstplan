@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, DEFAULT_STAFF, createEmptyMonth } from '../js/defaults.js';
+import { DEFAULT_SETTINGS, DEFAULT_STAFF, normalizeMonthData } from '../js/defaults.js';
 
 export function json(data, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
@@ -36,6 +36,5 @@ export function monthStorageKey(year, month) {
 }
 
 export function ensureMonthShape(year, month, payload) {
-  const base = createEmptyMonth(Number(year), Number(month));
-  return { ...base, ...(payload || {}), days: { ...base.days, ...(payload?.days || {}) } };
+  return normalizeMonthData(year, month, payload);
 }

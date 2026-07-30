@@ -197,6 +197,17 @@ test('BD unmittelbar vor Urlaub wird auch monatsübergreifend erkannt', () => {
   assert.ok(result.reasons.includes('BD unmittelbar vor Urlaubsbeginn'));
 });
 
+test('laufender Urlaub zeigt keine zusätzliche Warnung vor Urlaubsbeginn', () => {
+  const state = stateWith();
+  const data = month(state, 2026, 7);
+  setAbsence(data, 'martin', '2026-07-08', 'urlaub');
+  setAbsence(data, 'martin', '2026-07-09', 'urlaub');
+  const result = evalAt(state, '2026-07-08', 'bd', 'martin');
+  assert.equal(result.level, 'red');
+  assert.ok(result.reasons.includes('Urlaub eingetragen'));
+  assert.equal(result.reasons.includes('BD unmittelbar vor Urlaubsbeginn'), false);
+});
+
 test('Jahresverlauf erscheint nur vollständig geladen und bleibt reine Information', () => {
   const incomplete = stateWith([[2026, 1], [2026, 7]]);
   setAssignment(month(incomplete, 2026, 1), '2026-01-05', 'bd', 'lurz');
@@ -213,10 +224,10 @@ test('Jahresverlauf erscheint nur vollständig geladen und bleibt reine Informat
   assert.equal(higherHistory.level, 'green');
   assert.equal(higherHistory.meta.recommendationScore, lowerHistory.meta.recommendationScore);
   assert.equal(higherHistory.meta.recommendationScore, 0);
-  assert.ok(has(higherHistory, 'nur Hinweis, ohne Einfluss auf Bewertung'));
-  assert.ok(has(higherHistory, 'höhere bisherige Dienstlast'));
-  assert.ok(has(lowerHistory, 'nur Hinweis, ohne Einfluss auf Bewertung'));
-  assert.ok(has(lowerHistory, 'niedrigste bisherige Dienstlast'));
+  assert.ok(has(higherHistory, 'Jahresverlauf: höhere bisherige Dienstlast'));
+  assert.ok(has(lowerHistory, 'Jahresverlauf: niedrigste bisherige Dienstlast'));
+  assert.equal(higherHistory.reasons.some(reason => reason.includes('nur Hinweis, ohne Einfluss auf Bewertung')), false);
+  assert.equal(lowerHistory.reasons.some(reason => reason.includes('nur Hinweis, ohne Einfluss auf Bewertung')), false);
 });
 
 test('Becker/Martin-Regel gilt nur für Urlaub oder FZA', () => {
@@ -287,5 +298,6 @@ test('Jahresverlauf ist im Regelquelltext nicht bewertungswirksam verdrahtet', (
   const rules = readFileSync(new URL('../js/rules-evaluation.js', import.meta.url), 'utf8');
   assert.equal(rules.includes("recommend('Jahresverlauf"), false);
   assert.equal(rules.includes("push('yellow', `Jahresverlauf"), false);
-  assert.match(rules, /note\(`Jahresverlauf \(nur Hinweis, ohne Einfluss auf Bewertung\)/);
+  assert.match(rules, /note\(`Jahresverlauf:/);
+  assert.equal(rules.includes('nur Hinweis, ohne Einfluss auf Bewertung'), false);
 });

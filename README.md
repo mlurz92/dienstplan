@@ -440,8 +440,10 @@ Der Jahresverlauf wird nur betrachtet, wenn:
 
 Dann erscheint beispielsweise:
 
-- „Jahresverlauf (nur Hinweis, ohne Einfluss auf Bewertung): niedrigste bisherige Dienstlast (…)“ oder
-- „Jahresverlauf (nur Hinweis, ohne Einfluss auf Bewertung): höhere bisherige Dienstlast (… statt …)“.
+- „Jahresverlauf: niedrigste bisherige Dienstlast (…)“ oder
+- „Jahresverlauf: höhere bisherige Dienstlast (… statt …)“.
+
+Die technische Einordnung bleibt in dieser Dokumentation erhalten, wird aber nicht als Klammerkommentar in der Kandidatenkarte oder im Tooltip wiederholt.
 
 Verbindliche Zusagen:
 
@@ -453,7 +455,8 @@ Verbindliche Zusagen:
 
 ## 9.9 Urlaubsnähe
 
-- BD unmittelbar vor einem Urlaubstag: orange.
+- BD an einem ansonsten verfügbaren Tag unmittelbar vor einem Urlaubstag: orange.
+- Besteht am bewerteten Tag selbst bereits eine Abwesenheit, wird nur diese tagesbezogene Abwesenheit gemeldet; bei mehrtägigem Urlaub erscheint am ersten oder mittleren Urlaubstag keine zusätzliche Zeile „BD unmittelbar vor Urlaubsbeginn“.
 - Donnerstags-BD vor Urlaub in der folgenden Kalenderwoche: positive Empfehlung als möglicher Urlaubsverlängerer.
 - Die Prüfung funktioniert monatsübergreifend, sofern der Folgemonat geladen ist.
 
@@ -776,7 +779,20 @@ Bei `prefers-reduced-motion` werden nicht notwendige Übergänge reduziert bezie
 - `overrideLog`: unveränderlich anwachsende rote Freigaben;
 - `importLog`: reservierte Importhistorie.
 
-## 15.3 Standardpersonal
+## 15.3 Tiefennormalisierung und defensive Wiederherstellung
+
+Jeder Monat wird beim Serverlesen, lokalen Laden, JSON-Import und Export auf dasselbe vollständige Schema normalisiert. Die Normalisierung arbeitet bis auf Tagesfeldebene:
+
+- fehlende Felder `bd`, `hg`, `rbn1`, `rbn2` und `notes` werden ergänzt;
+- ungültige Feldtypen fallen auf sichere Leerwerte zurück;
+- monatsfremde Tagesangaben werden verworfen;
+- Abwesenheits-, Herkunfts- und Wunschlisten übernehmen nur gültige Tage des Zielmonats;
+- Protokolllisten akzeptieren ausschließlich Objekteinträge;
+- `year` und `month` werden immer aus dem Zielschlüssel abgeleitet und können nicht durch eine widersprechende Nutzlast überschrieben werden.
+
+Dadurch können ältere oder unvollständige Sicherungen gelesen werden, ohne dass einzelne Tagesobjekte anschließend fehlende Eigenschaften besitzen oder fremde Kalendertage in einen Monat eindringen.
+
+## 15.4 Standardpersonal
 
 | ID | Anzeige | Rolle | BD-Soll | Maximum | HG | Samstags-BD | Aktivität |
 |---|---|---|---:|---:|---|---|---|
@@ -811,7 +827,7 @@ lurz → polednia → dalitz → becker → hellmann → martin → elhouba → 
 - geladene Monate in einer `Map`;
 - sichtbares Jahr und Monat;
 - Speicherstatus;
-- Dirty-Flag und Debounce-Timer;
+- Dirty-Flag, monotonen Änderungszähler und Debounce-Timer;
 - Serverbereitschaft;
 - aktuellen Sammelmodus;
 - aktuellen Personendialog;
@@ -842,6 +858,8 @@ lurz → polednia → dalitz → becker → hellmann → martin → elhouba → 
 - wird der Monat zuerst lokal geschrieben;
 - folgt der Server-PUT;
 - wechselt die Statusanzeige zu gespeichert oder offline.
+
+Ein Speichervorgang merkt sich den Änderungszähler bei seinem Start. Trifft seine Serverantwort erst ein, nachdem bereits eine neuere Änderung vorgenommen wurde, darf der ältere Vorgang den Dirty-Status nicht zurücksetzen. Dadurch bleibt eine nachfolgende, noch nicht persistierte Änderung sichtbar und wird beim nächsten Debounce, Monatswechsel oder Schließen weiterhin gesichert.
 
 Beim Schließen versucht `beforeunload`, einen noch schmutzigen Monat zu persistieren. Die lokale Sicherung bleibt die erste Ausfallschicht.
 
@@ -878,7 +896,7 @@ Das Backend besteht aus Cloudflare Pages Functions und einem KV-Binding namens `
 
 ## 17.4 Normalisierung
 
-`ensureMonthShape()` legt zunächst einen vollständigen leeren Monat an und überlagert gespeicherte Nutzdaten. Fehlende Kalendertage werden dadurch ergänzt. Die Funktion bewahrt zusätzliche Monatsfelder und füllt `days` mit dem vollständigen Tagesgerüst auf.
+`ensureMonthShape()` delegiert an dieselbe Tiefennormalisierung wie das Frontend. Nicht nur fehlende Kalendertage, sondern auch fehlende Tagesfelder, ungültige Typen, monatsfremde Datumswerte und fehlerhafte Protokollcontainer werden defensiv behandelt. Der JSON-Import prüft die gesamte Sicherungsstruktur und alle Monatsschlüssel vollständig, bevor der erste KV-Schreibzugriff beginnt; ein später erkannter Strukturfehler kann dadurch keinen bewusst erzeugten Teilimport hinterlassen.
 
 ## 17.5 Antworten
 
@@ -902,7 +920,9 @@ JSON ist das verlustarme Sicherungsformat für Einstellungen, Personal, Monatsda
 
 ## 18.4 JSON-Wiederherstellung
 
-Eine geladene Datei wird als JSON geparst und strukturell geprüft. Die Wiederherstellung kann mehrere Monate enthalten. Serverfehler werden nicht als erfolgreicher Import dargestellt.
+Eine geladene Datei wird vollständig geparst und vor jeder lokalen Zustandsänderung strukturell geprüft. `settings` muss ein Objekt, `staff` und `rbnNames` müssen Arrays und jeder Monat muss ein Paar aus `YYYY-MM` und Monatsobjekt sein. Erst nach erfolgreicher Gesamtprüfung werden die Daten lokal übernommen und tief normalisiert.
+
+Der Server führt dieselbe Vorvalidierung vor seinem ersten KV-Schreibzugriff aus. Schlägt anschließend die Serverübertragung fehl, bleibt der lokal importierte Stand erhalten, die Statusanzeige wechselt jedoch ausdrücklich auf „Lokal importiert – Serverfehler“ und ein Dialog erklärt den Unterschied. Ein lokaler Teilimport wird damit nicht als zentral gespeicherter Erfolg ausgegeben.
 
 ## 18.5 Drucken und PDF
 
@@ -1003,7 +1023,7 @@ Verantwortlich für:
 
 ## 21.4 `js/defaults.js`
 
-Definiert Monatsnamen, Tabellenblätter, Wochentage, Standardeinstellungen, Personalreihenfolge, Standardpersonal, Abwesenheitstypen, Wunschtypen und das leere Monatsschema.
+Definiert Monatsnamen, Tabellenblätter, Wochentage, Standardeinstellungen, Personalreihenfolge, Standardpersonal, Abwesenheitstypen, Wunschtypen, das leere Monatsschema und die gemeinsame Tiefennormalisierung für Monatsdaten.
 
 ## 21.5 `js/holidays.js`
 
@@ -1029,7 +1049,7 @@ DOM-freie Fachquelle für:
 
 ## 21.8 `js/state.js`
 
-Verwaltet Laufzeitstatus, lokale Sicherung, Serverbootstrap, Monatsladen, Historienvorwärmung, Speicherdebounce und Persistierung.
+Verwaltet Laufzeitstatus, lokale Sicherung, Serverbootstrap, Monatsladen, Historienvorwärmung, Speicherdebounce, Änderungszähler und gegen verspätete Serverantworten abgesicherte Persistierung.
 
 ## 21.9 `js/api.js`
 
@@ -1088,6 +1108,7 @@ Definiert Paletten, Farbparsing, Kontrastberechnung, OKLab-/OKLCH-Interpolation,
 │           └── [year]/
 │               └── [month].js
 └── tests/
+    ├── data-integrity.test.js
     ├── delivery.test.js
     ├── historical-loading.test.js
     ├── month-navigation.test.js
@@ -1095,6 +1116,7 @@ Definiert Paletten, Farbparsing, Kontrastberechnung, OKLab-/OKLCH-Interpolation,
     ├── recommendation-rules.test.js
     ├── rule-matrix.test.js
     ├── rules.test.js
+    ├── state-persistence.test.js
     ├── theme.test.js
     └── timezone.test.js
 ```
@@ -1120,6 +1142,7 @@ npm test
 Die Tests decken unter anderem ab:
 
 - harte und weiche Regeln;
+- Unterdrückung redundanter Urlaubsbeginn-Hinweise während einer bereits bestehenden Abwesenheit;
 - Personensonderregeln;
 - monatsübergreifende Abstände;
 - Reihenfolgeunabhängigkeit;
@@ -1135,6 +1158,8 @@ Die Tests decken unter anderem ab:
 - Paletten, Kontrast und Farbinterpolation;
 - Monatsnavigation und Wettlaufschutz;
 - Release-Token und Modulauflösung;
+- Tiefennormalisierung, Import-Vorvalidierung und monatsfremde Daten;
+- Schutz neuer Änderungen vor verspäteten älteren Server-Saves;
 - vollständige Syntaxabdeckung;
 - Service-Worker-Neutralisierung;
 - Cloudflare-Cacheheader.
@@ -1156,6 +1181,18 @@ Bei sonst gleicher Situation müssen unterschiedliche Jahreslasten dieselbe Stuf
 ### Startschwelle des Monatsausgleichs
 
 Vor Erreichen irgendeines BD-Solls darf der Monatsausgleich weder positive noch gelbe relative Gründe erzeugen.
+
+### Keine redundante Urlaubsnähe während Abwesenheit
+
+Eine am bewerteten Tag bestehende Abwesenheit bleibt der maßgebliche Konflikt. Ein unmittelbar folgender weiterer Urlaubstag darf nicht zusätzlich die Warnung „BD unmittelbar vor Urlaubsbeginn“ erzeugen.
+
+### Speicherreihenfolge
+
+Eine ältere Serverantwort darf den Dirty-Status einer später entstandenen Änderung nicht löschen.
+
+### Datenintegrität
+
+Frontend, Monats-API, JSON-Import und Export müssen dasselbe vollständige Monatsschema verwenden.
 
 ---
 
@@ -1203,7 +1240,7 @@ Das Repository wird aus dem Projektstamm bereitgestellt. Pages Functions werden 
 Alle releasekritischen Assets und relativen Browserimporte verwenden denselben `?v=`-Token. Der Build-Stempel in `index.html` muss exakt dazu passen. Für diesen Funktionsstand ist die Kennung:
 
 ```text
-20260730.5
+20260730.6
 ```
 
 Der laufende Stand ist im Browser über `document.documentElement.dataset.build` und im Tooltip des Speicherstatus sichtbar.

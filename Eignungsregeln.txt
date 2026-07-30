@@ -1,4 +1,4 @@
-Regeln und Kriterien für manuelle Kandidatenempfehlungen in DienstplanRAD (v4.1)
+Regeln und Kriterien für manuelle Kandidatenempfehlungen in DienstplanRAD (v4.2)
 
 GRUNDPRINZIPIEN & DATENBASIS:
 - DienstplanRAD enthält keinen automatischen Dienstplaner, keinen Optimierungslauf, keine Iterationszyklen und keine automatischen Tauschvorgänge.
@@ -46,6 +46,7 @@ JAHRESVERLAUF ALS REINER KONTEXTHINWEIS:
 - Eine niedrigere bisherige Jahreslast wird als Text-Hinweis benannt, ohne den Empfehlungswert zu erhöhen.
 - Eine höhere bisherige Jahreslast wird als Text-Hinweis benannt, ohne eine gelbe oder andere Farbstufe auszulösen.
 - Der Hinweis dient ausschließlich der menschlichen Einordnung und darf keine Auswahl sperren, bevorzugen, nachrangig färben oder in den offenen Punkten als Konflikt erscheinen.
+- Der sichtbare Text beginnt knapp mit „Jahresverlauf:“; die technische Erläuterung zur Bewertungsneutralität wird nicht als Klammerkommentar in der Kandidatenkarte ausgegeben.
 
 ÜBERHANG-PRÄFERENZ:
 - Erst wenn alle geeigneten Personen ihr BD-Soll erreicht haben und noch niemand über dem Soll liegt, wird der erste notwendige BD-Überhang bevorzugt Dr. Lurz empfohlen.
@@ -69,7 +70,7 @@ PERSONELLE SONDEREINSCHRÄNKUNGEN:
 
 WEITERE EMPFEHLUNG:
 - Ein Donnerstags-BD wird als positiver „Urlaubsverlängerer“ empfohlen, wenn für die betreffende Person in der folgenden Kalenderwoche Urlaub eingetragen ist.
-- Ein BD unmittelbar vor dem ersten Urlaubstag bleibt unabhängig davon orange nachrangig.
+- Ein BD an einem ansonsten verfügbaren Tag unmittelbar vor dem ersten Urlaubstag bleibt orange nachrangig. Besteht am bewerteten Tag selbst bereits eine Abwesenheit, wird ausschließlich diese tagesbezogene Abwesenheit gemeldet; die zusätzliche Urlaubsbeginn-Warnung entfällt.
 
 ERKLÄRBARKEIT & INVARIANTEN:
 - Jede ausgelöste Regel und jeder relevante reine Kontext-Hinweis erscheint als konkrete Klartextbegründung.

@@ -1,4 +1,4 @@
-import { defaults, getOrInit, json, monthStorageKey } from '../_utils.js';
+import { defaults, ensureMonthShape, getOrInit, json, monthStorageKey } from '../_utils.js';
 
 export async function onRequestGet(context) {
   const base = defaults();
@@ -12,7 +12,7 @@ export async function onRequestGet(context) {
     for (let month = 1; month <= 12; month++) {
       const key = monthStorageKey(year, month);
       const value = await context.env.DIENSTPLAN_KV.get(key, 'json');
-      if (value) months.push([`${year}-${String(month).padStart(2,'0')}`, value]);
+      if (value) months.push([`${year}-${String(month).padStart(2,'0')}`, ensureMonthShape(year, month, value)]);
     }
   }
   return json({ ok: true, settings, staff, rbnNames, months });
