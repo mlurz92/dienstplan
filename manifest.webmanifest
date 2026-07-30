@@ -10,13 +10,13 @@
   "description": "Manueller Radiologie-Dienstplaner mit Cloudflare-KV-Speicherung",
   "icons": [
     {
-      "src": "/icons/icon.svg?v=20260730.8",
+      "src": "/icons/icon.svg?icon=glass-spectrum-1",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "/icons/icon.svg?v=20260730.8",
+      "src": "/icons/icon.svg?icon=glass-spectrum-1",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "maskable"
