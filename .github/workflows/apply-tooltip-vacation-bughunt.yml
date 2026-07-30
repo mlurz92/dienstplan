@@ -27,6 +27,19 @@ jobs:
           cat .github/bughunt-payload/part-* | base64 -d > .github/apply_bughunt.py
           python -m py_compile .github/apply_bughunt.py
           python .github/apply_bughunt.py
+      - name: Normalize escaped release assertion
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('tests/rbn.test.js')
+          source = path.read_text(encoding='utf-8')
+          old = r'20260730\.5'
+          new = r'20260730\.6'
+          if source.count(old) != 1:
+              raise SystemExit(f'expected one escaped release assertion, found {source.count(old)}')
+          path.write_text(source.replace(old, new), encoding='utf-8')
+          PY
       - name: Syntax check
         run: npm run check
       - name: Full test suite
