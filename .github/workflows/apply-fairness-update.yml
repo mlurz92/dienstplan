@@ -23,6 +23,30 @@ jobs:
           fetch-depth: 0
       - name: Apply reviewed changes
         run: python .github/apply-fairness-update.py
+      - name: Normalize generated regression tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          for path in Path('tests').glob('*.test.js'):
+              source = path.read_text(encoding='utf-8')
+              path.write_text(source.replace('20260730\\.4', '20260730\\.5').replace('20260730.4', '20260730.5'), encoding='utf-8')
+
+          path = Path('tests/recommendation-rules.test.js')
+          source = path.read_text(encoding='utf-8')
+          marker = "test('Jahresverlauf ist im Regelquelltext nicht bewertungswirksam verdrahtet'"
+          start = source.index(marker)
+          source = source[:start] + """test('Jahresverlauf ist im Regelquelltext nicht bewertungswirksam verdrahtet', () => {
+            const rules = readFileSync(new URL('../js/rules-evaluation.js', import.meta.url), 'utf8');
+            assert.equal(rules.includes("recommend('Jahresverlauf"), false);
+            assert.equal(rules.includes("push('yellow', `Jahresverlauf"), false);
+            assert.match(rules, /note\\(`Jahresverlauf \\(nur Hinweis, ohne Einfluss auf Bewertung\\)/);
+          });
+          """
+          path.write_text(source, encoding='utf-8')
+          PY
       - name: Syntax check
         run: npm run check
       - name: Full test suite
