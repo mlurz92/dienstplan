@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
+import fs, { readFileSync } from 'node:fs';
 import { createEmptyMonth, DEFAULT_STAFF } from '../js/defaults.js';
 import { collectIssues, evaluateCandidate, getAbsence, setAbsence, setAssignment, setPreference } from '../js/rules.js';
 
@@ -24,7 +24,7 @@ function fillBdTargets(state, year = 2026, monthNo = 7) {
   }
 }
 
-test('BD-Monatsausgleich bevorzugt den größeren Sollrückstand', () => {
+test('BD-Monatsausgleich bleibt inaktiv, solange niemand sein Soll erreicht hat', () => {
   const state = stateWith();
   const data = month(state, 2026, 7);
   setAssignment(data, '2026-07-01', 'bd', 'polednia');
@@ -32,9 +32,23 @@ test('BD-Monatsausgleich bevorzugt den größeren Sollrückstand', () => {
   const lurz = evalAt(state, '2026-07-08', 'bd', 'lurz');
   const polednia = evalAt(state, '2026-07-08', 'bd', 'polednia');
   assert.equal(lurz.level, 'green');
-  assert.ok(has(lurz, 'Monatsausgleich'));
-  assert.equal(polednia.level, 'yellow');
-  assert.ok(has(polednia, 'größeren BD-Rückstand'));
+  assert.equal(polednia.level, 'green');
+  assert.equal(has(lurz, 'Monatsausgleich'), false);
+  assert.equal(has(polednia, 'Monatsausgleich'), false);
+  assert.equal(has(polednia, 'größeren BD-Rückstand'), false);
+});
+
+test('BD-Monatsausgleich startet nach der ersten vollständigen Soll-Erfüllung', () => {
+  const state = stateWith();
+  const data = month(state, 2026, 7);
+  for (const iso of ['2026-07-01', '2026-07-02', '2026-07-03']) setAssignment(data, iso, 'bd', 'polednia');
+  setAbsence(data, 'polednia', '2026-07-08', 'urlaub');
+  const lurz = evalAt(state, '2026-07-08', 'bd', 'lurz');
+  const becker = evalAt(state, '2026-07-08', 'bd', 'becker');
+  assert.equal(lurz.level, 'green');
+  assert.ok(has(lurz, 'Monatsausgleich: noch 4 BD bis zum Soll'));
+  assert.equal(becker.level, 'yellow');
+  assert.ok(has(becker, 'größeren BD-Rückstand (4 statt 3)'));
 });
 
 test('positiver BD-Wunsch erhält die stärkste Empfehlungsgewichtung', () => {
@@ -183,7 +197,7 @@ test('BD unmittelbar vor Urlaub wird auch monatsübergreifend erkannt', () => {
   assert.ok(result.reasons.includes('BD unmittelbar vor Urlaubsbeginn'));
 });
 
-test('Jahreslast wirkt nur bei vollständig geladenen Vormonaten als Tie-Breaker', () => {
+test('Jahresverlauf erscheint nur vollständig geladen und bleibt reine Information', () => {
   const incomplete = stateWith([[2026, 1], [2026, 7]]);
   setAssignment(month(incomplete, 2026, 1), '2026-01-05', 'bd', 'lurz');
   assert.equal(has(evalAt(incomplete, '2026-07-08', 'bd', 'lurz'), 'Jahresverlauf'), false);
@@ -192,8 +206,17 @@ test('Jahreslast wirkt nur bei vollständig geladenen Vormonaten als Tie-Breaker
   const complete = stateWith(allMonths);
   setAssignment(month(complete, 2026, 1), '2026-01-05', 'bd', 'lurz');
   setAssignment(month(complete, 2026, 2), '2026-02-05', 'hg', 'lurz');
-  const result = evalAt(complete, '2026-07-08', 'bd', 'lurz');
-  assert.ok(has(result, 'Jahresverlauf als Tie-Breaker'));
+  const higherHistory = evalAt(complete, '2026-07-08', 'bd', 'lurz');
+  const lowerHistory = evalAt(complete, '2026-07-08', 'bd', 'martin');
+
+  assert.equal(higherHistory.level, lowerHistory.level);
+  assert.equal(higherHistory.level, 'green');
+  assert.equal(higherHistory.meta.recommendationScore, lowerHistory.meta.recommendationScore);
+  assert.equal(higherHistory.meta.recommendationScore, 0);
+  assert.ok(has(higherHistory, 'nur Hinweis, ohne Einfluss auf Bewertung'));
+  assert.ok(has(higherHistory, 'höhere bisherige Dienstlast'));
+  assert.ok(has(lowerHistory, 'nur Hinweis, ohne Einfluss auf Bewertung'));
+  assert.ok(has(lowerHistory, 'niedrigste bisherige Dienstlast'));
 });
 
 test('Becker/Martin-Regel gilt nur für Urlaub oder FZA', () => {
@@ -257,4 +280,12 @@ test('kanonische Regeln beschreiben ausschließlich manuelle Empfehlungen', () =
   assert.match(text, /keinen automatischen Dienstplaner/i);
   assert.match(text, /keine automatische Eintragung/i);
   assert.doesNotMatch(text, /Neural Scheduler|Optimierungszyklen|Cross-Role-Tauschvorgänge/i);
+});
+
+
+test('Jahresverlauf ist im Regelquelltext nicht bewertungswirksam verdrahtet', () => {
+  const rules = readFileSync(new URL('../js/rules-evaluation.js', import.meta.url), 'utf8');
+  assert.equal(rules.includes("recommend('Jahresverlauf"), false);
+  assert.equal(rules.includes("push('yellow', `Jahresverlauf"), false);
+  assert.match(rules, /note\(`Jahresverlauf \(nur Hinweis, ohne Einfluss auf Bewertung\)/);
 });
