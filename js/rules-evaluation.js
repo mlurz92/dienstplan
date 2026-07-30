@@ -1,12 +1,12 @@
-import { holidayBlocks, isFirstRegularWorkdayAfter, isHoliday } from './holidays.js?v=20260730.6';
+import { holidayBlocks, isFirstRegularWorkdayAfter, isHoliday } from './holidays.js?v=20260730.7';
 import {
   addDays, basicallyEligiblePeers, countHgForAaBdExcept, countRoleInMonthExcept,
-  countSaturdayBdExcept, countServicesInLoadedYearExcept, getAbsence, getAbsenceFromState,
+  countSaturdayBdExcept, countServicesInLoadedYearExcept, getAbsenceFromState, getEffectiveAbsence,
   getAssignment, getPlanningStaff, getPreference, getRoleProperties, getStaffById,
   hasCompleteLoadedHistory, hasVacationInFollowingWeek, isAaOn, isFaOn, isPositivePreference,
   isStaffActiveOn, labelForAbsence, listOwnRoleDates, monthForIso, parseIso,
   projectedWeekendEquivalent, severityRank, toLocalIso, weekendEquivalentFromMap, weekendMap
-} from './rules-core.js?v=20260730.6';
+} from './rules-core.js?v=20260730.7';
 
 function applyBundlingRules({ state, dateIso, role, staffId, push, recommend }) {
   const date = parseIso(dateIso);
@@ -96,7 +96,12 @@ function applyMonthlyBdFairness({ state, monthData, dateIso, staffId, currentBd,
 
   const positiveWishExists = peers.some(peer => peer.id !== 'lurz' && isPositivePreference(getPreference(monthData, peer.id, dateIso), 'bd'));
   const allReached = peers.length > 0 && peers.every(peer => countRoleInMonthExcept(monthData, peer.id, 'bd', dateIso) >= (peer.bdTarget || 0));
-  const firstOverhangOpen = allReached && peers.every(peer => countRoleInMonthExcept(monthData, peer.id, 'bd', dateIso) <= (peer.bdTarget || 0));
+  const lurz = getStaffById(state.staff, 'lurz');
+  const lurzBd = countRoleInMonthExcept(monthData, 'lurz', 'bd', dateIso);
+  const lurzNotOverTarget = !lurz?.bdTarget || lurzBd <= lurz.bdTarget;
+  const firstOverhangOpen = allReached
+    && lurzNotOverTarget
+    && peers.every(peer => countRoleInMonthExcept(monthData, peer.id, 'bd', dateIso) <= (peer.bdTarget || 0));
   if (firstOverhangOpen && !positiveWishExists) {
     if (staffId === 'lurz' && currentBd === (person.bdTarget || 0)) recommend('Erster BD-Überhang nach Monatsausgleich bevorzugt bei Dr. Lurz', 35);
     else if (peers.some(peer => peer.id === 'lurz' && countRoleInMonthExcept(monthData, 'lurz', 'bd', dateIso) === (peer.bdTarget || 0))) {
@@ -109,9 +114,9 @@ function applyMonthlyBdFairness({ state, monthData, dateIso, staffId, currentBd,
   if (hasCompleteLoadedHistory(state, year, currentMonth)) {
     const comparable = peers.filter(peer => countRoleInMonthExcept(monthData, peer.id, 'bd', dateIso) === currentBd);
     if (comparable.length > 1) {
-      const histories = comparable.map(peer => countServicesInLoadedYearExcept(state, peer.id, year, dateIso));
+      const histories = comparable.map(peer => countServicesInLoadedYearExcept(state, peer.id, year, dateIso, currentMonth));
       const minimum = Math.min(...histories);
-      const own = countServicesInLoadedYearExcept(state, staffId, year, dateIso);
+      const own = countServicesInLoadedYearExcept(state, staffId, year, dateIso, currentMonth);
       if (own === minimum) note(`Jahresverlauf: niedrigste bisherige Dienstlast (${own})`);
       else note(`Jahresverlauf: höhere bisherige Dienstlast (${own} statt ${minimum})`);
     }
@@ -145,9 +150,9 @@ function applyHgFairness({ state, monthData, dateIso, staffId, currentBd, curren
       return bd + hg === ownTotal;
     });
     if (comparable.length > 1) {
-      const histories = comparable.map(peer => countServicesInLoadedYearExcept(state, peer.id, year, dateIso));
+      const histories = comparable.map(peer => countServicesInLoadedYearExcept(state, peer.id, year, dateIso, currentMonth));
       const minimum = Math.min(...histories);
-      const own = countServicesInLoadedYearExcept(state, staffId, year, dateIso);
+      const own = countServicesInLoadedYearExcept(state, staffId, year, dateIso, currentMonth);
       if (own === minimum) note(`Jahresverlauf: niedrigste bisherige Dienstlast (${own})`);
       else note(`Jahresverlauf: höhere bisherige Dienstlast (${own} statt ${minimum})`);
     }
@@ -208,7 +213,7 @@ export function evaluateCandidate({ state, monthData, dateIso, role, staffId }) 
   if (role === 'bd' && monthData.days?.[dateIso]?.hg === staffId) push('red', 'Gleichzeitige Einteilung in HG und BD am selben Tag');
   if (role === 'hg' && monthData.days?.[dateIso]?.bd === staffId) push('red', 'Gleichzeitige Einteilung in BD und HG am selben Tag');
 
-  const absence = getAbsence(monthData, staffId, dateIso);
+  const absence = getEffectiveAbsence(state, monthData, staffId, dateIso);
   if (absence) push('red', `${labelForAbsence(absence)} eingetragen`);
   const preference = getPreference(monthData, staffId, dateIso);
   if (preference === 'kein-dienst') push('red', 'Wunsch: kein Dienst');
@@ -238,7 +243,7 @@ export function evaluateCandidate({ state, monthData, dateIso, role, staffId }) 
       const middleIso = toLocalIso(middleDate);
       const middleMonth = monthForIso(state, middleIso) || monthData;
       const isWeekdayPattern = [prevBd, middleDate, date].every(item => item.getDay() >= 1 && item.getDay() <= 5);
-      const isBdFzaBd = diff === 2 && isWeekdayPattern && getAbsence(middleMonth, staffId, middleIso) === 'fza';
+      const isBdFzaBd = diff === 2 && isWeekdayPattern && getEffectiveAbsence(state, middleMonth, staffId, middleIso) === 'fza';
       if (diff === 1) push('yellow', 'BD bereits am Vortag');
       else if (isBdFzaBd) push('yellow', 'BD–FZA–BD werktags');
       else if (diff > 1 && diff < 4) push('yellow', 'Kurzer Abstand zum letzten BD');
@@ -298,7 +303,7 @@ export function evaluateCandidate({ state, monthData, dateIso, role, staffId }) 
     currentBd,
     currentHg,
     recommendationScore,
-    historicalServices: countServicesInLoadedYearExcept(state, staffId, Number(dateIso.slice(0, 4)), dateIso)
+    historicalServices: countServicesInLoadedYearExcept(state, staffId, Number(dateIso.slice(0, 4)), dateIso, Number(dateIso.slice(5, 7)))
   };
   if (blocked) return { level: 'gray', reasons, canSelect: false, meta };
   return { level, reasons, canSelect: true, meta };

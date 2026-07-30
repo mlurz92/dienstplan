@@ -58,7 +58,9 @@ function importContext(payload) {
       }),
       env: {
         DIENSTPLAN_KV: {
-          put: async (key, value) => writes.set(key, value)
+          get: async key => writes.get(key) ?? null,
+          put: async (key, value) => writes.set(key, value),
+          delete: async key => writes.delete(key)
         }
       }
     }

@@ -1,4 +1,4 @@
-import { defaults, getOrInit, json } from '../_utils.js';
+import { defaults, getOrInit, json, normalizedBootstrap } from '../_utils.js';
 
 export async function onRequestGet(context) {
   const base = defaults();
@@ -7,5 +7,5 @@ export async function onRequestGet(context) {
     getOrInit(context, 'app:staff', base.staff),
     getOrInit(context, 'app:rbn-names', base.rbnNames)
   ]);
-  return json({ ok: true, settings, staff, rbnNames });
+  return json({ ok: true, ...normalizedBootstrap({ settings, staff, rbnNames }) });
 }

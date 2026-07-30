@@ -1240,7 +1240,7 @@ Das Repository wird aus dem Projektstamm bereitgestellt. Pages Functions werden 
 Alle releasekritischen Assets und relativen Browserimporte verwenden denselben `?v=`-Token. Der Build-Stempel in `index.html` muss exakt dazu passen. Für diesen Funktionsstand ist die Kennung:
 
 ```text
-20260730.6
+20260730.7
 ```
 
 Der laufende Stand ist im Browser über `document.documentElement.dataset.build` und im Tooltip des Speicherstatus sichtbar.
@@ -1399,3 +1399,20 @@ Für die aktuelle Fairnesslogik gelten zwei besonders wichtige Leitplanken:
 
 1. **Der BD-Monatsausgleich greift erst, nachdem mindestens eine Person ihr Monats-Soll erreicht hat.**
 2. **Der Jahresverlauf bleibt ein reiner Text-Hinweis und beeinflusst weder Farbe noch Empfehlungswert.**
+
+---
+
+# 30. Konsistenzhärtung 20260730.7
+
+- **Becker-FZA:** echtes dienstfreies FZA nach Samstags-BD; BD und HG sind gesperrt, Tagesfairness und CT-Leitungsregel verwenden dieselbe wirksame Abwesenheit.
+- **Jahresverlauf:** Vormonate plus vollständiger aktueller Monat; keine Folgemonate; leere Fehler-Fallbacks gelten nicht als vollständige Historie.
+- **Überhang:** ausschließlich am konkreten Tag verfügbare Personen; Dr.-Lurz-Präferenz nur, solange Dr. Lurz nicht bereits über Soll liegt.
+- **Vollsicherung:** Cloudflare KV wird dynamisch nach sämtlichen Monatskeys durchsucht; kein festes Endjahr mehr.
+- **Excel:** explizite Jahresbestätigung bei fehlender Angabe, unbekannte Namen und Serverfehler werden sichtbar, manuelle Werte bleiben erhalten.
+- **Validierung:** eindeutige Personal-IDs, Pflichtfelder, ISO-Daten, boolesche Eigenschaften, nichtnegative Zahlen und doppelte Monate werden geprüft.
+- **Serverimport:** vorvalidiert und bei KV-Fehlern mit Rohwert-Snapshots bestmöglich vollständig zurückgesetzt.
+- **Personalmodell:** Kernreihenfolge bleibt stabil; zusätzliche valide Personen werden anschließend auswählbar ergänzt.
+- **Persistenz:** sofortige lokale Sicherung und pro Monat geführter Unsynchronisiert-Zustand; ältere Antworten können keinen neueren Status auf „Gespeichert“ setzen.
+- **Betriebsmodell:** ausdrücklich Einzelbearbeitung, kein paralleler Mehrbenutzerbetrieb.
+- **CI:** permanenter GitHub-Actions-Workflow mit `npm ci`, Syntaxprüfung, Unit-Tests und realen Chromium-Tests über Playwright.
+

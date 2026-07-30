@@ -1,10 +1,10 @@
-import { ABSENCE_TYPES, MONTH_NAMES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, toIsoDate } from './defaults.js?v=20260730.6';
-import { state, bootstrapState, getMonthData, getMonthLabel, loadMonth, persistCurrentMonth, persistMonth, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260730.6';
-import { api } from './api.js?v=20260730.6';
-import { applyMonthTheme, prefersReducedMotion } from './theme.js?v=20260730.6';
-import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260730.6';
-import { buildStats, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getPlanningStaff, getPreference, getStaffById, labelForAbsence, labelForPreference, setAbsence, setAssignment, setPreference, weekdayLabel } from './rules.js?v=20260730.6';
-import { getRbnOptions, isRbnValueAllowed, isSecondRbnAvailable } from './rbn.js?v=20260730.6';
+import { ABSENCE_TYPES, MONTH_NAMES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, normalizeBackupPayload, toIsoDate } from './defaults.js?v=20260730.7';
+import { state, bootstrapState, getMonthData, getMonthLabel, loadMonth, markMonthDirty, persistCurrentMonth, persistMonth, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260730.7';
+import { api } from './api.js?v=20260730.7';
+import { applyMonthTheme, prefersReducedMotion } from './theme.js?v=20260730.7';
+import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260730.7';
+import { buildStats, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getEffectiveAbsence, getPlanningStaff, getPreference, getStaffById, labelForAbsence, labelForPreference, setAbsence, setAssignment, setPreference, weekdayLabel } from './rules.js?v=20260730.7';
+import { getRbnOptions, isRbnValueAllowed, isSecondRbnAvailable } from './rbn.js?v=20260730.7';
 
 const $ = selector => document.querySelector(selector);
 
@@ -61,7 +61,7 @@ function monthOrdinal(year, month) {
 }
 
 window.addEventListener('DOMContentLoaded', init);
-window.addEventListener('beforeunload', async () => { if (state.dirty) await persistCurrentMonth(); });
+window.addEventListener('beforeunload', () => { if (state.dirty) persistCurrentMonth(); });
 
 /**
  * Auslieferungsstempel aus dem Kopf der Seite in den DOM und die Konsole
@@ -265,7 +265,7 @@ function buildAssignmentButton(dateIso, role, staffId, monthData) {
   const button = document.createElement('button');
   button.className = 'assignment-btn';
   const person = getStaffById(state.staff, staffId);
-  const name = person?.name || '—';
+  const name = person?.name || (staffId ? `Unbekannte ID: ${staffId}` : '—');
   const evaluation = staffId ? evaluateCandidate({ state, monthData, dateIso, role, staffId }) : { level: 'green', reasons: [] };
   button.innerHTML = `
     <span class="assignment-name">${esc(name)}</span>
@@ -362,10 +362,11 @@ function buildAbsenceSummary(dateIso, monthData) {
   const details = [];
 
   const beckerAbsence = getAbsence(monthData, 'becker', dateIso);
-  const derivedBeckerFza = isBeckerFzaAfterSaturdayBd(dateIso);
-  if (derivedBeckerFza && (!beckerAbsence || beckerAbsence === 'fza')) {
+  const effectiveBeckerAbsence = getEffectiveAbsence(state, monthData, 'becker', dateIso);
+  const derivedBeckerFza = effectiveBeckerAbsence === 'fza' && !beckerAbsence;
+  if (derivedBeckerFza) {
     entries.push({ name: 'Becker', detail: 'FZA' });
-    details.push('Becker: FZA – automatisch aus Samstags-BD für den nächsten regulären Werktag abgeleitet');
+    details.push('Becker: FZA – echter dienstfreier Tag, automatisch aus Samstags-BD für den nächsten regulären Werktag abgeleitet');
   }
 
   for (const person of state.staff.filter(item => item.includeInAbsenceList)) {
@@ -714,11 +715,14 @@ function shiftMonth(delta) {
 function markDirty() {
   const year = state.currentYear;
   const month = state.currentMonth;
+  setMonthData(year, month, getMonthData(year, month));
   scheduleSave(async () => {
     setStatus('saving', 'Speichert …');
-    await persistMonth(year, month);
-    setStatus(state.serverReady ? 'saved' : 'offline', state.serverReady ? 'Gespeichert' : 'Offline gespeichert');
-  });
+    const result = await persistMonth(year, month);
+    if (!result.ok) setStatus('offline', 'Offline – lokal gesichert');
+    else if (state.dirty) setStatus('saving', 'Weitere Änderungen ausstehend …');
+    else setStatus('saved', 'Gespeichert');
+  }, year, month);
 }
 
 function setStatus(mode, text) {
@@ -806,98 +810,107 @@ async function releaseLegacyServiceWorker() {
 async function onExcelImport(event) {
   const file = event.target.files?.[0];
   if (!file) return;
-  if (!window.XLSX) { alert('Excel-Bibliothek noch nicht geladen.'); return; }
+  const reset = () => { event.target.value = ''; };
+  if (!window.XLSX) { alert('Excel-Bibliothek noch nicht geladen.'); reset(); return; }
   let workbook;
-  try {
-    workbook = XLSX.read(await file.arrayBuffer(), { type: 'array' });
-  } catch (error) {
-    alert(`Excel-Datei konnte nicht gelesen werden: ${error.message}`);
-    event.target.value = '';
-    return;
+  try { workbook = XLSX.read(await file.arrayBuffer(), { type: 'array' }); }
+  catch (error) { alert(`Excel-Datei konnte nicht gelesen werden: ${error.message}`); reset(); return; }
+
+  const recognized = workbook.SheetNames.filter(sheetName => monthNameBySheet[sheetName]);
+  if (!recognized.length) { alert(`Keine unterstützten Monatsblätter gefunden. Erwartet werden: ${SHEET_NAMES.join(', ')}.`); reset(); return; }
+  const missingYearSheets = recognized.filter(sheetName => !detectSheetYear(workbook.Sheets[sheetName]));
+  const fallbackYear = state.currentYear;
+  if (missingYearSheets.length && !confirm(`In ${missingYearSheets.join(', ')} wurde keine eindeutige Jahreszahl gefunden.\n\nDiese Blätter dem aktuell ausgewählten Jahr ${fallbackYear} zuordnen?`)) { reset(); return; }
+
+  const summaries = [];
+  const touched = new Map();
+  for (const sheetName of recognized) {
+    const imported = importMonthSheet(sheetName, workbook.Sheets[sheetName], fallbackYear);
+    if (!imported) { summaries.push(`${sheetName}: keine verwertbare Tageszeile gefunden`); continue; }
+    const targetMonth = getMonthData(imported.year, imported.month);
+    const merge = mergeMonthData(targetMonth, imported.monthData);
+    setMonthData(imported.year, imported.month, targetMonth);
+    markMonthDirty(imported.year, imported.month);
+    touched.set(`${imported.year}-${String(imported.month).padStart(2, '0')}`, [imported.year, imported.month]);
+    summaries.push(`${sheetName} ${imported.year}: ${imported.assignments} Dienste, ${imported.absences} Abwesenheiten erkannt; ${merge.added} ergänzt, ${merge.preserved} bestehende manuelle Werte bewahrt${imported.unknownNames.length ? `; unbekannte Namen: ${imported.unknownNames.join(', ')}` : ''}`);
   }
-  const summary = [];
-  const touchedMonths = [];
-  for (const sheetName of workbook.SheetNames) {
-    const month = monthNameBySheet[sheetName];
-    if (!month) continue;
-    const sheet = workbook.Sheets[sheetName];
-    const imported = importMonthSheet(sheetName, sheet);
-    if (imported) {
-      const targetMonth = getMonthData(imported.year, imported.month);
-      mergeMonthData(targetMonth, imported.monthData);
-      summary.push(`${sheetName}: ${imported.log.join(', ') || 'importiert'}`);
-      setMonthData(imported.year, imported.month, targetMonth);
-      touchedMonths.push([imported.year, imported.month]);
-      if (imported.year === state.currentYear && imported.month === state.currentMonth) render();
-    }
-  }
-  for (const [year, month] of touchedMonths) {
-    try { await api.saveMonth(year, month, getMonthData(year, month)); } catch {}
-  }
+  if (!touched.size) { alert(`Excel-Import ohne Änderungen beendet.\n\n${summaries.join('\n')}`); reset(); return; }
+
+  const saveResults = await Promise.all([...touched.values()].map(async ([year, month]) => ({ year, month, result: await persistMonth(year, month) })));
+  const failed = saveResults.filter(item => !item.result.ok);
+  if (failed.length) setStatus('offline', `Excel lokal importiert – ${failed.length} Serverfehler`);
+  else if (state.dirty) setStatus('saving', 'Weitere Änderungen ausstehend …');
+  else setStatus('saved', 'Excel-Import gespeichert');
   render();
-  alert(`Import abgeschlossen.\n\n${summary.join('\n')}`);
-  event.target.value = '';
+  alert(`Excel-Import abgeschlossen.\n\n${summaries.join('\n')}\n\n${failed.length ? `Nur lokal gesichert für: ${failed.map(item => `${item.year}-${String(item.month).padStart(2, '0')}`).join(', ')}.` : 'Alle betroffenen Monate wurden lokal und auf dem Server gespeichert.'}`);
+  reset();
 }
 
-function importMonthSheet(sheetName, sheet) {
+function detectSheetYear(sheet) {
+  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+  for (const row of rows.slice(0, 12)) for (const cell of row.slice(0, 12)) {
+    const match = String(cell || '').match(/\b(20\d{2})\b/);
+    if (match) return Number(match[1]);
+  }
+  return null;
+}
+
+function importMonthSheet(sheetName, sheet, fallbackYear) {
   const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
   const dayRowIndex = rows.findIndex(row => row.slice(2).filter(cell => Number.isFinite(Number(cell)) && Number(cell) >= 1 && Number(cell) <= 31).length >= 20);
   if (dayRowIndex < 0) return null;
-  const yearCell = String(rows[0]?.[0] || rows[1]?.[0] || '').match(/20\d{2}/);
-  const year = yearCell ? Number(yearCell[0]) : state.currentYear;
+  const year = detectSheetYear(sheet) || fallbackYear;
   const month = monthNameBySheet[sheetName];
   const monthData = createEmptyMonth(year, month);
-  const log = [];
-
+  const daysInMonth = new Date(year, month, 0).getDate();
   const dayCols = [];
   rows[dayRowIndex].forEach((cell, index) => {
-    const n = Number(cell);
-    const daysInMonth = new Date(year, month, 0).getDate();
-    if (index >= 2 && Number.isInteger(n) && n >= 1 && n <= daysInMonth) dayCols.push({ col: index, day: n, iso: toIsoDate(year, month, n) });
+    const day = Number(cell);
+    if (index >= 2 && Number.isInteger(day) && day >= 1 && day <= daysInMonth) dayCols.push({ col: index, iso: toIsoDate(year, month, day) });
   });
-
   const normalizeName = name => String(name || '').replace(/\s+/g, ' ').trim().toLowerCase();
   const staffMap = new Map(state.staff.map(person => [normalizeName(person.name), person.id]));
-  staffMap.set('dr. lurz', 'lurz'); staffMap.set('dr. martin', 'martin'); staffMap.set('fr. dalitz', 'dalitz'); staffMap.set('dr. becker', 'becker'); staffMap.set('dr. polednia', 'polednia'); staffMap.set('hr. el houba', 'elhouba'); staffMap.set('fr. licenji', 'licenji'); staffMap.set('hr. sebastian', 'sebastian'); staffMap.set('fr. hellmann', 'hellmann'); staffMap.set('prof. schäfer', 'schaefer');
-
-  for (let r = 0; r < rows.length; r++) {
-    const name = normalizeName(rows[r]?.[0]);
-    const type = normalizeName(rows[r]?.[1]);
+  [['dr. lurz','lurz'],['dr. martin','martin'],['fr. dalitz','dalitz'],['dr. becker','becker'],['dr. polednia','polednia'],['hr. el houba','elhouba'],['fr. licenji','licenji'],['hr. sebastian','sebastian'],['fr. hellmann','hellmann'],['prof. schäfer','schaefer']].forEach(([name,id]) => staffMap.set(name,id));
+  const absenceMap = { U:'urlaub', F:'fza', FZA:'fza', WB:'weiterbildung', K:'sonstige', KK:'sonstige', ZU:'sonstige', '§15C':'sonstige', DR:'sonstige' };
+  let assignments = 0;
+  let absences = 0;
+  const unknownNames = new Set();
+  for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
+    const name = normalizeName(rows[rowIndex]?.[0]);
+    const type = normalizeName(rows[rowIndex]?.[1]);
     if (!name || type !== 'arbeitsplatz') continue;
     const staffId = staffMap.get(name);
-    if (!staffId) continue;
-    const dutyRow = rows[r + 1] || [];
+    if (!staffId) { unknownNames.add(String(rows[rowIndex]?.[0] || '').trim()); continue; }
+    const dutyRow = rows[rowIndex + 1] || [];
     dayCols.forEach(({ col, iso }) => {
-      const workplaceValue = String(rows[r][col] || '').trim();
+      const workplaceValue = String(rows[rowIndex][col] || '').trim().toUpperCase();
       const dutyValue = String(dutyRow[col] || '').trim().toUpperCase();
-      const absenceMap = { 'U': 'urlaub', 'F': 'fza', 'FZA': 'fza', 'WB': 'weiterbildung', 'K': 'sonstige', 'KK': 'sonstige', 'ZU': 'sonstige', '§15C': 'sonstige', 'DR': 'sonstige' };
-      if (workplaceValue) {
-        const key = workplaceValue.toUpperCase();
-        if (absenceMap[key]) setAbsence(monthData, staffId, iso, absenceMap[key], 'import');
-      }
-      if (dutyValue === 'D') setAssignment(monthData, iso, 'bd', staffId);
-      else if (dutyValue === 'HG') setAssignment(monthData, iso, 'hg', staffId);
+      if (absenceMap[workplaceValue]) { setAbsence(monthData, staffId, iso, absenceMap[workplaceValue], 'import'); absences += 1; }
+      if (dutyValue === 'D') { setAssignment(monthData, iso, 'bd', staffId); assignments += 1; }
+      else if (dutyValue === 'HG') { setAssignment(monthData, iso, 'hg', staffId); assignments += 1; }
     });
   }
-  log.push('Monat ergänzt');
-  return { year, month, monthData, log };
+  return { year, month, monthData, assignments, absences, unknownNames: [...unknownNames] };
 }
 
 function mergeMonthData(target, source) {
+  let added = 0;
+  let preserved = 0;
   for (const [iso, day] of Object.entries(source.days || {})) {
-    target.days[iso] ||= { bd: '', hg: '', rbn1: '', rbn2: '', notes: '' };
-    if (!target.days[iso].bd && day.bd) target.days[iso].bd = day.bd;
-    if (!target.days[iso].hg && day.hg) target.days[iso].hg = day.hg;
-  }
-  for (const [staffId, absMap] of Object.entries(source.absences || {})) {
-    for (const [iso, type] of Object.entries(absMap)) {
-      const sourceType = getAbsenceSource(source, staffId, iso) || 'import';
-      setAbsence(target, staffId, iso, type, sourceType);
+    target.days[iso] ||= { bd:'', hg:'', rbn1:'', rbn2:'', notes:'' };
+    for (const role of ['bd','hg']) {
+      if (!day[role]) continue;
+      if (!target.days[iso][role]) { target.days[iso][role] = day[role]; added += 1; }
+      else preserved += 1;
     }
   }
-  for (const [staffId, prefMap] of Object.entries(source.preferences || {})) {
-    for (const [iso, type] of Object.entries(prefMap)) setPreference(target, staffId, iso, type);
+  for (const [staffId, absMap] of Object.entries(source.absences || {})) for (const [iso, type] of Object.entries(absMap)) {
+    const existing = getAbsence(target, staffId, iso);
+    const existingSource = getAbsenceSource(target, staffId, iso);
+    if (!existing || existingSource === 'import') { setAbsence(target, staffId, iso, type, 'import'); added += 1; }
+    else preserved += 1;
   }
+  return { added, preserved };
 }
 
 function exportCurrentMonthToExcel() {
@@ -929,42 +942,18 @@ async function onJsonImport(event) {
   const file = event.target.files?.[0];
   if (!file) return;
   let payload;
-  let monthEntries;
-  try {
-    payload = JSON.parse(await file.text());
-    if (!isPlainRecord(payload)) throw new Error('Die Wurzel muss ein JSON-Objekt sein.');
-    if ('settings' in payload && !isPlainRecord(payload.settings)) throw new Error('„settings“ muss ein JSON-Objekt sein.');
-    if ('staff' in payload && !Array.isArray(payload.staff)) throw new Error('„staff“ muss ein Array sein.');
-    if ('rbnNames' in payload && !Array.isArray(payload.rbnNames)) throw new Error('„rbnNames“ muss ein Array sein.');
-    monthEntries = payload.months ?? [];
-    if (!Array.isArray(monthEntries)) throw new Error('„months“ muss ein Array sein.');
-    for (const entry of monthEntries) {
-      if (!Array.isArray(entry) || entry.length !== 2 || !/^\d{4}-(0[1-9]|1[0-2])$/.test(entry[0]) || !isPlainRecord(entry[1])) {
-        throw new Error('Jeder Monat muss als [„YYYY-MM“, Monatsobjekt] vorliegen.');
-      }
-    }
-  } catch (error) {
-    alert(`JSON-Sicherung konnte nicht gelesen werden: ${error.message}`);
-    event.target.value = '';
-    return;
-  }
-
+  try { payload = normalizeBackupPayload(JSON.parse(await file.text()), { strict: true }); }
+  catch (error) { alert(`JSON-Sicherung konnte nicht gelesen werden: ${error.message}`); event.target.value = ''; return; }
   if ('settings' in payload) state.settings = payload.settings;
   if ('staff' in payload) state.staff = payload.staff;
   if ('rbnNames' in payload) state.rbnNames = payload.rbnNames;
-  for (const [key, monthPayload] of monthEntries) {
+  for (const [key, monthPayload] of payload.months || []) {
     const [year, month] = key.split('-').map(Number);
     setMonthData(year, month, monthPayload);
   }
   saveLocalBootstrap();
-
-  try {
-    await api.importJson(payload);
-    setStatus('saved', 'Import gespeichert');
-  } catch (error) {
-    setStatus('offline', 'Lokal importiert – Serverfehler');
-    alert(`Die Sicherung wurde lokal übernommen, konnte aber nicht auf dem Server gespeichert werden: ${error.message}`);
-  }
+  try { await api.importJson(payload); setStatus('saved', 'Import gespeichert'); }
+  catch (error) { setStatus('offline', 'Lokal importiert – Serverfehler'); alert(`Die Sicherung wurde lokal übernommen, der Serverimport wurde zurückgerollt: ${error.message}`); }
   render();
   event.target.value = '';
 }

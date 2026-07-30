@@ -1,27 +1,32 @@
-Regeln und Kriterien für manuelle Kandidatenempfehlungen in DienstplanRAD (v4.2)
+Regeln und Kriterien für manuelle Kandidatenempfehlungen in DienstplanRAD (v4.3)
 
 GRUNDPRINZIPIEN & DATENBASIS:
 - DienstplanRAD enthält keinen automatischen Dienstplaner, keinen Optimierungslauf, keine Iterationszyklen und keine automatischen Tauschvorgänge.
-- Jeder Bereitschaftsdienst (BD), Hintergrunddienst (HG) und jede Änderung wird ausschließlich durch eine bewusste manuelle Auswahl eingetragen.
+- Es erfolgt keine automatische Eintragung oder Umbesetzung. Jeder Bereitschaftsdienst (BD), Hintergrunddienst (HG) und jede Änderung wird ausschließlich durch eine bewusste manuelle Auswahl eingetragen.
 - Die Anwendung bewertet für den angeklickten Tag und die angeklickte Rolle alle aktiven Personen seiteneffektfrei. Eine Bewertung erzeugt, löscht, verschiebt oder überschreibt keinen Dienst.
 - Bereits manuell eingetragene Dienste bleiben unangetastete Fixpunkte. Empfehlungen passen den Plan nicht selbstständig um diese Einträge herum an.
 - Die Empfehlungen werden primär durch Qualifikation, harte Konflikte und die Ausgewogenheit innerhalb des aktuellen Monats bestimmt.
-- Vollständig geladene historische Monatsdaten seit dem 01.01. des Jahres dürfen bei im aktuellen Monat gleichauf liegenden Kandidaten ausschließlich als zusätzlicher Klartext-Hinweis angezeigt werden. Der Jahresverlauf verändert weder Farbstufe noch Empfehlungswert. Unvollständige Jahresdaten erzeugen keinen Jahres-Hinweis.
+- Die Feiertagsregion ist fachlich fest auf Sachsen (SN) gesetzt und keine frei konfigurierbare Einstellung.
+- Die Anwendung ist als Einzelbearbeiter-System ausgelegt. Ein paralleler Mehrbenutzerbetrieb mit konkurrierenden Schreibzugriffen ist nicht vorgesehen.
 - Positive Dienstwünsche werden als starke Empfehlung berücksichtigt. „Kein BD“, „Kein HG“ und „Kein Dienst“ erzeugen für die betroffene Rolle einen roten Konflikt.
 
-BESETZUNG & QUALIFIKATION:
+BESETZUNG, PERSONALDATEN & QUALIFIKATION:
 - Pro Kalendertag existiert genau ein manuell zu besetzendes Feld für BD und genau ein manuell zu besetzendes Feld für HG.
 - Samstags-BD dürfen nur von am Diensttag entsprechend qualifizierten Fachärzten geleistet werden.
 - HG dürfen nur von am Diensttag entsprechend qualifizierten Fachärzten geleistet werden.
 - Assistenzärzte dürfen BD montags bis freitags sowie sonntags übernehmen, jedoch keinen Samstags-BD und keinen HG.
 - Dieselbe Person darf am selben Tag nicht gleichzeitig BD und HG übernehmen; dies ist ein roter Konflikt.
-- Eine eingetragene Abwesenheit ist für BD und HG am selben Tag ein roter Konflikt.
+- Eine eingetragene oder fachlich abgeleitete wirksame Abwesenheit ist für BD und HG am selben Tag ein roter Konflikt.
+- Personal-IDs müssen eindeutig und strukturell gültig sein. Unbekannte Personal-IDs sind Datenintegritätsfehler und werden niemals automatisch als Assistenzarzt interpretiert.
+- Die historische Kernreihenfolge bleibt unverändert. Zusätzliche valide, aktive und planbare Personen werden anschließend in stabiler Reihenfolge im Picker und in den Fairnessvergleichen ergänzt.
 
-RUHEZEITEN & DIENSTFOLGEN:
+RUHEZEITEN, FREIZEITAUSGLEICH & DIENSTFOLGEN:
 - Nach einem gewöhnlichen BD wird kein FZA automatisch eingetragen oder angezeigt.
-- Ausschließlich bei Dr. Becker wird nach einem Samstags-BD am nächsten regulären Werktag ein FZA abgeleitet und angezeigt.
+- Ausschließlich bei Dr. Becker wird nach einem Samstags-BD am nächsten regulären Werktag ein echtes FZA abgeleitet und angezeigt.
+- Dieses abgeleitete Becker-FZA ist ein vollwertiger dienstfreier Tag: Es sperrt sowohl BD als auch HG, entfernt Dr. Becker aus den tagesbezogenen Eignungs- und Fairnessvergleichen und zählt bei der CT-Leitungsregel als Abwesenheit.
+- Eine am selben Tag zusätzlich manuell gepflegte Abwesenheit bleibt vorrangig sichtbar; das abgeleitete FZA erzeugt keinen doppelten Eintrag.
 - Ein eigener weiterer BD mit weniger als drei dienstfreien Tagen Abstand erzeugt lediglich einen gelben Hinweis, keinen automatischen roten oder orangefarbenen Konflikt. Die Prüfung erfolgt symmetrisch zum vorherigen und zum folgenden BD.
-- Das werktägliche Muster BD–FZA–BD wird als eigener gelber Hinweis ausgewiesen.
+- Das werktägliche Muster BD–FZA–BD wird als eigener gelber Hinweis ausgewiesen; dabei zählt auch das fachlich abgeleitete Becker-FZA.
 - Ein HG unmittelbar vor dem eigenen BD ist grundsätzlich nachrangig (orange), außer bei der zulässigen Kopplung Freitag-HG auf Samstags-BD oder wenn der am HG-Tag eingeteilte BD ebenfalls von einem Facharzt geleistet wird.
 - HG-Häufungen werden symmetrisch in beide Zeitrichtungen geprüft: erneuter HG innerhalb von drei Kalendertagen gelb, dritter HG in einer Dreierkette orange.
 
@@ -34,25 +39,30 @@ WOCHENEND- & FEIERTAGSLOGIK:
 - Oster- und Pfingstblock alternieren. Ein Dienst in beiden Blöcken ist orange nachrangig.
 
 MONATSFAIRNESS & HG-AUSGLEICH:
-- Der relative BD-Monatsausgleich beginnt erst, wenn mindestens eine am betrachteten Datum aktive planbare Person mit positivem BD-Soll ihr Soll im laufenden Monat vollständig erreicht hat. Der gerade bewertete Tag wird dabei aus der Zählung ausgeschlossen, damit Vorschlag und bestehende Einteilung selbstkonsistent bleiben.
+- Der relative BD-Monatsausgleich beginnt erst, wenn mindestens eine am betrachteten Datum aktive planbare Person mit positivem BD-Soll ihr Soll im laufenden Monat vollständig erreicht hat. Der gerade bewertete Tag wird aus der Zählung ausgeschlossen, damit Vorschlag und bestehende Einteilung selbstkonsistent bleiben.
 - Solange niemand sein BD-Soll erreicht hat, erzeugt der unterschiedliche Sollrückstand weder eine positive Monatsausgleichsempfehlung noch eine gelbe relative Nachrangigkeit.
-- Nach Aktivierung des Monatsausgleichs wird der jeweilige Monats-Sollrückstand der am konkreten Tag grundsätzlich geeigneten BD-Personen verglichen. Personen mit dem größten Rückstand werden positiv erklärt; ein kleinerer Rückstand wird gelb gegenüber dem größten Rückstand kenntlich gemacht.
+- Nach Aktivierung des Monatsausgleichs wird der jeweilige Monats-Sollrückstand ausschließlich zwischen den am konkreten Tag grundsätzlich verfügbaren und geeigneten BD-Personen verglichen. Abwesende, blockierte oder fachlich ungeeignete Personen beeinflussen den Tagesvergleich nicht.
+- Personen mit dem größten Rückstand werden positiv erklärt; ein kleinerer Rückstand wird gelb gegenüber dem größten Rückstand kenntlich gemacht.
 - Ein erreichtes individuelles BD-Soll erzeugt unabhängig davon einen gelben Richtwerthinweis. Ein ausdrücklich gesetztes hartes Monatsmaximum erzeugt beim zusätzlichen BD einen roten Konflikt.
-- Bei HG wird die kombinierte Monatslast aus BD und HG innerhalb der Facharztgruppe verglichen. Dadurch erhält ein Facharzt mit geringerer kombinierter Monatslast die positive Präferenz. Diese HG-Regel besitzt keine BD-Soll-Startschwelle.
+- Bei HG wird die kombinierte Monatslast aus BD und HG innerhalb der am konkreten Tag verfügbaren Facharztgruppe verglichen. Diese HG-Regel besitzt keine BD-Soll-Startschwelle.
 - Bei einem HG zu einem Assistenzarzt-BD wird zusätzlich die bisherige Anzahl belastender HG für Assistenzarzt-BD innerhalb der Facharztgruppe ausgeglichen.
 
 JAHRESVERLAUF ALS REINER KONTEXTHINWEIS:
-- Der Jahresverlauf wird nur angezeigt, wenn alle Vormonate des laufenden Jahres geladen sind und mehrere Personen im maßgeblichen aktuellen Monatsvergleich gleichauf liegen.
+- Der Jahresverlauf wird nur angezeigt, wenn alle Vormonate des laufenden Jahres tatsächlich vom Server oder aus einer vorhandenen lokalen Sicherung geladen sind und mehrere Personen im maßgeblichen aktuellen Monatsvergleich gleichauf liegen.
+- Ein lediglich wegen eines Ladefehlers erzeugter leerer Fallback-Monat gilt nicht als vollständige Historie und unterdrückt den Jahres-Hinweis.
+- Gezählt werden alle Dienste der Vormonate sowie der vollständige aktuelle Monat. Dienste aus Folgemonaten werden nicht berücksichtigt; der gerade bewertete Tag wird ausgeschlossen.
 - Eine niedrigere bisherige Jahreslast wird als Text-Hinweis benannt, ohne den Empfehlungswert zu erhöhen.
 - Eine höhere bisherige Jahreslast wird als Text-Hinweis benannt, ohne eine gelbe oder andere Farbstufe auszulösen.
 - Der Hinweis dient ausschließlich der menschlichen Einordnung und darf keine Auswahl sperren, bevorzugen, nachrangig färben oder in den offenen Punkten als Konflikt erscheinen.
 - Der sichtbare Text beginnt knapp mit „Jahresverlauf:“; die technische Erläuterung zur Bewertungsneutralität wird nicht als Klammerkommentar in der Kandidatenkarte ausgegeben.
 
 ÜBERHANG-PRÄFERENZ:
-- Erst wenn alle geeigneten Personen ihr BD-Soll erreicht haben und noch niemand über dem Soll liegt, wird der erste notwendige BD-Überhang bevorzugt Dr. Lurz empfohlen.
-- Diese Präferenz gilt ausschließlich für den ersten Schritt von Soll auf Soll+1.
-- Ein positiver BD-Wunsch einer anderen geeigneten Person am konkreten Tag setzt diese Überhangpräferenz außer Kraft.
-- Die Präferenz erzeugt keinen Dienst und verdrängt keine Person, die ihr Soll noch nicht erreicht hat.
+- Der erste notwendige BD-Überhang wird ausschließlich anhand der am konkreten Tag verfügbaren und geeigneten Personen beurteilt.
+- Die Überhanglogik kann erst greifen, wenn alle diese Personen ihr BD-Soll erreicht haben und keine von ihnen bereits über ihrem Soll liegt.
+- Dr. Lurz wird für den ersten Schritt von Soll auf Soll+1 nur bevorzugt, solange er im laufenden Monat nicht bereits über seinem eigenen Soll liegt.
+- Ist Dr. Lurz am betrachteten Tag nicht verfügbar, entsteht keine Nachrangigkeit zugunsten einer nicht auswählbaren Person.
+- Ein positiver BD-Wunsch einer anderen geeigneten Person am konkreten Tag setzt die Dr.-Lurz-Überhangpräferenz außer Kraft.
+- Die Präferenz erzeugt keinen Dienst und verdrängt keine am Tag verfügbare Person, die ihr Soll noch nicht erreicht hat.
 
 DETERMINISTISCHE KOPPLUNGSREGELN (NUR PRÜFUNG, KEINE AUTOMATISCHE EINTRAGUNG):
 - Hat ein Assistenzarzt am Freitag BD und ist der Samstags-BD bereits bekannt, muss der Freitag-HG durch die Person des Samstags-BD übernommen werden.
@@ -66,16 +76,28 @@ PERSONELLE SONDEREINSCHRÄNKUNGEN:
 - Dr. Polednia darf dienstags und sonntags weder BD noch HG übernehmen; dies ist ein roter Konflikt.
 - Dr. Becker ist für Samstags-BD nur als Ultima Ratio vorgesehen; die Bewertung bleibt orange.
 - Fr. Dalitz als HG an einem Sonntag oder Montag bei gleichzeitigem Sebastian-BD bleibt zulässig, aber orange nachrangig.
-- Dr. Becker und Dr. Martin dürfen an regulären Werktagen nicht gleichzeitig mit Urlaub oder FZA abwesend sein. Weiterbildung oder sonstige Abwesenheit allein lösen diese spezielle CT-Leitungsregel nicht aus.
+- Dr. Becker und Dr. Martin dürfen an regulären Werktagen nicht gleichzeitig mit Urlaub oder FZA abwesend sein. Das abgeleitete Becker-FZA wird hierbei wie manuell gepflegtes FZA behandelt. Weiterbildung oder sonstige Abwesenheit allein lösen diese spezielle CT-Leitungsregel nicht aus.
 
-WEITERE EMPFEHLUNG:
+URLAUBSNÄHE & WEITERE EMPFEHLUNGEN:
 - Ein Donnerstags-BD wird als positiver „Urlaubsverlängerer“ empfohlen, wenn für die betreffende Person in der folgenden Kalenderwoche Urlaub eingetragen ist.
-- Ein BD an einem ansonsten verfügbaren Tag unmittelbar vor dem ersten Urlaubstag bleibt orange nachrangig. Besteht am bewerteten Tag selbst bereits eine Abwesenheit, wird ausschließlich diese tagesbezogene Abwesenheit gemeldet; die zusätzliche Urlaubsbeginn-Warnung entfällt.
+- Ein BD an einem ansonsten verfügbaren Tag unmittelbar vor dem ersten Urlaubstag bleibt orange nachrangig.
+- Besteht am bewerteten Tag selbst bereits eine Abwesenheit, wird ausschließlich diese tagesbezogene Abwesenheit gemeldet; die zusätzliche Urlaubsbeginn-Warnung entfällt.
 
-ERKLÄRBARKEIT & INVARIANTEN:
+IMPORT, SICHERUNG & DATENINTEGRITÄT:
+- Einstellungen, Personal, Legacy-RBN-Namen und Monatsdaten werden vor der Verwendung normalisiert. Strikte Importpfade lehnen falsche Typen, ungültige Pflichtfelder, doppelte Personal-IDs, ungültige ISO-Daten, negative Kontingente und doppelte Monatsschlüssel ab.
+- Monatsdaten werden tief normalisiert; monatsfremde Tage und ungültige Feldtypen werden verworfen oder auf sichere Leerwerte zurückgeführt.
+- Der JSON-Vollbackup-Export listet dynamisch sämtliche vorhandenen gültigen Monatskeys im KV-Speicher und besitzt kein fest codiertes Endjahr.
+- Der JSON-Serverimport validiert die gesamte Nutzlast vor dem ersten Schreibzugriff. Vorhandene Rohwerte werden gesichert; scheitert ein späterer KV-Schreibzugriff, werden bereits geschriebene Schlüssel in umgekehrter Reihenfolge bestmöglich vollständig zurückgesetzt.
+- Der lokale JSON-Import bleibt bei einem Serverfehler erhalten, wird aber ausdrücklich als nur lokal übernommen gekennzeichnet.
+- Der Excel-Import erkennt unterstützte Monatsblätter, sucht eine eindeutige Jahreszahl und verlangt bei fehlender Jahresangabe eine ausdrückliche Zuordnung zum aktuell ausgewählten Jahr.
+- Der Excel-Import meldet unbekannte Namen, bewahrt bestehende manuelle Dienste und manuelle Abwesenheiten und unterscheidet vollständig servergespeicherte Monate von nur lokal gesicherten Monaten.
+- Änderungen werden unmittelbar lokal gesichert. Nicht synchronisierte Zustände werden pro Monat geführt; eine ältere Serverantwort darf weder eine neuere Änderung als gespeichert markieren noch deren Dirty-Status löschen.
+
+ERKLÄRBARKEIT, TESTS & INVARIANTEN:
 - Jede ausgelöste Regel und jeder relevante reine Kontext-Hinweis erscheint als konkrete Klartextbegründung.
 - Bei mehreren bewertungswirksamen Treffern bestimmt die höchste Konfliktstufe die Farbe; alle Gründe bleiben sichtbar.
 - Reine Hinweise wie der Jahresverlauf verändern die Farbe und den Empfehlungswert nicht.
 - Die Bewertung derselben Dienstkonstellation ist unabhängig von der Eingabereihenfolge.
 - Eine bereits eingetragene Einteilung wird für denselben Tag genauso bewertet wie dieselbe Auswahl vor dem Eintragen.
 - Die Bewertung ist seiteneffektfrei und verändert weder Dienste noch Abwesenheiten, Wünsche oder Protokolle.
+- Permanente GitHub-Actions-CI führt auf Pull Requests und auf main Syntaxprüfung, Unit-/Regressionstests sowie reale Chromium-End-to-End-Tests aus.

@@ -1,4 +1,5 @@
-import { MONTH_NAMES, PREFERENCE_TYPES, STAFF_ORDER, toIsoDate, WEEKDAYS } from './defaults.js?v=20260730.6';
+import { MONTH_NAMES, PREFERENCE_TYPES, STAFF_ORDER, toIsoDate, WEEKDAYS } from './defaults.js?v=20260730.7';
+import { isFirstRegularWorkdayAfter } from './holidays.js?v=20260730.7';
 
 export function parseIso(date) { return new Date(`${date}T00:00:00`); }
 export function addDays(date, days) { const d = new Date(date); d.setDate(d.getDate() + days); return d; }
@@ -10,11 +11,16 @@ export const ABSENCE_FOR_CT_LEADERSHIP = new Set(['urlaub', 'fza']);
 
 export function getStaffById(staff, id) { return staff.find(item => item.id === id); }
 export function getPlanningStaff(staff, dateIso) {
-  return STAFF_ORDER
-    .map(id => getStaffById(staff, id))
-    .filter(Boolean)
-    .filter(person => person.includeInPlanning)
-    .filter(person => isStaffActiveOn(person, dateIso));
+  const fixedOrder = new Map(STAFF_ORDER.map((id, index) => [id, index]));
+  return staff
+    .map((person, index) => ({ person, index }))
+    .filter(({ person }) => person?.includeInPlanning && isStaffActiveOn(person, dateIso))
+    .sort((left, right) => {
+      const leftOrder = fixedOrder.has(left.person.id) ? fixedOrder.get(left.person.id) : STAFF_ORDER.length + left.index;
+      const rightOrder = fixedOrder.has(right.person.id) ? fixedOrder.get(right.person.id) : STAFF_ORDER.length + right.index;
+      return leftOrder - rightOrder;
+    })
+    .map(({ person }) => person);
 }
 
 export function isStaffActiveOn(person, dateIso) {
@@ -58,6 +64,19 @@ export function setAssignment(monthData, dateIso, role, staffId) {
 export function getAbsence(monthData, staffId, dateIso) { return monthData?.absences?.[staffId]?.[dateIso] || ''; }
 export function getAbsenceSource(monthData, staffId, dateIso) { return monthData?.absenceSources?.[staffId]?.[dateIso] || ''; }
 export function getAbsenceFromState(state, staffId, dateIso) { return getAbsence(monthForIso(state, dateIso), staffId, dateIso); }
+
+export function isDerivedBeckerFza(state, staffId, dateIso) {
+  if (staffId !== 'becker') return false;
+  return isFirstRegularWorkdayAfter(
+    dateIso,
+    iso => parseIso(iso).getDay() === 6 && getAssignment(state, iso, 'bd') === 'becker'
+  );
+}
+
+export function getEffectiveAbsence(state, monthData, staffId, dateIso) {
+  return getAbsence(monthData, staffId, dateIso)
+    || (isDerivedBeckerFza(state, staffId, dateIso) ? 'fza' : '');
+}
 
 export function setAbsence(monthData, staffId, dateIso, type, source = 'manual') {
   monthData.absences ||= {};
@@ -142,7 +161,8 @@ export function isFaOn(state, staffId, dateIso) {
 }
 
 export function isAaOn(state, staffId, dateIso) {
-  return Boolean(staffId) && !isFaOn(state, staffId, dateIso);
+  const person = getStaffById(state.staff, staffId);
+  return Boolean(person) && !getRoleProperties(person, dateIso).canHg;
 }
 
 export function hasBlockingPreference(monthData, staffId, dateIso, role) {
@@ -158,7 +178,7 @@ export function basicallyEligiblePeers(state, monthData, dateIso, role) {
     const props = getRoleProperties(person, dateIso);
     if (role === 'hg' && !props.canHg) return false;
     if (role === 'bd' && weekday === 6 && !props.canSaturdayBd) return false;
-    if (getAbsence(monthData, person.id, dateIso)) return false;
+    if (getEffectiveAbsence(state, monthData, person.id, dateIso)) return false;
     if (hasBlockingPreference(monthData, person.id, dateIso, role)) return false;
     if (monthData.days?.[dateIso]?.[role === 'bd' ? 'hg' : 'bd'] === person.id) return false;
     if (person.id === 'polednia' && [0, 2].includes(weekday)) return false;
@@ -178,10 +198,11 @@ export function countHgForAaBdExcept(state, monthData, staffId, exceptIso) {
   }).length;
 }
 
-export function countServicesInLoadedYearExcept(state, staffId, year, exceptIso) {
+export function countServicesInLoadedYearExcept(state, staffId, year, exceptIso, throughMonth = 12) {
   let count = 0;
   for (const [key, month] of state.months.entries()) {
     if (!key.startsWith(`${year}-`)) continue;
+    if (Number(key.slice(5, 7)) > throughMonth) continue;
     for (const [iso, day] of Object.entries(month.days || {})) {
       if (iso === exceptIso) continue;
       if (day.bd === staffId) count += 1;
@@ -193,8 +214,17 @@ export function countServicesInLoadedYearExcept(state, staffId, year, exceptIso)
 
 export function hasCompleteLoadedHistory(state, year, currentMonth) {
   for (let month = 1; month < currentMonth; month += 1) {
-    if (!state.months.has(`${year}-${String(month).padStart(2, '0')}`)) return false;
+    const key = `${year}-${String(month).padStart(2, '0')}`;
+    if (!state.months.has(key) || state.monthSources?.get(key) === 'fallback') return false;
   }
+  return true;
+}
+
+export function isStaffActiveDuringMonth(person, year, month) {
+  const first = parseIso(toIsoDate(year, month, 1));
+  const last = parseIso(toIsoDate(year, month, new Date(year, month, 0).getDate()));
+  if (person.activeFrom && parseIso(person.activeFrom) > last) return false;
+  if (person.activeUntil && parseIso(person.activeUntil) < first) return false;
   return true;
 }
 
