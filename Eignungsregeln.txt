@@ -1,4 +1,4 @@
-Regeln und Kriterien für manuelle Kandidatenempfehlungen in DienstplanRAD (v4.0)
+Regeln und Kriterien für manuelle Kandidatenempfehlungen in DienstplanRAD (v4.1)
 
 GRUNDPRINZIPIEN & DATENBASIS:
 - DienstplanRAD enthält keinen automatischen Dienstplaner, keinen Optimierungslauf, keine Iterationszyklen und keine automatischen Tauschvorgänge.
@@ -6,7 +6,7 @@ GRUNDPRINZIPIEN & DATENBASIS:
 - Die Anwendung bewertet für den angeklickten Tag und die angeklickte Rolle alle aktiven Personen seiteneffektfrei. Eine Bewertung erzeugt, löscht, verschiebt oder überschreibt keinen Dienst.
 - Bereits manuell eingetragene Dienste bleiben unangetastete Fixpunkte. Empfehlungen passen den Plan nicht selbstständig um diese Einträge herum an.
 - Die Empfehlungen werden primär durch Qualifikation, harte Konflikte und die Ausgewogenheit innerhalb des aktuellen Monats bestimmt.
-- Vollständig geladene historische Monatsdaten seit dem 01.01. des Jahres dürfen ausschließlich bei im aktuellen Monat absolut gleichwertigen Kandidaten als schwacher Tie-Breaker berücksichtigt werden. Unvollständige Jahresdaten dürfen die Empfehlung nicht beeinflussen.
+- Vollständig geladene historische Monatsdaten seit dem 01.01. des Jahres dürfen bei im aktuellen Monat gleichauf liegenden Kandidaten ausschließlich als zusätzlicher Klartext-Hinweis angezeigt werden. Der Jahresverlauf verändert weder Farbstufe noch Empfehlungswert. Unvollständige Jahresdaten erzeugen keinen Jahres-Hinweis.
 - Positive Dienstwünsche werden als starke Empfehlung berücksichtigt. „Kein BD“, „Kein HG“ und „Kein Dienst“ erzeugen für die betroffene Rolle einen roten Konflikt.
 
 BESETZUNG & QUALIFIKATION:
@@ -34,10 +34,18 @@ WOCHENEND- & FEIERTAGSLOGIK:
 - Oster- und Pfingstblock alternieren. Ein Dienst in beiden Blöcken ist orange nachrangig.
 
 MONATSFAIRNESS & HG-AUSGLEICH:
-- Für BD wird der jeweilige Monats-Sollrückstand verglichen. Unter sonst gleichen Bedingungen werden Personen mit größerem Rückstand bis zum persönlichen BD-Soll bevorzugt.
-- Ein erreichtes BD-Soll erzeugt einen gelben Hinweis. Ein ausdrücklich gesetztes hartes Monatsmaximum erzeugt beim zusätzlichen BD einen roten Konflikt.
-- Bei HG wird die kombinierte Monatslast aus BD und HG innerhalb der Facharztgruppe verglichen. Dadurch erhält ein Facharzt mit einem BD weniger grundsätzlich die Präferenz für einen HG mehr.
+- Der relative BD-Monatsausgleich beginnt erst, wenn mindestens eine am betrachteten Datum aktive planbare Person mit positivem BD-Soll ihr Soll im laufenden Monat vollständig erreicht hat. Der gerade bewertete Tag wird dabei aus der Zählung ausgeschlossen, damit Vorschlag und bestehende Einteilung selbstkonsistent bleiben.
+- Solange niemand sein BD-Soll erreicht hat, erzeugt der unterschiedliche Sollrückstand weder eine positive Monatsausgleichsempfehlung noch eine gelbe relative Nachrangigkeit.
+- Nach Aktivierung des Monatsausgleichs wird der jeweilige Monats-Sollrückstand der am konkreten Tag grundsätzlich geeigneten BD-Personen verglichen. Personen mit dem größten Rückstand werden positiv erklärt; ein kleinerer Rückstand wird gelb gegenüber dem größten Rückstand kenntlich gemacht.
+- Ein erreichtes individuelles BD-Soll erzeugt unabhängig davon einen gelben Richtwerthinweis. Ein ausdrücklich gesetztes hartes Monatsmaximum erzeugt beim zusätzlichen BD einen roten Konflikt.
+- Bei HG wird die kombinierte Monatslast aus BD und HG innerhalb der Facharztgruppe verglichen. Dadurch erhält ein Facharzt mit geringerer kombinierter Monatslast die positive Präferenz. Diese HG-Regel besitzt keine BD-Soll-Startschwelle.
 - Bei einem HG zu einem Assistenzarzt-BD wird zusätzlich die bisherige Anzahl belastender HG für Assistenzarzt-BD innerhalb der Facharztgruppe ausgeglichen.
+
+JAHRESVERLAUF ALS REINER KONTEXTHINWEIS:
+- Der Jahresverlauf wird nur angezeigt, wenn alle Vormonate des laufenden Jahres geladen sind und mehrere Personen im maßgeblichen aktuellen Monatsvergleich gleichauf liegen.
+- Eine niedrigere bisherige Jahreslast wird als Text-Hinweis benannt, ohne den Empfehlungswert zu erhöhen.
+- Eine höhere bisherige Jahreslast wird als Text-Hinweis benannt, ohne eine gelbe oder andere Farbstufe auszulösen.
+- Der Hinweis dient ausschließlich der menschlichen Einordnung und darf keine Auswahl sperren, bevorzugen, nachrangig färben oder in den offenen Punkten als Konflikt erscheinen.
 
 ÜBERHANG-PRÄFERENZ:
 - Erst wenn alle geeigneten Personen ihr BD-Soll erreicht haben und noch niemand über dem Soll liegt, wird der erste notwendige BD-Überhang bevorzugt Dr. Lurz empfohlen.
@@ -64,8 +72,9 @@ WEITERE EMPFEHLUNG:
 - Ein BD unmittelbar vor dem ersten Urlaubstag bleibt unabhängig davon orange nachrangig.
 
 ERKLÄRBARKEIT & INVARIANTEN:
-- Jede ausgelöste Regel erscheint als konkrete Klartextbegründung.
-- Bei mehreren Treffern bestimmt die höchste Konfliktstufe die Farbe; alle Gründe bleiben sichtbar.
+- Jede ausgelöste Regel und jeder relevante reine Kontext-Hinweis erscheint als konkrete Klartextbegründung.
+- Bei mehreren bewertungswirksamen Treffern bestimmt die höchste Konfliktstufe die Farbe; alle Gründe bleiben sichtbar.
+- Reine Hinweise wie der Jahresverlauf verändern die Farbe und den Empfehlungswert nicht.
 - Die Bewertung derselben Dienstkonstellation ist unabhängig von der Eingabereihenfolge.
 - Eine bereits eingetragene Einteilung wird für denselben Tag genauso bewertet wie dieselbe Auswahl vor dem Eintragen.
 - Die Bewertung ist seiteneffektfrei und verändert weder Dienste noch Abwesenheiten, Wünsche oder Protokolle.

@@ -167,11 +167,11 @@ const matrix = [
     grund: 'Bereits Dienst im alternierenden Oster-/Pfingstblock'
   },
   {
-    name: 'Freier Werktag ohne Vorbelastung ist geeignet und erhält eine Empfehlung',
+    name: 'Freier Werktag vor erster Soll-Erfüllung bleibt neutral geeignet',
     aufbau: () => zustand(),
     prüfe: state => bewerte(state, '2026-07-08', 'bd', 'martin'),
     stufe: 'green',
-    grund: 'Monatsausgleich: noch 4 BD bis zum Soll'
+    grund: 'Keine relevanten Konflikte'
   }
 ];
 

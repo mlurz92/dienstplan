@@ -1,4 +1,4 @@
-import { holidayBlocks, isFirstRegularWorkdayAfter, isHoliday } from './holidays.js?v=20260730.4';
+import { holidayBlocks, isFirstRegularWorkdayAfter, isHoliday } from './holidays.js?v=20260730.5';
 import {
   addDays, basicallyEligiblePeers, countHgForAaBdExcept, countRoleInMonthExcept,
   countSaturdayBdExcept, countServicesInLoadedYearExcept, getAbsence, getAbsenceFromState,
@@ -6,7 +6,7 @@ import {
   hasCompleteLoadedHistory, hasVacationInFollowingWeek, isAaOn, isFaOn, isPositivePreference,
   isStaffActiveOn, labelForAbsence, listOwnRoleDates, monthForIso, parseIso,
   projectedWeekendEquivalent, severityRank, toLocalIso, weekendEquivalentFromMap, weekendMap
-} from './rules-core.js?v=20260730.4';
+} from './rules-core.js?v=20260730.5';
 
 function applyBundlingRules({ state, dateIso, role, staffId, push, recommend }) {
   const date = parseIso(dateIso);
@@ -75,9 +75,13 @@ function applyBundlingRules({ state, dateIso, role, staffId, push, recommend }) 
   }
 }
 
-function applyMonthlyBdFairness({ state, monthData, dateIso, staffId, currentBd, push, recommend }) {
+function applyMonthlyBdFairness({ state, monthData, dateIso, staffId, currentBd, push, recommend, note }) {
   const person = getStaffById(state.staff, staffId);
   const peers = basicallyEligiblePeers(state, monthData, dateIso, 'bd');
+  const targetStaff = getPlanningStaff(state.staff, dateIso).filter(peer => (peer.bdTarget || 0) > 0);
+  const monthlyBalanceEnabled = targetStaff.some(peer =>
+    countRoleInMonthExcept(monthData, peer.id, 'bd', dateIso) >= (peer.bdTarget || 0)
+  );
   const deficits = peers.map(peer => ({
     id: peer.id,
     value: Math.max(0, (peer.bdTarget || 0) - countRoleInMonthExcept(monthData, peer.id, 'bd', dateIso))
@@ -85,7 +89,7 @@ function applyMonthlyBdFairness({ state, monthData, dateIso, staffId, currentBd,
   const ownDeficit = Math.max(0, (person.bdTarget || 0) - currentBd);
   const maxDeficit = Math.max(0, ...deficits.map(item => item.value));
 
-  if (maxDeficit > 0) {
+  if (monthlyBalanceEnabled && maxDeficit > 0) {
     if (ownDeficit === maxDeficit) recommend(`Monatsausgleich: noch ${ownDeficit} BD bis zum Soll`, 25 + ownDeficit);
     else push('yellow', `Monatsausgleich: andere geeignete Personen haben größeren BD-Rückstand (${maxDeficit} statt ${ownDeficit})`);
   }
@@ -108,13 +112,13 @@ function applyMonthlyBdFairness({ state, monthData, dateIso, staffId, currentBd,
       const histories = comparable.map(peer => countServicesInLoadedYearExcept(state, peer.id, year, dateIso));
       const minimum = Math.min(...histories);
       const own = countServicesInLoadedYearExcept(state, staffId, year, dateIso);
-      if (own === minimum) recommend('Jahresverlauf als Tie-Breaker: geringere bisherige Dienstlast', 2);
-      else push('yellow', `Jahresverlauf als Tie-Breaker: höhere bisherige Dienstlast (${own} statt ${minimum})`);
+      if (own === minimum) note(`Jahresverlauf (nur Hinweis, ohne Einfluss auf Bewertung): niedrigste bisherige Dienstlast (${own})`);
+      else note(`Jahresverlauf (nur Hinweis, ohne Einfluss auf Bewertung): höhere bisherige Dienstlast (${own} statt ${minimum})`);
     }
   }
 }
 
-function applyHgFairness({ state, monthData, dateIso, staffId, currentBd, currentHg, push, recommend }) {
+function applyHgFairness({ state, monthData, dateIso, staffId, currentBd, currentHg, push, recommend, note }) {
   const peers = basicallyEligiblePeers(state, monthData, dateIso, 'hg');
   if (!peers.length) return;
   const totals = peers.map(peer => countRoleInMonthExcept(monthData, peer.id, 'bd', dateIso) + countRoleInMonthExcept(monthData, peer.id, 'hg', dateIso));
@@ -144,8 +148,8 @@ function applyHgFairness({ state, monthData, dateIso, staffId, currentBd, curren
       const histories = comparable.map(peer => countServicesInLoadedYearExcept(state, peer.id, year, dateIso));
       const minimum = Math.min(...histories);
       const own = countServicesInLoadedYearExcept(state, staffId, year, dateIso);
-      if (own === minimum) recommend('Jahresverlauf als Tie-Breaker: geringere bisherige Dienstlast', 2);
-      else push('yellow', `Jahresverlauf als Tie-Breaker: höhere bisherige Dienstlast (${own} statt ${minimum})`);
+      if (own === minimum) note(`Jahresverlauf (nur Hinweis, ohne Einfluss auf Bewertung): niedrigste bisherige Dienstlast (${own})`);
+      else note(`Jahresverlauf (nur Hinweis, ohne Einfluss auf Bewertung): höhere bisherige Dienstlast (${own} statt ${minimum})`);
     }
   }
 }
@@ -194,6 +198,7 @@ export function evaluateCandidate({ state, monthData, dateIso, role, staffId }) 
     recommendationScore += score;
     addReason(reason);
   };
+  const note = addReason;
 
   if (!person.includeInPlanning) push('gray', 'Nicht im aktiven Dienstpool');
   if (!isStaffActiveOn(person, dateIso)) push('gray', 'Zu diesem Zeitpunkt noch nicht bzw. nicht mehr aktiv');
@@ -262,7 +267,7 @@ export function evaluateCandidate({ state, monthData, dateIso, role, staffId }) 
     const previousBdWasFa = isFaOn(state, previousBd, prevDateIso);
     if (previousHg === staffId && !fridaySaturdayBundle && !previousBdWasFa) push('orange', 'Eigener HG am Vortag vor BD');
 
-    applyMonthlyBdFairness({ state, monthData, dateIso, staffId, currentBd, push, recommend });
+    applyMonthlyBdFairness({ state, monthData, dateIso, staffId, currentBd, push, recommend, note });
     applyWeekendWarnings(state, staffId, date, 'bd', push);
     applyWeekendFairness({ state, monthData, dateIso, role, staffId, push, recommend });
     applyHolidayBlockWarnings(state, staffId, date, push);
@@ -282,7 +287,7 @@ export function evaluateCandidate({ state, monthData, dateIso, role, staffId }) 
     const todayBdIsFa = isFaOn(state, todayBd, dateIso);
     if (ownBdNext && !fridaySaturdayBundle && !todayBdIsFa) push('orange', 'HG am Tag vor eigenem BD');
 
-    applyHgFairness({ state, monthData, dateIso, staffId, currentBd, currentHg, push, recommend });
+    applyHgFairness({ state, monthData, dateIso, staffId, currentBd, currentHg, push, recommend, note });
     applyWeekendWarnings(state, staffId, date, 'hg', push);
     applyWeekendFairness({ state, monthData, dateIso, role, staffId, push, recommend });
     applyHolidayBlockWarnings(state, staffId, date, push);
