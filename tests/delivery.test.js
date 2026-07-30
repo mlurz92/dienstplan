@@ -41,21 +41,36 @@ test('the application ships without any service worker and never registers one',
  * Dieser Test hält die Grenze: Der Grabstein darf abmelden und aufräumen – und
  * sonst nichts. Keine Zwischenspeicherung, kein Eingriff in Anfragen.
  */
-test('the /sw.js route serves a tombstone that only unregisters and purges', async () => {
-  const worker = await read('sw.js');
+test('the /sw.js route is a Function, not an asset, and only unregisters and purges', async () => {
+  // Keine Worker-Datei im Auslieferungsstand – das ist die eigentliche Zusage.
+  assert.equal(await exists('sw.js'), false, 'sw.js darf nicht als Asset zurückkehren');
 
-  assert.match(worker, /self\.registration\.unregister\(\)/, 'der Grabstein muss sich selbst abmelden');
-  assert.match(worker, /caches\.delete\(/, 'und die Caches des Altbestands löschen');
+  // Der Endpunkt ist eine Pages Function. Nur so umgeht er den Asset-Cache, der
+  // die gelöschte Datei nachweislich bis zu sieben Tage weiter ausgeliefert hat.
+  const fn = await read('functions/sw.js.js');
+
+  assert.match(fn, /export const onRequestGet/, '/sw.js muss von einer Function bedient werden');
+  assert.match(fn, /self\.registration\.unregister\(\)/, 'das Skript muss sich selbst abmelden');
+  assert.match(fn, /caches\.delete\(/, 'und die Caches des Altbestands löschen');
+
+  // Korrekter MIME-Typ: Ein falscher bricht die Updateprüfung mit einem
+  // MIME-Fehler ab, OHNE die Registrierung zu lösen – genau der Fehler, den der
+  // SPA-Rückfall verursacht hat.
+  assert.match(fn, /application\/javascript/, 'ohne korrekten MIME-Typ greift die Updateprüfung nicht');
+
+  // Nirgends zwischenspeichern, sonst prüft der Browser das Skript nicht neu
+  // und der Edge legt erneut etwas an, das uns später im Weg steht.
+  assert.match(fn, /'Cache-Control': 'no-store/);
+  assert.match(fn, /'CDN-Cache-Control': 'no-store'/);
 
   // Die harte Sperre: nichts, womit ein Worker Auslieferung übernehmen könnte.
-  assert.doesNotMatch(worker, /addEventListener\(\s*['"]fetch['"]/, 'kein fetch-Handler');
-  assert.doesNotMatch(worker, /respondWith/, 'der Grabstein darf keine Antwort erzeugen');
-  assert.doesNotMatch(worker, /cache\.addAll|caches\.match|cache\.put/, 'keine Zwischenspeicherung');
+  assert.doesNotMatch(fn, /addEventListener\(\s*\\?['"]fetch\\?['"]/, 'kein fetch-Handler');
+  assert.doesNotMatch(fn, /respondWith/, 'das Skript darf keine Anfrage beantworten');
+  assert.doesNotMatch(fn, /cache\.addAll|caches\.match|cache\.put/, 'keine Zwischenspeicherung');
 
-  // Und er darf nicht aus dem HTTP-Cache beantwortet werden, sonst prüft der
-  // Browser das Skript gar nicht neu und der Grabstein erreicht niemanden.
-  const headers = await read('_headers');
-  assert.match(headers, /\/sw\.js\n\s+Cache-Control: no-store/, '_headers muss /sw.js auf no-store setzen');
+  // Und `_headers` darf keine Regel für /sw.js mehr enthalten: Eine Regel dort
+  // gilt nur für Assets und würde suggerieren, es gäbe noch eines.
+  assert.doesNotMatch(await read('_headers'), /^\/sw\.js/m, 'kein Asset-Header für einen Function-Pfad');
 });
 
 /**

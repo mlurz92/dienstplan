@@ -4,10 +4,6 @@
 /index.html
   Cache-Control: no-cache, no-store, must-revalidate
 
-/sw.js
-  Cache-Control: no-store
-  Content-Type: application/javascript; charset=utf-8
-
 /styles.css
   Cache-Control: no-cache, must-revalidate
 
