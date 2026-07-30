@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>DienstplanRAD</title>
+  <meta name="application-name" content="DienstplanRAD" />
+  <meta name="apple-mobile-web-app-title" content="DienstplanRAD" />
   <meta name="theme-color" content="#0b0f14" />
   <!--
     Auslieferungsstempel. Er macht von außen prüfbar, welcher Stand tatsächlich
@@ -16,7 +18,7 @@
     Zweig als main auslieferte. Von außen war das nicht zu erkennen, weil die
     Anwendung im Übrigen normal funktionierte.
   -->
-  <meta name="dienstplanrad-build" content="20260730.7" />
+  <meta name="dienstplanrad-build" content="20260730.8" />
   <script>
     (() => {
       const cachePrefix = 'dienstplanrad';
@@ -70,10 +72,13 @@
       document.documentElement.dataset.assetCleanup = cleanupKey;
     })();
   </script>
-  <link rel="manifest" href="/manifest.webmanifest?v=20260730.7" />
-  <link rel="stylesheet" href="/styles.css?v=20260730.7" />
+  <link rel="icon" href="/icons/icon.svg?v=20260730.8" type="image/svg+xml" sizes="any" />
+  <link rel="shortcut icon" href="/icons/icon.svg?v=20260730.8" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/icons/icon.svg?v=20260730.8" />
+  <link rel="manifest" href="/manifest.webmanifest?v=20260730.8" />
+  <link rel="stylesheet" href="/styles.css?v=20260730.8" />
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" defer></script>
-  <script type="module" src="/js/app.js?v=20260730.7"></script>
+  <script type="module" src="/js/app.js?v=20260730.8"></script>
 </head>
 <body>
   <div class="ambient-layer" aria-hidden="true">
@@ -84,7 +89,7 @@
   <div class="app-shell">
     <header class="topbar glass-panel">
       <div class="brand-block">
-        <div class="brand-mark">DR</div>
+        <img class="brand-mark" src="/icons/icon.svg?v=20260730.8" alt="" aria-hidden="true" draggable="false" />
         <div>
           <div class="eyebrow">Klinik für Radiologie und Nuklearmedizin</div>
           <h1>DienstplanRAD</h1>
