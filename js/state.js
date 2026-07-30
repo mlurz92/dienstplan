@@ -94,16 +94,28 @@ export async function warmAdjacentMonths(year, month) {
   const previousReady = state.serverReady;
   const prev = new Date(year, month - 2, 1);
   const next = new Date(year, month, 1);
-  const tasks = [
-    [prev.getFullYear(), prev.getMonth() + 1],
-    [next.getFullYear(), next.getMonth() + 1]
-  ].map(async ([y, m]) => {
+  const requestedMonths = new Map();
+  const addRequest = (requestedYear, requestedMonth) => {
+    requestedMonths.set(monthKey(requestedYear, requestedMonth), [requestedYear, requestedMonth]);
+  };
+
+  // Direkte Nachbarmonate für Abstands-, Urlaubs- und Kopplungsregeln.
+  addRequest(prev.getFullYear(), prev.getMonth() + 1);
+  addRequest(next.getFullYear(), next.getMonth() + 1);
+
+  // Vollständiger Jahresverlauf bis zum Vormonat. Erst bei lückenlos geladenen
+  // Daten darf die historische Dienstlast als schwacher Tie-Breaker wirken.
+  for (let historicalMonth = 1; historicalMonth < month; historicalMonth += 1) {
+    addRequest(year, historicalMonth);
+  }
+
+  const tasks = [...requestedMonths.values()].map(async ([requestedYear, requestedMonth]) => {
     try {
-      const data = await api.getMonth(y, m);
-      setMonthData(y, m, data.month || createEmptyMonth(y, m));
+      const data = await api.getMonth(requestedYear, requestedMonth);
+      setMonthData(requestedYear, requestedMonth, data.month || createEmptyMonth(requestedYear, requestedMonth));
     } catch {
-      const local = readLocalMonth(y, m);
-      if (local) setMonthData(y, m, local);
+      const local = readLocalMonth(requestedYear, requestedMonth);
+      if (local) setMonthData(requestedYear, requestedMonth, local);
     }
   });
   await Promise.allSettled(tasks);
