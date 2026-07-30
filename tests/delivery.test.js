@@ -20,7 +20,6 @@ const exists = async path => {
  * im Projekt liegt oder irgendwo eine Registrierung erfolgt.
  */
 test('the application ships without any service worker and never registers one', async () => {
-  assert.equal(await exists('sw.js'), false, 'sw.js darf nicht wieder eingeführt werden');
   assert.equal(await exists('service-worker.js'), false, 'kein Worker unter alternativem Namen');
 
   const sources = await Promise.all(['index.html', 'js/app.js', 'js/state.js', 'js/theme.js'].map(read));
@@ -28,6 +27,35 @@ test('the application ships without any service worker and never registers one',
     const registrations = [...source.matchAll(/serviceWorker\s*\.\s*register\s*\(/g)];
     assert.equal(registrations.length, 0, 'kein serviceWorker.register() im Auslieferungsstand');
   }
+});
+
+/**
+ * `/sw.js` existiert wieder – aber ausschließlich als Grabstein.
+ *
+ * Das bloße Löschen der Datei hat den Worker nachweislich NICHT entfernt: Der
+ * Cloudflare-Edge lieferte das alte Skript bis zu sieben Tage weiter aus, und
+ * danach antwortete der SPA-Rückfall mit `index.html` als `text/html`, was die
+ * Updateprüfung mit einem MIME-Fehler abbricht, ohne die Registrierung zu
+ * lösen. Beides in der Produktion gemessen, siehe Kopf von `sw.js`.
+ *
+ * Dieser Test hält die Grenze: Der Grabstein darf abmelden und aufräumen – und
+ * sonst nichts. Keine Zwischenspeicherung, kein Eingriff in Anfragen.
+ */
+test('the /sw.js route serves a tombstone that only unregisters and purges', async () => {
+  const worker = await read('sw.js');
+
+  assert.match(worker, /self\.registration\.unregister\(\)/, 'der Grabstein muss sich selbst abmelden');
+  assert.match(worker, /caches\.delete\(/, 'und die Caches des Altbestands löschen');
+
+  // Die harte Sperre: nichts, womit ein Worker Auslieferung übernehmen könnte.
+  assert.doesNotMatch(worker, /addEventListener\(\s*['"]fetch['"]/, 'kein fetch-Handler');
+  assert.doesNotMatch(worker, /respondWith/, 'der Grabstein darf keine Antwort erzeugen');
+  assert.doesNotMatch(worker, /cache\.addAll|caches\.match|cache\.put/, 'keine Zwischenspeicherung');
+
+  // Und er darf nicht aus dem HTTP-Cache beantwortet werden, sonst prüft der
+  // Browser das Skript gar nicht neu und der Grabstein erreicht niemanden.
+  const headers = await read('_headers');
+  assert.match(headers, /\/sw\.js\n\s+Cache-Control: no-store/, '_headers muss /sw.js auf no-store setzen');
 });
 
 /**
@@ -72,8 +100,6 @@ test('all release-critical shell and module assets share one cache-busting token
 test('Cloudflare revalidates the app shell and application assets on every visit', async () => {
   const headers = await read('_headers');
 
-  assert.doesNotMatch(headers, /^\/sw\.js/m, 'kein Eintrag für eine nicht mehr existierende Worker-Datei');
-
   for (const route of ['/', '/index.html']) {
     assert.match(
       headers,
@@ -111,4 +137,66 @@ test('the deployed build stamp matches the module graph release token', async ()
 
   const app = await read('js/app.js');
   assert.match(app, /dienstplanrad-build/, 'der Stempel muss zur Laufzeit ausgelesen werden');
+});
+
+/**
+ * `npm run check` muss jedes ausgelieferte Modul erfassen.
+ *
+ * Die Prüfliste war handgeschrieben und lief mit dem Projekt auseinander:
+ * `js/holidays.js` und sämtliche Endpunkte unter `functions/api/` standen nicht
+ * darin. Ein Syntaxfehler in einer dieser Dateien wäre also durch beide Tore
+ * gegangen – und ein Fehler in einer Function kostet nicht einen Endpunkt,
+ * sondern das gesamte Deployment.
+ */
+test('the syntax check covers every shipped module under js/ and functions/', async () => {
+  const { readdir } = await import('node:fs/promises');
+  const { resolve, relative, dirname } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const wurzel = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+
+  async function module_(verzeichnis) {
+    const einträge = await readdir(verzeichnis, { withFileTypes: true });
+    const treffer = [];
+    for (const eintrag of einträge) {
+      const pfad = resolve(verzeichnis, eintrag.name);
+      if (eintrag.isDirectory()) treffer.push(...await module_(pfad));
+      else if (eintrag.name.endsWith('.js')) treffer.push(relative(wurzel, pfad));
+    }
+    return treffer;
+  }
+
+  const erwartet = [...await module_(resolve(wurzel, 'js')), ...await module_(resolve(wurzel, 'functions'))];
+  const { scripts } = JSON.parse(await read('package.json'));
+  const fehlend = erwartet.filter(datei => !scripts.check.includes(datei));
+  assert.deepEqual(fehlend, [], `nicht von "npm run check" erfasst: ${fehlend.join(', ')}`);
+});
+
+/**
+ * Die Bereinigung des historischen Workers darf zwei Dinge nicht tun: fremde
+ * Registrierungen desselben Origin anfassen, und in eine Neustartschleife
+ * laufen. Beide Grenzen sind hier festgeschrieben.
+ */
+test('the legacy cleanup is scoped to the own worker and reloads at most once per tab', async () => {
+  const [html, app] = await Promise.all([read('index.html'), read('js/app.js')]);
+
+  for (const [name, quelle] of [['index.html', html], ['js/app.js', app]]) {
+    assert.match(quelle, /pathname === '\/sw\.js'/, `${name} muss die Abmeldung auf den eigenen Worker begrenzen`);
+    assert.doesNotMatch(
+      quelle,
+      /getRegistrations\(\)\s*\.?\s*\n?\s*\.?then\(registrations => Promise\.all\(registrations\.map/,
+      `${name} darf nicht alle Registrierungen des Origin abmelden`
+    );
+  }
+
+  // Der Neustart hängt an einem tatsächlich vorhandenen Controller – nur dann
+  // wird der Tab überhaupt noch von einem Worker bedient.
+  assert.match(html, /serviceWorker\.controller !== null/);
+  // Und er ist einmalig: Die Marke wird gesetzt, bevor neu geladen wird.
+  const markePosition = html.indexOf("sessionStorage.setItem(reloadKey");
+  const reloadPosition = html.indexOf('location.reload()');
+  assert.ok(markePosition > 0 && reloadPosition > markePosition, 'die Neustartmarke muss vor dem Neuladen gesetzt werden');
+
+  // Und der Anwendungsstart bricht ab, statt in einen Neustart hinein Anfragen
+  // abzusetzen.
+  assert.match(app, /if \(await legacyNeustartAngekuendigt\(\)\) return;/);
 });
