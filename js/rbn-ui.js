@@ -74,8 +74,10 @@ function initRbnUi() {
   enhanceRbnRows();
 }
 
-if (document.readyState === 'loading') {
-  window.addEventListener('DOMContentLoaded', initRbnUi, { once: true });
-} else {
-  initRbnUi();
+if (typeof document !== 'undefined' && typeof window !== 'undefined') {
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', initRbnUi, { once: true });
+  } else {
+    initRbnUi();
+  }
 }
