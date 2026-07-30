@@ -737,6 +737,53 @@ einen Konflikt zu protokollieren statt ihn stillschweigend aufzulösen. Deshalb 
 * Alle daraus abgeleiteten Flächen sind auf Textkontrast geprüft (mindestens 4,5:1 über alle zwölf
   Paletten, siehe 12.x) – die Kontrastvorgabe des Designsystems wird also eingehalten.
 
+### 12a.3 Glasoptik: Kante statt Durchsichtigkeit
+
+Die Leisten sahen zuvor grau und matt aus. Ursache war nicht „zu viel Glas“, sondern eine falsche
+Kombination: Kopfleiste, Werkzeugleiste, Einfassungen, Dialogkarte und Monatsplakette lagen bei 50 bis
+80 Prozent Weiß über einem fast schwarzen Hintergrund und trugen zusätzlich
+`backdrop-filter: blur(22px) saturate(1.42)`. Das Schwarz schlug als Grau durch, und die
+Sättigungsanhebung verstärkte genau dieses Grau — ein Schleier ohne Tiefe, ohne Bezug zur Monatsfarbe der
+Tabelle darunter.
+
+**Gemessen, fps während eines Monatswechsels:**
+
+| Zustand | fps |
+|---|---|
+| `blur(22px) saturate(1.42)` | 15 |
+| `blur(10px) saturate(1.06)` | 14 |
+| ohne Weichzeichner | 19 |
+
+Der Radius ist also fast gleichgültig — die Kosten entstehen dadurch, dass der Compositor in jedem Frame
+die Pixel hinter dem Element ausliest. Ein Viertel der Bildrate für einen Effekt, der hinter einer dichten
+Fläche ohnehin nichts beiträgt.
+
+**Daraus die jetzige Lösung.** Glasanmutung entsteht über die Kante, nicht über Durchsichtigkeit:
+
+- **Flächen fast deckend** (97,5 → 96 Prozent) mit einer **Dosis Monatsfarbe** (5 → 9 Prozent). Der
+  Farbanteil ist klein, aber er bindet die Leisten an das Monatsblatt: Juli warm koralle, November kühl
+  schieferblau. Vorher standen sie als graue Platten davor.
+- **Rand, Lichtlinie, Brechung** tragen die Optik: 1 px Rand aus 22 Prozent Monatsfarbe, `inset 0 1px 0`
+  in Weiß oben, eine feine dunkle Innenkante unten.
+- **Enger, hellerer Schatten** statt des weichen dunklen Schlagschattens, der sich als Trübung über die
+  eigene Fläche legte.
+- **Bedienelemente weiß mit präzisem Rand** statt grauem Verlauf; beim Überfahren übernimmt die
+  Monatsfarbe die Führung. Eingabefelder und Einfassungen sind deckend — dort geht Lesbarkeit vor Optik.
+- **`backdrop-filter` bleibt an genau einer Stelle:** `.app-dialog::backdrop`. Dort verschwimmt die
+  gesamte Seite hinter einem geöffneten Dialog. Das ist sichtbar, sinnvoll, und läuft nur, solange ein
+  Dialog offen ist.
+
+Ergebnis: 18 fps statt 14, optisch nicht vom weichgezeichneten Zustand zu unterscheiden — was belegt, dass
+der Weichzeichner dort nichts beitrug. Textkontrast über alles geprüft: Subline 4,96:1, Statuszeile 5,59:1,
+Monatsplakette 6,41:1, Schaltflächentext 16,45:1 — durchweg über der AA-Schwelle.
+
+**Eine Falle, zum zweiten Mal dieselbe:** `.topbar` und `.glass-panel` haben dieselbe Spezifität (0,1,0),
+und `.glass-panel` steht weiter unten in `styles.css`. Die erste Fassung dieser Regeln blieb deshalb
+vollständig wirkungslos — genau der Fehler, der zuvor schon die Wochentagsspalte farblos gelassen hatte.
+Die Regeln stehen jetzt als `.topbar.glass-panel` / `.toolbar.glass-panel` (0,2,0). Auch der Rückfall
+unter `prefers-reduced-transparency` musste nachgezogen werden, sonst hätte er die Leisten nicht mehr
+erreicht.
+
 ### 12a.3 Transparenz zurücknehmen
 
 Milchglas ist bewusst dosiert (siehe Kapitel 12). Zusätzlich wird
