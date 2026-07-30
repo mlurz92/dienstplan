@@ -16,30 +16,64 @@
     Zweig als main auslieferte. Von außen war das nicht zu erkennen, weil die
     Anwendung im Übrigen normal funktionierte.
   -->
-  <meta name="dienstplanrad-build" content="20260729.4" />
+  <meta name="dienstplanrad-build" content="20260730.1" />
   <script>
     (() => {
       const cachePrefix = 'dienstplanrad';
       const cleanupKey = 'dienstplanrad:legacy-cleanup';
+      const reloadKey = 'dienstplanrad:legacy-reload';
+
+      // Nur der historische eigene Worker wird abgemeldet. Eine originweite
+      // Bereinigung würde auch fremde Registrierungen desselben Hosts treffen –
+      // auf einer Pages-Domain ist das derzeit niemand, aber es ist nicht
+      // unsere Registrierung, über die wir verfügen dürfen.
+      const istEigenerWorker = registration => {
+        const worker = registration.active || registration.waiting || registration.installing;
+        if (!worker) return false;
+        try {
+          return new URL(worker.scriptURL, location.href).pathname === '/sw.js';
+        } catch {
+          return false;
+        }
+      };
+
+      // Entscheidend: Ist dieses Dokument selbst von einem Worker ausgeliefert
+      // worden? `unregister()` löst den Controller eines bereits geöffneten Tabs
+      // NICHT ab – der Worker bedient diesen Tab bis zu seinem Ende weiter aus
+      // seinem Cache. Genau dann, und nur dann, ist ein einmaliger Neustart
+      // nötig, damit der Anwender wirklich den aktuellen Stand sieht.
+      const wirdVonWorkerBedient = 'serviceWorker' in navigator && navigator.serviceWorker.controller !== null;
+
       const unregister = 'serviceWorker' in navigator
         ? navigator.serviceWorker.getRegistrations()
-            .then(registrations => Promise.all(registrations.map(registration => registration.unregister())))
+            .then(registrations => Promise.all(registrations.filter(istEigenerWorker).map(registration => registration.unregister())))
         : Promise.resolve();
       const clearCaches = 'caches' in window
         ? caches.keys()
             .then(keys => Promise.all(keys.filter(key => key.startsWith(cachePrefix)).map(key => caches.delete(key))))
         : Promise.resolve();
 
+      const schonNeugestartet = (() => {
+        try { return sessionStorage.getItem(reloadKey) === '1'; } catch { return true; }
+      })();
+
       // Läuft inline vor den ersten eigenen Asset-Anfragen. Selbst wenn ein
       // früherer Worker app.js festhält, erreicht diese Bereinigung den Client.
-      window.__dienstplanLegacyCleanup = Promise.allSettled([unregister, clearCaches]);
+      window.__dienstplanLegacyCleanup = Promise.allSettled([unregister, clearCaches]).then(() => {
+        if (!wirdVonWorkerBedient || schonNeugestartet) return { neustart: false };
+        // Marke VOR dem Neuladen setzen: Damit ist eine Schleife auch dann
+        // unmöglich, wenn der Controller überraschend bestehen bleibt.
+        try { sessionStorage.setItem(reloadKey, '1'); } catch { return { neustart: false }; }
+        location.reload();
+        return { neustart: true };
+      });
       document.documentElement.dataset.assetCleanup = cleanupKey;
     })();
   </script>
-  <link rel="manifest" href="/manifest.webmanifest?v=20260729.4" />
-  <link rel="stylesheet" href="/styles.css?v=20260729.4" />
+  <link rel="manifest" href="/manifest.webmanifest?v=20260730.1" />
+  <link rel="stylesheet" href="/styles.css?v=20260730.1" />
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" defer></script>
-  <script type="module" src="/js/app.js?v=20260729.4"></script>
+  <script type="module" src="/js/app.js?v=20260730.1"></script>
 </head>
 <body>
   <div class="ambient-layer" aria-hidden="true">

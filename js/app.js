@@ -1,9 +1,9 @@
-import { ABSENCE_TYPES, MONTH_NAMES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, toIsoDate } from './defaults.js?v=20260729.4';
-import { state, bootstrapState, getMonthData, getMonthLabel, loadMonth, persistCurrentMonth, persistMonth, saveLocalBootstrap, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260729.4';
-import { api } from './api.js?v=20260729.4';
-import { applyMonthTheme, prefersReducedMotion } from './theme.js?v=20260729.4';
-import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260729.4';
-import { buildStats, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getPlanningStaff, getPreference, getStaffById, labelForAbsence, labelForPreference, setAbsence, setAssignment, setPreference, weekdayLabel } from './rules.js?v=20260729.4';
+import { ABSENCE_TYPES, MONTH_NAMES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, toIsoDate } from './defaults.js?v=20260730.1';
+import { state, bootstrapState, getMonthData, getMonthLabel, loadMonth, persistCurrentMonth, persistMonth, saveLocalBootstrap, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260730.1';
+import { api } from './api.js?v=20260730.1';
+import { applyMonthTheme, prefersReducedMotion } from './theme.js?v=20260730.1';
+import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260730.1';
+import { buildStats, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getPlanningStaff, getPreference, getStaffById, labelForAbsence, labelForPreference, setAbsence, setAssignment, setPreference, weekdayLabel } from './rules.js?v=20260730.1';
 
 const $ = selector => document.querySelector(selector);
 
@@ -79,8 +79,15 @@ async function init() {
   cacheElements();
   bindEvents();
   buildStaticSelectors();
-  releaseLegacyServiceWorker();
   setStatus('loading', 'Lädt …');
+
+  // Die Inline-Bereinigung im <head> kann zu dem Ergebnis kommen, dass dieses
+  // Dokument noch von einem historischen Worker ausgeliefert wurde und ein
+  // einmaliger Neustart fällig ist. Dann hier abbrechen, bevor die erste
+  // Anfrage rausgeht: Ein Neustart mitten in laufenden Abrufen war genau das,
+  // was die Seite in einem früheren Versuch dauerhaft bei "Lädt …" hängen ließ.
+  if (await legacyNeustartAngekuendigt()) return;
+  releaseLegacyServiceWorker();
   await bootstrapState();
   applyMonthTheme(state.currentMonth, { animate: false });
   populateSelectors();
@@ -699,11 +706,38 @@ function labelByLevel(level) {
  * abgemeldet und geleert. Der Aufruf ist dauerhaft nötig, nicht nur einmalig –
  * es ist nicht absehbar, wann der letzte Client das nächste Mal vorbeikommt.
  */
+/**
+ * Wartet die Inline-Bereinigung ab und meldet, ob sie einen Neustart auslöst.
+ *
+ * Die Wartezeit ist gedeckelt. Bliebe das Versprechen aus irgendeinem Grund
+ * offen, dürfte die Anwendung darüber nicht selbst stehen bleiben – dann wird
+ * eben ohne Bereinigung gestartet, was der Zustand aller Fassungen vor dieser
+ * Änderung war.
+ */
+async function legacyNeustartAngekuendigt() {
+  const angekuendigt = window.__dienstplanLegacyCleanup;
+  if (!angekuendigt) return false;
+  const abgelaufen = new Promise(resolve => setTimeout(() => resolve(null), 3000));
+  const ergebnis = await Promise.race([angekuendigt.catch(() => null), abgelaufen]);
+  return Boolean(ergebnis && ergebnis.neustart);
+}
+
+/** Nur der eigene historische `/sw.js` – fremde Registrierungen bleiben unberührt. */
+function istEigenerLegacyWorker(registration) {
+  const worker = registration.active || registration.waiting || registration.installing;
+  if (!worker) return false;
+  try {
+    return new URL(worker.scriptURL, location.href).pathname === '/sw.js';
+  } catch {
+    return false;
+  }
+}
+
 async function releaseLegacyServiceWorker() {
   try {
     if ('serviceWorker' in navigator) {
       const registrations = await navigator.serviceWorker.getRegistrations();
-      await Promise.all(registrations.map(registration => registration.unregister()));
+      await Promise.all(registrations.filter(istEigenerLegacyWorker).map(registration => registration.unregister()));
     }
     if ('caches' in window) {
       const keys = await caches.keys();
@@ -714,12 +748,22 @@ async function releaseLegacyServiceWorker() {
     // Zugriff, war auch nie ein Worker registriert, der stören könnte.
   }
 }
-// Bewusst KEIN erzwungener Neustart nach dem Abmelden: Getestet bricht ein
-// location.reload() in dieser Situation die Seite: Nach dem Neuladen blieben
-// alle Anfragen hängen und die Anwendung stand dauerhaft bei "Lädt …" – sowohl
-// aus der laufenden Initialisierung heraus als auch nach dem load-Ereignis.
-// Die Abmeldung allein genügt: Sie wirkt dauerhaft, und spätestens der nächste
-// Aufruf lädt garantiert ungecachten Code.
+// Zur Neustartfrage, weil sie zweimal falsch beantwortet wurde:
+//
+// Ein bedingungsloses location.reload() aus dem Anwendungsstart heraus bricht
+// die Seite – getestet: Nach dem Neuladen blieben alle Anfragen hängen und die
+// Anwendung stand dauerhaft bei "Lädt …", sowohl aus der laufenden
+// Initialisierung als auch nach dem load-Ereignis. Deshalb steht hier keiner.
+//
+// Ganz ohne Neustart bleibt aber eine Lücke, und die ist real: `unregister()`
+// löst den Controller eines bereits geöffneten Tabs nicht ab. Wer die Seite mit
+// aktivem Alt-Worker öffnet, wird für die gesamte Lebensdauer dieses Tabs weiter
+// aus dessen Cache bedient – die Abmeldung wirkt erst beim nächsten Aufruf.
+//
+// Beides zusammen ergibt die jetzige Lösung: Der Neustart steht im Inline-Skript
+// des <head>, geschieht ausschließlich bei tatsächlich vorhandenem Controller,
+// höchstens einmal pro Tab (Marke in sessionStorage, vor dem Neuladen gesetzt)
+// und vor jeder eigenen Anfrage – init() bricht dafür oben ab.
 
 async function onExcelImport(event) {
   const file = event.target.files?.[0];

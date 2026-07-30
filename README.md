@@ -990,13 +990,32 @@ einer zukünftigen Änderung muss der Token im gesamten Browser-Modulgraph gemei
 
 Vor Stylesheet und Modulscript startet `index.html`:
 
-- `navigator.serviceWorker.getRegistrations()` und `unregister()` für Registrierungen des Origins;
+- `navigator.serviceWorker.getRegistrations()` und `unregister()` — **ausschließlich** für Registrierungen,
+  deren Skriptpfad `/sw.js` ist. Eine originweite Abmeldung würde auch fremde Worker desselben Hosts
+  treffen; das ist nicht unsere Registrierung, über die wir verfügen dürfen;
 - `caches.keys()` und Löschen aller Cache-Namen mit Präfix `dienstplanrad`;
 - Ablage des Abschluss-Promises als `window.__dienstplanLegacyCleanup`.
 
 Die Position im HTML ist absichtlich früh: Die Bereinigung hängt nicht von einem möglicherweise
 veralteten `app.js` ab. `releaseLegacyServiceWorker()` wiederholt sie während `init()` als defensive
-zweite Ebene.
+zweite Ebene — mit derselben Begrenzung auf den eigenen Worker.
+
+**Einmaliger Neustart, und nur wenn nötig.** `unregister()` löst den Controller eines bereits geöffneten
+Tabs nicht ab: Wer die Seite mit aktivem Alt-Worker öffnet, wird für die gesamte Lebensdauer dieses Tabs
+weiter aus dessen Cache bedient. Die Bereinigung wirkt dort erst beim nächsten Aufruf. Deshalb lädt das
+Inline-Skript die Seite genau dann einmal neu, wenn `navigator.serviceWorker.controller` tatsächlich
+gesetzt ist. Drei Sicherungen verhindern die Fehler früherer Versuche:
+
+1. Die Marke in `sessionStorage` wird **vor** dem Neuladen gesetzt — eine Schleife ist damit auch dann
+   unmöglich, wenn der Controller überraschend bestehen bleibt.
+2. Der Neustart geschieht im `<head>`, vor jeder eigenen Anfrage. `init()` fragt
+   `legacyNeustartAngekuendigt()` ab und bricht ab, statt in einen bevorstehenden Neustart hinein Abrufe
+   abzusetzen. Ein Neustart mitten in laufenden Anfragen war genau das, was die Seite in einem früheren
+   Versuch dauerhaft bei „Lädt …“ stehen ließ.
+3. Ohne Controller passiert nichts. Der Normalfall — kein Worker vorhanden — bleibt unberührt.
+
+Die Wartezeit auf das Bereinigungs-Promise ist auf drei Sekunden begrenzt. Bliebe es offen, startet die
+Anwendung ohne Bereinigung, statt selbst stehen zu bleiben.
 
 ### 17.4 Kein Service Worker
 
@@ -1004,13 +1023,43 @@ Die Anwendung liefert **keinen Service Worker** aus, und sie registriert auch ke
 
 Der ursprüngliche Worker lieferte eigenen Anwendungscode Cache-First aus. Ein Client, der ihn einmal
 installiert hatte, bekam dauerhaft alte Fassungen von `styles.css` und den JS-Modulen; ausgerollte
-Korrekturen erreichten ihn nicht mehr. Eine Zwischenfassung ließ eine leere Worker-Datei als Grabstein
-unter der historischen URL stehen, damit ein Browser dort ein Update findet, das sich selbst abmeldet.
-Auch dieser Rest ist entfernt: Registriert hat ihn niemand mehr, und die Abmeldung erledigen zwei
-Schichten in der Seite selbst zuverlässiger (siehe 17.3).
+Korrekturen erreichten ihn nicht mehr.
 
-`tests/delivery.test.js` hält das fest. Der Test schlägt an, sobald wieder eine Worker-Datei im Projekt
-liegt oder irgendwo `serviceWorker.register(` auftaucht. Damit kann die Ursache nicht zurückkehren.
+Unter `/sw.js` liegt aus genau einem Grund wieder eine Datei: als **Grabstein**, der den historischen
+Worker aus bestehenden Installationen entfernt. Er cacht nichts, hat keinen `fetch`-Handler und greift in
+keine Anfrage ein — er löscht die `dienstplanrad*`-Caches, meldet sich selbst ab und baut offene Tabs
+einmal neu auf.
+
+#### Warum Löschen allein nicht genügte
+
+Das ist keine Vorsichtsmaßnahme, sondern die Behebung eines gemessenen Fehlers. Am 30.07.2026 gegen die
+Produktion geprüft, mit `sw.js` seit dem Vortag nicht mehr im Repository:
+
+| Anfrage | Antwort | Wirkung auf einen installierten Worker |
+|---|---|---|
+| `GET /sw.js` | HTTP 200, **der alte Worker**, 1144 Byte, `dienstplanrad-v4`, `cf-cache-status: HIT`, `age: 30048`, `cache-control: public, s-maxage=604800` | Die Updateprüfung erhält ein byteweise identisches Skript. Kein Wechsel. Bis zu **sieben Tage je Edge-Standort**. |
+| `GET /sw.js?x=…` (Cache-Miss) | HTTP 200, **`index.html`** mit `Content-Type: text/html` — der SPA-Rückfall von Pages | MIME-Fehler. Die Updateprüfung bricht ab, **ohne** die Registrierung zu löschen. Der Worker bleibt dauerhaft. |
+
+Zusammengenommen heißt das: Ein Browser, der den Worker je installiert hatte, behielt ihn **für immer**
+und wurde für immer aus dessen Cache bedient. Genau das erklärt den Befund, dass Korrekturen auf einem
+eingerichteten Gerät nicht ankamen, während ein frisches Gerät den aktuellen Stand sah — und es erklärt,
+warum das Löschen der Datei sich als Lösung angefühlt hat, ohne eine zu sein.
+
+Der Grabstein durchbricht beides, weil er gültiges JavaScript mit korrektem MIME-Typ ist und sich vom
+installierten Skript unterscheidet: Die Updateprüfung nimmt ihn an, er wird aktiv und räumt auf.
+`_headers` gibt ihm `no-store`, damit der Browser bei jeder Navigation wirklich neu prüft.
+
+**Nachgewiesen, nicht angenommen.** In Chromium gemessen: Alt-Worker installiert (1 Registrierung, Cache
+`dienstplanrad-v4`, Seite wird nachweislich aus dem Cache mit fremdem Inhalt bedient) → Grabstein
+ausgeliefert → nach einer Navigation 0 Registrierungen, 0 Caches, Anwendung bootet mit 31 Zeilen auf dem
+aktuellen Stempel.
+
+#### Die Sperre bleibt
+
+`tests/delivery.test.js` erlaubt jetzt genau diese eine Datei und verbietet ihr alles Übrige: kein
+`fetch`-Handler, kein `respondWith`, kein `caches.match`/`cache.put`/`addAll`, `unregister()` und
+Cache-Löschung zwingend vorhanden, `_headers` muss `no-store` setzen. Zusätzlich weiterhin: nirgends
+`serviceWorker.register(`. Ein Worker, der wieder ausliefert, kann damit nicht zurückkehren.
 
 **Folge für den Betrieb:** Es gibt keine Zwischenschicht mehr, die Dateien festhalten könnte. Die
 Aktualität hängt allein an den Cache-Headern und dem Release-Token – beides in 17.5 beschrieben. Der
@@ -1023,6 +1072,7 @@ Kaltstart ohne Netz lädt die Anwendung dagegen bewusst nicht mehr.
 |---|---|
 | `/` | `no-cache, no-store, must-revalidate` |
 | `/index.html` | `no-cache, no-store, must-revalidate` |
+| `/sw.js` | `no-store` (Grabstein, siehe 17.4) |
 | `/styles.css` | `no-cache, must-revalidate` |
 | `/js/*` | `no-cache, must-revalidate` |
 
@@ -1185,6 +1235,42 @@ Excel-Import mit produktiven Arbeitsmappen, Accessibility-Audits sowie Last- und
 ---
 
 ## 21. Deployment und Betrieb
+
+### 21.-2 Herkunft: was aus fremden Beiträgen übernommen wurde
+
+Am Projekt haben mehrere Beitragende gearbeitet. Mehrere Ansätze aus fremden Pull Requests sind
+inhaltlich richtig und im aktuellen Stand enthalten — die Herkunft ist hier festgehalten, damit sie bei
+späteren Umbauten nicht versehentlich wieder herausfällt.
+
+**Aus PR #7 und #8** (`codex/automatisch-farbwechsel-beim-monatswechsel-implementieren`):
+
+| Idee | Warum sie richtig ist | Wo sie steht |
+|---|---|---|
+| `shiftMonth` liest die **Auswahlfelder**, nicht `state` | Wer im Dropdown springt und dann die Pfeiltaste drückt, erwartet den Nachbarn des Sichtbaren, nicht des geladenen Monats | `js/app.js`, `shiftMonth` |
+| `persistMonth(year, month)` statt `persistCurrentMonth()` | Eine gepufferte Speicherung muss ihrem **Ursprungsmonat** zugeordnet werden, sonst schreibt sie beim Wechsel in den falschen | `js/state.js` |
+| `monthRequestId` als Anforderungskennung | Bei schnellen Wechseln darf eine langsamere alte Serverantwort den zuletzt gewählten Monat nicht überschreiben | `js/app.js`, `openCurrentMonth` |
+| Jahresauswahl relativ zum Kalenderjahr | Der fest verdrahtete Bereich 2025–2030 läuft ab | `js/app.js`, `buildStaticSelectors` |
+| Importe gegen Fehleingaben härten | `XLSX.read` in `try`/`catch`, JSON-Wurzeltyp und Monatsschlüssel geprüft, Tagesspalten gegen die **echte** Monatslänge statt gegen 31 | `js/app.js`, `onExcelImport`, `importMonthSheet`, `onJsonImport` |
+| `theme-color` beim Monatswechsel **nicht** mitziehen | Die Browserleiste soll nicht monatlich die Farbe wechseln | `index.html` |
+| Sättigungsimpuls zum Farbwechsel | Bindet Farb- und Inhaltswechsel zu einer wahrgenommenen Bewegung | `styles.css`, `.month-content-transition` |
+
+Nicht übernommen wurde aus diesen PRs der Übergang selbst: `@property` plus CSS-`transition` auf `<html>`
+löste nicht verlässlich aus. An seiner Stelle steht die zeitgesteuerte OKLCH-Interpolation in
+`js/theme.js` (siehe 13.0).
+
+**Aus PR #13** (`agent/re-audit-month-delivery`, nie zusammengeführt) — drei Befunde, die trotz
+Nichtzusammenführung zutrafen:
+
+- `unregister()` löst den Controller eines geöffneten Tabs nicht ab → einmaliger, dreifach gesicherter
+  Neustart (17.3);
+- die Bereinigung darf keine fremden Worker desselben Origin abmelden → Begrenzung auf `/sw.js` (17.3);
+- `npm run check` erfasste `js/holidays.js` und alle Endpunkte unter `functions/api/` nicht → die
+  Prüfliste ist jetzt vollständig und `tests/delivery.test.js` erzwingt das, indem er die Dateien im
+  Projekt gegen das Skript abgleicht. Ein Syntaxfehler in einer Function kostet nicht einen Endpunkt,
+  sondern das gesamte Deployment (21.-1).
+
+Der Grabstein unter `/sw.js` (17.4) geht ebenfalls auf PR #13 zurück. Er wurde dort verworfen und ist
+nach Messung gegen die Produktion nachweislich notwendig.
 
 ### 21.-1 Vorfall: gescheiterte Builds hielten die Auslieferung wochenlang auf
 
