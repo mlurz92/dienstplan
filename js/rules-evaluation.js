@@ -1,4 +1,4 @@
-import { holidayBlocks, isFirstRegularWorkdayAfter, isHoliday } from './holidays.js?v=20260730.5';
+import { holidayBlocks, isFirstRegularWorkdayAfter, isHoliday } from './holidays.js?v=20260730.6';
 import {
   addDays, basicallyEligiblePeers, countHgForAaBdExcept, countRoleInMonthExcept,
   countSaturdayBdExcept, countServicesInLoadedYearExcept, getAbsence, getAbsenceFromState,
@@ -6,7 +6,7 @@ import {
   hasCompleteLoadedHistory, hasVacationInFollowingWeek, isAaOn, isFaOn, isPositivePreference,
   isStaffActiveOn, labelForAbsence, listOwnRoleDates, monthForIso, parseIso,
   projectedWeekendEquivalent, severityRank, toLocalIso, weekendEquivalentFromMap, weekendMap
-} from './rules-core.js?v=20260730.5';
+} from './rules-core.js?v=20260730.6';
 
 function applyBundlingRules({ state, dateIso, role, staffId, push, recommend }) {
   const date = parseIso(dateIso);
@@ -112,8 +112,8 @@ function applyMonthlyBdFairness({ state, monthData, dateIso, staffId, currentBd,
       const histories = comparable.map(peer => countServicesInLoadedYearExcept(state, peer.id, year, dateIso));
       const minimum = Math.min(...histories);
       const own = countServicesInLoadedYearExcept(state, staffId, year, dateIso);
-      if (own === minimum) note(`Jahresverlauf (nur Hinweis, ohne Einfluss auf Bewertung): niedrigste bisherige Dienstlast (${own})`);
-      else note(`Jahresverlauf (nur Hinweis, ohne Einfluss auf Bewertung): höhere bisherige Dienstlast (${own} statt ${minimum})`);
+      if (own === minimum) note(`Jahresverlauf: niedrigste bisherige Dienstlast (${own})`);
+      else note(`Jahresverlauf: höhere bisherige Dienstlast (${own} statt ${minimum})`);
     }
   }
 }
@@ -148,8 +148,8 @@ function applyHgFairness({ state, monthData, dateIso, staffId, currentBd, curren
       const histories = comparable.map(peer => countServicesInLoadedYearExcept(state, peer.id, year, dateIso));
       const minimum = Math.min(...histories);
       const own = countServicesInLoadedYearExcept(state, staffId, year, dateIso);
-      if (own === minimum) note(`Jahresverlauf (nur Hinweis, ohne Einfluss auf Bewertung): niedrigste bisherige Dienstlast (${own})`);
-      else note(`Jahresverlauf (nur Hinweis, ohne Einfluss auf Bewertung): höhere bisherige Dienstlast (${own} statt ${minimum})`);
+      if (own === minimum) note(`Jahresverlauf: niedrigste bisherige Dienstlast (${own})`);
+      else note(`Jahresverlauf: höhere bisherige Dienstlast (${own} statt ${minimum})`);
     }
   }
 }
@@ -254,7 +254,7 @@ export function evaluateCandidate({ state, monthData, dateIso, role, staffId }) 
     else if (person.bdTarget && currentBd >= person.bdTarget) push('yellow', `BD-Richtwert ${person.bdTarget} bereits erreicht`);
 
     const nextIso = toLocalIso(addDays(date, 1));
-    if (getAbsenceFromState(state, staffId, nextIso) === 'urlaub') push('orange', 'BD unmittelbar vor Urlaubsbeginn');
+    if (!absence && getAbsenceFromState(state, staffId, nextIso) === 'urlaub') push('orange', 'BD unmittelbar vor Urlaubsbeginn');
     if (weekday === 4 && hasVacationInFollowingWeek(state, staffId, dateIso)) recommend('Donnerstags-BD als Urlaubsverlängerer vor Urlaub in der Folgewoche', 45);
 
     if (person.id === 'becker' && isFirstRegularWorkdayAfter(dateIso, iso => parseIso(iso).getDay() === 6 && getAssignment(state, iso, 'bd') === 'becker')) {

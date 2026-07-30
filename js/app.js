@@ -1,10 +1,10 @@
-import { ABSENCE_TYPES, MONTH_NAMES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, toIsoDate } from './defaults.js?v=20260730.5';
-import { state, bootstrapState, getMonthData, getMonthLabel, loadMonth, persistCurrentMonth, persistMonth, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260730.5';
-import { api } from './api.js?v=20260730.5';
-import { applyMonthTheme, prefersReducedMotion } from './theme.js?v=20260730.5';
-import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260730.5';
-import { buildStats, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getPlanningStaff, getPreference, getStaffById, labelForAbsence, labelForPreference, setAbsence, setAssignment, setPreference, weekdayLabel } from './rules.js?v=20260730.5';
-import { getRbnOptions, isRbnValueAllowed, isSecondRbnAvailable } from './rbn.js?v=20260730.5';
+import { ABSENCE_TYPES, MONTH_NAMES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, toIsoDate } from './defaults.js?v=20260730.6';
+import { state, bootstrapState, getMonthData, getMonthLabel, loadMonth, persistCurrentMonth, persistMonth, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260730.6';
+import { api } from './api.js?v=20260730.6';
+import { applyMonthTheme, prefersReducedMotion } from './theme.js?v=20260730.6';
+import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260730.6';
+import { buildStats, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getPlanningStaff, getPreference, getStaffById, labelForAbsence, labelForPreference, setAbsence, setAssignment, setPreference, weekdayLabel } from './rules.js?v=20260730.6';
+import { getRbnOptions, isRbnValueAllowed, isSecondRbnAvailable } from './rbn.js?v=20260730.6';
 
 const $ = selector => document.querySelector(selector);
 
@@ -14,6 +14,7 @@ const $ = selector => document.querySelector(selector);
  * pflegbar; ein Name mit spitzer Klammer hätte das Markup zerlegt.
  */
 const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
+const isPlainRecord = value => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 const els = {};
 let pendingConflict = null;
 let monthRequestId = 0;
@@ -928,24 +929,42 @@ async function onJsonImport(event) {
   const file = event.target.files?.[0];
   if (!file) return;
   let payload;
+  let monthEntries;
   try {
     payload = JSON.parse(await file.text());
-    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('Die Wurzel muss ein JSON-Objekt sein.');
+    if (!isPlainRecord(payload)) throw new Error('Die Wurzel muss ein JSON-Objekt sein.');
+    if ('settings' in payload && !isPlainRecord(payload.settings)) throw new Error('„settings“ muss ein JSON-Objekt sein.');
+    if ('staff' in payload && !Array.isArray(payload.staff)) throw new Error('„staff“ muss ein Array sein.');
+    if ('rbnNames' in payload && !Array.isArray(payload.rbnNames)) throw new Error('„rbnNames“ muss ein Array sein.');
+    monthEntries = payload.months ?? [];
+    if (!Array.isArray(monthEntries)) throw new Error('„months“ muss ein Array sein.');
+    for (const entry of monthEntries) {
+      if (!Array.isArray(entry) || entry.length !== 2 || !/^\d{4}-(0[1-9]|1[0-2])$/.test(entry[0]) || !isPlainRecord(entry[1])) {
+        throw new Error('Jeder Monat muss als [„YYYY-MM“, Monatsobjekt] vorliegen.');
+      }
+    }
   } catch (error) {
     alert(`JSON-Sicherung konnte nicht gelesen werden: ${error.message}`);
     event.target.value = '';
     return;
   }
-  if (payload.settings) state.settings = payload.settings;
-  if (payload.staff) state.staff = payload.staff;
-  if (payload.rbnNames) state.rbnNames = payload.rbnNames;
-  if (Array.isArray(payload.months)) payload.months.forEach(entry => {
-    if (!Array.isArray(entry) || !/^\d{4}-(0[1-9]|1[0-2])$/.test(entry[0]) || !entry[1] || typeof entry[1] !== 'object') return;
-    const [year, month] = entry[0].split('-').map(Number);
-    setMonthData(year, month, entry[1]);
-  });
+
+  if ('settings' in payload) state.settings = payload.settings;
+  if ('staff' in payload) state.staff = payload.staff;
+  if ('rbnNames' in payload) state.rbnNames = payload.rbnNames;
+  for (const [key, monthPayload] of monthEntries) {
+    const [year, month] = key.split('-').map(Number);
+    setMonthData(year, month, monthPayload);
+  }
   saveLocalBootstrap();
-  try { await api.importJson(payload); } catch {}
+
+  try {
+    await api.importJson(payload);
+    setStatus('saved', 'Import gespeichert');
+  } catch (error) {
+    setStatus('offline', 'Lokal importiert – Serverfehler');
+    alert(`Die Sicherung wurde lokal übernommen, konnte aber nicht auf dem Server gespeichert werden: ${error.message}`);
+  }
   render();
   event.target.value = '';
 }

@@ -72,6 +72,71 @@ export function createEmptyMonth(year, month) {
   };
 }
 
+
+function isPlainRecord(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function normalizePerStaffDateMap(value, validDates) {
+  if (!isPlainRecord(value)) return {};
+  const normalized = {};
+  for (const [staffId, entries] of Object.entries(value)) {
+    if (!isPlainRecord(entries)) continue;
+    const clean = {};
+    for (const [iso, entry] of Object.entries(entries)) {
+      if (!validDates.has(iso) || typeof entry !== 'string' || !entry.trim()) continue;
+      clean[iso] = entry;
+    }
+    if (Object.keys(clean).length) normalized[staffId] = clean;
+  }
+  return normalized;
+}
+
+/**
+ * Normalisiert geladene, importierte oder ältere Monatsdaten auf das vollständige
+ * aktuelle Schema. Fehlende Tagesfelder werden ergänzt, ungültige Typen verworfen
+ * und außerhalb des Monats liegende Tageswerte nicht übernommen.
+ */
+export function normalizeMonthData(year, month, payload) {
+  const normalizedYear = Number(year);
+  const normalizedMonth = Number(month);
+  const base = createEmptyMonth(normalizedYear, normalizedMonth);
+  const source = isPlainRecord(payload) ? payload : {};
+  const sourceDays = isPlainRecord(source.days) ? source.days : {};
+  const days = {};
+
+  for (const [iso, emptyDay] of Object.entries(base.days)) {
+    const raw = isPlainRecord(sourceDays[iso]) ? sourceDays[iso] : {};
+    days[iso] = {
+      bd: typeof raw.bd === 'string' ? raw.bd : emptyDay.bd,
+      hg: typeof raw.hg === 'string' ? raw.hg : emptyDay.hg,
+      rbn1: typeof raw.rbn1 === 'string' ? raw.rbn1 : emptyDay.rbn1,
+      rbn2: typeof raw.rbn2 === 'string' ? raw.rbn2 : emptyDay.rbn2,
+      notes: typeof raw.notes === 'string' ? raw.notes : emptyDay.notes
+    };
+  }
+
+  const validDates = new Set(Object.keys(days));
+  const revision = Number(source.revision);
+  const schemaVersion = Number(source.schemaVersion);
+
+  return {
+    ...base,
+    ...source,
+    schemaVersion: Number.isInteger(schemaVersion) && schemaVersion > 0 ? schemaVersion : base.schemaVersion,
+    year: normalizedYear,
+    month: normalizedMonth,
+    revision: Number.isFinite(revision) && revision >= 0 ? revision : base.revision,
+    updatedAt: typeof source.updatedAt === 'string' || source.updatedAt === null ? source.updatedAt : base.updatedAt,
+    days,
+    absences: normalizePerStaffDateMap(source.absences, validDates),
+    absenceSources: normalizePerStaffDateMap(source.absenceSources, validDates),
+    preferences: normalizePerStaffDateMap(source.preferences, validDates),
+    overrideLog: Array.isArray(source.overrideLog) ? source.overrideLog.filter(isPlainRecord) : [],
+    importLog: Array.isArray(source.importLog) ? source.importLog.filter(isPlainRecord) : []
+  };
+}
+
 export function toIsoDate(year, month, day) {
   return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }

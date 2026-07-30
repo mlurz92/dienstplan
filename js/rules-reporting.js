@@ -1,9 +1,9 @@
-import { isRegularWorkdayIso } from './holidays.js?v=20260730.5';
+import { isRegularWorkdayIso } from './holidays.js?v=20260730.6';
 import {
   ABSENCE_FOR_CT_LEADERSHIP, computeWeekendEquivalent, countRoleInMonth, dayIso,
   fmtGermanDate, getAbsence, getRoleProperties, getStaffById, isStaffActiveOn, severityRank
-} from './rules-core.js?v=20260730.5';
-import { evaluateCandidate } from './rules-evaluation.js?v=20260730.5';
+} from './rules-core.js?v=20260730.6';
+import { evaluateCandidate } from './rules-evaluation.js?v=20260730.6';
 
 export function collectIssues(state, monthData) {
   const issues = [];
