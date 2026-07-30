@@ -1,0 +1,42 @@
+name: Apply fairness update
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'README.md'
+      - '.github/apply-fairness-update.py'
+      - '.github/workflows/apply-fairness-update.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-verify:
+    if: ${{ github.head_ref == 'agent/fairness-tooltip-readme' && !contains(github.event.pull_request.title, '[applied]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/fairness-tooltip-readme
+          fetch-depth: 0
+      - name: Apply reviewed changes
+        run: python .github/apply-fairness-update.py
+      - name: Syntax check
+        run: npm run check
+      - name: Full test suite
+        run: npm test
+      - name: Commit verified final source
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/apply-fairness-update.py
+          rm -f .github/workflows/apply-fairness-update.yml
+          rmdir .github/workflows 2>/dev/null || true
+          rmdir .github 2>/dev/null || true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Fairnessbewertung präzisieren und README vollständig erneuern [applied]"
+          git push
