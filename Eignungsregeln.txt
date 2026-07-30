@@ -1,60 +1,71 @@
-Regeln und Kriterien für den RadPlan Neural Scheduler (v3.2):
+Regeln und Kriterien für manuelle Kandidatenempfehlungen in DienstplanRAD (v4.0)
 
 GRUNDPRINZIPIEN & DATENBASIS:
-- Als relevante Dienste zählen ausschließlich der Bereitschaftsdienst (D) und der Hintergrunddienst (HG).
-- Der Algorithmus arbeitet mit hoher Iterationstiefe über mehrere Optimierungszyklen, in denen Cross-Role-Tauschvorgänge (Swaps) pro Phase simuliert und auf Fairness getestet werden. Die konkrete Zyklen-/Pass-Anzahl ist eine Implementierungsdetail; die kanonische, code-synchron gehaltene Angabe dazu steht in algorithm_rules.md Abschnitt 1 (dort steht auch der Grund, warum diese Zahlen hier bewusst nicht wiederholt werden).
-- Die Verteilung wird primär durch die Ausgewogenheit innerhalb des aktuellen Monats diktiert.
-- Historische Daten (seit 01.01. des Jahres) werden protokolliert, fungieren aber nur noch als "Tie-Breaker" bei absolut gleichwertigen Kandidaten im aktuellen Monat.
-- Manuell gesetzte Dienste (Fix-Dienste) haben absolute Priorität. Der Algorithmus passt sich um diese Anker herum an.
-- Dienstwünsche (Wishes) fließen mit hohem positivem Score, "Kein Dienst"-Wünsche als hartes K.-o.-Kriterium in die Planung ein.
+- DienstplanRAD enthält keinen automatischen Dienstplaner, keinen Optimierungslauf, keine Iterationszyklen und keine automatischen Tauschvorgänge.
+- Jeder Bereitschaftsdienst (BD), Hintergrunddienst (HG) und jede Änderung wird ausschließlich durch eine bewusste manuelle Auswahl eingetragen.
+- Die Anwendung bewertet für den angeklickten Tag und die angeklickte Rolle alle aktiven Personen seiteneffektfrei. Eine Bewertung erzeugt, löscht, verschiebt oder überschreibt keinen Dienst.
+- Bereits manuell eingetragene Dienste bleiben unangetastete Fixpunkte. Empfehlungen passen den Plan nicht selbstständig um diese Einträge herum an.
+- Die Empfehlungen werden primär durch Qualifikation, harte Konflikte und die Ausgewogenheit innerhalb des aktuellen Monats bestimmt.
+- Vollständig geladene historische Monatsdaten seit dem 01.01. des Jahres dürfen ausschließlich bei im aktuellen Monat absolut gleichwertigen Kandidaten als schwacher Tie-Breaker berücksichtigt werden. Unvollständige Jahresdaten dürfen die Empfehlung nicht beeinflussen.
+- Positive Dienstwünsche werden als starke Empfehlung berücksichtigt. „Kein BD“, „Kein HG“ und „Kein Dienst“ erzeugen für die betroffene Rolle einen roten Konflikt.
 
-BESETZUNGSREGELN & QUALIFIKATION:
-- An jedem Tag des Monats muss zwingend exakt ein D und ein HG besetzt sein.
-- Samstags-Dienste (D) dürfen nur von Fachärzten (FA) geleistet werden.
-- Alle Hintergrunddienste (HG) dürfen nur von Fachärzten (FA) geleistet werden.
-- Assistenzärzte (AA) werden nur für Bereitschaftsdienste (D) an Werktagen (Mo-Do), Freitagen und Sonntagen eingesetzt.
+BESETZUNG & QUALIFIKATION:
+- Pro Kalendertag existiert genau ein manuell zu besetzendes Feld für BD und genau ein manuell zu besetzendes Feld für HG.
+- Samstags-BD dürfen nur von am Diensttag entsprechend qualifizierten Fachärzten geleistet werden.
+- HG dürfen nur von am Diensttag entsprechend qualifizierten Fachärzten geleistet werden.
+- Assistenzärzte dürfen BD montags bis freitags sowie sonntags übernehmen, jedoch keinen Samstags-BD und keinen HG.
+- Dieselbe Person darf am selben Tag nicht gleichzeitig BD und HG übernehmen; dies ist ein roter Konflikt.
+- Eine eingetragene Abwesenheit ist für BD und HG am selben Tag ein roter Konflikt.
 
 RUHEZEITEN & DIENSTFOLGEN:
-- Die gesetzliche Ruhezeit ist kompromisslos: Nach jedem Bereitschaftsdienst (D) wird automatisch ein F (Frei) am folgenden Werktag generiert.
-- Eine D-D Kombination (Dienst an zwei direkt aufeinanderfolgenden Tagen bei derselben Person) ist unter keinen Umständen zulässig.
-- Ein HG-Dienst direkt vor einem eigenen Bereitschaftsdienst (HG -> D) ist verboten und wird hart bestraft, es sei denn, es handelt sich um die zulässige Kopplung von Freitag-HG auf Samstag-BD.
-- Das fragmentierte Muster D-F-D-F (Dienst-Frei-Dienst-Frei) wird algorithmisch erschwert.
+- Nach einem gewöhnlichen BD wird kein FZA automatisch eingetragen oder angezeigt.
+- Ausschließlich bei Dr. Becker wird nach einem Samstags-BD am nächsten regulären Werktag ein FZA abgeleitet und angezeigt.
+- Ein eigener weiterer BD mit weniger als drei dienstfreien Tagen Abstand erzeugt lediglich einen gelben Hinweis, keinen automatischen roten oder orangefarbenen Konflikt. Die Prüfung erfolgt symmetrisch zum vorherigen und zum folgenden BD.
+- Das werktägliche Muster BD–FZA–BD wird als eigener gelber Hinweis ausgewiesen.
+- Ein HG unmittelbar vor dem eigenen BD ist grundsätzlich nachrangig (orange), außer bei der zulässigen Kopplung Freitag-HG auf Samstags-BD oder wenn der am HG-Tag eingeteilte BD ebenfalls von einem Facharzt geleistet wird.
+- HG-Häufungen werden symmetrisch in beide Zeitrichtungen geprüft: erneuter HG innerhalb von drei Kalendertagen gelb, dritter HG in einer Dreierkette orange.
 
 WOCHENEND- & FEIERTAGSLOGIK:
-- Das "Wochenende" umfasst Freitag, Samstag und Sonntag.
-- Die Belastungsberechnung erfolgt in Äquivalenten: Ein Wochenende mit mindestens einem D zählt als 1.0; ein Wochenende mit reinem HG zählt als 0.5. Das Ziel ist exakt 1.0 Einheiten pro Person.
-- Aufeinanderfolgende Wochenenden mit Dienst (egal ob D oder HG) sind schlecht.
-- Wochenend-Fairness wird doppelt abgesichert: neben der Abweichung vom festen Ziel von exakt 1.0 Äquivalenten pro Person wird zusätzlich die Streuung um den tatsächlichen Gruppendurchschnitt bestraft. So trägt auch in einem engen Monat, in dem 1.0 nicht für alle exakt erreichbar ist, niemand deutlich mehr Wochenend-Last als die übrigen.
-- Die Samstags-Dienste (D) rotieren streng unter den Fachärzten. Ein zweiter Samstags-Dienst im selben Monat ist massiv strafbehaftet.
-- Feiertags-Alternanz: Wer an Ostern Dienst leistet, ist für Pfingsten gesperrt (und vice versa).
+- Ein Wochenende umfasst Freitag, Samstag und Sonntag.
+- Ein Wochenende mit mindestens einem BD zählt als 1,0 Wochenend-Äquivalent; ein Wochenende mit ausschließlich HG als 0,5.
+- Zielwert ist 1,0 Wochenend-Äquivalent je Person. Kandidaten mit geringerer bisheriger Wochenendbelastung werden bevorzugt; eine Überschreitung von 1,0 wird gelb kenntlich gemacht.
+- Direkt aufeinanderfolgende Wochenenden mit Dienst sind nachrangig. Zwei benachbarte BD-Wochenenden bleiben ein roter Konflikt, sonstige benachbarte Dienstwochenenden orange.
+- Samstags-BD rotieren unter den Fachärzten. Ein weiterer Samstags-BD derselben Person im selben Monat ist orange nachrangig.
+- Oster- und Pfingstblock alternieren. Ein Dienst in beiden Blöcken ist orange nachrangig.
 
-HINTERGRUNDDIENST (HG) ANTI-CLUSTERING:
-- HG-Dienste müssen in einem gleichmäßigen Rhythmus über den Monat verteilt werden.
-- HG-Dienste an aufeinanderfolgenden Tagen (außer bei Kopplungen) werden bestraft.
-- Kein HG für einen AA, wenn der FA am Folgetag selbst D hat, der HG ist jedoch zulässig, wenn der BD auch ein Facharzt ist.
+MONATSFAIRNESS & HG-AUSGLEICH:
+- Für BD wird der jeweilige Monats-Sollrückstand verglichen. Unter sonst gleichen Bedingungen werden Personen mit größerem Rückstand bis zum persönlichen BD-Soll bevorzugt.
+- Ein erreichtes BD-Soll erzeugt einen gelben Hinweis. Ein ausdrücklich gesetztes hartes Monatsmaximum erzeugt beim zusätzlichen BD einen roten Konflikt.
+- Bei HG wird die kombinierte Monatslast aus BD und HG innerhalb der Facharztgruppe verglichen. Dadurch erhält ein Facharzt mit einem BD weniger grundsätzlich die Präferenz für einen HG mehr.
+- Bei einem HG zu einem Assistenzarzt-BD wird zusätzlich die bisherige Anzahl belastender HG für Assistenzarzt-BD innerhalb der Facharztgruppe ausgeglichen.
 
-FAIRNESS & WORKLOAD-BALANCE (FA-GRUPPE):
-- Fachärzte, die im Monat weniger Bereitschaftsdienste (D) absolvieren, bekommen algorithmisch garantiert mehr Hintergrunddienste (HG) zugeteilt. Die Formel ist 1:1 (ein BD weniger = ein HG mehr als der Durchschnitt).
-- Die Art der HG-Belastung (anstrengender HG für AA vs. ruhigerer HG für FA) wird streng überwacht und ausbalanciert.
+ÜBERHANG-PRÄFERENZ:
+- Erst wenn alle geeigneten Personen ihr BD-Soll erreicht haben und noch niemand über dem Soll liegt, wird der erste notwendige BD-Überhang bevorzugt Dr. Lurz empfohlen.
+- Diese Präferenz gilt ausschließlich für den ersten Schritt von Soll auf Soll+1.
+- Ein positiver BD-Wunsch einer anderen geeigneten Person am konkreten Tag setzt diese Überhangpräferenz außer Kraft.
+- Die Präferenz erzeugt keinen Dienst und verdrängt keine Person, die ihr Soll noch nicht erreicht hat.
 
-ÜBERHANG-PRÄFERENZ (FÜNFTER DIENST):
-- Sind alle Bereitschaftsdienste bereits gleichmäßig und fair entsprechend der Monatsziele verteilt und MUSS dennoch ein zusätzlicher Dienst über dem Ziel vergeben werden (z. B. ein fünfter Dienst), erhält Dr. Lurz diesen ersten Überhang-Dienst bevorzugt.
-- Diese Präferenz greift ausschließlich für den ersten Dienst über dem Ziel (Ziel -> Ziel+1) und nur, wenn keine BD-Wünsche anderer Personen für genau diesen Tag etwas anderes festlegen. Weitere Überhang-Dienste werden wieder regulär nach Fairness verteilt.
-- Der Bonus ist bewusst klein gehalten: er erzwingt niemals einen unnötigen Überhang und verdrängt niemals eine Person, die ihr Ziel noch nicht erreicht hat.
-
-SPEZIFISCHE KOPPLUNGSREGELN (BUNDLING):
-Diese Regeln greifen deterministisch und überschreiben die Abstands-Regeln:
-- AA-Freitags-Regel: Hat ein AA am Freitag D, übernimmt der FA, der am Samstag D hat, zwingend den HG am Freitag.
-- FA-Samstags-Regel: Ein FA mit Samstags-D übernimmt zwingend den HG am Sonntag.
-- Feiertags-Vortags-Regel: Hat ein AA am Tag vor einem Feiertag D, übernimmt der FA des Feiertags-D den HG am Vortag.
+DETERMINISTISCHE KOPPLUNGSREGELN (NUR PRÜFUNG, KEINE AUTOMATISCHE EINTRAGUNG):
+- Hat ein Assistenzarzt am Freitag BD und ist der Samstags-BD bereits bekannt, muss der Freitag-HG durch die Person des Samstags-BD übernommen werden.
+- Hat ein Facharzt am Samstag BD, muss der Sonntag-HG durch dieselbe Person übernommen werden.
+- Hat ein Assistenzarzt am Tag vor einem Feiertag BD und ist der Feiertags-BD bereits bekannt, muss der Vortags-HG durch die Person des Feiertags-BD übernommen werden.
+- Die Regeln werden in beiden Eingabereihenfolgen identisch geprüft. Die passende Person erhält eine positive Kopplungsbegründung, eine widersprechende bereits mögliche Auswahl einen roten Konflikt.
+- Die Anwendung trägt den gekoppelten Gegenposten niemals selbst ein.
 
 PERSONELLE SONDEREINSCHRÄNKUNGEN:
-- Prof. Schäfer: Komplett dienstbefreit (Target 0).
-- Dr. Polednia: Absolutes Dienstverbot (D) und HG-Verbot für AA an Sonntagen und Dienstagen (Ursache: Befundfreigabe-Kollision mit KUS-Untersuchungen am Folgetag).
-- Dr. Becker: Samstags-D nur als absolut letzte Instanz (Ultima Ratio). Falls sie Samstags-D hat, trägt das System zwingend einen FZA-Tag am nächsten regulären Werktag ein.
-- Fr. Dalitz: Sie darf an einem Sonntag oder Montag niemals einen HG übernehmen, wenn gleichzeitig Hr. Sebastian BD übernimmt (Ursache: Mammographie-Schicht am Folgetag lässt keine Zeit für zeitintensive AA-Befundfreigaben).
-- Dr. Becker & Dr. Martin (CT-Leitung): Diese beiden dürfen an Werktagen nicht gleichzeitig im Urlaub sein oder ein "F" (Freizeitausgleich) haben. Der Algorithmus routet Dienste und die daraus resultierenden F-Tage so, dass immer mindestens einer anwesend ist.
+- Prof. Schäfer ist vollständig dienstbefreit und nicht Bestandteil des aktiven Dienstpools.
+- Dr. Polednia darf dienstags und sonntags weder BD noch HG übernehmen; dies ist ein roter Konflikt.
+- Dr. Becker ist für Samstags-BD nur als Ultima Ratio vorgesehen; die Bewertung bleibt orange.
+- Fr. Dalitz als HG an einem Sonntag oder Montag bei gleichzeitigem Sebastian-BD bleibt zulässig, aber orange nachrangig.
+- Dr. Becker und Dr. Martin dürfen an regulären Werktagen nicht gleichzeitig mit Urlaub oder FZA abwesend sein. Weiterbildung oder sonstige Abwesenheit allein lösen diese spezielle CT-Leitungsregel nicht aus.
 
-SONSTIGES:
-- Donnerstags-Dienste werden als "Urlaubs-Verlängerer" priorisiert an Personen vergeben, die in der Folgewoche Urlaub haben.
+WEITERE EMPFEHLUNG:
+- Ein Donnerstags-BD wird als positiver „Urlaubsverlängerer“ empfohlen, wenn für die betreffende Person in der folgenden Kalenderwoche Urlaub eingetragen ist.
+- Ein BD unmittelbar vor dem ersten Urlaubstag bleibt unabhängig davon orange nachrangig.
 
+ERKLÄRBARKEIT & INVARIANTEN:
+- Jede ausgelöste Regel erscheint als konkrete Klartextbegründung.
+- Bei mehreren Treffern bestimmt die höchste Konfliktstufe die Farbe; alle Gründe bleiben sichtbar.
+- Die Bewertung derselben Dienstkonstellation ist unabhängig von der Eingabereihenfolge.
+- Eine bereits eingetragene Einteilung wird für denselben Tag genauso bewertet wie dieselbe Auswahl vor dem Eintragen.
+- Die Bewertung ist seiteneffektfrei und verändert weder Dienste noch Abwesenheiten, Wünsche oder Protokolle.
