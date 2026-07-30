@@ -1186,6 +1186,35 @@ Excel-Import mit produktiven Arbeitsmappen, Accessibility-Audits sowie Last- und
 
 ## 21. Deployment und Betrieb
 
+### 21.-1 Vorfall: gescheiterte Builds hielten die Auslieferung wochenlang auf
+
+**Ursache:** In `functions/api/month/[year]/[month].js` stand `'../../../../_utils.js'` – vier Ebenen
+aufwärts statt drei, damit außerhalb von `functions/`. Cloudflare Pages bündelt die Functions vor der
+Auslieferung und brach daran ab:
+
+```
+✘ [ERROR] Could not resolve "../../../../_utils.js"
+    api/month/[year]/[month].js:1:89
+Failed: generating Pages Functions failed.
+```
+
+**Wirkung:** Nicht ein kaputter Endpunkt, sondern **kein Deployment**. Bei einem gescheiterten Build
+bleibt die Produktion am letzten erfolgreichen Stand stehen – hier an einem Commit, dem das
+Monatsfarbsystem vollständig fehlte. Über einen langen Zeitraum wurde damit eine alte Fassung
+ausgeliefert, während im Repository längst korrigierter Code lag. Die Fehlersuche lief dadurch mehrfach
+ins Leere: Sie suchte im Anwendungscode nach etwas, das dort nicht war.
+
+Sichtbar war es ausschließlich in der Deployment-Liste des Pages-Projekts – jede Zeile
+`build failure`, sowohl für `main` als auch für jede Vorschau.
+
+**Absicherung:** `tests/functions.test.js` prüft jeden relativen Import unter `functions/` gegen das
+Dateisystem und verbietet Versionsmarken (`?v=`) in Function-Importen. Gegen den fehlerhaften Stand
+schlägt der Test an. `node --check` konnte das nicht leisten – es prüft nur Syntax und löst keine
+Importe auf.
+
+**Merksatz:** Ein grüner Testlauf im Repository sagt nichts über die Auslieferung. Vor jeder Fehlersuche
+im Anwendungscode gehört der Blick auf den tatsächlich ausgelieferten Stand – siehe 21.0.
+
 ### 21.0 Prüfen, welcher Stand tatsächlich online ist
 
 **Diese Prüfung ist verbindlich, bevor ein Fehlerbild im Code gesucht wird.**
