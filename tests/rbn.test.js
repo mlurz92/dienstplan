@@ -19,7 +19,7 @@ const RBN1_BEFORE_OCTOBER = [
 const RBN2 = ['Prof. Schob', 'Dr. Bailis', 'Dr. Maybaum'];
 const RBN2_TRIGGERS = ['Dr. Schüngel', 'Fr. Hellmann', 'Dr. Martin', 'Hr. El Houba'];
 
- test('RBN bietet bis einschließlich September exakt den vorgesehenen Pool', () => {
+test('RBN bietet bis einschließlich September exakt den vorgesehenen Pool', () => {
   assert.deepEqual(getRbnOptions('rbn1', '2026-09-30'), RBN1_BEFORE_OCTOBER);
 });
 
