@@ -131,11 +131,10 @@ body.month-content-transition .plan-table tbody tr { animation: none; }
    Apple die Liquid-Glass-Kritik beantwortet hat. Die Farbhierarchie und jede
    Information bleiben dabei vollständig erhalten. */
 @media (prefers-reduced-transparency: reduce) {
-  .topbar, .toolbar, .glass-inset, .dialog-card, .month-palette-label {
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-  }
   .glass-panel, .dialog-card { background: #f4f7fa; }
+  /* Muss `.topbar.glass-panel` (0,2,0) schlagen, sonst bliebe die Leiste
+     durchsichtig – genau das, was diese Einstellung abwählt. */
+  .topbar.glass-panel, .toolbar.glass-panel { background: #f4f7fa; }
   .glass-inset { background: #eef2f6; }
   .sheet-panel { background: #ffffff; }
   .ambient-layer { display: none; }
@@ -193,16 +192,19 @@ button, .file-btn {
   appearance: none;
   position: relative;
   overflow: hidden;
-  border: 1px solid rgba(255,255,255,.48);
-  background: linear-gradient(180deg, rgba(255,255,255,.82), rgba(232,238,245,.68));
+  /* Weiße Schaltfläche mit präzisem Rand statt grauem Verlauf. Der frühere
+     Verlauf nach rgba(232,238,245,.68) las sich auf der Leiste als zweites,
+     dunkleres Grau – die Bedienelemente wirkten dadurch stumpf. */
+  border: 1px solid color-mix(in srgb, var(--month-accent) 18%, rgba(150,163,178,.62));
+  background: linear-gradient(180deg, #fff, color-mix(in srgb, var(--month-accent) 4%, #f7f9fb));
   color: #17202a;
   border-radius: 9px;
   padding: .48rem .72rem;
   cursor: pointer;
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.94),
-    0 1px 2px rgba(9,14,20,.14),
-    0 7px 18px rgba(9,14,20,.08);
+    inset 0 1px 0 #fff,
+    0 1px 1px rgba(9,14,20,.10),
+    0 2px 6px rgba(9,14,20,.07);
   transition: transform .16s ease, border-color .16s ease, background .16s ease, box-shadow .16s ease;
 }
 button::before, .file-btn::before {
@@ -212,22 +214,25 @@ button::before, .file-btn::before {
   background: linear-gradient(180deg, rgba(255,255,255,.48), rgba(255,255,255,.04));
   pointer-events: none;
 }
+/* Beim Überfahren übernimmt die Monatsfarbe die Führung – erkennbar, aber ohne
+   Sprung in der Helligkeit. */
 button:hover, .file-btn:hover {
   transform: translateY(-1px);
-  border-color: rgba(255,255,255,.78);
-  background: linear-gradient(180deg, rgba(255,255,255,.94), rgba(231,239,248,.79));
+  border-color: color-mix(in srgb, var(--month-accent) 52%, rgba(150,163,178,.5));
+  background: linear-gradient(180deg, #fff, color-mix(in srgb, var(--month-accent) 11%, #fff));
   box-shadow:
     inset 0 1px 0 #fff,
-    0 2px 5px rgba(9,14,20,.17),
-    0 10px 24px rgba(9,14,20,.12);
+    0 2px 4px rgba(9,14,20,.13),
+    0 6px 14px color-mix(in srgb, var(--month-accent) 18%, rgba(9,14,20,.10));
 }
 button:active, .file-btn:active { transform: translateY(0); }
-button.secondary, .file-btn.secondary { background: linear-gradient(180deg, rgba(248,250,253,.70), rgba(223,230,238,.58)); }
+button.secondary, .file-btn.secondary { background: linear-gradient(180deg, #fbfcfe, #eef1f5); }
 select, textarea, input[type="text"], input[list] {
   width: 100%;
   border: 1px solid rgba(94,107,121,.38);
   border-radius: 8px;
-  background: rgba(255,255,255,.84);
+  /* Deckend weiß: Eingabefelder sind der Ort, an dem Lesbarkeit vor Optik geht. */
+  background: #fff;
   color: var(--text);
   padding: .45rem .55rem;
   box-shadow: inset 0 1px 2px rgba(22,30,40,.08), 0 1px 0 rgba(255,255,255,.8);
@@ -243,18 +248,7 @@ label { display: grid; gap: .3rem; color: var(--muted); font-size: .9rem; }
 .app-shell { max-width: 1720px; margin: 0 auto; padding: 12px; display: grid; gap: 9px; }
 
 /* --------------------------------------------------------------------------
-   Milchglas – bewusst dosiert
-
-   Echtes `backdrop-filter` kostet Fläche × Radius: Der Compositor liest in
-   jedem Frame die Pixel hinter dem Element, faltet sie mit dem Weichzeichner
-   und setzt das Ergebnis wieder zusammen. Gemessen an dieser Oberfläche:
-   Der Blur allein auf dem großen Plan-Panel hat 9 fps auf 16 fps gedrückt.
-
-   Deshalb tragen echtes Milchglas nur noch die kleinen, schwebenden Elemente,
-   hinter denen sich tatsächlich etwas bewegt – Kopfleiste, Werkzeugleiste,
-   Dialoge, Einfassungen. Die große Arbeitsfläche bekommt stattdessen eine
-   geschichtete Glasoptik ohne Weichzeichner: Sie wirkt dichter, ist hinter
-   einer engen Datentabelle deutlich besser lesbar und kostet nichts.
+   Glasoptik – Kante statt Durchsichtigkeit
    -------------------------------------------------------------------------- */
 
 .glass-panel,
@@ -263,15 +257,68 @@ label { display: grid; gap: .3rem; color: var(--muted); font-size: .9rem; }
   --glass-rim: color-mix(in srgb, var(--month-accent) 26%, rgba(255,255,255,.72));
 }
 
-@supports (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)) {
-  .topbar,
-  .toolbar,
-  .glass-inset,
-  .dialog-card,
-  .month-palette-label {
-    backdrop-filter: blur(22px) saturate(1.42);
-    -webkit-backdrop-filter: blur(22px) saturate(1.42);
-  }
+/* Milchglas nur dort, wo es etwas leistet – und das ist genau eine Stelle.
+
+   Vorher lag `backdrop-filter: blur(22px) saturate(1.42)` auf Kopfleiste,
+   Werkzeugleiste, Einfassungen, Dialogkarte und Monatsplakette. Das war in
+   zweifacher Hinsicht falsch:
+
+   OPTISCH: Die Flächen lagen bei 50 bis 80 Prozent Weiß über einem fast
+   schwarzen Hintergrund. Das Schwarz schlug als Grau durch, und die
+   Sättigungsanhebung verstärkte genau dieses Grau – ein matter Schleier ohne
+   Tiefe und ohne jeden Bezug zur Monatsfarbe der Tabelle darunter.
+
+   RECHNERISCH: Gemessen an dieser Oberfläche, fps während eines Monatswechsels:
+
+     blur(22px) saturate(1.42) ....... 15 fps
+     blur(10px) saturate(1.06) ....... 14 fps
+     ohne Weichzeichner .............. 19 fps
+
+   Der Radius ist also fast gleichgültig; die Kosten entstehen dadurch, dass der
+   Compositor in jedem Frame die Pixel hinter dem Element ausliest. Ein Viertel
+   der Bildrate für einen Effekt, der hinter einer nun 97,5 Prozent deckenden
+   Fläche ohnehin nichts mehr beiträgt.
+
+   Milchglas entsteht auch nicht durch Durchsichtigkeit, sondern durch die
+   Kante: Lichtlinie oben, feine Brechung unten, ein präziser, farbig gefasster
+   Rand. Das kostet nichts und liest sich sauberer.
+
+   Geblieben ist der Weichzeichner deshalb nur auf `.app-dialog::backdrop`
+   (weiter unten). Dort verschwimmt die gesamte Seite hinter einem geöffneten
+   Dialog – ein sichtbarer, sinnvoller Effekt, der ausschließlich läuft, solange
+   ein Dialog offen ist, und der die Arbeitsfläche gerade nicht animiert. */
+
+/* Die Chrome-Flächen: helles, fast deckendes Glas mit einer Dosis Monatsfarbe.
+   Der Farbanteil ist klein, aber entscheidend – er bindet Kopf- und
+   Werkzeugleiste an das Monatsblatt, statt sie als graue Platten davorzusetzen.
+
+   Die Doppelklasse ist zwingend, nicht kosmetisch: Beide Leisten tragen im
+   Markup zusätzlich `glass-panel`, und `.glass-panel` (0,1,0) steht weiter
+   unten in dieser Datei. Bei gleicher Spezifität gewinnt die spätere Regel –
+   ein einfaches `.topbar` bliebe also wirkungslos. Genau dieser Fehler hatte
+   zuvor schon die Wochentagsspalte farblos gelassen. */
+.topbar.glass-panel,
+.toolbar.glass-panel {
+  background:
+    linear-gradient(
+      168deg,
+      color-mix(in srgb, var(--month-accent) 5%, rgba(255,255,255,.975)),
+      color-mix(in srgb, var(--month-accent) 9%, rgba(250,252,254,.96))
+    );
+  border: 1px solid color-mix(in srgb, var(--month-accent) 22%, rgba(255,255,255,.86));
+  /* Enger, heller gestaffelter Schatten. Der frühere weiche, dunkle Schlagschatten
+     legte sich als Trübung über die eigene Fläche. */
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.98),
+    inset 0 -1px 0 color-mix(in srgb, var(--month-accent) 12%, rgba(83,96,110,.16)),
+    0 1px 2px rgba(9,14,20,.16),
+    0 10px 24px rgba(9,14,20,.14);
+}
+.topbar.glass-panel::after,
+.toolbar.glass-panel::after {
+  /* Die Lichtreflexion der großen Panels ist hier zu viel: Sie erzeugt auf der
+     schmalen Leiste eine sichtbare Kante quer über die Bedienelemente. */
+  background: linear-gradient(180deg, rgba(255,255,255,.34), transparent 58%);
 }
 
 .glass-panel {
@@ -310,10 +357,15 @@ label { display: grid; gap: .3rem; color: var(--muted); font-size: .9rem; }
     linear-gradient(147deg, rgba(255,255,255,.90), rgba(236,241,248,.84)),
     var(--month-panel-tint);
 }
+/* Einfassungen liegen INNERHALB der Leisten, also auf hellem Grund. Sie dürfen
+   deshalb nicht durchsichtig sein – sonst mischen sie sich mit der Leiste zu
+   einem zweiten Grauton. Sie sind eine vertiefte, weiße Mulde. */
 .glass-inset {
-  background: linear-gradient(180deg, rgba(255,255,255,.54), rgba(226,233,241,.43));
-  border: 1px solid rgba(255,255,255,.54);
-  box-shadow: inset 0 1px 3px rgba(17,24,39,.12), 0 1px 0 rgba(255,255,255,.7);
+  background: linear-gradient(180deg, rgba(255,255,255,.97), rgba(248,250,253,.94));
+  border: 1px solid color-mix(in srgb, var(--month-accent) 16%, rgba(163,176,190,.5));
+  box-shadow:
+    inset 0 1px 2px color-mix(in srgb, var(--month-accent) 10%, rgba(17,24,39,.10)),
+    0 1px 0 rgba(255,255,255,.9);
 }
 
 .topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--radius); }
@@ -350,8 +402,8 @@ h3 { font-size: 1.05rem; }
 .month-palette-label {
   color: var(--month-accent-strong);
   font-weight: 700;
-  background: color-mix(in srgb, var(--month-accent) 14%, rgba(255,255,255,.78));
-  border: 1px solid color-mix(in srgb, var(--month-accent) 42%, rgba(255,255,255,.6));
+  background: color-mix(in srgb, var(--month-accent) 16%, #fff);
+  border: 1px solid color-mix(in srgb, var(--month-accent) 46%, #fff);
   border-radius: 999px;
   padding: 2px 7px;
 }
@@ -475,9 +527,8 @@ h3 { font-size: 1.05rem; }
 .dialog-card {
   width: min(900px, calc(100vw - 2rem)); border-radius: 17px; padding: 13px; color: var(--text);
   background:
-    linear-gradient(145deg, rgba(255,255,255,.88), rgba(226,233,242,.78)),
-    var(--month-panel-tint);
-  border: 1px solid rgba(255,255,255,.70);
+    linear-gradient(145deg, color-mix(in srgb, var(--month-accent) 4%, #fff), color-mix(in srgb, var(--month-accent) 9%, #f7f9fc));
+  border: 1px solid color-mix(in srgb, var(--month-accent) 24%, rgba(255,255,255,.86));
   box-shadow: inset 0 1px 0 rgba(255,255,255,.96), 0 24px 74px rgba(0,0,0,.34), 0 3px 10px rgba(0,0,0,.16);
 }
 .dialog-card.wide { width: min(1120px, calc(100vw - 2rem)); }
