@@ -1025,10 +1025,10 @@ Der ursprüngliche Worker lieferte eigenen Anwendungscode Cache-First aus. Ein C
 installiert hatte, bekam dauerhaft alte Fassungen von `styles.css` und den JS-Modulen; ausgerollte
 Korrekturen erreichten ihn nicht mehr.
 
-Unter `/sw.js` liegt aus genau einem Grund wieder eine Datei: als **Grabstein**, der den historischen
-Worker aus bestehenden Installationen entfernt. Er cacht nichts, hat keinen `fetch`-Handler und greift in
-keine Anfrage ein — er löscht die `dienstplanrad*`-Caches, meldet sich selbst ab und baut offene Tabs
-einmal neu auf.
+Es gibt **keine Worker-Datei** im Auslieferungsstand. `/sw.js` wird von einer **Pages Function**
+(`functions/sw.js.js`) bedient, deren einziger Zweck es ist, den historischen Worker aus bestehenden
+Installationen zu entfernen: Sie liefert ein Skript aus, das die `dienstplanrad*`-Caches löscht, sich
+selbst abmeldet und offene Tabs einmal neu aufbaut. Es horcht auf keine Anfragen und speichert nichts.
 
 #### Warum Löschen allein nicht genügte
 
@@ -1045,20 +1045,31 @@ und wurde für immer aus dessen Cache bedient. Genau das erklärt den Befund, da
 eingerichteten Gerät nicht ankamen, während ein frisches Gerät den aktuellen Stand sah — und es erklärt,
 warum das Löschen der Datei sich als Lösung angefühlt hat, ohne eine zu sein.
 
-Der Grabstein durchbricht beides, weil er gültiges JavaScript mit korrektem MIME-Typ ist und sich vom
-installierten Skript unterscheidet: Die Updateprüfung nimmt ihn an, er wird aktiv und räumt auf.
-`_headers` gibt ihm `no-store`, damit der Browser bei jeder Navigation wirklich neu prüft.
+#### Warum eine Function und keine neue Datei
+
+Eine neue statische Datei löst das nicht: Sie liegt unter derselben URL, für die der Edge bereits eine
+gültige Kopie hält — die Wirkung träte erst nach bis zu sieben Tagen ein. **Functions stehen im Routing
+vor den statischen Assets und werden bei jeder Anfrage ausgeführt.** Der Cache-Eintrag wird damit ab dem
+Deployment nicht mehr erreicht. Das ist der Unterschied zwischen „in einer Woche" und „sofort".
+
+Die Antwort trägt `Content-Type: application/javascript; charset=utf-8` — ein falscher MIME-Typ war
+genau der Fehler des SPA-Rückfalls — sowie `Cache-Control: no-store` und `CDN-Cache-Control: no-store`,
+damit weder Browser noch Edge erneut etwas anlegen, das später im Weg steht.
+
+Der Dateiname `functions/sw.js.js` ist Absicht: Pages leitet die Route aus dem Pfad ohne die Endung
+`.js` ab, die Datei bedient daher genau `/sw.js`.
 
 **Nachgewiesen, nicht angenommen.** In Chromium gemessen: Alt-Worker installiert (1 Registrierung, Cache
-`dienstplanrad-v4`, Seite wird nachweislich aus dem Cache mit fremdem Inhalt bedient) → Grabstein
+`dienstplanrad-v4`, Seite wird nachweislich aus dem Cache mit fremdem Inhalt bedient) → Function-Endpunkt
 ausgeliefert → nach einer Navigation 0 Registrierungen, 0 Caches, Anwendung bootet mit 31 Zeilen auf dem
 aktuellen Stempel.
 
 #### Die Sperre bleibt
 
-`tests/delivery.test.js` erlaubt jetzt genau diese eine Datei und verbietet ihr alles Übrige: kein
-`fetch`-Handler, kein `respondWith`, kein `caches.match`/`cache.put`/`addAll`, `unregister()` und
-Cache-Löschung zwingend vorhanden, `_headers` muss `no-store` setzen. Zusätzlich weiterhin: nirgends
+`tests/delivery.test.js` prüft: **keine** Datei `sw.js` im Projekt, `/sw.js` von einer Function bedient,
+`unregister()` und Cache-Löschung zwingend vorhanden, korrekter MIME-Typ, `no-store` und
+`CDN-Cache-Control: no-store` gesetzt — und verboten: `fetch`-Handler, `respondWith`,
+`caches.match`/`cache.put`/`addAll`, ein `_headers`-Eintrag für `/sw.js`. Zusätzlich weiterhin: nirgends
 `serviceWorker.register(`. Ein Worker, der wieder ausliefert, kann damit nicht zurückkehren.
 
 **Folge für den Betrieb:** Es gibt keine Zwischenschicht mehr, die Dateien festhalten könnte. Die
@@ -1072,7 +1083,6 @@ Kaltstart ohne Netz lädt die Anwendung dagegen bewusst nicht mehr.
 |---|---|
 | `/` | `no-cache, no-store, must-revalidate` |
 | `/index.html` | `no-cache, no-store, must-revalidate` |
-| `/sw.js` | `no-store` (Grabstein, siehe 17.4) |
 | `/styles.css` | `no-cache, must-revalidate` |
 | `/js/*` | `no-cache, must-revalidate` |
 
@@ -1269,8 +1279,9 @@ Nichtzusammenführung zutrafen:
   Projekt gegen das Skript abgleicht. Ein Syntaxfehler in einer Function kostet nicht einen Endpunkt,
   sondern das gesamte Deployment (21.-1).
 
-Der Grabstein unter `/sw.js` (17.4) geht ebenfalls auf PR #13 zurück. Er wurde dort verworfen und ist
-nach Messung gegen die Produktion nachweislich notwendig.
+Der selbstabmeldende Worker unter `/sw.js` (17.4) geht ebenfalls auf PR #13 zurück. Er wurde dort
+verworfen und ist nach Messung gegen die Produktion nachweislich notwendig — dort allerdings als Datei
+gedacht; als solche hätte er wegen des Asset-Caches bis zu sieben Tage gebraucht.
 
 ### 21.-1 Vorfall: gescheiterte Builds hielten die Auslieferung wochenlang auf
 
