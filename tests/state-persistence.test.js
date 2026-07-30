@@ -27,9 +27,10 @@ test('ein älterer Server-Save löscht keinen danach entstandenen Dirty-Stand', 
   state.currentMonth = 7;
   state.dirty = false;
   state.dirtyVersion = 0;
+  state.dirtyMonths.clear();
 
   getMonthData(2026, 7).days['2026-07-01'].bd = 'lurz';
-  scheduleSave(() => {});
+  scheduleSave(() => {}, 2026, 7);
   clearTimeout(state.saveTimer);
   state.saveTimer = null;
 
@@ -37,7 +38,7 @@ test('ein älterer Server-Save löscht keinen danach entstandenen Dirty-Stand', 
   const versionAtSave = state.dirtyVersion;
 
   // Neue Änderung, während der ältere Serveraufruf noch aussteht.
-  scheduleSave(() => {});
+  scheduleSave(() => {}, 2026, 7);
   clearTimeout(state.saveTimer);
   state.saveTimer = null;
   assert.equal(state.dirtyVersion, versionAtSave + 1);

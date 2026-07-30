@@ -1,38 +1,53 @@
-import { ensureMonthShape, json, put } from '../_utils.js';
+import { invalid, json, kv, normalizeBackupPayload } from '../_utils.js';
 
-const isPlainRecord = value => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-const invalid = message => json({ ok: false, error: message }, 400);
+async function rollback(store, snapshots, writtenKeys) {
+  const failures = [];
+  for (const key of [...writtenKeys].reverse()) {
+    try {
+      const previous = snapshots.get(key);
+      if (previous === null) await store.delete(key);
+      else await store.put(key, previous);
+    } catch (error) {
+      failures.push(`${key}: ${error.message}`);
+    }
+  }
+  return failures;
+}
 
 export async function onRequestPost(context) {
   let payload;
   try {
-    payload = await context.request.json();
-  } catch {
-    return invalid('Ungültiges JSON.');
+    payload = normalizeBackupPayload(await context.request.json(), { strict: true });
+  } catch (error) {
+    return invalid(error.message || 'Ungültiges JSON.');
   }
 
-  if (!isPlainRecord(payload)) return invalid('Die Wurzel muss ein JSON-Objekt sein.');
-  if ('settings' in payload && !isPlainRecord(payload.settings)) return invalid('„settings“ muss ein JSON-Objekt sein.');
-  if ('staff' in payload && !Array.isArray(payload.staff)) return invalid('„staff“ muss ein Array sein.');
-  if ('rbnNames' in payload && !Array.isArray(payload.rbnNames)) return invalid('„rbnNames“ muss ein Array sein.');
-  if ('months' in payload && !Array.isArray(payload.months)) return invalid('„months“ muss ein Array sein.');
+  const writes = [];
+  if ('settings' in payload) writes.push(['app:settings', payload.settings]);
+  if ('staff' in payload) writes.push(['app:staff', payload.staff]);
+  if ('rbnNames' in payload) writes.push(['app:rbn-names', payload.rbnNames]);
+  for (const [key, value] of payload.months || []) {
+    writes.push([`year:${key.slice(0, 4)}:month:${key.slice(5, 7)}`, value]);
+  }
 
-  const normalizedMonths = [];
-  for (const entry of payload.months || []) {
-    if (!Array.isArray(entry) || entry.length !== 2 || !/^\d{4}-(0[1-9]|1[0-2])$/.test(entry[0]) || !isPlainRecord(entry[1])) {
-      return invalid('Jeder Monat muss als [„YYYY-MM“, Monatsobjekt] vorliegen.');
+  const store = kv(context);
+  const snapshots = new Map();
+  for (const [key] of writes) snapshots.set(key, await store.get(key));
+  const writtenKeys = [];
+  try {
+    for (const [key, value] of writes) {
+      await store.put(key, JSON.stringify(value));
+      writtenKeys.push(key);
     }
-    const [year, month] = entry[0].split('-').map(Number);
-    normalizedMonths.push([entry[0], ensureMonthShape(year, month, entry[1])]);
+  } catch (error) {
+    const rollbackFailures = await rollback(store, snapshots, writtenKeys);
+    return json({
+      ok: false,
+      error: rollbackFailures.length
+        ? `Serverimport fehlgeschlagen; Rücksetzung unvollständig: ${rollbackFailures.join(' | ')}`
+        : `Serverimport fehlgeschlagen und wurde vollständig zurückgerollt: ${error.message}`
+    }, 500);
   }
 
-  // Erst nach vollständig erfolgreicher Prüfung beginnen Schreibzugriffe.
-  if ('settings' in payload) await put(context, 'app:settings', payload.settings);
-  if ('staff' in payload) await put(context, 'app:staff', payload.staff);
-  if ('rbnNames' in payload) await put(context, 'app:rbn-names', payload.rbnNames);
-  for (const [key, value] of normalizedMonths) {
-    await put(context, `year:${key.slice(0,4)}:month:${key.slice(5,7)}`, value);
-  }
-
-  return json({ ok: true, importedMonths: normalizedMonths.length });
+  return json({ ok: true, importedMonths: payload.months?.length || 0 });
 }

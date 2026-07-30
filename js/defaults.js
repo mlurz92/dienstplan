@@ -2,23 +2,10 @@ export const MONTH_NAMES = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni'
 export const SHEET_NAMES = ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
 export const WEEKDAYS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 
-export const DEFAULT_SETTINGS = {
-  schemaVersion: 1,
-  holidayRegion: 'SN',
-  fixedMenuOrder: true,
-  appName: 'DienstplanRAD'
-};
+export const DEFAULT_SETTINGS = Object.freeze({ schemaVersion: 2 });
 
 export const STAFF_ORDER = [
-  'lurz',
-  'polednia',
-  'dalitz',
-  'becker',
-  'hellmann',
-  'martin',
-  'elhouba',
-  'licenji',
-  'sebastian'
+  'lurz', 'polednia', 'dalitz', 'becker', 'hellmann', 'martin', 'elhouba', 'licenji', 'sebastian'
 ];
 
 export const DEFAULT_STAFF = [
@@ -50,11 +37,150 @@ export const PREFERENCE_TYPES = [
   { id: 'dienst-bevorzugt', label: 'Dienst bevorzugt' }
 ];
 
+export function isPlainRecord(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+const ISO_DAY = /^(\d{4})-(\d{2})-(\d{2})$/;
+const STAFF_ID = /^[a-z0-9][a-z0-9_-]{0,49}$/i;
+
+export function isValidIsoDay(value) {
+  const match = ISO_DAY.exec(String(value || ''));
+  if (!match) return false;
+  const [, yearText, monthText, dayText] = match;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
+
+function normalizedDate(value, field, strict) {
+  if (value === null || value === undefined || value === '') return null;
+  if (isValidIsoDay(value)) return String(value);
+  if (strict) throw new Error(`„${field}“ muss ein gültiges ISO-Datum YYYY-MM-DD sein.`);
+  return null;
+}
+
+function normalizedNonNegativeInteger(value, fallback, field, strict, nullable = false) {
+  if (nullable && (value === null || value === undefined || value === '')) return null;
+  const number = Number(value);
+  if (Number.isInteger(number) && number >= 0) return number;
+  if (strict && value !== undefined) throw new Error(`„${field}“ muss eine nichtnegative ganze Zahl sein.`);
+  return fallback;
+}
+
+function normalizedBoolean(value, fallback, field, strict) {
+  if (typeof value === 'boolean') return value;
+  if (strict && value !== undefined) throw new Error(`„${field}“ muss true oder false sein.`);
+  return fallback;
+}
+
+function normalizedText(value, fallback, field, strict, required = false) {
+  if (typeof value === 'string' && value.trim()) return value.trim();
+  if (required && strict) throw new Error(`„${field}“ darf nicht leer sein.`);
+  return fallback;
+}
+
+export function normalizeSettings(value, { strict = false } = {}) {
+  if (!isPlainRecord(value)) {
+    if (strict) throw new Error('„settings“ muss ein JSON-Objekt sein.');
+    return structuredClone(DEFAULT_SETTINGS);
+  }
+  const schemaVersion = normalizedNonNegativeInteger(value.schemaVersion, DEFAULT_SETTINGS.schemaVersion, 'settings.schemaVersion', strict);
+  return { schemaVersion: Math.max(1, schemaVersion) };
+}
+
+export function normalizeRbnNames(value, { strict = false } = {}) {
+  if (!Array.isArray(value)) {
+    if (strict) throw new Error('„rbnNames“ muss ein Array sein.');
+    return [];
+  }
+  const result = [];
+  const seen = new Set();
+  for (const entry of value) {
+    if (typeof entry !== 'string' || !entry.trim()) {
+      if (strict) throw new Error('Jeder Eintrag in „rbnNames“ muss ein nichtleerer Text sein.');
+      continue;
+    }
+    const normalized = entry.trim();
+    const key = normalized.toLocaleLowerCase('de');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(normalized);
+  }
+  return result;
+}
+
+function normalizeStaffEntry(entry, index, strict) {
+  if (!isPlainRecord(entry)) {
+    if (strict) throw new Error(`Personal-Eintrag ${index + 1} muss ein JSON-Objekt sein.`);
+    return null;
+  }
+  const id = normalizedText(entry.id, '', `staff[${index}].id`, strict, true);
+  if (!STAFF_ID.test(id)) {
+    if (strict) throw new Error(`„staff[${index}].id“ enthält unzulässige Zeichen.`);
+    return null;
+  }
+  const name = normalizedText(entry.name, '', `staff[${index}].name`, strict, true);
+  if (!name) return null;
+  const activeFrom = normalizedDate(entry.activeFrom, `staff[${index}].activeFrom`, strict);
+  const activeUntil = normalizedDate(entry.activeUntil, `staff[${index}].activeUntil`, strict);
+  const promotionDate = normalizedDate(entry.promotionDate, `staff[${index}].promotionDate`, strict);
+  if (activeFrom && activeUntil && activeUntil < activeFrom) {
+    if (strict) throw new Error(`Personal-Eintrag „${id}“ endet vor seinem Aktivierungsdatum.`);
+    return null;
+  }
+  return {
+    id,
+    name,
+    short: normalizedText(entry.short, name, `staff[${index}].short`, strict),
+    category: normalizedText(entry.category, 'custom', `staff[${index}].category`, strict),
+    roleLabel: normalizedText(entry.roleLabel, '', `staff[${index}].roleLabel`, strict),
+    activeFrom,
+    activeUntil,
+    includeInPlanning: normalizedBoolean(entry.includeInPlanning, false, `staff[${index}].includeInPlanning`, strict),
+    includeInAbsenceList: normalizedBoolean(entry.includeInAbsenceList, true, `staff[${index}].includeInAbsenceList`, strict),
+    bdTarget: normalizedNonNegativeInteger(entry.bdTarget, 0, `staff[${index}].bdTarget`, strict),
+    maxBd: normalizedNonNegativeInteger(entry.maxBd, null, `staff[${index}].maxBd`, strict, true),
+    canHg: normalizedBoolean(entry.canHg, false, `staff[${index}].canHg`, strict),
+    canSaturdayBd: normalizedBoolean(entry.canSaturdayBd, false, `staff[${index}].canSaturdayBd`, strict),
+    promotionDate,
+    promotedRoleLabel: normalizedText(entry.promotedRoleLabel, '', `staff[${index}].promotedRoleLabel`, strict),
+    promotedCanHg: entry.promotedCanHg === undefined ? undefined : normalizedBoolean(entry.promotedCanHg, false, `staff[${index}].promotedCanHg`, strict),
+    promotedCanSaturdayBd: entry.promotedCanSaturdayBd === undefined ? undefined : normalizedBoolean(entry.promotedCanSaturdayBd, false, `staff[${index}].promotedCanSaturdayBd`, strict)
+  };
+}
+
+export function normalizeStaffList(value, { strict = false } = {}) {
+  if (!Array.isArray(value)) {
+    if (strict) throw new Error('„staff“ muss ein Array sein.');
+    return structuredClone(DEFAULT_STAFF);
+  }
+  const result = [];
+  const seen = new Set();
+  for (let index = 0; index < value.length; index += 1) {
+    const normalized = normalizeStaffEntry(value[index], index, strict);
+    if (!normalized) continue;
+    if (seen.has(normalized.id)) {
+      if (strict) throw new Error(`Personal-ID „${normalized.id}“ ist doppelt vorhanden.`);
+      continue;
+    }
+    seen.add(normalized.id);
+    result.push(normalized);
+  }
+  if (!result.length) {
+    if (strict) throw new Error('„staff“ muss mindestens einen gültigen Personal-Eintrag enthalten.');
+    return structuredClone(DEFAULT_STAFF);
+  }
+  return result;
+}
+
 export function createEmptyMonth(year, month) {
   const daysInMonth = new Date(year, month, 0).getDate();
   const days = {};
-  for (let d = 1; d <= daysInMonth; d++) {
-    const iso = toIsoDate(year, month, d);
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const iso = toIsoDate(year, month, day);
     days[iso] = { bd: '', hg: '', rbn1: '', rbn2: '', notes: '' };
   }
   return {
@@ -72,54 +198,43 @@ export function createEmptyMonth(year, month) {
   };
 }
 
-
-function isPlainRecord(value) {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-}
-
 function normalizePerStaffDateMap(value, validDates) {
   if (!isPlainRecord(value)) return {};
   const normalized = {};
   for (const [staffId, entries] of Object.entries(value)) {
-    if (!isPlainRecord(entries)) continue;
+    if (!STAFF_ID.test(staffId) || !isPlainRecord(entries)) continue;
     const clean = {};
     for (const [iso, entry] of Object.entries(entries)) {
       if (!validDates.has(iso) || typeof entry !== 'string' || !entry.trim()) continue;
-      clean[iso] = entry;
+      clean[iso] = entry.trim();
     }
     if (Object.keys(clean).length) normalized[staffId] = clean;
   }
   return normalized;
 }
 
-/**
- * Normalisiert geladene, importierte oder ältere Monatsdaten auf das vollständige
- * aktuelle Schema. Fehlende Tagesfelder werden ergänzt, ungültige Typen verworfen
- * und außerhalb des Monats liegende Tageswerte nicht übernommen.
- */
 export function normalizeMonthData(year, month, payload) {
   const normalizedYear = Number(year);
   const normalizedMonth = Number(month);
+  if (!Number.isInteger(normalizedYear) || normalizedYear < 2000 || normalizedYear > 2200) throw new Error('Jahr außerhalb des unterstützten Bereichs 2000–2200.');
+  if (!Number.isInteger(normalizedMonth) || normalizedMonth < 1 || normalizedMonth > 12) throw new Error('Monat muss zwischen 1 und 12 liegen.');
   const base = createEmptyMonth(normalizedYear, normalizedMonth);
   const source = isPlainRecord(payload) ? payload : {};
   const sourceDays = isPlainRecord(source.days) ? source.days : {};
   const days = {};
-
   for (const [iso, emptyDay] of Object.entries(base.days)) {
     const raw = isPlainRecord(sourceDays[iso]) ? sourceDays[iso] : {};
     days[iso] = {
-      bd: typeof raw.bd === 'string' ? raw.bd : emptyDay.bd,
-      hg: typeof raw.hg === 'string' ? raw.hg : emptyDay.hg,
-      rbn1: typeof raw.rbn1 === 'string' ? raw.rbn1 : emptyDay.rbn1,
-      rbn2: typeof raw.rbn2 === 'string' ? raw.rbn2 : emptyDay.rbn2,
+      bd: typeof raw.bd === 'string' ? raw.bd.trim() : emptyDay.bd,
+      hg: typeof raw.hg === 'string' ? raw.hg.trim() : emptyDay.hg,
+      rbn1: typeof raw.rbn1 === 'string' ? raw.rbn1.trim() : emptyDay.rbn1,
+      rbn2: typeof raw.rbn2 === 'string' ? raw.rbn2.trim() : emptyDay.rbn2,
       notes: typeof raw.notes === 'string' ? raw.notes : emptyDay.notes
     };
   }
-
   const validDates = new Set(Object.keys(days));
   const revision = Number(source.revision);
   const schemaVersion = Number(source.schemaVersion);
-
   return {
     ...base,
     ...source,
@@ -135,6 +250,26 @@ export function normalizeMonthData(year, month, payload) {
     overrideLog: Array.isArray(source.overrideLog) ? source.overrideLog.filter(isPlainRecord) : [],
     importLog: Array.isArray(source.importLog) ? source.importLog.filter(isPlainRecord) : []
   };
+}
+
+export function normalizeBackupPayload(payload, { strict = true } = {}) {
+  if (!isPlainRecord(payload)) throw new Error('Die Wurzel muss ein JSON-Objekt sein.');
+  const normalized = {};
+  if ('settings' in payload) normalized.settings = normalizeSettings(payload.settings, { strict });
+  if ('staff' in payload) normalized.staff = normalizeStaffList(payload.staff, { strict });
+  if ('rbnNames' in payload) normalized.rbnNames = normalizeRbnNames(payload.rbnNames, { strict });
+  if ('months' in payload && !Array.isArray(payload.months)) throw new Error('„months“ muss ein Array sein.');
+  const months = [];
+  const seenMonths = new Set();
+  for (const entry of payload.months || []) {
+    if (!Array.isArray(entry) || entry.length !== 2 || !/^\d{4}-(0[1-9]|1[0-2])$/.test(entry[0]) || !isPlainRecord(entry[1])) throw new Error('Jeder Monat muss als [„YYYY-MM“, Monatsobjekt] vorliegen.');
+    if (seenMonths.has(entry[0])) throw new Error(`Monat „${entry[0]}“ ist in der Sicherung doppelt vorhanden.`);
+    seenMonths.add(entry[0]);
+    const [entryYear, entryMonth] = entry[0].split('-').map(Number);
+    months.push([entry[0], normalizeMonthData(entryYear, entryMonth, entry[1])]);
+  }
+  if ('months' in payload) normalized.months = months;
+  return normalized;
 }
 
 export function toIsoDate(year, month, day) {

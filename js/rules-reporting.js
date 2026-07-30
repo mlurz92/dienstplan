@@ -1,9 +1,9 @@
-import { isRegularWorkdayIso } from './holidays.js?v=20260730.6';
+import { isRegularWorkdayIso } from './holidays.js?v=20260730.7';
 import {
   ABSENCE_FOR_CT_LEADERSHIP, computeWeekendEquivalent, countRoleInMonth, dayIso,
-  fmtGermanDate, getAbsence, getRoleProperties, getStaffById, isStaffActiveOn, severityRank
-} from './rules-core.js?v=20260730.6';
-import { evaluateCandidate } from './rules-evaluation.js?v=20260730.6';
+  fmtGermanDate, getEffectiveAbsence, getRoleProperties, getStaffById, isStaffActiveDuringMonth, severityRank
+} from './rules-core.js?v=20260730.7';
+import { evaluateCandidate } from './rules-evaluation.js?v=20260730.7';
 
 export function collectIssues(state, monthData) {
   const issues = [];
@@ -13,6 +13,14 @@ export function collectIssues(state, monthData) {
     for (const role of ['bd', 'hg']) {
       const staffId = day[role];
       if (!staffId) continue;
+      if (!getStaffById(state.staff, staffId)) {
+        issues.push({
+          level: 'red',
+          title: `${fmtGermanDate(iso)} · ${role.toUpperCase()} · unbekannte Personal-ID`,
+          details: `Der gespeicherte Wert „${staffId}“ ist keiner gültigen Person zugeordnet.`
+        });
+        continue;
+      }
       const evaluation = evaluateCandidate({ state, monthData, dateIso: iso, role, staffId });
       if (['orange', 'red'].includes(evaluation.level)) issues.push({
         level: evaluation.level,
@@ -24,8 +32,8 @@ export function collectIssues(state, monthData) {
 
   for (const iso of Object.keys(monthData.days || {})) {
     if (!isRegularWorkdayIso(iso)) continue;
-    const becker = getAbsence(monthData, 'becker', iso);
-    const martin = getAbsence(monthData, 'martin', iso);
+    const becker = getEffectiveAbsence(state, monthData, 'becker', iso);
+    const martin = getEffectiveAbsence(state, monthData, 'martin', iso);
     if (!ABSENCE_FOR_CT_LEADERSHIP.has(becker) || !ABSENCE_FOR_CT_LEADERSHIP.has(martin)) continue;
     issues.push({ level: 'red', title: `${fmtGermanDate(iso)} · Becker/Martin gleichzeitig abwesend`, details: 'CT-Leitungsbesetzung prüfen.' });
   }
@@ -34,7 +42,7 @@ export function collectIssues(state, monthData) {
 
 export function buildStats(state, monthData) {
   return state.staff
-    .filter(person => person.includeInPlanning && isStaffActiveOn(person, dayIso(monthData.year, monthData.month, 1)))
+    .filter(person => person.includeInPlanning && isStaffActiveDuringMonth(person, monthData.year, monthData.month))
     .map(person => ({
       id: person.id,
       name: person.name,

@@ -1,12 +1,17 @@
 {
   "name": "dienstplanrad",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Manueller Dienstplaner für Radiologie auf Cloudflare Pages",
   "type": "module",
   "scripts": {
-    "check": "node --check \"js/api.js\" && node --check \"js/app.js\" && node --check \"js/defaults.js\" && node --check \"js/holidays.js\" && node --check \"js/rbn.js\" && node --check \"js/rules-core.js\" && node --check \"js/rules-evaluation.js\" && node --check \"js/rules-reporting.js\" && node --check \"js/rules.js\" && node --check \"js/state.js\" && node --check \"js/theme.js\" && node --check \"functions/_utils.js\" && node --check \"functions/api/bootstrap.js\" && node --check \"functions/api/export.js\" && node --check \"functions/api/import.js\" && node --check \"functions/api/month/[year]/[month].js\" && node --check \"functions/api/rbn-names.js\" && node --check \"functions/api/settings.js\" && node --check \"functions/api/staff.js\" && node --check \"functions/sw.js.js\"",
+    "check": "node --check \"js/api.js\" && node --check \"js/app.js\" && node --check \"js/defaults.js\" && node --check \"js/holidays.js\" && node --check \"js/rbn.js\" && node --check \"js/rules-core.js\" && node --check \"js/rules-evaluation.js\" && node --check \"js/rules-reporting.js\" && node --check \"js/rules.js\" && node --check \"js/state.js\" && node --check \"js/theme.js\" && node --check \"functions/_utils.js\" && node --check \"functions/api/bootstrap.js\" && node --check \"functions/api/export.js\" && node --check \"functions/api/import.js\" && node --check \"functions/api/month/[year]/[month].js\" && node --check \"functions/api/rbn-names.js\" && node --check \"functions/api/settings.js\" && node --check \"functions/api/staff.js\" && node --check \"functions/sw.js.js\" && node --check \"playwright.config.js\"",
     "test": "node --test tests/*.test.js",
+    "test:e2e": "playwright test",
+    "verify": "npm run check && npm test && npm run test:e2e",
     "deploy-note": "Deploy via Cloudflare Pages from GitHub repository root"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.1"
   }
 }

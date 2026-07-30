@@ -1,11 +1,28 @@
-import { DEFAULT_SETTINGS, DEFAULT_STAFF, normalizeMonthData } from '../js/defaults.js';
+import {
+  DEFAULT_SETTINGS, DEFAULT_STAFF, normalizeBackupPayload, normalizeMonthData,
+  normalizeRbnNames, normalizeSettings, normalizeStaffList
+} from '../js/defaults.js';
 
 export function json(data, status = 200) {
-  return new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Cache-Control': 'no-store'
+    }
+  });
 }
 
-export function readJsonRequest(request) {
-  return request.json();
+export function invalid(message) {
+  return json({ ok: false, error: message }, 400);
+}
+
+export async function readJsonRequest(request) {
+  try {
+    return await request.json();
+  } catch {
+    throw new Error('Ungültiges JSON.');
+  }
 }
 
 export function kv(context) {
@@ -28,13 +45,36 @@ export async function put(context, key, value) {
 }
 
 export function defaults() {
-  return { settings: structuredClone(DEFAULT_SETTINGS), staff: structuredClone(DEFAULT_STAFF), rbnNames: [] };
+  return {
+    settings: structuredClone(DEFAULT_SETTINGS),
+    staff: structuredClone(DEFAULT_STAFF),
+    rbnNames: []
+  };
+}
+
+export function normalizedBootstrap({ settings, staff, rbnNames }) {
+  return {
+    settings: normalizeSettings(settings),
+    staff: normalizeStaffList(staff),
+    rbnNames: normalizeRbnNames(rbnNames)
+  };
 }
 
 export function monthStorageKey(year, month) {
   return `year:${year}:month:${String(month).padStart(2, '0')}`;
 }
 
-export function ensureMonthShape(year, month, payload) {
-  return normalizeMonthData(year, month, payload);
+export function assertYearMonth(year, month) {
+  const numericYear = Number(year);
+  const numericMonth = Number(month);
+  if (!Number.isInteger(numericYear) || numericYear < 2000 || numericYear > 2200) throw new Error('Jahr außerhalb des unterstützten Bereichs 2000–2200.');
+  if (!Number.isInteger(numericMonth) || numericMonth < 1 || numericMonth > 12) throw new Error('Monat muss zwischen 1 und 12 liegen.');
+  return { year: numericYear, month: numericMonth };
 }
+
+export function ensureMonthShape(year, month, payload) {
+  const valid = assertYearMonth(year, month);
+  return normalizeMonthData(valid.year, valid.month, payload);
+}
+
+export { normalizeBackupPayload, normalizeRbnNames, normalizeSettings, normalizeStaffList };
