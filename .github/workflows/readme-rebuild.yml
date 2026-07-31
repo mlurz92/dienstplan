@@ -26,7 +26,11 @@ jobs:
           cache: npm
 
       - name: Rebuild current-state README
-        run: python tools/rebuild_readme.py
+        shell: bash
+        run: |
+          sed -i 's/- kein aktiver Service Worker;/- Kein aktiver Service Worker./g' tools/rebuild_readme.py
+          sed -i 's/- kein aktiver Service Worker und damit kein garantierter frischer Offline-Start;/- Kein aktiver Service Worker und damit kein garantierter frischer Offline-Start./g' tools/rebuild_readme.py
+          python tools/rebuild_readme.py
 
       - name: Validate README structure
         shell: bash
