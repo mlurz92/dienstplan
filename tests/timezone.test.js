@@ -39,6 +39,7 @@ test('BD am Vortag wird als solcher erkannt', () => {
   const juli = monat(state, 2026, 7);
   setAssignment(juli, '2026-07-06', 'bd', 'lurz');           // Montag
   const bewertung = evaluateCandidate({ state, monthData: juli, dateIso: '2026-07-07', role: 'bd', staffId: 'lurz' });
+  assert.equal(bewertung.level, 'red');
   assert.ok(bewertung.reasons.includes('BD bereits am Vortag'), `Gründe: ${bewertung.reasons.join(' | ')}`);
 });
 
@@ -108,6 +109,7 @@ test('Monatsübergreifend: BD am Vortag im Vormonat wird erkannt', () => {
   setAssignment(monat(state, 2026, 7), '2026-07-31', 'bd', 'lurz');
   const august = monat(state, 2026, 8);
   const bewertung = evaluateCandidate({ state, monthData: august, dateIso: '2026-08-01', role: 'bd', staffId: 'lurz' });
+  assert.equal(bewertung.level, 'red');
   assert.ok(bewertung.reasons.includes('BD bereits am Vortag'), `Gründe: ${bewertung.reasons.join(' | ')}`);
 });
 
@@ -137,8 +139,8 @@ test('BD-Abstand wird symmetrisch bewertet, unabhängig von der Eingabereihenfol
   setAssignment(monat(vorwaerts, 2026, 7), '2026-07-08', 'bd', 'lurz');
   const davor = evaluateCandidate({ state: vorwaerts, monthData: monat(vorwaerts, 2026, 7), dateIso: '2026-07-07', role: 'bd', staffId: 'lurz' });
 
-  assert.equal(nachher.level, 'yellow');
-  assert.equal(davor.level, 'yellow', 'BD am Tag vor einem eigenen BD muss ebenso auffallen');
+  assert.equal(nachher.level, 'red');
+  assert.equal(davor.level, 'red', 'BD am Tag vor einem eigenen BD muss ebenso auffallen');
   assert.ok(davor.reasons.includes('BD bereits am Folgetag'), `Gründe: ${davor.reasons.join(' | ')}`);
 });
 
