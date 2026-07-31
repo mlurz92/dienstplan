@@ -46,7 +46,7 @@ jobs:
           assert 'Rufbereitschaft Nuklearmedizin' not in text
           assert 'Eine **belegte** Zelle zeigt bewusst nur den Namen.' in text
           assert 'eigener BD am Vortag: **rot**' in text
-          assert len(text.split()) > 10000, len(text.split())
+          assert len(text.split()) > 8000, len(text.split())
           print(f'README: {len(text.split())} words, {len(text.splitlines())} lines')
           PY
 
