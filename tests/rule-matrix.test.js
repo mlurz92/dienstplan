@@ -223,6 +223,20 @@ for (const paar of paare) {
   });
 }
 
+test('Unmittelbar aufeinanderfolgende BD sind über So–Mo in beiden Eingabereihenfolgen rot', () => {
+  const vorwaerts = zustand();
+  setAssignment(monat(vorwaerts, 2026, 7), '2026-07-05', 'bd', 'lurz'); // Sonntag
+  const montag = bewerte(vorwaerts, '2026-07-06', 'bd', 'lurz');
+  assert.equal(montag.level, 'red');
+  assert.ok(montag.reasons.includes('BD bereits am Vortag'));
+
+  const rueckwaerts = zustand();
+  setAssignment(monat(rueckwaerts, 2026, 7), '2026-07-06', 'bd', 'lurz'); // Montag
+  const sonntag = bewerte(rueckwaerts, '2026-07-05', 'bd', 'lurz');
+  assert.equal(sonntag.level, 'red');
+  assert.ok(sonntag.reasons.includes('BD bereits am Folgetag'));
+});
+
 test('Invariante Selbstkonsistenz: eine bestehende Einteilung wird wie ein Vorschlag bewertet', () => {
   // Für jede Person werden bis an ihr Kontingent heran Dienste vergeben. Die
   // bereits eingetragene Einteilung darf keine andere Stufe bekommen als
