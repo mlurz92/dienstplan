@@ -1,10 +1,10 @@
-import { ABSENCE_TYPES, MONTH_NAMES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, normalizeBackupPayload, toIsoDate } from './defaults.js?v=20260730.7';
-import { state, bootstrapState, getMonthData, getMonthLabel, loadMonth, markMonthDirty, persistCurrentMonth, persistMonth, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260730.7';
-import { api } from './api.js?v=20260730.7';
-import { applyMonthTheme, prefersReducedMotion } from './theme.js?v=20260730.7';
-import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260730.7';
-import { buildStats, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getEffectiveAbsence, getPlanningStaff, getPreference, getStaffById, labelForAbsence, labelForPreference, setAbsence, setAssignment, setPreference, weekdayLabel } from './rules.js?v=20260730.7';
-import { getRbnOptions, isRbnValueAllowed, isSecondRbnAvailable } from './rbn.js?v=20260730.7';
+import { ABSENCE_TYPES, MONTH_NAMES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, normalizeBackupPayload, toIsoDate } from './defaults.js?v=20260731.1';
+import { state, bootstrapState, getMonthData, getMonthLabel, loadMonth, markMonthDirty, persistCurrentMonth, persistMonth, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260731.1';
+import { api } from './api.js?v=20260731.1';
+import { applyMonthTheme, prefersReducedMotion } from './theme.js?v=20260731.1';
+import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260731.1';
+import { buildStats, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getEffectiveAbsence, getPlanningStaff, getPreference, getStaffById, labelForAbsence, labelForPreference, setAbsence, setAssignment, setPreference, weekdayLabel } from './rules.js?v=20260731.1';
+import { getRbnOptions, isRbnValueAllowed, isSecondRbnAvailable } from './rbn.js?v=20260731.1';
 
 const $ = selector => document.querySelector(selector);
 
@@ -267,9 +267,12 @@ function buildAssignmentButton(dateIso, role, staffId, monthData) {
   const person = getStaffById(state.staff, staffId);
   const name = person?.name || (staffId ? `Unbekannte ID: ${staffId}` : '—');
   const evaluation = staffId ? evaluateCandidate({ state, monthData, dateIso, role, staffId }) : { level: 'green', reasons: [] };
+  const badgeMarkup = staffId
+    ? ''
+    : '<span class="assignment-badges"><span class="small-chip">offen</span></span>';
   button.innerHTML = `
     <span class="assignment-name">${esc(name)}</span>
-    <span class="assignment-badges">${staffId ? `<span class="small-chip ${evaluation.level}">${labelByLevel(evaluation.level)}</span>` : '<span class="small-chip">offen</span>'}</span>`;
+    ${badgeMarkup}`;
   button.title = staffId ? evaluation.reasons.join('\n') : `${role.toUpperCase()} eintragen`;
   button.addEventListener('click', () => openPicker(dateIso, role));
   return button;
@@ -518,7 +521,7 @@ function openPicker(dateIso, role) {
   state.currentPicker = { dateIso, role };
   $('#pickerEyebrow').textContent = role === 'bd' ? 'Bereitschaftsdienst' : 'Hintergrunddienst';
   $('#pickerTitle').textContent = `${fmtGermanDate(dateIso)} · ${role.toUpperCase()}`;
-  $('#pickerSubtitle').textContent = 'Farbkodierte Eignungsbewertung mit Tooltip-Begründung. Rote Konflikte erfordern eine explizite Bestätigung.';
+  $('#pickerSubtitle').textContent = 'Harte und strukturelle Regeln greifen sofort; relative Ausgleichshinweise erst nach der ersten Verteilungsrunde. Rote Konflikte erfordern eine explizite Bestätigung.';
   $('#pickerList').innerHTML = '';
   const staffList = getPlanningStaff(state.staff, dateIso);
   staffList.forEach(person => {

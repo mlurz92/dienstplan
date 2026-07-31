@@ -1,4 +1,4 @@
-Regeln und Kriterien für manuelle Kandidatenempfehlungen in DienstplanRAD (v4.3)
+Regeln und Kriterien für manuelle Kandidatenempfehlungen in DienstplanRAD (v4.4)
 
 GRUNDPRINZIPIEN & DATENBASIS:
 - DienstplanRAD enthält keinen automatischen Dienstplaner, keinen Optimierungslauf, keine Iterationszyklen und keine automatischen Tauschvorgänge.
@@ -33,7 +33,7 @@ RUHEZEITEN, FREIZEITAUSGLEICH & DIENSTFOLGEN:
 WOCHENEND- & FEIERTAGSLOGIK:
 - Ein Wochenende umfasst Freitag, Samstag und Sonntag.
 - Ein Wochenende mit mindestens einem BD zählt als 1,0 Wochenend-Äquivalent; ein Wochenende mit ausschließlich HG als 0,5.
-- Zielwert ist 1,0 Wochenend-Äquivalent je Person. Kandidaten mit geringerer bisheriger Wochenendbelastung werden bevorzugt; eine Überschreitung von 1,0 wird gelb kenntlich gemacht.
+- Zielwert ist 1,0 Wochenend-Äquivalent je Person. Kandidaten mit geringerer bisheriger Wochenendbelastung werden ab der ersten Einteilung bevorzugt. Eine höhere relative Last wird erst nach einer ersten Verteilungsrunde von aufsummiert 0,5 Wochenend-Äquivalenten je aktuell geeigneter Person gelb; zuvor bleibt sie ein neutraler Klartexthinweis. Eine Überschreitung von 1,0 wird unabhängig davon sofort gelb kenntlich gemacht.
 - Direkt aufeinanderfolgende Wochenenden mit Dienst sind nachrangig. Zwei benachbarte BD-Wochenenden bleiben ein roter Konflikt, sonstige benachbarte Dienstwochenenden orange.
 - Samstags-BD rotieren unter den Fachärzten. Ein weiterer Samstags-BD derselben Person im selben Monat ist orange nachrangig.
 - Oster- und Pfingstblock alternieren. Ein Dienst in beiden Blöcken ist orange nachrangig.
@@ -44,8 +44,8 @@ MONATSFAIRNESS & HG-AUSGLEICH:
 - Nach Aktivierung des Monatsausgleichs wird der jeweilige Monats-Sollrückstand ausschließlich zwischen den am konkreten Tag grundsätzlich verfügbaren und geeigneten BD-Personen verglichen. Abwesende, blockierte oder fachlich ungeeignete Personen beeinflussen den Tagesvergleich nicht.
 - Personen mit dem größten Rückstand werden positiv erklärt; ein kleinerer Rückstand wird gelb gegenüber dem größten Rückstand kenntlich gemacht.
 - Ein erreichtes individuelles BD-Soll erzeugt unabhängig davon einen gelben Richtwerthinweis. Ein ausdrücklich gesetztes hartes Monatsmaximum erzeugt beim zusätzlichen BD einen roten Konflikt.
-- Bei HG wird die kombinierte Monatslast aus BD und HG innerhalb der am konkreten Tag verfügbaren Facharztgruppe verglichen. Diese HG-Regel besitzt keine BD-Soll-Startschwelle.
-- Bei einem HG zu einem Assistenzarzt-BD wird zusätzlich die bisherige Anzahl belastender HG für Assistenzarzt-BD innerhalb der Facharztgruppe ausgeglichen.
+- Bei HG wird die kombinierte Monatslast aus BD und HG innerhalb der am konkreten Tag verfügbaren Facharztgruppe verglichen. Die geringste Last wird von Beginn an positiv erklärt. Eine höhere relative Last wird erst gelb, sobald die Summe der bereits eingetragenen BD und HG mindestens einem Dienst je aktuell geeigneter Person entspricht; vorher bleibt sie ein neutraler Klartexthinweis. Diese HG-Regel besitzt weiterhin keine BD-Soll-Startschwelle.
+- Bei einem HG zu einem Assistenzarzt-BD wird zusätzlich die bisherige Anzahl belastender HG für Assistenzarzt-BD innerhalb der Facharztgruppe ausgeglichen. Auch hier bleibt eine höhere relative Last bis zu einer vollständigen ersten AA-HG-Verteilungsrunde neutral informativ und wird erst danach gelb.
 
 JAHRESVERLAUF ALS REINER KONTEXTHINWEIS:
 - Der Jahresverlauf wird nur angezeigt, wenn alle Vormonate des laufenden Jahres tatsächlich vom Server oder aus einer vorhandenen lokalen Sicherung geladen sind und mehrere Personen im maßgeblichen aktuellen Monatsvergleich gleichauf liegen.

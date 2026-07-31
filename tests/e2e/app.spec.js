@@ -62,3 +62,26 @@ test('Becker-FZA nach Samstags-BD blockiert auch HG', async ({ page }) => {
   await expect(becker).toHaveClass(/red/);
   await expect(becker).toContainText('FZA/Frei eingetragen');
 });
+
+test('Belegte Dienstfelder zeigen keinen Badge, der Picker aber weiterhin die Bewertung', async ({ page }) => {
+  const month = emptyMonth(2026, 7);
+  month.days['2026-07-01'].bd = 'lurz';
+  await mockApi(page, month);
+  await page.goto('/');
+  await page.selectOption('#yearSelect', '2026');
+  await page.selectOption('#monthSelect', '7');
+
+  const firstRow = page.locator('#planTableBody tr').first();
+  const occupiedBd = firstRow.locator('.assignment-btn').first();
+  const openHg = firstRow.locator('.assignment-btn').nth(1);
+
+  await expect(occupiedBd.locator('.assignment-name')).toHaveText('Dr. Lurz');
+  await expect(occupiedBd.locator('.assignment-badges')).toHaveCount(0);
+  await expect(openHg.locator('.assignment-badges .small-chip')).toHaveText('offen');
+
+  await occupiedBd.click();
+  await expect(page.locator('#pickerDialog')).toBeVisible();
+  const lurz = page.locator('#pickerList .picker-item').filter({ hasText: 'Dr. Lurz' });
+  await expect(lurz.locator('.small-chip')).toHaveCount(1);
+  await expect(lurz.locator('.reasons')).not.toBeEmpty();
+});

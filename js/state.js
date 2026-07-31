@@ -1,8 +1,8 @@
 import {
   createEmptyMonth, DEFAULT_SETTINGS, DEFAULT_STAFF, MONTH_NAMES, normalizeMonthData,
   normalizeRbnNames, normalizeSettings, normalizeStaffList
-} from './defaults.js?v=20260730.7';
-import { api } from './api.js?v=20260730.7';
+} from './defaults.js?v=20260731.1';
+import { api } from './api.js?v=20260731.1';
 
 const LOCAL_KEY_PREFIX = 'dienstplanrad:';
 

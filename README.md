@@ -173,7 +173,7 @@ Der **Jahresverlauf als Tie-Breaker** gehört ausdrücklich zur dritten Gruppe: 
 10. Nach Abschluss Excel oder PDF erzeugen und gegebenenfalls eine JSON-Sicherung erstellen.
 11. Bei Verdacht auf veraltete Daten den Serverstand ausdrücklich neu laden und den Build-Stempel kontrollieren.
 
-Jede Änderung löst eine neue Darstellung aus. Dadurch werden nicht nur neue Kandidaten, sondern auch bereits eingetragene Dienste sofort gegen den aktuellen Gesamtstand bewertet.
+Jede Änderung löst eine neue Darstellung aus. Offene Felder und der Picker werden sofort gegen den aktuellen Gesamtstand bewertet. Bereits eingetragene BD-/HG-Zellen zeigen bewusst nur den Namen; ihre aktuelle Bewertung bleibt über den nativen Tooltip und einen erneuten Klick vollständig zugänglich.
 
 ---
 
@@ -464,17 +464,19 @@ Verbindliche Zusagen:
 
 Für HG werden unter den grundsätzlich geeigneten Fachärztinnen und Fachärzten BD und HG des Monats kombiniert:
 
-- geringste kombinierte Monatslast: positive Empfehlung;
-- höhere kombinierte Monatslast als das Minimum: gelb.
+- geringste kombinierte Monatslast: positive Empfehlung ab der ersten Einteilung;
+- höhere kombinierte Monatslast vor Abschluss der ersten Verteilungsrunde: neutraler Klartexthinweis;
+- höhere kombinierte Monatslast nach Abschluss der ersten Verteilungsrunde: gelb.
 
-Diese HG-Verteilungsregel ist nicht identisch mit der bedingten BD-Monatsausgleichsregel und besitzt keine Soll-Erreichungsschwelle.
+Die erste Verteilungsrunde gilt als abgeschlossen, sobald die Summe der bisher eingetragenen BD und HG innerhalb der aktuell geeigneten Facharztgruppe mindestens einem Dienst je Person entspricht. Dadurch bleibt die Bewertung sowohl bei tageweiser als auch bei personenweiser Erfassung ruhig, ohne einen späteren Monatsausgleich zu verlieren. Die Regel besitzt weiterhin keine BD-Soll-Erreichungsschwelle.
 
 ## 9.11 HG bei Assistenzarzt-BD
 
 Steht am Tag ein BD durch eine nicht fachärztliche Person, wird zusätzlich gezählt, wie häufig jede HG-berechtigte Person im Monat bereits einen solchen belastenden HG übernommen hat:
 
-- geringste Zahl: positive Empfehlung;
-- höhere Zahl als das Minimum: gelb.
+- geringste Zahl: positive Empfehlung ab der ersten Einteilung;
+- höhere Zahl vor einer vollständigen ersten AA-HG-Verteilungsrunde: neutraler Klartexthinweis;
+- höhere Zahl danach: gelb.
 
 ## 9.12 HG-Häufung
 
@@ -515,7 +517,7 @@ Je Person wird die bisherige Monatsbelastung in Wochenend-Äquivalenten berechne
 - Wochenende ohne BD, aber mit mindestens einem HG: 0,5;
 - kein Wochenenddienst: 0.
 
-Personen mit der geringsten bisherigen Last erhalten eine positive Erklärung. Höhere Last wird gelb erläutert. Würde der geplante Dienst das Ziel 1,0 überschreiten, erscheint ein zusätzlicher gelber Hinweis.
+Personen mit der geringsten bisherigen Last erhalten eine positive Erklärung. Eine höhere relative Last bleibt bis zu einer aufsummierten halben Wochenend-Einheit je aktuell geeigneter Person neutral informativ und wird erst danach gelb erläutert. Würde der geplante Dienst das Ziel 1,0 überschreiten, erscheint unabhängig davon sofort ein zusätzlicher gelber Hinweis.
 
 ## 9.16 Samstagsrotation
 
@@ -1240,7 +1242,7 @@ Das Repository wird aus dem Projektstamm bereitgestellt. Pages Functions werden 
 Alle releasekritischen Assets und relativen Browserimporte verwenden denselben `?v=`-Token. Der Build-Stempel in `index.html` muss exakt dazu passen. Für diesen Funktionsstand ist die Kennung:
 
 ```text
-20260730.7
+20260731.1
 ```
 
 Der laufende Stand ist im Browser über `document.documentElement.dataset.build` und im Tooltip des Speicherstatus sichtbar.
@@ -1402,7 +1404,7 @@ Für die aktuelle Fairnesslogik gelten zwei besonders wichtige Leitplanken:
 
 ---
 
-# 30. Konsistenzhärtung 20260730.7
+# 30. Konsistenzhärtung 20260731.1
 
 - **Becker-FZA:** echtes dienstfreies FZA nach Samstags-BD; BD und HG sind gesperrt, Tagesfairness und CT-Leitungsregel verwenden dieselbe wirksame Abwesenheit.
 - **Jahresverlauf:** Vormonate plus vollständiger aktueller Monat; keine Folgemonate; leere Fehler-Fallbacks gelten nicht als vollständige Historie.
