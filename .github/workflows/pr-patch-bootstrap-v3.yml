@@ -1,0 +1,46 @@
+name: PR patch bootstrap v3
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    if: github.head_ref == 'agent/incremental-suitability-badges' && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/incremental-suitability-badges
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Apply focused implementation
+        run: |
+          python tools/apply_incremental_suitability.py
+          python tools/postfix_incremental_suitability.py
+
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+
+      - name: Commit verified implementation
+        shell: bash
+        run: |
+          rm -f tools/apply_incremental_suitability.py tools/postfix_incremental_suitability.py .github/workflows/apply-incremental-suitability.yml .branch-patch-trigger .branch-patch-trigger-v2 .branch-patch-trigger-v3
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Eignungsbewertung für schrittweise Planung präzisieren"
+          git push origin HEAD:agent/incremental-suitability-badges
