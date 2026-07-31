@@ -13,6 +13,10 @@ def replace_once(path, old, new):
 replace_once('tests/rbn.test.js', r'20260730\.7', r'20260731\.1')
 replace_once(
     'tests/recommendation-rules.test.js',
-    "setAssignment(data, '2026-07-09', 'bd', 'lurz');",
-    "setAssignment(data, '2026-07-15', 'bd', 'lurz');"
+    """  for (const [staffId, iso] of firstRound) setAssignment(data, iso, 'bd', staffId);
+  setAssignment(data, '2026-07-09', 'bd', 'lurz');
+  const lurz = evalAt(state, '2026-07-08', 'hg', 'lurz');""",
+    """  for (const [staffId, iso] of firstRound) setAssignment(data, iso, 'bd', staffId);
+  setAssignment(data, '2026-07-15', 'bd', 'lurz');
+  const lurz = evalAt(state, '2026-07-08', 'hg', 'lurz');"""
 )
