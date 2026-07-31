@@ -27,75 +27,46 @@ jobs:
           python - <<'PY'
           from pathlib import Path
 
+          def replace_function(text, start_marker, end_marker, replacement):
+              start = text.find(start_marker)
+              end = text.find(end_marker, start)
+              if start < 0 or end < 0:
+                  raise SystemExit(f'function boundaries not found: {start_marker}')
+              return text[:start] + replacement.rstrip() + text[end:]
+
           state = Path('js/state.js')
           text = state.read_text(encoding='utf-8')
-          old = '''  try {
-            const storedKeys = JSON.parse(storageGet(DIRTY_MONTHS_KEY) || '[]');
-            if (Array.isArray(storedKeys)) {
-              for (const key of storedKeys) {
-                if (!parseMonthKey(key) || !storageGet(`${LOCAL_KEY_PREFIX}month:${key}`)) continue;
-                state.dirtyMonths.set(key, ++state.dirtyVersion);
-                state.monthSources.set(key, 'local');
-              }
-            }
-          } catch {
-            storageRemove(DIRTY_MONTHS_KEY);
-          }
-          '''
-          new = '''  try {
-            const storedKeys = JSON.parse(storageGet(DIRTY_MONTHS_KEY) || '[]');
-            if (Array.isArray(storedKeys)) {
-              for (const key of storedKeys) {
-                const parsed = parseMonthKey(key);
-                const raw = parsed ? storageGet(`${LOCAL_KEY_PREFIX}month:${key}`) : null;
-                if (!parsed || !raw) continue;
-                try {
-                  state.months.set(key, normalizeMonthData(parsed[0], parsed[1], JSON.parse(raw)));
-                  state.dirtyMonths.set(key, ++state.dirtyVersion);
-                  state.monthSources.set(key, 'local');
-                } catch {
-                  // Ein defekter lokaler Monat darf nicht als leeres Gerüst
-                  // automatisch zum Server synchronisiert werden.
+          text = replace_function(text, 'export function restoreSyncState() {', '\n\nexport function getMonthData', r'''export function restoreSyncState() {
+            if (state.syncStateRestored) return;
+            state.syncStateRestored = true;
+
+            try {
+              const storedKeys = JSON.parse(storageGet(DIRTY_MONTHS_KEY) || '[]');
+              if (Array.isArray(storedKeys)) {
+                for (const key of storedKeys) {
+                  const parsed = parseMonthKey(key);
+                  const raw = parsed ? storageGet(`${LOCAL_KEY_PREFIX}month:${key}`) : null;
+                  if (!parsed || !raw) continue;
+                  try {
+                    state.months.set(key, normalizeMonthData(parsed[0], parsed[1], JSON.parse(raw)));
+                    state.dirtyMonths.set(key, ++state.dirtyVersion);
+                    state.monthSources.set(key, 'local');
+                  } catch {
+                    // Defekte lokale Inhalte dürfen niemals als leeres Gerüst
+                    // automatisch zum Server synchronisiert werden.
+                  }
                 }
               }
-            }
-            persistDirtyMarkers();
-          } catch {
-            storageRemove(DIRTY_MONTHS_KEY);
-          }
-          '''
-          if text.count(old) != 1:
-              raise SystemExit(f'restore block count: {text.count(old)}')
-          text = text.replace(old, new)
-
-          old = '''export function buildBackupPayload(serverPayload = null) {
-            restoreSyncState();
-            let server = {};
-            try { server = serverPayload ? normalizeBackupPayload(serverPayload, { strict: false }) : {}; }
-            catch { server = {}; }
-
-            const months = new Map(server.months || []);
-            for (const [key, month] of readAllLocalMonths()) {
-              if (!months.has(key) || state.dirtyMonths.has(key)) months.set(key, month);
-            }
-            for (const [key, month] of state.months) {
-              const source = state.monthSources.get(key);
-              if (!months.has(key) || state.dirtyMonths.has(key) || source === 'local' || source === 'fallback') {
-                const parsed = parseMonthKey(key);
-                if (parsed) months.set(key, normalizeMonthData(parsed[0], parsed[1], month));
-              }
+              persistDirtyMarkers();
+            } catch {
+              storageRemove(DIRTY_MONTHS_KEY);
             }
 
-            return {
-              ok: true,
-              settings: structuredClone(state.settings),
-              staff: structuredClone(state.staff),
-              rbnNames: structuredClone(state.rbnNames),
-              months: [...months.entries()].sort(([left], [right]) => left.localeCompare(right))
-            };
-          }
-          '''
-          new = '''export function buildBackupPayload(serverPayload = null) {
+            state.bootstrapDirty = storageGet(BOOTSTRAP_DIRTY_KEY) === '1' && Boolean(storageGet(`${LOCAL_KEY_PREFIX}bootstrap`));
+            if (state.bootstrapDirty) state.bootstrapVersion += 1;
+            updateDirtyFlag();
+          }''')
+          text = replace_function(text, 'export function buildBackupPayload(serverPayload = null) {', '\n\nexport function getMonthLabel', r'''export function buildBackupPayload(serverPayload = null) {
             restoreSyncState();
             let server = {};
             let hasServerSnapshot = false;
@@ -106,7 +77,6 @@ jobs:
               }
             } catch {
               server = {};
-              hasServerSnapshot = false;
             }
 
             const months = new Map(server.months || []);
@@ -128,11 +98,8 @@ jobs:
               rbnNames: structuredClone(preferServerBootstrap && server.rbnNames ? server.rbnNames : state.rbnNames),
               months: [...months.entries()].sort(([left], [right]) => left.localeCompare(right))
             };
-          }
-          '''
-          if text.count(old) != 1:
-              raise SystemExit(f'backup block count: {text.count(old)}')
-          state.write_text(text.replace(old, new), encoding='utf-8')
+          }''')
+          state.write_text(text, encoding='utf-8')
 
           app = Path('js/app.js')
           text = app.read_text(encoding='utf-8')
@@ -144,7 +111,7 @@ jobs:
 
           test = Path('tests/bughunt-regressions.test.js')
           content = test.read_text(encoding='utf-8').rstrip()
-          content += '''
+          content += r'''
 
           test('Dirty-Monate werden nach Neustart vor dem automatischen Sync aus dem lokalen Snapshot rekonstruiert', async () => {
             globalThis.localStorage = new MemoryStorage();
@@ -153,10 +120,7 @@ jobs:
             localStorage.setItem('dienstplanrad:month:2026-06', JSON.stringify(local));
             localStorage.setItem('dienstplanrad:dirty-months', JSON.stringify(['2026-06']));
             const bodies = [];
-            globalThis.fetch = async (_url, options) => {
-              bodies.push(JSON.parse(options.body));
-              return okResponse();
-            };
+            globalThis.fetch = async (_url, options) => { bodies.push(JSON.parse(options.body)); return okResponse(); };
             const { persistDirtyState } = await freshState('restart-before-sync');
             await persistDirtyState();
             assert.equal(bodies.length, 1);
@@ -191,7 +155,6 @@ jobs:
             assert.equal(cleanBackup.settings.schemaVersion, 7);
             assert.deepEqual(cleanBackup.rbnNames, ['Server']);
             assert.equal(new Map(cleanBackup.months).get('2026-07').days['2026-07-01'].bd, 'becker');
-
             module.state.settings = { schemaVersion: 9 };
             module.markBootstrapDirty();
             module.getMonthData(2026, 7).days['2026-07-01'].bd = 'lurz';
