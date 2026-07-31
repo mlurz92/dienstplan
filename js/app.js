@@ -1,10 +1,10 @@
-import { ABSENCE_TYPES, MONTH_NAMES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, normalizeBackupPayload, toIsoDate } from './defaults.js?v=20260731.2';
-import { state, bootstrapState, getMonthData, getMonthLabel, loadMonth, markMonthDirty, persistCurrentMonth, persistMonth, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260731.2';
-import { api } from './api.js?v=20260731.2';
-import { applyMonthTheme, prefersReducedMotion } from './theme.js?v=20260731.2';
-import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260731.2';
-import { buildStats, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getEffectiveAbsence, getPlanningStaff, getPreference, getStaffById, labelForAbsence, labelForPreference, setAbsence, setAssignment, setPreference, weekdayLabel } from './rules.js?v=20260731.2';
-import { getRbnOptions, isRbnValueAllowed, isSecondRbnAvailable } from './rbn.js?v=20260731.2';
+import { ABSENCE_TYPES, MONTH_NAMES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, normalizeBackupPayload, toIsoDate } from './defaults.js?v=20260731.3';
+import { state, bootstrapState, buildBackupPayload, getMonthData, getMonthLabel, isMonthDirty, isMonthMergeSafe, loadMonth, markBootstrapDirty, markBootstrapSynced, markMonthDirty, markMonthSynced, persistDirtyState, persistMonth, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260731.3';
+import { api } from './api.js?v=20260731.3';
+import { applyMonthTheme, prefersReducedMotion } from './theme.js?v=20260731.3';
+import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260731.3';
+import { buildStats, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getEffectiveAbsence, getPlanningStaff, getPreference, getStaffById, labelForAbsence, labelForPreference, setAbsence, setAssignment, setPreference, weekdayLabel } from './rules.js?v=20260731.3';
+import { getRbnOptions, isRbnValueAllowed, isSecondRbnAvailable } from './rbn.js?v=20260731.3';
 
 const $ = selector => document.querySelector(selector);
 
@@ -21,6 +21,8 @@ let monthRequestId = 0;
 let requestedYear = null;
 let requestedMonth = null;
 const monthNameBySheet = Object.fromEntries(SHEET_NAMES.map((name, idx) => [name, idx + 1]));
+const MIN_YEAR = 2000;
+const MAX_YEAR = 2200;
 
 
 
@@ -61,7 +63,7 @@ function monthOrdinal(year, month) {
 }
 
 window.addEventListener('DOMContentLoaded', init);
-window.addEventListener('beforeunload', () => { if (state.dirty) persistCurrentMonth(); });
+window.addEventListener('beforeunload', () => { if (state.dirty) persistDirtyState(); });
 
 /**
  * Auslieferungsstempel aus dem Kopf der Seite in den DOM und die Konsole
@@ -127,6 +129,17 @@ function bindEvents() {
   $('#jsonImportInput').addEventListener('change', onJsonImport);
 }
 
+function ensureYearOption(year) {
+  if (!Number.isInteger(year) || year < MIN_YEAR || year > MAX_YEAR) return false;
+  const select = $('#yearSelect');
+  if ([...select.options].some(option => Number(option.value) === year)) return true;
+  const option = new Option(String(year), String(year));
+  const before = [...select.options].find(existing => Number(existing.value) > year);
+  if (before) select.insertBefore(option, before);
+  else select.append(option);
+  return true;
+}
+
 function buildStaticSelectors() {
   for (let i = 1; i <= 12; i++) {
     const option = document.createElement('option');
@@ -135,23 +148,25 @@ function buildStaticSelectors() {
     $('#monthSelect').append(option);
   }
   const currentYear = new Date().getFullYear();
-  for (let year = Math.min(2025, currentYear - 5); year <= Math.max(2030, currentYear + 5); year++) {
-    const option = document.createElement('option');
-    option.value = String(year);
-    option.textContent = String(year);
-    $('#yearSelect').append(option);
-  }
+  const firstYear = Math.max(MIN_YEAR, Math.min(2025, currentYear - 5));
+  const lastYear = Math.min(MAX_YEAR, Math.max(2030, currentYear + 5));
+  for (let year = firstYear; year <= lastYear; year++) ensureYearOption(year);
 }
 
 function populateSelectors() {
+  ensureYearOption(state.currentYear);
   $('#monthSelect').value = String(state.currentMonth);
   $('#yearSelect').value = String(state.currentYear);
 }
 
 async function openCurrentMonth(year, month, forceServer = false) {
+  if (!Number.isInteger(year) || year < MIN_YEAR || year > MAX_YEAR || !Number.isInteger(month) || month < 1 || month > 12) {
+    setStatus('error', 'Ungültiger Monat');
+    return;
+  }
+  ensureYearOption(year);
+
   const requestId = ++monthRequestId;
-  const loadedYear = state.currentYear;
-  const loadedMonth = state.currentMonth;
   const previousYear = requestedYear ?? state.currentYear;
   const previousMonth = requestedMonth ?? state.currentMonth;
   const targetChanged = month !== previousMonth || year !== previousYear;
@@ -159,27 +174,16 @@ async function openCurrentMonth(year, month, forceServer = false) {
   requestedMonth = month;
   const direction = Math.sign(monthOrdinal(year, month) - monthOrdinal(previousYear, previousMonth)) || 1;
 
-  // Offene Änderungen des bisherigen Monats sichern. Der Vorgang läuft parallel
-  // weiter und hält die Anzeige nicht auf.
+  // Sämtliche tatsächlich ungespeicherten Monate sichern. Ein globales Dirty-
+  // Flag darf niemals dazu führen, dass der bloß sichtbare Zwischenmonat als
+  // leerer Stand gespeichert wird.
   let pendingSave = null;
   if (state.dirty) {
     clearTimeout(state.saveTimer);
     state.saveTimer = null;
-    pendingSave = persistMonth(loadedYear, loadedMonth);
+    pendingSave = persistDirtyState();
   }
 
-  // Grundfarbe, Titel, Tabelle und Statistik wechseln in EINEM Schritt.
-  //
-  // Zuvor wurde die Palette sofort gesetzt, der Monat aber erst nach dem
-  // Serverabruf gerendert. Gemessen an einer antwortenden API lagen dazwischen
-  // rund 800 ms: Die Farbe lief vollständig durch, während in der Überschrift
-  // noch der alte Monat stand. Ohne Backend – wie in allen früheren Testläufen –
-  // scheiterte der Abruf sofort und der Versatz fiel nicht auf.
-  //
-  // Das Kalendergerüst eines Monats steht ohne Serverdaten fest: Tage,
-  // Wochentage, Feiertage und damit die gesamte Farbhierarchie. Es wird deshalb
-  // sofort aus dem Zwischenspeicher gerendert; für Nachbarmonate liegen auch
-  // die Einteilungen bereits vor. Der Serverstand zieht anschließend nach.
   state.currentYear = year;
   state.currentMonth = month;
   populateSelectors();
@@ -191,14 +195,13 @@ async function openCurrentMonth(year, month, forceServer = false) {
   if (requestId !== monthRequestId) return;
 
   setStatus('loading', forceServer ? 'Lädt Serverstand …' : 'Lädt …');
-  await loadMonth(year, month, forceServer);
+  await loadMonth(year, month, { forceServer });
   if (requestId !== monthRequestId) return;
   await warmAdjacentMonths(year, month);
   if (requestId !== monthRequestId) return;
 
-  setStatus(state.serverReady ? 'saved' : 'offline', state.serverReady ? 'Gespeichert' : 'Offline – lokaler Stand');
-  // Zweiter Durchlauf mit dem Serverstand. Die Farbe bleibt dabei unangetastet,
-  // weil applyMonthTheme einen laufenden Übergang auf dasselbe Ziel nicht stört.
+  if (state.dirty || isMonthDirty(year, month)) setStatus('offline', 'Lokale Änderungen noch nicht synchronisiert');
+  else setStatus(state.serverReady ? 'saved' : 'offline', state.serverReady ? 'Gespeichert' : 'Offline – lokaler Stand');
   render();
 }
 
@@ -710,9 +713,15 @@ function shiftMonth(delta) {
   const selectedYear = Number($('#yearSelect').value) || state.currentYear;
   const selectedMonth = Number($('#monthSelect').value) || state.currentMonth;
   const next = new Date(selectedYear, selectedMonth - 1 + delta, 1);
-  $('#yearSelect').value = String(next.getFullYear());
+  const nextYear = next.getFullYear();
+  if (nextYear < MIN_YEAR || nextYear > MAX_YEAR) {
+    setStatus('error', `Unterstützter Zeitraum: ${MIN_YEAR}–${MAX_YEAR}`);
+    return;
+  }
+  ensureYearOption(nextYear);
+  $('#yearSelect').value = String(nextYear);
   $('#monthSelect').value = String(next.getMonth() + 1);
-  openCurrentMonth(next.getFullYear(), next.getMonth() + 1);
+  openCurrentMonth(nextYear, next.getMonth() + 1);
 }
 
 function markDirty() {
@@ -825,16 +834,38 @@ async function onExcelImport(event) {
   const fallbackYear = state.currentYear;
   if (missingYearSheets.length && !confirm(`In ${missingYearSheets.join(', ')} wurde keine eindeutige Jahreszahl gefunden.\n\nDiese Blätter dem aktuell ausgewählten Jahr ${fallbackYear} zuordnen?`)) { reset(); return; }
 
+  const parsedImports = [];
   const summaries = [];
-  const touched = new Map();
   for (const sheetName of recognized) {
     const imported = importMonthSheet(sheetName, workbook.Sheets[sheetName], fallbackYear);
-    if (!imported) { summaries.push(`${sheetName}: keine verwertbare Tageszeile gefunden`); continue; }
+    if (!imported) summaries.push(`${sheetName}: keine verwertbare Tageszeile gefunden`);
+    else parsedImports.push({ sheetName, imported });
+  }
+  if (!parsedImports.length) { alert(`Excel-Import ohne Änderungen beendet.\n\n${summaries.join('\n')}`); reset(); return; }
+
+  // Vor dem Merge jeden Zielmonat laden. Andernfalls würde ein noch nie
+  // geöffneter Monat aus einem leeren Gerüst entstehen und bestehende manuelle
+  // Serverwerte beim anschließenden PUT verlieren.
+  await Promise.all(parsedImports.map(({ imported }) => loadMonth(imported.year, imported.month)));
+
+  const unsafeTargets = parsedImports.filter(({ imported }) => !isMonthMergeSafe(imported.year, imported.month));
+  if (unsafeTargets.length) {
+    const labels = unsafeTargets.map(({ sheetName, imported }) => `${sheetName} ${imported.year}`).join(', ');
+    setStatus('offline', 'Excel-Import abgebrochen – Zielmonat nicht verlässlich geladen');
+    alert(`Excel-Import abgebrochen. Für ${labels} konnte weder ein aktueller Serverstand noch ein ausdrücklich unsynchronisierter lokaler Arbeitsstand bestätigt werden. Bestehende Serverwerte werden deshalb nicht mit einem möglicherweise veralteten oder leeren Ersatzstand überschrieben.`);
+    reset();
+    return;
+  }
+
+  const touched = new Map();
+  for (const { sheetName, imported } of parsedImports) {
     const targetMonth = getMonthData(imported.year, imported.month);
     const merge = mergeMonthData(targetMonth, imported.monthData);
-    setMonthData(imported.year, imported.month, targetMonth);
-    markMonthDirty(imported.year, imported.month);
-    touched.set(`${imported.year}-${String(imported.month).padStart(2, '0')}`, [imported.year, imported.month]);
+    setMonthData(imported.year, imported.month, targetMonth, 'local');
+    if (merge.added > 0) {
+      markMonthDirty(imported.year, imported.month);
+      touched.set(`${imported.year}-${String(imported.month).padStart(2, '0')}`, [imported.year, imported.month]);
+    }
     summaries.push(`${sheetName} ${imported.year}: ${imported.assignments} Dienste, ${imported.absences} Abwesenheiten erkannt; ${merge.added} ergänzt, ${merge.preserved} bestehende manuelle Werte bewahrt${imported.unknownNames.length ? `; unbekannte Namen: ${imported.unknownNames.join(', ')}` : ''}`);
   }
   if (!touched.size) { alert(`Excel-Import ohne Änderungen beendet.\n\n${summaries.join('\n')}`); reset(); return; }
@@ -936,7 +967,8 @@ function exportCurrentMonthToExcel() {
 }
 
 async function exportJsonBackup() {
-  const payload = await api.exportJson().catch(() => ({ settings: state.settings, staff: state.staff, rbnNames: state.rbnNames, months: Array.from(state.months.entries()) }));
+  const serverPayload = await api.exportJson().catch(() => null);
+  const payload = buildBackupPayload(serverPayload);
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
   triggerDownload(blob, `dienstplanrad_backup_${new Date().toISOString().slice(0,10)}.json`);
 }
@@ -947,16 +979,37 @@ async function onJsonImport(event) {
   let payload;
   try { payload = normalizeBackupPayload(JSON.parse(await file.text()), { strict: true }); }
   catch (error) { alert(`JSON-Sicherung konnte nicht gelesen werden: ${error.message}`); event.target.value = ''; return; }
+
+  // Bereits gestartete ältere Monats-PUTs müssen beendet sein, bevor der
+  // Gesamtimport schreibt; andernfalls könnte ein später eintreffender alter PUT
+  // einen soeben importierten Monat wieder überschreiben.
+  clearTimeout(state.saveTimer);
+  state.saveTimer = null;
+  if (state.dirty) await persistDirtyState();
+
+  const importedMonths = [];
+  const importsBootstrap = ['settings', 'staff', 'rbnNames'].some(field => field in payload);
   if ('settings' in payload) state.settings = payload.settings;
   if ('staff' in payload) state.staff = payload.staff;
   if ('rbnNames' in payload) state.rbnNames = payload.rbnNames;
   for (const [key, monthPayload] of payload.months || []) {
     const [year, month] = key.split('-').map(Number);
-    setMonthData(year, month, monthPayload);
+    setMonthData(year, month, monthPayload, 'local');
+    markMonthDirty(year, month);
+    importedMonths.push([year, month]);
   }
-  saveLocalBootstrap();
-  try { await api.importJson(payload); setStatus('saved', 'Import gespeichert'); }
-  catch (error) { setStatus('offline', 'Lokal importiert – Serverfehler'); alert(`Die Sicherung wurde lokal übernommen, der Serverimport wurde zurückgerollt: ${error.message}`); }
+  if (importsBootstrap) markBootstrapDirty();
+
+  try {
+    await api.importJson(payload);
+    importedMonths.forEach(([year, month]) => markMonthSynced(year, month));
+    if (importsBootstrap) markBootstrapSynced();
+    if (state.dirty) setStatus('offline', 'Import gespeichert – weitere lokale Änderungen nicht synchronisiert');
+    else setStatus('saved', 'Import gespeichert');
+  } catch (error) {
+    setStatus('offline', 'Lokal importiert – Serverfehler');
+    alert(`Die Sicherung wurde lokal übernommen, der Serverimport wurde zurückgerollt: ${error.message}`);
+  }
   render();
   event.target.value = '';
 }

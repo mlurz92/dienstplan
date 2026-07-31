@@ -1,5 +1,5 @@
-import { MONTH_NAMES, PREFERENCE_TYPES, STAFF_ORDER, toIsoDate, WEEKDAYS } from './defaults.js?v=20260731.2';
-import { isFirstRegularWorkdayAfter } from './holidays.js?v=20260731.2';
+import { MONTH_NAMES, PREFERENCE_TYPES, STAFF_ORDER, toIsoDate, WEEKDAYS } from './defaults.js?v=20260731.3';
+import { isFirstRegularWorkdayAfter } from './holidays.js?v=20260731.3';
 
 export function parseIso(date) { return new Date(`${date}T00:00:00`); }
 export function addDays(date, days) { const d = new Date(date); d.setDate(d.getDate() + days); return d; }
@@ -162,7 +162,9 @@ export function isFaOn(state, staffId, dateIso) {
 
 export function isAaOn(state, staffId, dateIso) {
   const person = getStaffById(state.staff, staffId);
-  return Boolean(person) && !getRoleProperties(person, dateIso).canHg;
+  return Boolean(person?.includeInPlanning)
+    && person.category === 'aa'
+    && !getRoleProperties(person, dateIso).canHg;
 }
 
 export function hasBlockingPreference(monthData, staffId, dateIso, role) {
@@ -182,7 +184,7 @@ export function basicallyEligiblePeers(state, monthData, dateIso, role) {
     if (hasBlockingPreference(monthData, person.id, dateIso, role)) return false;
     if (monthData.days?.[dateIso]?.[role === 'bd' ? 'hg' : 'bd'] === person.id) return false;
     if (person.id === 'polednia' && [0, 2].includes(weekday)) return false;
-    if (role === 'bd' && person.maxBd && countRoleInMonthExcept(monthData, person.id, 'bd', dateIso) >= person.maxBd) return false;
+    if (role === 'bd' && person.maxBd != null && countRoleInMonthExcept(monthData, person.id, 'bd', dateIso) >= person.maxBd) return false;
     return true;
   });
 }

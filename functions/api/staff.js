@@ -1,16 +1,22 @@
-import { defaults, getOrInit, invalid, json, normalizeStaffList, put, readJsonRequest } from '../_utils.js';
+import { defaults, getOrInit, invalid, json, normalizeStaffList, put, readJsonRequest, serverError } from '../_utils.js';
 
 export async function onRequestGet(context) {
-  const value = normalizeStaffList(await getOrInit(context, 'app:staff', defaults().staff));
-  return json({ ok: true, staff: value });
+  try {
+    const value = normalizeStaffList(await getOrInit(context, 'app:staff', defaults().staff));
+    return json({ ok: true, staff: value });
+  } catch (error) {
+    return serverError(error);
+  }
 }
 
 export async function onRequestPut(context) {
+  let payload;
+  try { payload = normalizeStaffList(await readJsonRequest(context.request), { strict: true }); }
+  catch (error) { return invalid(error.message); }
   try {
-    const payload = normalizeStaffList(await readJsonRequest(context.request), { strict: true });
     await put(context, 'app:staff', payload);
     return json({ ok: true, staff: payload });
   } catch (error) {
-    return invalid(error.message);
+    return serverError(error);
   }
 }

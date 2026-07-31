@@ -1,4 +1,4 @@
-import { invalid, json, kv, normalizeBackupPayload } from '../_utils.js';
+import { invalid, json, kv, normalizeBackupPayload, serverError } from '../_utils.js';
 
 async function rollback(store, snapshots, writtenKeys) {
   const failures = [];
@@ -26,13 +26,17 @@ export async function onRequestPost(context) {
   if ('settings' in payload) writes.push(['app:settings', payload.settings]);
   if ('staff' in payload) writes.push(['app:staff', payload.staff]);
   if ('rbnNames' in payload) writes.push(['app:rbn-names', payload.rbnNames]);
-  for (const [key, value] of payload.months || []) {
-    writes.push([`year:${key.slice(0, 4)}:month:${key.slice(5, 7)}`, value]);
+  for (const [key, value] of payload.months || []) writes.push([`year:${key.slice(0, 4)}:month:${key.slice(5, 7)}`, value]);
+
+  let store;
+  const snapshots = new Map();
+  try {
+    store = kv(context);
+    for (const [key] of writes) snapshots.set(key, await store.get(key));
+  } catch (error) {
+    return serverError(error);
   }
 
-  const store = kv(context);
-  const snapshots = new Map();
-  for (const [key] of writes) snapshots.set(key, await store.get(key));
   const writtenKeys = [];
   try {
     for (const [key, value] of writes) {

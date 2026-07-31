@@ -6,7 +6,7 @@
 
 <p align="center"><strong>Manuelle, regelgestützte Monatsplanung für Bereitschaftsdienst, Hintergrunddienst und RBN</strong></p>
 
-> **Referenzstand:** Build `20260731.2` · Paketversion `0.2.0` · Datenregion Sachsen (`SN`)  
+> **Referenzstand:** Build `20260731.3` · Paketversion `0.2.0` · Datenregion Sachsen (`SN`)  
 > **Betriebsmodell:** Cloudflare Pages + Pages Functions + Cloudflare KV, ergänzt durch eine lokale Browser-Sicherung  
 > **Grundsatz:** Der Mensch plant. DienstplanRAD prüft, erklärt, speichert und dokumentiert.
 
@@ -876,7 +876,7 @@ Die Monats- und Bootstrapdaten liegen in `localStorage`. Die Schleifensperre `di
 
 ## 16.4 Speichern
 
-Änderungen setzen `dirty` und starten einen Debounce von 1.100 Millisekunden. Beim Speichern:
+Änderungen markieren immer den konkreten Monat als unsynchronisiert und starten einen Debounce von 1.100 Millisekunden. Der Marker und der zugehörige normalisierte Monatssnapshot werden zusätzlich lokal persistiert und beim Start gemeinsam rekonstruiert, sodass ein fehlgeschlagener Save auch nach einem Browserneustart weder durch einen älteren Serverstand noch durch ein leeres Monatsgerüst verdrängt wird. Beim Speichern:
 
 - steigt `revision`;
 - wird `updatedAt` gesetzt;
@@ -884,7 +884,7 @@ Die Monats- und Bootstrapdaten liegen in `localStorage`. Die Schleifensperre `di
 - folgt der Server-PUT;
 - wechselt die Statusanzeige zu gespeichert oder offline.
 
-Ein Speichervorgang merkt sich den Änderungszähler bei seinem Start. Trifft seine Serverantwort erst ein, nachdem bereits eine neuere Änderung vorgenommen wurde, darf der ältere Vorgang den Dirty-Status nicht zurücksetzen. Dadurch bleibt eine nachfolgende, noch nicht persistierte Änderung sichtbar und wird beim nächsten Debounce, Monatswechsel oder Schließen weiterhin gesichert.
+Ein Speichervorgang merkt sich den Änderungszähler bei seinem Start. Saves desselben Monats werden strikt serialisiert und mit unveränderlichen Nutzlast-Snapshots übertragen. Ein älterer Request kann damit weder den neueren Serverstand rückwärts überschreiben noch dessen Dirty-Status löschen. Beim Monatswechsel werden ausschließlich tatsächlich markierte Monate gespeichert; ein bloß kurz sichtbarer Zwischenmonat kann nicht versehentlich als leerer Stand übertragen werden.
 
 Beim Schließen versucht `beforeunload`, einen noch schmutzigen Monat zu persistieren. Die lokale Sicherung bleibt die erste Ausfallschicht.
 
@@ -937,7 +937,7 @@ JSON-Antworten verwenden UTF-8 und `Cache-Control: no-store`. Fehlende KV-Bindin
 
 ## 18.1 Excel-Import
 
-Der Import verwendet SheetJS 0.20.3 aus dem externen CDN `cdn.sheetjs.com`. Das Skript wird mit `defer`, derzeit jedoch weder lokal vendort noch mit einem `integrity`-Attribut geladen. Ist die Bibliothek nicht verfügbar, bleiben Kernplanung, JSON-Sicherung und Druck funktionsfähig; nur Excel-Import und -Export melden einen Fehler.
+Der Import verwendet SheetJS 0.20.3 aus dem externen CDN `cdn.sheetjs.com`. Das Skript wird mit `defer`, derzeit jedoch weder lokal vendort noch mit einem `integrity`-Attribut geladen. Ist die Bibliothek nicht verfügbar, bleiben Kernplanung, JSON-Sicherung und Druck funktionsfähig; nur Excel-Import und -Export melden einen Fehler. Vor dem Merge wird jeder erkannte Zielmonat geladen. Zulässig sind ausschließlich ein bestätigter aktueller Serverstand oder ein ausdrücklich als unsynchronisiert markierter lokaler Arbeitsstand. Ein bloß gecachter beziehungsweise frisch erzeugter Ersatzmonat nach fehlgeschlagenem Serverabruf führt zum sichtbaren Abbruch; dadurch bleiben unbekannte manuelle Serverwerte auch bei partiellen Netzstörungen erhalten.
 
 Unterstützte Monatsblätter heißen exakt `Jan`, `Feb`, `Mrz`, `Apr`, `Mai`, `Jun`, `Jul`, `Aug`, `Sep`, `Okt`, `Nov`, `Dez`. Die ersten zwölf Zeilen und zwölf Spalten werden nach einer Jahreszahl `20xx` durchsucht. Fehlt sie, muss die Zuordnung zum aktuell ausgewählten Jahr ausdrücklich bestätigt werden. Als Tageskopf gilt eine Zeile, die ab der dritten Spalte mindestens zwanzig ganzzahlige Tageswerte zwischen 1 und 31 enthält.
 
@@ -951,7 +951,7 @@ Der sichtbare Monat wird in eine neue Arbeitsmappe übertragen. Die Ausgabe bild
 
 ## 18.3 JSON-Sicherung
 
-JSON ist das verlustarme Sicherungsformat für Einstellungen, Personal, Monatsdaten, Abwesenheiten, Wünsche und Protokolle. Bei erreichbarem Server wird der serverseitige Gesamtstand verwendet; im Offlinefall kann der lokal verfügbare Zustand gesichert werden.
+JSON ist das verlustarme Sicherungsformat für Einstellungen, Personal, Monatsdaten, Abwesenheiten, Wünsche und Protokolle. Ein erreichbarer Serverexport bildet die Basis; nur nachweislich unsynchronisierte lokale Monate und Bootstrapdaten überschreiben gleichnamige Serverstände. Rein lokal gecachte, aber nicht geänderte Altstände ersetzen keine frisch exportierten Serverdaten. Im Offlinefall werden alle auffindbaren lokalen Monatsstände einbezogen, nicht nur die gerade im Arbeitsspeicher geöffneten Monate.
 
 ## 18.4 JSON-Wiederherstellung
 
@@ -1283,7 +1283,7 @@ Das Repository wird aus dem Projektstamm bereitgestellt. Pages Functions werden 
 Alle releasekritischen Assets und relativen Browserimporte verwenden denselben `?v=`-Token. Der Build-Stempel in `index.html` muss exakt dazu passen. Für diesen Funktionsstand ist die Kennung:
 
 ```text
-20260731.2
+20260731.3
 ```
 
 Der laufende Stand ist im Browser über `document.documentElement.dataset.build` und im Tooltip des Speicherstatus sichtbar.
