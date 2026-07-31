@@ -1,0 +1,129 @@
+name: Excel import safety
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  verify-excel-merge-safety:
+    if: github.head_ref == 'agent/exhaustive-bughunt-20260731' && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/exhaustive-bughunt-20260731
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Guard Excel merge targets
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          state = Path('js/state.js')
+          text = state.read_text(encoding='utf-8')
+          anchor = '''export function isMonthDirty(year, month) {
+            restoreSyncState();
+            return state.dirtyMonths.has(monthKey(year, month));
+          }
+          '''
+          replacement = anchor + '''
+          export function isMonthMergeSafe(year, month) {
+            restoreSyncState();
+            const key = monthKey(year, month);
+            return state.monthSources.get(key) === 'server' || state.dirtyMonths.has(key);
+          }
+          '''
+          if text.count(anchor) != 1:
+              raise SystemExit(f'state merge-safety anchor count: {text.count(anchor)}')
+          state.write_text(text.replace(anchor, replacement), encoding='utf-8')
+
+          app = Path('js/app.js')
+          text = app.read_text(encoding='utf-8')
+          old_import = "buildBackupPayload, getMonthData, getMonthLabel, isMonthDirty, loadMonth"
+          new_import = "buildBackupPayload, getMonthData, getMonthLabel, isMonthDirty, isMonthMergeSafe, loadMonth"
+          if text.count(old_import) != 1:
+              raise SystemExit(f'app import anchor count: {text.count(old_import)}')
+          text = text.replace(old_import, new_import)
+
+          anchor = '''  await Promise.all(parsedImports.map(({ imported }) => loadMonth(imported.year, imported.month)));
+
+            const touched = new Map();
+          '''
+          replacement = '''  await Promise.all(parsedImports.map(({ imported }) => loadMonth(imported.year, imported.month)));
+
+            const unsafeTargets = parsedImports.filter(({ imported }) => !isMonthMergeSafe(imported.year, imported.month));
+            if (unsafeTargets.length) {
+              const labels = unsafeTargets.map(({ sheetName, imported }) => `${sheetName} ${imported.year}`).join(', ');
+              setStatus('offline', 'Excel-Import abgebrochen – Zielmonat nicht verlässlich geladen');
+              alert(`Excel-Import abgebrochen. Für ${labels} konnte weder ein aktueller Serverstand noch ein ausdrücklich unsynchronisierter lokaler Arbeitsstand bestätigt werden. Bestehende Serverwerte werden deshalb nicht mit einem möglicherweise veralteten oder leeren Ersatzstand überschrieben.`);
+              reset();
+              return;
+            }
+
+            const touched = new Map();
+          '''
+          if text.count(anchor) != 1:
+              raise SystemExit(f'Excel guard anchor count: {text.count(anchor)}')
+          text = text.replace(anchor, replacement)
+          text = text.replace("setStatus('saving', 'Import gespeichert – weitere Änderungen ausstehend …')", "setStatus('offline', 'Import gespeichert – weitere lokale Änderungen nicht synchronisiert')")
+          app.write_text(text, encoding='utf-8')
+
+          test = Path('tests/bughunt-regressions.test.js')
+          content = test.read_text(encoding='utf-8').rstrip()
+          content += r'''
+
+          test('Excel-Merge ist nur mit bestätigtem Serverstand oder bewusstem Dirty-Lokalstand zulässig', async () => {
+            globalThis.localStorage = new MemoryStorage();
+            globalThis.fetch = async () => okResponse();
+            const module = await freshState('excel-merge-safety');
+            const month = createEmptyMonth(2026, 8);
+            module.setMonthData(2026, 8, month, 'fallback');
+            assert.equal(module.isMonthMergeSafe(2026, 8), false);
+            module.setMonthData(2026, 8, month, 'local');
+            assert.equal(module.isMonthMergeSafe(2026, 8), false);
+            module.markMonthDirty(2026, 8);
+            assert.equal(module.isMonthMergeSafe(2026, 8), true);
+            module.markMonthSynced(2026, 8);
+            assert.equal(module.isMonthMergeSafe(2026, 8), true);
+          });
+
+          test('Excel-Import bricht vor dem Merge ab, wenn ein Zielmonat nicht verlässlich geladen wurde', async () => {
+            const source = await readFile(new URL('../js/app.js', import.meta.url), 'utf8');
+            const guard = source.indexOf('const unsafeTargets = parsedImports.filter');
+            const merge = source.indexOf('const merge = mergeMonthData(targetMonth, imported.monthData)');
+            assert.ok(guard >= 0 && merge > guard);
+            assert.match(source, /Excel-Import abgebrochen – Zielmonat nicht verlässlich geladen/);
+          });
+          '''
+          test.write_text(content + '\n', encoding='utf-8')
+
+          readme = Path('README.md')
+          text = readme.read_text(encoding='utf-8')
+          old = 'Vor dem Merge wird jeder erkannte Zielmonat vom Server beziehungsweise aus seinem geschützten lokalen Offlinebestand geladen; dadurch bleiben auch manuelle Werte in zuvor nie geöffneten Monaten erhalten.'
+          new = 'Vor dem Merge wird jeder erkannte Zielmonat geladen. Zulässig sind ausschließlich ein bestätigter aktueller Serverstand oder ein ausdrücklich als unsynchronisiert markierter lokaler Arbeitsstand. Ein bloß gecachter beziehungsweise frisch erzeugter Ersatzmonat nach fehlgeschlagenem Serverabruf führt zum sichtbaren Abbruch; dadurch bleiben unbekannte manuelle Serverwerte auch bei partiellen Netzstörungen erhalten.'
+          if text.count(old) != 1:
+              raise SystemExit(f'README Excel safety anchor count: {text.count(old)}')
+          readme.write_text(text.replace(old, new), encoding='utf-8')
+          PY
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - name: Commit verified Excel merge guard
+        shell: bash
+        run: |
+          rm -f .github/workflows/excel-import-safety.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Excel-Import bei unbekanntem Zielstand verlustfrei abbrechen"
+          git push origin HEAD:agent/exhaustive-bughunt-20260731
