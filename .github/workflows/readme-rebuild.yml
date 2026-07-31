@@ -1,0 +1,63 @@
+name: README rebuild
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  rebuild-and-verify:
+    if: github.head_ref == 'agent/complete-readme-rebuild' && github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/complete-readme-rebuild
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Rebuild current-state README
+        run: python tools/rebuild_readme.py
+
+      - name: Validate README structure
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          text = Path('README.md').read_text(encoding='utf-8')
+          main = re.findall(r'^# (\d+)\. ', text, flags=re.M)
+          assert main == [str(i) for i in range(1, 30)], main
+          assert text.count('```') % 2 == 0
+          assert '# 30. Konsistenzhärtung' not in text
+          assert 'Rufbereitschaft Nuklearmedizin' not in text
+          assert 'Eine **belegte** Zelle zeigt bewusst nur den Namen.' in text
+          assert 'eigener BD am Vortag: **rot**' in text
+          assert len(text.split()) > 10000, len(text.split())
+          print(f'README: {len(text.split())} words, {len(text.splitlines())} lines')
+          PY
+
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+
+      - name: Commit verified README
+        shell: bash
+        run: |
+          rm -f tools/rebuild_readme.py .github/workflows/readme-rebuild.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "README als vollständige Anwendungsreferenz neu aufbauen"
+          git push origin HEAD:agent/complete-readme-rebuild
