@@ -44,15 +44,6 @@ replace_once(
     "- Ein eigener BD am unmittelbar vorhergehenden oder folgenden Kalendertag ist ein roter Konflikt. Ein Abstand von zwei oder drei Kalendertagen erzeugt weiterhin lediglich einen gelben Hinweis. Die Prüfung erfolgt symmetrisch zum vorherigen und zum folgenden BD sowie monatsübergreifend.",
 )
 
-replace_once(
-    "tests/timezone.test.js",
-    """  const bewertung = evaluateCandidate({ state, monthData: juli, dateIso: '2026-07-07', role: 'bd', staffId: 'lurz' });
-  assert.ok(bewertung.reasons.includes('BD bereits am Vortag'), `Gründe: ${bewertung.reasons.join(' | ')}`);""",
-    """  const bewertung = evaluateCandidate({ state, monthData: juli, dateIso: '2026-07-07', role: 'bd', staffId: 'lurz' });
-  assert.equal(bewertung.level, 'red');
-  assert.ok(bewertung.reasons.includes('BD bereits am Vortag'), `Gründe: ${bewertung.reasons.join(' | ')}`);""",
-)
-
 rule_matrix = ROOT / "tests/rule-matrix.test.js"
 text = rule_matrix.read_text(encoding="utf-8")
 marker = "test('Invariante Selbstkonsistenz: eine bestehende Einteilung wird wie ein Vorschlag bewertet', () => {"
@@ -75,7 +66,6 @@ if text.count(marker) != 1:
     raise SystemExit(f"tests/rule-matrix.test.js: expected one insertion marker, found {text.count(marker)}")
 rule_matrix.write_text(text.replace(marker, block + marker, 1), encoding="utf-8")
 
-# Keep the browser module graph and visible build stamp synchronized.
 for file in ROOT.rglob("*"):
     if not file.is_file() or any(part in {".git", "node_modules"} for part in file.parts):
         continue
