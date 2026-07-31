@@ -1,0 +1,58 @@
+name: Branch patch bootstrap
+
+on:
+  push:
+    branches:
+      - agent/incremental-suitability-badges
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-verify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/incremental-suitability-badges
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Extract and run the branch-local patch
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          workflow = Path('.github/workflows/apply-incremental-suitability.yml').read_text(encoding='utf-8')
+          start_marker = "          python <<'PY'\n"
+          end_marker = "\n          PY\n"
+          start = workflow.index(start_marker) + len(start_marker)
+          end = workflow.index(end_marker, start)
+          lines = workflow[start:end].splitlines()
+          script = '\n'.join(line[10:] if line.startswith('          ') else line for line in lines) + '\n'
+          Path('/tmp/apply-incremental-suitability.py').write_text(script, encoding='utf-8')
+          PY
+          python /tmp/apply-incremental-suitability.py
+
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+
+      - name: Commit verified implementation
+        shell: bash
+        run: |
+          rm -f .github/workflows/apply-incremental-suitability.yml .branch-patch-trigger
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Eignungsbewertung für schrittweise Planung präzisieren"
+          git push origin HEAD:agent/incremental-suitability-badges
