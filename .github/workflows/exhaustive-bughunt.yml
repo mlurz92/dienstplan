@@ -41,6 +41,35 @@ jobs:
           PY
       - name: Apply exhaustive bughunt fixes
         run: python tools/apply_exhaustive_bughunt.py
+      - name: Align regression tests with serialized saves and new release token
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('tests/bughunt-regressions.test.js')
+          text = path.read_text(encoding='utf-8')
+          old = "  month.days['2026-07-01'].bd = 'becker';\n  markMonthDirty(2026, 7);"
+          new = "  getMonthData(2026, 7).days['2026-07-01'].bd = 'becker';\n  markMonthDirty(2026, 7);"
+          if text.count(old) != 1:
+              raise SystemExit(f'serial test reference anchor count: {text.count(old)}')
+          path.write_text(text.replace(old, new), encoding='utf-8')
+
+          path = Path('tests/rbn.test.js')
+          text = path.read_text(encoding='utf-8')
+          old = r"20260731\.2"
+          if text.count(old) != 1:
+              raise SystemExit(f'RBN token anchor count: {text.count(old)}')
+          path.write_text(text.replace(old, r"20260731\.3"), encoding='utf-8')
+
+          path = Path('tests/state-persistence.test.js')
+          text = path.read_text(encoding='utf-8')
+          old = "  releaseFetch();\n  await save;"
+          new = "  await new Promise(resolve => setTimeout(resolve, 0));\n  assert.equal(typeof releaseFetch, 'function');\n  releaseFetch();\n  await save;"
+          if text.count(old) != 1:
+              raise SystemExit(f'legacy race test anchor count: {text.count(old)}')
+          path.write_text(text.replace(old, new), encoding='utf-8')
+          PY
       - run: npm ci
       - run: npm run check
       - run: npm test
