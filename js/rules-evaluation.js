@@ -1,4 +1,4 @@
-import { holidayBlocks, isFirstRegularWorkdayAfter, isHoliday } from './holidays.js?v=20260730.7';
+import { holidayBlocks, isFirstRegularWorkdayAfter, isHoliday } from './holidays.js?v=20260731.1';
 import {
   addDays, basicallyEligiblePeers, countHgForAaBdExcept, countRoleInMonthExcept,
   countSaturdayBdExcept, countServicesInLoadedYearExcept, getAbsenceFromState, getEffectiveAbsence,
@@ -6,7 +6,11 @@ import {
   hasCompleteLoadedHistory, hasVacationInFollowingWeek, isAaOn, isFaOn, isPositivePreference,
   isStaffActiveOn, labelForAbsence, listOwnRoleDates, monthForIso, parseIso,
   projectedWeekendEquivalent, severityRank, toLocalIso, weekendEquivalentFromMap, weekendMap
-} from './rules-core.js?v=20260730.7';
+} from './rules-core.js?v=20260731.1';
+
+function hasCompletedDistributionRound(loads, unit = 1) {
+  return loads.length > 0 && loads.reduce((sum, load) => sum + load, 0) >= loads.length * unit;
+}
 
 function applyBundlingRules({ state, dateIso, role, staffId, push, recommend }) {
   const date = parseIso(dateIso);
@@ -129,16 +133,20 @@ function applyHgFairness({ state, monthData, dateIso, staffId, currentBd, curren
   const totals = peers.map(peer => countRoleInMonthExcept(monthData, peer.id, 'bd', dateIso) + countRoleInMonthExcept(monthData, peer.id, 'hg', dateIso));
   const minimumTotal = Math.min(...totals);
   const ownTotal = currentBd + currentHg;
+  const monthlyRoundComplete = hasCompletedDistributionRound(totals);
   if (ownTotal === minimumTotal) recommend('BD/HG-Ausgleich: aktuell geringste kombinierte Monatslast', 24);
-  else push('yellow', `BD/HG-Ausgleich: andere Fachärzte haben geringere kombinierte Monatslast (${minimumTotal} statt ${ownTotal})`);
+  else if (monthlyRoundComplete) push('yellow', `BD/HG-Ausgleich: andere Fachärzte haben geringere kombinierte Monatslast (${minimumTotal} statt ${ownTotal})`);
+  else note(`BD/HG-Ausgleich: erste Verteilungsrunde noch offen; andere Fachärzte haben geringere kombinierte Monatslast (${minimumTotal} statt ${ownTotal})`);
 
   const currentDayBd = getAssignment(state, dateIso, 'bd');
   if (isAaOn(state, currentDayBd, dateIso)) {
     const aaHgCounts = peers.map(peer => countHgForAaBdExcept(state, monthData, peer.id, dateIso));
     const minimumAaHg = Math.min(...aaHgCounts);
     const ownAaHg = countHgForAaBdExcept(state, monthData, staffId, dateIso);
+    const aaRoundComplete = hasCompletedDistributionRound(aaHgCounts);
     if (ownAaHg === minimumAaHg) recommend('AA-HG-Ausgleich: aktuell geringste Zahl belastender HG für AA', 18);
-    else push('yellow', `AA-HG-Ausgleich: andere Fachärzte haben weniger HG für AA (${minimumAaHg} statt ${ownAaHg})`);
+    else if (aaRoundComplete) push('yellow', `AA-HG-Ausgleich: andere Fachärzte haben weniger HG für AA (${minimumAaHg} statt ${ownAaHg})`);
+    else note(`AA-HG-Ausgleich: erste Verteilungsrunde noch offen; andere Fachärzte haben weniger HG für AA (${minimumAaHg} statt ${ownAaHg})`);
   }
 
   const currentMonth = Number(dateIso.slice(5, 7));
@@ -159,7 +167,7 @@ function applyHgFairness({ state, monthData, dateIso, staffId, currentBd, curren
   }
 }
 
-function applyWeekendFairness({ state, monthData, dateIso, role, staffId, push, recommend }) {
+function applyWeekendFairness({ state, monthData, dateIso, role, staffId, push, recommend, note }) {
   const date = parseIso(dateIso);
   if (![5, 6, 0].includes(date.getDay())) return;
   const projected = projectedWeekendEquivalent(monthData, staffId, dateIso, role);
@@ -167,9 +175,11 @@ function applyWeekendFairness({ state, monthData, dateIso, role, staffId, push, 
   const peerLoads = peers.map(peer => weekendEquivalentFromMap(weekendMap(monthData, peer.id, dateIso)));
   const minimum = peerLoads.length ? Math.min(...peerLoads) : 0;
   const ownBase = weekendEquivalentFromMap(weekendMap(monthData, staffId, dateIso));
+  const weekendRoundComplete = hasCompletedDistributionRound(peerLoads, 0.5);
 
   if (ownBase === minimum) recommend(`Wochenend-Ausgleich: aktuell geringste Belastung (${ownBase.toFixed(1)})`, 20);
-  else push('yellow', `Wochenend-Ausgleich: andere geeignete Personen liegen niedriger (${minimum.toFixed(1)} statt ${ownBase.toFixed(1)})`);
+  else if (weekendRoundComplete) push('yellow', `Wochenend-Ausgleich: andere geeignete Personen liegen niedriger (${minimum.toFixed(1)} statt ${ownBase.toFixed(1)})`);
+  else note(`Wochenend-Ausgleich: erste Verteilungsrunde noch offen; andere geeignete Personen liegen niedriger (${minimum.toFixed(1)} statt ${ownBase.toFixed(1)})`);
   if (projected > 1) push('yellow', `Wochenendziel 1,0 würde auf ${projected.toFixed(1)} steigen`);
 
   if (role === 'bd' && date.getDay() === 6 && countSaturdayBdExcept(monthData, staffId, dateIso) >= 1) {
@@ -274,7 +284,7 @@ export function evaluateCandidate({ state, monthData, dateIso, role, staffId }) 
 
     applyMonthlyBdFairness({ state, monthData, dateIso, staffId, currentBd, push, recommend, note });
     applyWeekendWarnings(state, staffId, date, 'bd', push);
-    applyWeekendFairness({ state, monthData, dateIso, role, staffId, push, recommend });
+    applyWeekendFairness({ state, monthData, dateIso, role, staffId, push, recommend, note });
     applyHolidayBlockWarnings(state, staffId, date, push);
   }
 
@@ -294,7 +304,7 @@ export function evaluateCandidate({ state, monthData, dateIso, role, staffId }) 
 
     applyHgFairness({ state, monthData, dateIso, staffId, currentBd, currentHg, push, recommend, note });
     applyWeekendWarnings(state, staffId, date, 'hg', push);
-    applyWeekendFairness({ state, monthData, dateIso, role, staffId, push, recommend });
+    applyWeekendFairness({ state, monthData, dateIso, role, staffId, push, recommend, note });
     applyHolidayBlockWarnings(state, staffId, date, push);
   }
 

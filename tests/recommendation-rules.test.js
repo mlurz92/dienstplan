@@ -79,7 +79,7 @@ test('BD-Wunsch einer anderen Person setzt die Lurz-Überhangpräferenz außer K
   assert.ok(martin.reasons.includes('Wunsch: BD bevorzugt'));
 });
 
-test('HG-Ausgleich bevorzugt die geringere kombinierte Monatslast', () => {
+test('HG-Ausgleich bleibt während der ersten Verteilungsrunde neutral informativ', () => {
   const state = stateWith();
   const data = month(state, 2026, 7);
   setAssignment(data, '2026-07-01', 'bd', 'lurz');
@@ -88,8 +88,27 @@ test('HG-Ausgleich bevorzugt die geringere kombinierte Monatslast', () => {
   const lurz = evalAt(state, '2026-07-08', 'hg', 'lurz');
   assert.equal(martin.level, 'green');
   assert.ok(has(martin, 'geringste kombinierte Monatslast'));
+  assert.equal(lurz.level, 'green');
+  assert.ok(has(lurz, 'erste Verteilungsrunde noch offen'));
+  assert.ok(has(lurz, 'geringere kombinierte Monatslast'));
+});
+
+test('HG-Ausgleich wird nach einer vollständigen Verteilungsrunde gelb wirksam', () => {
+  const state = stateWith();
+  const data = month(state, 2026, 7);
+  const firstRound = [
+    ['lurz', '2026-07-01'],
+    ['polednia', '2026-07-02'],
+    ['dalitz', '2026-07-03'],
+    ['becker', '2026-07-06'],
+    ['martin', '2026-07-07']
+  ];
+  for (const [staffId, iso] of firstRound) setAssignment(data, iso, 'bd', staffId);
+  setAssignment(data, '2026-07-15', 'bd', 'lurz');
+  const lurz = evalAt(state, '2026-07-08', 'hg', 'lurz');
   assert.equal(lurz.level, 'yellow');
   assert.ok(has(lurz, 'geringere kombinierte Monatslast'));
+  assert.equal(has(lurz, 'erste Verteilungsrunde noch offen'), false);
 });
 
 test('HG für AA wird nach bisheriger AA-HG-Belastung ausgeglichen', () => {
