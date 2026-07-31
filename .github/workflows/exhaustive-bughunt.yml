@@ -21,6 +21,19 @@ jobs:
         with:
           node-version: 24
           cache: npm
+      - name: Align README patch anchor
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('tools/apply_exhaustive_bughunt.py')
+          text = path.read_text(encoding='utf-8')
+          old = 'Der Import verwendet SheetJS 0.20.3. Monatsblätter werden anhand der deutschen Kurzbezeichnungen erkannt.'
+          new = 'Der Import verwendet SheetJS 0.20.3 aus dem externen CDN `cdn.sheetjs.com`. Das Skript wird mit `defer`, derzeit jedoch weder lokal vendort noch mit einem `integrity`-Attribut geladen. Ist die Bibliothek nicht verfügbar, bleiben Kernplanung, JSON-Sicherung und Druck funktionsfähig; nur Excel-Import und -Export melden einen Fehler.'
+          if text.count(old) != 2:
+              raise SystemExit(f'expected two Excel anchor occurrences, found {text.count(old)}')
+          path.write_text(text.replace(old, new), encoding='utf-8')
+          PY
       - name: Apply exhaustive bughunt fixes
         run: python tools/apply_exhaustive_bughunt.py
       - run: npm ci
