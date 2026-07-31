@@ -21,7 +21,7 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - name: Align README patch anchor
+      - name: Align patch driver with current README and literal escapes
         shell: bash
         run: |
           python - <<'PY'
@@ -32,7 +32,12 @@ jobs:
           new = 'Der Import verwendet SheetJS 0.20.3 aus dem externen CDN `cdn.sheetjs.com`. Das Skript wird mit `defer`, derzeit jedoch weder lokal vendort noch mit einem `integrity`-Attribut geladen. Ist die Bibliothek nicht verfügbar, bleiben Kernplanung, JSON-Sicherung und Druck funktionsfähig; nur Excel-Import und -Export melden einen Fehler.'
           if text.count(old) != 2:
               raise SystemExit(f'expected two Excel anchor occurrences, found {text.count(old)}')
-          path.write_text(text.replace(old, new), encoding='utf-8')
+          text = text.replace(old, new)
+          old_sub = 'pattern.subn(replacement, text, count=1)'
+          if text.count(old_sub) != 3:
+              raise SystemExit(f'expected three regex substitutions, found {text.count(old_sub)}')
+          text = text.replace(old_sub, 'pattern.subn(lambda _match: replacement, text, count=1)')
+          path.write_text(text, encoding='utf-8')
           PY
       - name: Apply exhaustive bughunt fixes
         run: python tools/apply_exhaustive_bughunt.py
