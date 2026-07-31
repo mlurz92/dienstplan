@@ -168,3 +168,55 @@ test('reiner Monats-JSON-Import verwendet keine nicht importierte Bootstrap-Funk
   assert.doesNotMatch(source, /else saveLocalBootstrap\(\)/);
   assert.match(source, /if \(importsBootstrap\) markBootstrapDirty\(\)/);
 });
+
+test('Dirty-Monate werden nach Neustart vor dem automatischen Sync aus dem lokalen Snapshot rekonstruiert', async () => {
+  globalThis.localStorage = new MemoryStorage();
+  const local = createEmptyMonth(2026, 6);
+  local.days['2026-06-15'].bd = 'becker';
+  localStorage.setItem('dienstplanrad:month:2026-06', JSON.stringify(local));
+  localStorage.setItem('dienstplanrad:dirty-months', JSON.stringify(['2026-06']));
+  const bodies = [];
+  globalThis.fetch = async (_url, options) => { bodies.push(JSON.parse(options.body)); return okResponse(); };
+  const { persistDirtyState } = await freshState('restart-before-sync');
+  await persistDirtyState();
+  assert.equal(bodies.length, 1);
+  assert.equal(bodies[0].days['2026-06-15'].bd, 'becker');
+});
+
+test('defekter Dirty-Snapshot wird verworfen statt als leerer Monat synchronisiert', async () => {
+  globalThis.localStorage = new MemoryStorage();
+  localStorage.setItem('dienstplanrad:month:2026-06', '{defekt');
+  localStorage.setItem('dienstplanrad:dirty-months', JSON.stringify(['2026-06']));
+  let fetches = 0;
+  globalThis.fetch = async () => { fetches += 1; return okResponse(); };
+  const { persistDirtyState, state } = await freshState('corrupt-restart');
+  await persistDirtyState();
+  assert.equal(fetches, 0);
+  assert.equal(state.dirty, false);
+  assert.equal(localStorage.getItem('dienstplanrad:dirty-months'), null);
+});
+
+test('Serverexport gewinnt gegen sauberen lokalen Cache, Dirty-Daten behalten Vorrang', async () => {
+  globalThis.localStorage = new MemoryStorage();
+  globalThis.fetch = async () => okResponse();
+  const cached = createEmptyMonth(2026, 7);
+  cached.days['2026-07-01'].bd = 'lurz';
+  localStorage.setItem('dienstplanrad:month:2026-07', JSON.stringify(cached));
+  const module = await freshState('backup-precedence');
+  module.state.settings = { schemaVersion: 2 };
+  const server = createEmptyMonth(2026, 7);
+  server.days['2026-07-01'].bd = 'becker';
+  const serverPayload = { settings: { schemaVersion: 7 }, staff: DEFAULT_STAFF, rbnNames: ['Server'], months: [['2026-07', server]] };
+  const cleanBackup = module.buildBackupPayload(serverPayload);
+  assert.equal(cleanBackup.settings.schemaVersion, 7);
+  assert.deepEqual(cleanBackup.rbnNames, ['Server']);
+  assert.equal(new Map(cleanBackup.months).get('2026-07').days['2026-07-01'].bd, 'becker');
+  module.state.settings = { schemaVersion: 9 };
+  module.markBootstrapDirty();
+  module.getMonthData(2026, 7).days['2026-07-01'].bd = 'lurz';
+  module.markMonthDirty(2026, 7);
+  const dirtyBackup = module.buildBackupPayload(serverPayload);
+  assert.equal(dirtyBackup.settings.schemaVersion, 9);
+  assert.equal(new Map(dirtyBackup.months).get('2026-07').days['2026-07-01'].bd, 'lurz');
+});
+

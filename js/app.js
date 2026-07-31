@@ -995,7 +995,8 @@ async function onJsonImport(event) {
     await api.importJson(payload);
     importedMonths.forEach(([year, month]) => markMonthSynced(year, month));
     if (importsBootstrap) markBootstrapSynced();
-    setStatus('saved', 'Import gespeichert');
+    if (state.dirty) setStatus('saving', 'Import gespeichert – weitere Änderungen ausstehend …');
+    else setStatus('saved', 'Import gespeichert');
   } catch (error) {
     setStatus('offline', 'Lokal importiert – Serverfehler');
     alert(`Die Sicherung wurde lokal übernommen, der Serverimport wurde zurückgerollt: ${error.message}`);

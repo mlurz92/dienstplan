@@ -876,7 +876,7 @@ Die Monats- und Bootstrapdaten liegen in `localStorage`. Die Schleifensperre `di
 
 ## 16.4 Speichern
 
-Änderungen markieren immer den konkreten Monat als unsynchronisiert und starten einen Debounce von 1.100 Millisekunden. Der Marker wird zusätzlich lokal persistiert, sodass ein fehlgeschlagener Save auch nach einem Browserneustart nicht durch einen älteren Serverstand verdrängt wird. Beim Speichern:
+Änderungen markieren immer den konkreten Monat als unsynchronisiert und starten einen Debounce von 1.100 Millisekunden. Der Marker und der zugehörige normalisierte Monatssnapshot werden zusätzlich lokal persistiert und beim Start gemeinsam rekonstruiert, sodass ein fehlgeschlagener Save auch nach einem Browserneustart weder durch einen älteren Serverstand noch durch ein leeres Monatsgerüst verdrängt wird. Beim Speichern:
 
 - steigt `revision`;
 - wird `updatedAt` gesetzt;
@@ -951,7 +951,7 @@ Der sichtbare Monat wird in eine neue Arbeitsmappe übertragen. Die Ausgabe bild
 
 ## 18.3 JSON-Sicherung
 
-JSON ist das verlustarme Sicherungsformat für Einstellungen, Personal, Monatsdaten, Abwesenheiten, Wünsche und Protokolle. Ein erreichbarer Serverexport bildet die Basis; sämtliche lokal neueren oder noch nicht synchronisierten Monate werden anschließend darübergelegt. Im Offlinefall werden alle auffindbaren lokalen Monatsstände einbezogen, nicht nur die gerade im Arbeitsspeicher geöffneten Monate.
+JSON ist das verlustarme Sicherungsformat für Einstellungen, Personal, Monatsdaten, Abwesenheiten, Wünsche und Protokolle. Ein erreichbarer Serverexport bildet die Basis; nur nachweislich unsynchronisierte lokale Monate und Bootstrapdaten überschreiben gleichnamige Serverstände. Rein lokal gecachte, aber nicht geänderte Altstände ersetzen keine frisch exportierten Serverdaten. Im Offlinefall werden alle auffindbaren lokalen Monatsstände einbezogen, nicht nur die gerade im Arbeitsspeicher geöffneten Monate.
 
 ## 18.4 JSON-Wiederherstellung
 

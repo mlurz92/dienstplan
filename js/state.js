@@ -87,11 +87,20 @@ export function restoreSyncState() {
     const storedKeys = JSON.parse(storageGet(DIRTY_MONTHS_KEY) || '[]');
     if (Array.isArray(storedKeys)) {
       for (const key of storedKeys) {
-        if (!parseMonthKey(key) || !storageGet(`${LOCAL_KEY_PREFIX}month:${key}`)) continue;
-        state.dirtyMonths.set(key, ++state.dirtyVersion);
-        state.monthSources.set(key, 'local');
+        const parsed = parseMonthKey(key);
+        const raw = parsed ? storageGet(`${LOCAL_KEY_PREFIX}month:${key}`) : null;
+        if (!parsed || !raw) continue;
+        try {
+          state.months.set(key, normalizeMonthData(parsed[0], parsed[1], JSON.parse(raw)));
+          state.dirtyMonths.set(key, ++state.dirtyVersion);
+          state.monthSources.set(key, 'local');
+        } catch {
+          // Defekte lokale Inhalte dürfen niemals als leeres Gerüst
+          // automatisch zum Server synchronisiert werden.
+        }
       }
     }
+    persistDirtyMarkers();
   } catch {
     storageRemove(DIRTY_MONTHS_KEY);
   }
@@ -399,26 +408,33 @@ export async function persistDirtyState() {
 export function buildBackupPayload(serverPayload = null) {
   restoreSyncState();
   let server = {};
-  try { server = serverPayload ? normalizeBackupPayload(serverPayload, { strict: false }) : {}; }
-  catch { server = {}; }
+  let hasServerSnapshot = false;
+  try {
+    if (serverPayload) {
+      server = normalizeBackupPayload(serverPayload, { strict: false });
+      hasServerSnapshot = true;
+    }
+  } catch {
+    server = {};
+  }
 
   const months = new Map(server.months || []);
   for (const [key, month] of readAllLocalMonths()) {
-    if (!months.has(key) || state.dirtyMonths.has(key)) months.set(key, month);
+    if (!hasServerSnapshot || !months.has(key) || state.dirtyMonths.has(key)) months.set(key, month);
   }
   for (const [key, month] of state.months) {
-    const source = state.monthSources.get(key);
-    if (!months.has(key) || state.dirtyMonths.has(key) || source === 'local' || source === 'fallback') {
+    if (!hasServerSnapshot || !months.has(key) || state.dirtyMonths.has(key)) {
       const parsed = parseMonthKey(key);
       if (parsed) months.set(key, normalizeMonthData(parsed[0], parsed[1], month));
     }
   }
 
+  const preferServerBootstrap = hasServerSnapshot && !state.bootstrapDirty;
   return {
     ok: true,
-    settings: structuredClone(state.settings),
-    staff: structuredClone(state.staff),
-    rbnNames: structuredClone(state.rbnNames),
+    settings: structuredClone(preferServerBootstrap && server.settings ? server.settings : state.settings),
+    staff: structuredClone(preferServerBootstrap && server.staff ? server.staff : state.staff),
+    rbnNames: structuredClone(preferServerBootstrap && server.rbnNames ? server.rbnNames : state.rbnNames),
     months: [...months.entries()].sort(([left], [right]) => left.localeCompare(right))
   };
 }
