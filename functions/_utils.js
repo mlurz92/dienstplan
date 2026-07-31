@@ -17,6 +17,10 @@ export function invalid(message) {
   return json({ ok: false, error: message }, 400);
 }
 
+export function serverError(error) {
+  return json({ ok: false, error: error?.message || 'Interner Serverfehler' }, 500);
+}
+
 export async function readJsonRequest(request) {
   try {
     return await request.json();

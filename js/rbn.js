@@ -1,5 +1,5 @@
 /**
- * Verbindliche Auswahllisten für die beiden Rufbereitschaften Nuklearmedizin.
+ * Verbindliche Auswahllisten für die beiden Rufbereitschaften Neuroradiologie.
  *
  * Die Werte werden bewusst nicht aus dem frei veränderlichen RBN-Namensspeicher
  * bezogen: RBN und 2. RBN haben unterschiedliche, fachlich festgelegte Pools.

@@ -1,10 +1,13 @@
 import {
-  createEmptyMonth, DEFAULT_SETTINGS, DEFAULT_STAFF, MONTH_NAMES, normalizeMonthData,
-  normalizeRbnNames, normalizeSettings, normalizeStaffList
-} from './defaults.js?v=20260731.2';
-import { api } from './api.js?v=20260731.2';
+  createEmptyMonth, DEFAULT_SETTINGS, DEFAULT_STAFF, MONTH_NAMES, normalizeBackupPayload,
+  normalizeMonthData, normalizeRbnNames, normalizeSettings, normalizeStaffList
+} from './defaults.js?v=20260731.3';
+import { api } from './api.js?v=20260731.3';
 
 const LOCAL_KEY_PREFIX = 'dienstplanrad:';
+const DIRTY_MONTHS_KEY = `${LOCAL_KEY_PREFIX}dirty-months`;
+const BOOTSTRAP_DIRTY_KEY = `${LOCAL_KEY_PREFIX}bootstrap-dirty`;
+const MONTH_KEY_PATTERN = /^(\d{4})-(0[1-9]|1[0-2])$/;
 
 export const state = {
   settings: structuredClone(DEFAULT_SETTINGS),
@@ -18,15 +21,84 @@ export const state = {
   dirty: false,
   dirtyVersion: 0,
   dirtyMonths: new Map(),
+  bootstrapDirty: false,
+  bootstrapVersion: 0,
   saveTimer: null,
+  saveChains: new Map(),
+  saveRequests: new Map(),
+  bootstrapSaveChain: Promise.resolve(),
+  bootstrapSaveRequest: null,
+  syncStateRestored: false,
   serverReady: false,
   currentBatchMode: 'absence',
   currentPicker: null,
   cachedBootstrap: null
 };
 
+function storageGet(key) {
+  try { return typeof localStorage === 'undefined' ? null : localStorage.getItem(key); }
+  catch { return null; }
+}
+
+function storageSet(key, value) {
+  try {
+    if (typeof localStorage === 'undefined') return false;
+    localStorage.setItem(key, value);
+    return true;
+  } catch { return false; }
+}
+
+function storageRemove(key) {
+  try {
+    if (typeof localStorage === 'undefined') return false;
+    localStorage.removeItem(key);
+    return true;
+  } catch { return false; }
+}
+
+function updateDirtyFlag() {
+  state.dirty = state.bootstrapDirty || state.dirtyMonths.size > 0;
+}
+
+function persistDirtyMarkers() {
+  if (state.dirtyMonths.size) storageSet(DIRTY_MONTHS_KEY, JSON.stringify([...state.dirtyMonths.keys()]));
+  else storageRemove(DIRTY_MONTHS_KEY);
+}
+
+function persistBootstrapDirtyMarker() {
+  if (state.bootstrapDirty) storageSet(BOOTSTRAP_DIRTY_KEY, '1');
+  else storageRemove(BOOTSTRAP_DIRTY_KEY);
+}
+
 export function monthKey(year, month) {
   return `${year}-${String(month).padStart(2, '0')}`;
+}
+
+function parseMonthKey(key) {
+  const match = MONTH_KEY_PATTERN.exec(String(key || ''));
+  return match ? [Number(match[1]), Number(match[2])] : null;
+}
+
+export function restoreSyncState() {
+  if (state.syncStateRestored) return;
+  state.syncStateRestored = true;
+
+  try {
+    const storedKeys = JSON.parse(storageGet(DIRTY_MONTHS_KEY) || '[]');
+    if (Array.isArray(storedKeys)) {
+      for (const key of storedKeys) {
+        if (!parseMonthKey(key) || !storageGet(`${LOCAL_KEY_PREFIX}month:${key}`)) continue;
+        state.dirtyMonths.set(key, ++state.dirtyVersion);
+        state.monthSources.set(key, 'local');
+      }
+    }
+  } catch {
+    storageRemove(DIRTY_MONTHS_KEY);
+  }
+
+  state.bootstrapDirty = storageGet(BOOTSTRAP_DIRTY_KEY) === '1' && Boolean(storageGet(`${LOCAL_KEY_PREFIX}bootstrap`));
+  if (state.bootstrapDirty) state.bootstrapVersion += 1;
+  updateDirtyFlag();
 }
 
 export function getMonthData(year, month) {
@@ -40,18 +112,37 @@ export function setMonthData(year, month, payload, source = null) {
   const key = monthKey(year, month);
   state.months.set(key, normalized);
   if (source) state.monthSources.set(key, source);
-  localStorage.setItem(`${LOCAL_KEY_PREFIX}month:${key}`, JSON.stringify(normalized));
+  storageSet(`${LOCAL_KEY_PREFIX}month:${key}`, JSON.stringify(normalized));
   return normalized;
 }
 
 export function readLocalMonth(year, month) {
-  const raw = localStorage.getItem(`${LOCAL_KEY_PREFIX}month:${monthKey(year, month)}`);
+  const raw = storageGet(`${LOCAL_KEY_PREFIX}month:${monthKey(year, month)}`);
   if (!raw) return null;
   try { return JSON.parse(raw); } catch { return null; }
 }
 
+export function readAllLocalMonths() {
+  const months = new Map();
+  try {
+    if (typeof localStorage === 'undefined' || typeof localStorage.key !== 'function') return months;
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const storageKey = localStorage.key(index);
+      if (!storageKey?.startsWith(`${LOCAL_KEY_PREFIX}month:`)) continue;
+      const key = storageKey.slice(`${LOCAL_KEY_PREFIX}month:`.length);
+      const parsed = parseMonthKey(key);
+      if (!parsed) continue;
+      const raw = storageGet(storageKey);
+      if (!raw) continue;
+      try { months.set(key, normalizeMonthData(parsed[0], parsed[1], JSON.parse(raw))); }
+      catch { /* Defekte Einzelmonate werden nicht in eine Sicherung übernommen. */ }
+    }
+  } catch { /* Storage kann in restriktiven Browsermodi vollständig blockiert sein. */ }
+  return months;
+}
+
 export function saveLocalBootstrap() {
-  localStorage.setItem(`${LOCAL_KEY_PREFIX}bootstrap`, JSON.stringify({
+  storageSet(`${LOCAL_KEY_PREFIX}bootstrap`, JSON.stringify({
     settings: state.settings,
     staff: state.staff,
     rbnNames: state.rbnNames
@@ -59,7 +150,7 @@ export function saveLocalBootstrap() {
 }
 
 export function readLocalBootstrap() {
-  const raw = localStorage.getItem(`${LOCAL_KEY_PREFIX}bootstrap`);
+  const raw = storageGet(`${LOCAL_KEY_PREFIX}bootstrap`);
   if (!raw) return null;
   try { return JSON.parse(raw); } catch { return null; }
 }
@@ -72,7 +163,58 @@ function applyBootstrap(data) {
   saveLocalBootstrap();
 }
 
+export function isMonthDirty(year, month) {
+  restoreSyncState();
+  return state.dirtyMonths.has(monthKey(year, month));
+}
+
+export function markMonthDirty(year, month) {
+  restoreSyncState();
+  const key = monthKey(year, month);
+  const version = ++state.dirtyVersion;
+  state.dirtyMonths.set(key, version);
+  if (!state.monthSources.has(key) || state.monthSources.get(key) === 'fallback') state.monthSources.set(key, 'local');
+  persistDirtyMarkers();
+  updateDirtyFlag();
+  return version;
+}
+
+export function markMonthSynced(year, month) {
+  const key = monthKey(year, month);
+  state.dirtyMonths.delete(key);
+  state.monthSources.set(key, 'server');
+  persistDirtyMarkers();
+  updateDirtyFlag();
+}
+
+export function markBootstrapDirty() {
+  restoreSyncState();
+  state.bootstrapDirty = true;
+  state.bootstrapVersion += 1;
+  saveLocalBootstrap();
+  persistBootstrapDirtyMarker();
+  updateDirtyFlag();
+  return state.bootstrapVersion;
+}
+
+export function markBootstrapSynced() {
+  state.bootstrapDirty = false;
+  persistBootstrapDirtyMarker();
+  updateDirtyFlag();
+}
+
 export async function bootstrapState() {
+  restoreSyncState();
+  if (state.bootstrapDirty) {
+    const local = readLocalBootstrap();
+    if (local) {
+      applyBootstrap(local);
+      state.serverReady = false;
+      return false;
+    }
+    markBootstrapSynced();
+  }
+
   try {
     const data = await api.bootstrap();
     applyBootstrap(data);
@@ -86,7 +228,25 @@ export async function bootstrapState() {
   }
 }
 
-export async function loadMonth(year, month) {
+export async function loadMonth(year, month, { forceServer = false } = {}) {
+  restoreSyncState();
+  const key = monthKey(year, month);
+
+  // Ein nicht synchronisierter lokaler Stand darf niemals durch einen älteren
+  // Serverstand ersetzt werden – auch nicht durch „Serverstand neu laden“.
+  if (state.dirtyMonths.has(key)) {
+    const local = state.months.get(key) || readLocalMonth(year, month);
+    if (local) {
+      setMonthData(year, month, local, 'local');
+      state.serverReady = false;
+      return getMonthData(year, month);
+    }
+    // Verwaister Marker ohne zugehörigen lokalen Monat.
+    state.dirtyMonths.delete(key);
+    persistDirtyMarkers();
+    updateDirtyFlag();
+  }
+
   try {
     const data = await api.getMonth(year, month);
     setMonthData(year, month, data.month || createEmptyMonth(year, month), 'server');
@@ -107,6 +267,7 @@ export async function loadMonth(year, month) {
 }
 
 export async function warmAdjacentMonths(year, month) {
+  restoreSyncState();
   const previousReady = state.serverReady;
   const prev = new Date(year, month - 2, 1);
   const next = new Date(year, month, 1);
@@ -115,7 +276,10 @@ export async function warmAdjacentMonths(year, month) {
   addRequest(prev.getFullYear(), prev.getMonth() + 1);
   addRequest(next.getFullYear(), next.getMonth() + 1);
   for (let historicalMonth = 1; historicalMonth < month; historicalMonth += 1) addRequest(year, historicalMonth);
+
   const tasks = [...requestedMonths.values()].map(async ([requestedYear, requestedMonth]) => {
+    const key = monthKey(requestedYear, requestedMonth);
+    if (state.dirtyMonths.has(key)) return;
     try {
       const data = await api.getMonth(requestedYear, requestedMonth);
       setMonthData(requestedYear, requestedMonth, data.month || createEmptyMonth(requestedYear, requestedMonth), 'server');
@@ -127,14 +291,6 @@ export async function warmAdjacentMonths(year, month) {
   });
   await Promise.allSettled(tasks);
   state.serverReady = previousReady;
-}
-
-export function markMonthDirty(year, month) {
-  const key = monthKey(year, month);
-  const version = ++state.dirtyVersion;
-  state.dirtyMonths.set(key, version);
-  state.dirty = true;
-  return version;
 }
 
 export function scheduleSave(saveFn, year = state.currentYear, month = state.currentMonth) {
@@ -151,27 +307,120 @@ export async function persistCurrentMonth() {
 }
 
 export async function persistMonth(year, monthNumber) {
+  restoreSyncState();
   const key = monthKey(year, monthNumber);
-  const saveVersion = state.dirtyMonths.get(key) ?? state.dirtyVersion;
+  const saveVersion = state.dirtyMonths.get(key);
+  if (saveVersion === undefined) {
+    return { ok: true, current: true, pending: state.dirty, skipped: true };
+  }
+
+  const duplicate = state.saveRequests.get(key);
+  if (duplicate?.version === saveVersion) return duplicate.promise;
+
   const month = getMonthData(year, monthNumber);
   month.updatedAt = new Date().toISOString();
   month.revision = (month.revision || 0) + 1;
-  setMonthData(year, monthNumber, month);
+  setMonthData(year, monthNumber, month, 'local');
+  const payload = structuredClone(getMonthData(year, monthNumber));
   state.saveStatus = 'saving';
-  try {
-    await api.saveMonth(year, monthNumber, getMonthData(year, monthNumber));
-    if (state.dirtyMonths.get(key) === saveVersion) state.dirtyMonths.delete(key);
-    state.dirty = state.dirtyMonths.size > 0;
-    state.saveStatus = state.dirty ? 'pending' : 'saved';
-    state.serverReady = true;
-    return { ok: true, current: !state.dirtyMonths.has(key), pending: state.dirty };
-  } catch (error) {
-    if (!state.dirtyMonths.has(key)) state.dirtyMonths.set(key, saveVersion);
-    state.dirty = true;
-    state.saveStatus = 'offline';
-    state.serverReady = false;
-    return { ok: false, current: false, pending: true, error };
+
+  const previous = state.saveChains.get(key) || Promise.resolve();
+  const run = previous.catch(() => undefined).then(async () => {
+    try {
+      await api.saveMonth(year, monthNumber, payload);
+      if (state.dirtyMonths.get(key) === saveVersion) markMonthSynced(year, monthNumber);
+      state.saveStatus = state.dirty ? 'pending' : 'saved';
+      state.serverReady = true;
+      return { ok: true, current: !state.dirtyMonths.has(key), pending: state.dirty };
+    } catch (error) {
+      if (!state.dirtyMonths.has(key)) state.dirtyMonths.set(key, saveVersion);
+      state.monthSources.set(key, 'local');
+      persistDirtyMarkers();
+      updateDirtyFlag();
+      state.saveStatus = 'offline';
+      state.serverReady = false;
+      return { ok: false, current: false, pending: true, error };
+    }
+  });
+
+  let publicPromise;
+  publicPromise = run.finally(() => {
+    if (state.saveChains.get(key) === run) state.saveChains.delete(key);
+    if (state.saveRequests.get(key)?.promise === publicPromise) state.saveRequests.delete(key);
+  });
+  state.saveChains.set(key, run);
+  state.saveRequests.set(key, { version: saveVersion, promise: publicPromise });
+  return publicPromise;
+}
+
+export async function persistBootstrap() {
+  restoreSyncState();
+  if (!state.bootstrapDirty) return { ok: true, skipped: true };
+  const version = state.bootstrapVersion;
+  if (state.bootstrapSaveRequest?.version === version) return state.bootstrapSaveRequest.promise;
+
+  const payload = structuredClone({ settings: state.settings, staff: state.staff, rbnNames: state.rbnNames });
+  const run = state.bootstrapSaveChain.catch(() => undefined).then(async () => {
+    try {
+      await api.importJson(payload);
+      if (state.bootstrapDirty && state.bootstrapVersion === version) markBootstrapSynced();
+      state.serverReady = true;
+      return { ok: true, pending: state.dirty };
+    } catch (error) {
+      state.bootstrapDirty = true;
+      persistBootstrapDirtyMarker();
+      updateDirtyFlag();
+      state.serverReady = false;
+      return { ok: false, pending: true, error };
+    }
+  });
+
+  let publicPromise;
+  publicPromise = run.finally(() => {
+    if (state.bootstrapSaveChain === run) state.bootstrapSaveChain = Promise.resolve();
+    if (state.bootstrapSaveRequest?.promise === publicPromise) state.bootstrapSaveRequest = null;
+  });
+  state.bootstrapSaveChain = run;
+  state.bootstrapSaveRequest = { version, promise: publicPromise };
+  return publicPromise;
+}
+
+export async function persistDirtyMonths() {
+  restoreSyncState();
+  const targets = [...state.dirtyMonths.keys()].map(parseMonthKey).filter(Boolean);
+  return Promise.all(targets.map(([year, month]) => persistMonth(year, month)));
+}
+
+export async function persistDirtyState() {
+  const [bootstrap, months] = await Promise.all([persistBootstrap(), persistDirtyMonths()]);
+  return { bootstrap, months, ok: bootstrap.ok !== false && months.every(result => result.ok !== false) };
+}
+
+export function buildBackupPayload(serverPayload = null) {
+  restoreSyncState();
+  let server = {};
+  try { server = serverPayload ? normalizeBackupPayload(serverPayload, { strict: false }) : {}; }
+  catch { server = {}; }
+
+  const months = new Map(server.months || []);
+  for (const [key, month] of readAllLocalMonths()) {
+    if (!months.has(key) || state.dirtyMonths.has(key)) months.set(key, month);
   }
+  for (const [key, month] of state.months) {
+    const source = state.monthSources.get(key);
+    if (!months.has(key) || state.dirtyMonths.has(key) || source === 'local' || source === 'fallback') {
+      const parsed = parseMonthKey(key);
+      if (parsed) months.set(key, normalizeMonthData(parsed[0], parsed[1], month));
+    }
+  }
+
+  return {
+    ok: true,
+    settings: structuredClone(state.settings),
+    staff: structuredClone(state.staff),
+    rbnNames: structuredClone(state.rbnNames),
+    months: [...months.entries()].sort(([left], [right]) => left.localeCompare(right))
+  };
 }
 
 export function getMonthLabel(year = state.currentYear, month = state.currentMonth) {

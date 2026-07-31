@@ -1,4 +1,4 @@
-import { holidayBlocks, isFirstRegularWorkdayAfter, isHoliday } from './holidays.js?v=20260731.2';
+import { holidayBlocks, isFirstRegularWorkdayAfter, isHoliday } from './holidays.js?v=20260731.3';
 import {
   addDays, basicallyEligiblePeers, countHgForAaBdExcept, countRoleInMonthExcept,
   countSaturdayBdExcept, countServicesInLoadedYearExcept, getAbsenceFromState, getEffectiveAbsence,
@@ -6,7 +6,7 @@ import {
   hasCompleteLoadedHistory, hasVacationInFollowingWeek, isAaOn, isFaOn, isPositivePreference,
   isStaffActiveOn, labelForAbsence, listOwnRoleDates, monthForIso, parseIso,
   projectedWeekendEquivalent, severityRank, toLocalIso, weekendEquivalentFromMap, weekendMap
-} from './rules-core.js?v=20260731.2';
+} from './rules-core.js?v=20260731.3';
 
 function hasCompletedDistributionRound(loads, unit = 1) {
   return loads.length > 0 && loads.reduce((sum, load) => sum + load, 0) >= loads.length * unit;
@@ -220,6 +220,7 @@ export function evaluateCandidate({ state, monthData, dateIso, role, staffId }) 
 
   const currentBd = countRoleInMonthExcept(monthData, staffId, 'bd', dateIso);
   const currentHg = countRoleInMonthExcept(monthData, staffId, 'hg', dateIso);
+  if (role !== 'bd' && role !== 'hg') return { level: 'gray', reasons: ['Unbekannte Dienstrolle'], canSelect: false, meta: { recommendationScore: 0 } };
   if (role === 'bd' && monthData.days?.[dateIso]?.hg === staffId) push('red', 'Gleichzeitige Einteilung in HG und BD am selben Tag');
   if (role === 'hg' && monthData.days?.[dateIso]?.bd === staffId) push('red', 'Gleichzeitige Einteilung in BD und HG am selben Tag');
 
@@ -261,11 +262,17 @@ export function evaluateCandidate({ state, monthData, dateIso, role, staffId }) 
     if (idx >= 0 && idx < ownBdDates.length - 1) {
       const nextBd = parseIso(ownBdDates[idx + 1]);
       const diffForward = Math.round((nextBd - date) / 86400000);
+      const middleDate = addDays(date, 1);
+      const middleIso = toLocalIso(middleDate);
+      const middleMonth = monthForIso(state, middleIso) || monthData;
+      const isWeekdayPattern = [date, middleDate, nextBd].every(item => item.getDay() >= 1 && item.getDay() <= 5);
+      const isBdFzaBd = diffForward === 2 && isWeekdayPattern && getEffectiveAbsence(state, middleMonth, staffId, middleIso) === 'fza';
       if (diffForward === 1) push('red', 'BD bereits am Folgetag');
+      else if (isBdFzaBd) push('yellow', 'BD–FZA–BD werktags');
       else if (diffForward > 1 && diffForward < 4) push('yellow', 'Kurzer Abstand zum nächsten BD');
     }
 
-    if (person.maxBd && currentBd >= person.maxBd) push('red', `Monatsmaximum von ${person.maxBd} BD bereits erreicht`);
+    if (person.maxBd != null && currentBd >= person.maxBd) push('red', `Monatsmaximum von ${person.maxBd} BD bereits erreicht`);
     else if (person.bdTarget && currentBd >= person.bdTarget) push('yellow', `BD-Richtwert ${person.bdTarget} bereits erreicht`);
 
     const nextIso = toLocalIso(addDays(date, 1));

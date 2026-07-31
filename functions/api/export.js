@@ -1,4 +1,4 @@
-import { defaults, ensureMonthShape, getOrInit, json, normalizedBootstrap } from '../_utils.js';
+import { defaults, ensureMonthShape, getOrInit, json, kv, normalizedBootstrap, serverError } from '../_utils.js';
 
 async function listAllMonthKeys(store) {
   const keys = [];
@@ -14,23 +14,27 @@ async function listAllMonthKeys(store) {
 }
 
 export async function onRequestGet(context) {
-  const base = defaults();
-  const [settings, staff, rbnNames] = await Promise.all([
-    getOrInit(context, 'app:settings', base.settings),
-    getOrInit(context, 'app:staff', base.staff),
-    getOrInit(context, 'app:rbn-names', base.rbnNames)
-  ]);
-  const store = context.env.DIENSTPLAN_KV;
-  const keys = await listAllMonthKeys(store);
-  const values = await Promise.all(keys.map(key => store.get(key, 'json')));
-  const months = [];
-  keys.forEach((key, index) => {
-    const value = values[index];
-    if (!value) return;
-    const match = /^year:(\d{4}):month:(\d{2})$/.exec(key);
-    const year = Number(match[1]);
-    const month = Number(match[2]);
-    months.push([`${match[1]}-${match[2]}`, ensureMonthShape(year, month, value)]);
-  });
-  return json({ ok: true, ...normalizedBootstrap({ settings, staff, rbnNames }), months });
+  try {
+    const base = defaults();
+    const [settings, staff, rbnNames] = await Promise.all([
+      getOrInit(context, 'app:settings', base.settings),
+      getOrInit(context, 'app:staff', base.staff),
+      getOrInit(context, 'app:rbn-names', base.rbnNames)
+    ]);
+    const store = kv(context);
+    const keys = await listAllMonthKeys(store);
+    const values = await Promise.all(keys.map(key => store.get(key, 'json')));
+    const months = [];
+    keys.forEach((key, index) => {
+      const value = values[index];
+      if (!value) return;
+      const match = /^year:(\d{4}):month:(\d{2})$/.exec(key);
+      const year = Number(match[1]);
+      const month = Number(match[2]);
+      months.push([`${match[1]}-${match[2]}`, ensureMonthShape(year, month, value)]);
+    });
+    return json({ ok: true, ...normalizedBootstrap({ settings, staff, rbnNames }), months });
+  } catch (error) {
+    return serverError(error);
+  }
 }

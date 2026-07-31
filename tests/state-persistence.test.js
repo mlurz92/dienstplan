@@ -43,6 +43,8 @@ test('ein älterer Server-Save löscht keinen danach entstandenen Dirty-Stand', 
   state.saveTimer = null;
   assert.equal(state.dirtyVersion, versionAtSave + 1);
 
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(typeof releaseFetch, 'function');
   releaseFetch();
   await save;
 
