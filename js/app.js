@@ -1,5 +1,5 @@
 import { ABSENCE_TYPES, MONTH_NAMES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, normalizeBackupPayload, toIsoDate } from './defaults.js?v=20260731.3';
-import { state, bootstrapState, buildBackupPayload, getMonthData, getMonthLabel, isMonthDirty, loadMonth, markBootstrapDirty, markBootstrapSynced, markMonthDirty, markMonthSynced, persistDirtyState, persistMonth, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260731.3';
+import { state, bootstrapState, buildBackupPayload, getMonthData, getMonthLabel, isMonthDirty, isMonthMergeSafe, loadMonth, markBootstrapDirty, markBootstrapSynced, markMonthDirty, markMonthSynced, persistDirtyState, persistMonth, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260731.3';
 import { api } from './api.js?v=20260731.3';
 import { applyMonthTheme, prefersReducedMotion } from './theme.js?v=20260731.3';
 import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260731.3';
@@ -848,6 +848,15 @@ async function onExcelImport(event) {
   // Serverwerte beim anschließenden PUT verlieren.
   await Promise.all(parsedImports.map(({ imported }) => loadMonth(imported.year, imported.month)));
 
+  const unsafeTargets = parsedImports.filter(({ imported }) => !isMonthMergeSafe(imported.year, imported.month));
+  if (unsafeTargets.length) {
+    const labels = unsafeTargets.map(({ sheetName, imported }) => `${sheetName} ${imported.year}`).join(', ');
+    setStatus('offline', 'Excel-Import abgebrochen – Zielmonat nicht verlässlich geladen');
+    alert(`Excel-Import abgebrochen. Für ${labels} konnte weder ein aktueller Serverstand noch ein ausdrücklich unsynchronisierter lokaler Arbeitsstand bestätigt werden. Bestehende Serverwerte werden deshalb nicht mit einem möglicherweise veralteten oder leeren Ersatzstand überschrieben.`);
+    reset();
+    return;
+  }
+
   const touched = new Map();
   for (const { sheetName, imported } of parsedImports) {
     const targetMonth = getMonthData(imported.year, imported.month);
@@ -995,7 +1004,7 @@ async function onJsonImport(event) {
     await api.importJson(payload);
     importedMonths.forEach(([year, month]) => markMonthSynced(year, month));
     if (importsBootstrap) markBootstrapSynced();
-    if (state.dirty) setStatus('saving', 'Import gespeichert – weitere Änderungen ausstehend …');
+    if (state.dirty) setStatus('offline', 'Import gespeichert – weitere lokale Änderungen nicht synchronisiert');
     else setStatus('saved', 'Import gespeichert');
   } catch (error) {
     setStatus('offline', 'Lokal importiert – Serverfehler');

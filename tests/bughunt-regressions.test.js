@@ -220,3 +220,26 @@ test('Serverexport gewinnt gegen sauberen lokalen Cache, Dirty-Daten behalten Vo
   assert.equal(new Map(dirtyBackup.months).get('2026-07').days['2026-07-01'].bd, 'lurz');
 });
 
+test('Excel-Merge ist nur mit bestätigtem Serverstand oder bewusstem Dirty-Lokalstand zulässig', async () => {
+  globalThis.localStorage = new MemoryStorage();
+  globalThis.fetch = async () => okResponse();
+  const module = await freshState('excel-merge-safety');
+  const month = createEmptyMonth(2026, 8);
+  module.setMonthData(2026, 8, month, 'fallback');
+  assert.equal(module.isMonthMergeSafe(2026, 8), false);
+  module.setMonthData(2026, 8, month, 'local');
+  assert.equal(module.isMonthMergeSafe(2026, 8), false);
+  module.markMonthDirty(2026, 8);
+  assert.equal(module.isMonthMergeSafe(2026, 8), true);
+  module.markMonthSynced(2026, 8);
+  assert.equal(module.isMonthMergeSafe(2026, 8), true);
+});
+
+test('Excel-Import bricht vor dem Merge ab, wenn ein Zielmonat nicht verlässlich geladen wurde', async () => {
+  const source = await readFile(new URL('../js/app.js', import.meta.url), 'utf8');
+  const guard = source.indexOf('const unsafeTargets = parsedImports.filter');
+  const merge = source.indexOf('const merge = mergeMonthData(targetMonth, imported.monthData)');
+  assert.ok(guard >= 0 && merge > guard);
+  assert.match(source, /Excel-Import abgebrochen – Zielmonat nicht verlässlich geladen/);
+});
+

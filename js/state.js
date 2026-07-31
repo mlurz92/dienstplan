@@ -177,6 +177,12 @@ export function isMonthDirty(year, month) {
   return state.dirtyMonths.has(monthKey(year, month));
 }
 
+export function isMonthMergeSafe(year, month) {
+  restoreSyncState();
+  const key = monthKey(year, month);
+  return state.monthSources.get(key) === 'server' || state.dirtyMonths.has(key);
+}
+
 export function markMonthDirty(year, month) {
   restoreSyncState();
   const key = monthKey(year, month);
