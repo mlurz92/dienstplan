@@ -1,4 +1,4 @@
-import { holidayBlocks, isFirstRegularWorkdayAfter, isHoliday } from './holidays.js?v=20260731.1';
+import { holidayBlocks, isFirstRegularWorkdayAfter, isHoliday } from './holidays.js?v=20260731.2';
 import {
   addDays, basicallyEligiblePeers, countHgForAaBdExcept, countRoleInMonthExcept,
   countSaturdayBdExcept, countServicesInLoadedYearExcept, getAbsenceFromState, getEffectiveAbsence,
@@ -6,7 +6,7 @@ import {
   hasCompleteLoadedHistory, hasVacationInFollowingWeek, isAaOn, isFaOn, isPositivePreference,
   isStaffActiveOn, labelForAbsence, listOwnRoleDates, monthForIso, parseIso,
   projectedWeekendEquivalent, severityRank, toLocalIso, weekendEquivalentFromMap, weekendMap
-} from './rules-core.js?v=20260731.1';
+} from './rules-core.js?v=20260731.2';
 
 function hasCompletedDistributionRound(loads, unit = 1) {
   return loads.length > 0 && loads.reduce((sum, load) => sum + load, 0) >= loads.length * unit;
@@ -254,14 +254,14 @@ export function evaluateCandidate({ state, monthData, dateIso, role, staffId }) 
       const middleMonth = monthForIso(state, middleIso) || monthData;
       const isWeekdayPattern = [prevBd, middleDate, date].every(item => item.getDay() >= 1 && item.getDay() <= 5);
       const isBdFzaBd = diff === 2 && isWeekdayPattern && getEffectiveAbsence(state, middleMonth, staffId, middleIso) === 'fza';
-      if (diff === 1) push('yellow', 'BD bereits am Vortag');
+      if (diff === 1) push('red', 'BD bereits am Vortag');
       else if (isBdFzaBd) push('yellow', 'BD–FZA–BD werktags');
       else if (diff > 1 && diff < 4) push('yellow', 'Kurzer Abstand zum letzten BD');
     }
     if (idx >= 0 && idx < ownBdDates.length - 1) {
       const nextBd = parseIso(ownBdDates[idx + 1]);
       const diffForward = Math.round((nextBd - date) / 86400000);
-      if (diffForward === 1) push('yellow', 'BD bereits am Folgetag');
+      if (diffForward === 1) push('red', 'BD bereits am Folgetag');
       else if (diffForward > 1 && diffForward < 4) push('yellow', 'Kurzer Abstand zum nächsten BD');
     }
 

@@ -1,4 +1,4 @@
-Regeln und Kriterien für manuelle Kandidatenempfehlungen in DienstplanRAD (v4.4)
+Regeln und Kriterien für manuelle Kandidatenempfehlungen in DienstplanRAD (v4.5)
 
 GRUNDPRINZIPIEN & DATENBASIS:
 - DienstplanRAD enthält keinen automatischen Dienstplaner, keinen Optimierungslauf, keine Iterationszyklen und keine automatischen Tauschvorgänge.
@@ -25,7 +25,7 @@ RUHEZEITEN, FREIZEITAUSGLEICH & DIENSTFOLGEN:
 - Ausschließlich bei Dr. Becker wird nach einem Samstags-BD am nächsten regulären Werktag ein echtes FZA abgeleitet und angezeigt.
 - Dieses abgeleitete Becker-FZA ist ein vollwertiger dienstfreier Tag: Es sperrt sowohl BD als auch HG, entfernt Dr. Becker aus den tagesbezogenen Eignungs- und Fairnessvergleichen und zählt bei der CT-Leitungsregel als Abwesenheit.
 - Eine am selben Tag zusätzlich manuell gepflegte Abwesenheit bleibt vorrangig sichtbar; das abgeleitete FZA erzeugt keinen doppelten Eintrag.
-- Ein eigener weiterer BD mit weniger als drei dienstfreien Tagen Abstand erzeugt lediglich einen gelben Hinweis, keinen automatischen roten oder orangefarbenen Konflikt. Die Prüfung erfolgt symmetrisch zum vorherigen und zum folgenden BD.
+- Ein eigener BD am unmittelbar vorhergehenden oder folgenden Kalendertag ist ein roter Konflikt. Ein Abstand von zwei oder drei Kalendertagen erzeugt weiterhin lediglich einen gelben Hinweis. Die Prüfung erfolgt symmetrisch zum vorherigen und zum folgenden BD sowie monatsübergreifend.
 - Das werktägliche Muster BD–FZA–BD wird als eigener gelber Hinweis ausgewiesen; dabei zählt auch das fachlich abgeleitete Becker-FZA.
 - Ein HG unmittelbar vor dem eigenen BD ist grundsätzlich nachrangig (orange), außer bei der zulässigen Kopplung Freitag-HG auf Samstags-BD oder wenn der am HG-Tag eingeteilte BD ebenfalls von einem Facharzt geleistet wird.
 - HG-Häufungen werden symmetrisch in beide Zeitrichtungen geprüft: erneuter HG innerhalb von drei Kalendertagen gelb, dritter HG in einer Dreierkette orange.

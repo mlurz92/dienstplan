@@ -1,10 +1,10 @@
-import { ABSENCE_TYPES, MONTH_NAMES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, normalizeBackupPayload, toIsoDate } from './defaults.js?v=20260731.1';
-import { state, bootstrapState, getMonthData, getMonthLabel, loadMonth, markMonthDirty, persistCurrentMonth, persistMonth, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260731.1';
-import { api } from './api.js?v=20260731.1';
-import { applyMonthTheme, prefersReducedMotion } from './theme.js?v=20260731.1';
-import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260731.1';
-import { buildStats, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getEffectiveAbsence, getPlanningStaff, getPreference, getStaffById, labelForAbsence, labelForPreference, setAbsence, setAssignment, setPreference, weekdayLabel } from './rules.js?v=20260731.1';
-import { getRbnOptions, isRbnValueAllowed, isSecondRbnAvailable } from './rbn.js?v=20260731.1';
+import { ABSENCE_TYPES, MONTH_NAMES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, normalizeBackupPayload, toIsoDate } from './defaults.js?v=20260731.2';
+import { state, bootstrapState, getMonthData, getMonthLabel, loadMonth, markMonthDirty, persistCurrentMonth, persistMonth, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260731.2';
+import { api } from './api.js?v=20260731.2';
+import { applyMonthTheme, prefersReducedMotion } from './theme.js?v=20260731.2';
+import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260731.2';
+import { buildStats, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getEffectiveAbsence, getPlanningStaff, getPreference, getStaffById, labelForAbsence, labelForPreference, setAbsence, setAssignment, setPreference, weekdayLabel } from './rules.js?v=20260731.2';
+import { getRbnOptions, isRbnValueAllowed, isSecondRbnAvailable } from './rbn.js?v=20260731.2';
 
 const $ = selector => document.querySelector(selector);
 

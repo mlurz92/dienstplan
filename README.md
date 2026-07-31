@@ -394,12 +394,12 @@ Positive Wünsche erzeugen eine starke positive Empfehlung, beseitigen aber kein
 
 Alle eigenen BD-Termine aus den geladenen Monaten werden sortiert und in beide Richtungen geprüft:
 
-- eigener BD am Vortag: gelb;
-- eigener BD am Folgetag: gelb;
+- eigener BD am Vortag: **rot**;
+- eigener BD am Folgetag: **rot**;
 - Abstand von zwei oder drei Kalendertagen: gelb;
 - werktägliches Muster BD–FZA–BD mit eingetragenem FZA in der Mitte: eigener gelber Klartextgrund.
 
-Die beidseitige Prüfung verhindert eine Abhängigkeit von der Reihenfolge, in der zwei Dienste eingetragen werden.
+Unmittelbar aufeinanderfolgende BD derselben Person sind damit unabhängig von Wochentag, Monatsgrenze oder Eingabereihenfolge ausgeschlossen. Die beidseitige Prüfung verhindert eine Abhängigkeit von der Reihenfolge, in der zwei Dienste eingetragen werden.
 
 ## 9.5 BD-Soll und hartes Maximum
 
@@ -1242,7 +1242,7 @@ Das Repository wird aus dem Projektstamm bereitgestellt. Pages Functions werden 
 Alle releasekritischen Assets und relativen Browserimporte verwenden denselben `?v=`-Token. Der Build-Stempel in `index.html` muss exakt dazu passen. Für diesen Funktionsstand ist die Kennung:
 
 ```text
-20260731.1
+20260731.2
 ```
 
 Der laufende Stand ist im Browser über `document.documentElement.dataset.build` und im Tooltip des Speicherstatus sichtbar.
@@ -1404,7 +1404,7 @@ Für die aktuelle Fairnesslogik gelten zwei besonders wichtige Leitplanken:
 
 ---
 
-# 30. Konsistenzhärtung 20260731.1
+# 30. Konsistenzhärtung 20260731.2
 
 - **Becker-FZA:** echtes dienstfreies FZA nach Samstags-BD; BD und HG sind gesperrt, Tagesfairness und CT-Leitungsregel verwenden dieselbe wirksame Abwesenheit.
 - **Jahresverlauf:** Vormonate plus vollständiger aktueller Monat; keine Folgemonate; leere Fehler-Fallbacks gelten nicht als vollständige Historie.
