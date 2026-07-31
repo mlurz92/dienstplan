@@ -46,8 +46,11 @@ replace_once(
 
 replace_once(
     "tests/timezone.test.js",
-    "  assert.ok(bewertung.reasons.includes('BD bereits am Vortag'), `Gründe: ${bewertung.reasons.join(' | ')}`);",
-    "  assert.equal(bewertung.level, 'red');\n  assert.ok(bewertung.reasons.includes('BD bereits am Vortag'), `Gründe: ${bewertung.reasons.join(' | ')}`);",
+    """  const bewertung = evaluateCandidate({ state, monthData: juli, dateIso: '2026-07-07', role: 'bd', staffId: 'lurz' });
+  assert.ok(bewertung.reasons.includes('BD bereits am Vortag'), `Gründe: ${bewertung.reasons.join(' | ')}`);""",
+    """  const bewertung = evaluateCandidate({ state, monthData: juli, dateIso: '2026-07-07', role: 'bd', staffId: 'lurz' });
+  assert.equal(bewertung.level, 'red');
+  assert.ok(bewertung.reasons.includes('BD bereits am Vortag'), `Gründe: ${bewertung.reasons.join(' | ')}`);""",
 )
 
 rule_matrix = ROOT / "tests/rule-matrix.test.js"
