@@ -162,3 +162,9 @@ test('Excel-Import lädt jeden Zielmonat vor dem Merge', async () => {
   const mergePosition = source.indexOf('const merge = mergeMonthData(targetMonth, imported.monthData)');
   assert.ok(loadPosition >= 0 && mergePosition > loadPosition);
 });
+
+test('reiner Monats-JSON-Import verwendet keine nicht importierte Bootstrap-Funktion', async () => {
+  const source = await readFile(new URL('../js/app.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /else saveLocalBootstrap\(\)/);
+  assert.match(source, /if \(importsBootstrap\) markBootstrapDirty\(\)/);
+});

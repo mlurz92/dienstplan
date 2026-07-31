@@ -990,7 +990,6 @@ async function onJsonImport(event) {
     importedMonths.push([year, month]);
   }
   if (importsBootstrap) markBootstrapDirty();
-  else saveLocalBootstrap();
 
   try {
     await api.importJson(payload);
