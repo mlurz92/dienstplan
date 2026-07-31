@@ -34,8 +34,8 @@ jobs:
               raise SystemExit(f'expected two Excel anchor occurrences, found {text.count(old)}')
           text = text.replace(old, new)
           old_sub = 'pattern.subn(replacement, text, count=1)'
-          if text.count(old_sub) != 3:
-              raise SystemExit(f'expected three regex substitutions, found {text.count(old_sub)}')
+          if text.count(old_sub) != 4:
+              raise SystemExit(f'expected four regex substitutions, found {text.count(old_sub)}')
           text = text.replace(old_sub, 'pattern.subn(lambda _match: replacement, text, count=1)')
           path.write_text(text, encoding='utf-8')
           PY
