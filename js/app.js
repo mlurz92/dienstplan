@@ -423,7 +423,9 @@ function shortPreferenceLabel(type) {
     'kein-dienst': 'kein Dienst',
     'bd-bevorzugt': '+BD',
     'hg-bevorzugt': '+HG',
-    'dienst-bevorzugt': '+Dienst'
+    'dienst-bevorzugt': '+Dienst',
+    'bd-moeglich': 'BD mögl.',
+    'hg-moeglich': 'HG mögl.'
   })[type] || labelForPreference(type);
 }
 
