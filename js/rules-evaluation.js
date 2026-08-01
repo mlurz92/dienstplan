@@ -233,6 +233,8 @@ export function evaluateCandidate({ state, monthData, dateIso, role, staffId }) 
   if (preference === 'bd-bevorzugt' && role === 'bd') recommend('Wunsch: BD bevorzugt', 100);
   if (preference === 'hg-bevorzugt' && role === 'hg') recommend('Wunsch: HG bevorzugt', 100);
   if (preference === 'dienst-bevorzugt') recommend('Wunsch: Dienst bevorzugt', 100);
+  if (preference === 'bd-moeglich' && role === 'bd') recommend('Option: BD möglich', 45);
+  if (preference === 'hg-moeglich' && role === 'hg') recommend('Option: HG möglich', 45);
 
   if (role === 'hg' && !roleProps.canHg) push('red', 'HG nur für Fachärzte zulässig');
   if (role === 'bd' && weekday === 6 && !roleProps.canSaturdayBd) push('red', 'Samstags-BD nur für Fachärzte zulässig');

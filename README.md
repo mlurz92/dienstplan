@@ -264,7 +264,7 @@ Alle Dialoge verwenden native `<dialog>`-Elemente. Damit übernimmt die Browserp
 | **RBN** | feste, datumsabhängige Auswahl |
 | **2. RBN** | feste, bedingt sichtbare Auswahl |
 | **Urlaub / FZA** | kompakte Tageszusammenfassung, öffnet den Detaildialog |
-| **Kein Dienst / Wünsche** | kompakte Wunschzusammenfassung, öffnet den Detaildialog |
+| **Kein Dienst / Wünsche / Optionen** | kompakte Wunsch- und Optionszusammenfassung, öffnet den Detaildialog |
 
 ## 6.2 Layout
 
@@ -608,6 +608,8 @@ Jede eingetragene Abwesenheit erzeugt bei einer BD- oder HG-Auswahl am selben Ta
 | `bd-bevorzugt` | BD bevorzugt | starke positive Empfehlung bei BD |
 | `hg-bevorzugt` | HG bevorzugt | starke positive Empfehlung bei HG |
 | `dienst-bevorzugt` | Dienst bevorzugt | starke positive Empfehlung bei BD und HG |
+| `bd-moeglich` | BD möglich | moderate positive Empfehlung bei BD |
+| `hg-moeglich` | HG möglich | moderate positive Empfehlung bei HG |
 
 ## 11.3 Einzelbearbeitung
 

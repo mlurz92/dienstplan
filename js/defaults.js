@@ -34,7 +34,9 @@ export const PREFERENCE_TYPES = [
   { id: 'kein-dienst', label: 'Kein Dienst' },
   { id: 'bd-bevorzugt', label: 'BD bevorzugt' },
   { id: 'hg-bevorzugt', label: 'HG bevorzugt' },
-  { id: 'dienst-bevorzugt', label: 'Dienst bevorzugt' }
+  { id: 'dienst-bevorzugt', label: 'Dienst bevorzugt' },
+  { id: 'bd-moeglich', label: 'BD möglich' },
+  { id: 'hg-moeglich', label: 'HG möglich' }
 ];
 
 export function isPlainRecord(value) {

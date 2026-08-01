@@ -320,3 +320,22 @@ test('Jahresverlauf ist im Regelquelltext nicht bewertungswirksam verdrahtet', (
   assert.match(rules, /note\(`Jahresverlauf:/);
   assert.equal(rules.includes('nur Hinweis, ohne Einfluss auf Bewertung'), false);
 });
+
+test('Option „BD möglich“ wirkt nur auf BD und schwächer als ein positiver Wunsch', () => {
+  const state = stateWith();
+  setPreference(month(state, 2026, 7), 'martin', '2026-07-08', 'bd-moeglich');
+  const bd = evalAt(state, '2026-07-08', 'bd', 'martin');
+  const hg = evalAt(state, '2026-07-08', 'hg', 'martin');
+  assert.ok(bd.reasons.includes('Option: BD möglich'));
+  assert.ok(bd.meta.recommendationScore >= 45 && bd.meta.recommendationScore < 100);
+  assert.equal(has(hg, 'Option: BD möglich'), false);
+});
+
+test('Option „HG möglich“ wirkt nur auf HG', () => {
+  const state = stateWith();
+  setPreference(month(state, 2026, 7), 'martin', '2026-07-08', 'hg-moeglich');
+  const hg = evalAt(state, '2026-07-08', 'hg', 'martin');
+  const bd = evalAt(state, '2026-07-08', 'bd', 'martin');
+  assert.ok(hg.reasons.includes('Option: HG möglich'));
+  assert.equal(has(bd, 'Option: HG möglich'), false);
+});
