@@ -25,6 +25,7 @@ async function mockApi(page) {
 
 test('Seasonal Spectrum Director controls the visible application palette', async ({ page }) => {
   await mockApi(page);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
   await page.selectOption('#yearSelect', '2026');
 
@@ -33,10 +34,11 @@ test('Seasonal Spectrum Director controls the visible application palette', asyn
   for (let month = 1; month <= 12; month += 1) {
     await page.selectOption('#monthSelect', String(month));
     await expect(page.locator('html')).toHaveAttribute('data-spectrum-key', `2026-${String(month).padStart(2, '0')}`);
+    await expect.poll(() => page.evaluate(() => document.documentElement.style.getPropertyPriority('--month-accent'))).toBe('important');
     const state = await page.evaluate(() => ({
       accent: getComputedStyle(document.documentElement).getPropertyValue('--month-accent').trim(),
       priority: document.documentElement.style.getPropertyPriority('--month-accent'),
-      name: document.documentElement.dataset.spectrumPalette,
+      name: document.documentElement.dataset.spectrumPalette || '',
       badge: document.getElementById('monthPaletteLabel')?.textContent || ''
     }));
     accents.push(state.accent);
@@ -52,6 +54,7 @@ test('Seasonal Spectrum Director controls the visible application palette', asyn
 
 test('the same month changes strongly with the year while the 24-year cycle stays deterministic', async ({ page }) => {
   await mockApi(page);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
   await page.selectOption('#monthSelect', '1');
 
