@@ -1,11 +1,11 @@
-import { isRegularWorkdayIso } from './holidays.js?v=20260801.8';
-import { isRbnValueAllowed, isSecondRbnAvailable } from './rbn.js?v=20260801.8';
+import { isRegularWorkdayIso } from './holidays.js?v=20260801.9';
+import { isRbnValueAllowed, isSecondRbnAvailable } from './rbn.js?v=20260801.9';
 import {
   ABSENCE_FOR_CT_LEADERSHIP, computeWeekendEquivalent, countRoleInMonth, dayIso,
   externalAssignmentLabel, fmtGermanDate, getEffectiveAbsence, getRoleProperties, getStaffById,
   isExternalAssignment, isStaffActiveDuringMonth, severityRank
-} from './rules-core.js?v=20260801.8';
-import { evaluateCandidate } from './rules-evaluation.js?v=20260801.8';
+} from './rules-core.js?v=20260801.9';
+import { evaluateCandidate } from './rules-evaluation.js?v=20260801.9';
 
 export function collectIssues(state, monthData) {
   const issues = [];

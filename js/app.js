@@ -1,11 +1,11 @@
-import { ABSENCE_TYPES, MONTH_NAMES, OPTION_TYPES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, normalizeBackupPayload, toIsoDate } from './defaults.js?v=20260801.8';
-import { state, bootstrapState, buildBackupPayload, getMonthData, getMonthLabel, isMonthDirty, isMonthMergeSafe, loadMonth, markBootstrapDirty, markBootstrapSynced, markMonthDirty, markMonthSynced, persistDirtyState, persistMonth, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260801.8';
-import { api } from './api.js?v=20260801.8';
-import { applyMonthTheme, prefersReducedMotion } from './theme.js?v=20260801.8';
-import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260801.8';
-import { assignmentLabel, buildStats, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getEffectiveAbsence, getPlanningStaff, getOptions, getPreference, getStaffById, isExternalAssignment, labelForAbsence, labelForOption, labelForPreference, setAbsence, setAssignment, setOptions, setPreference, toggleOption, weekdayLabel } from './rules.js?v=20260801.8';
-import { getRbnOptions, isRbnValueAllowed, isSecondRbnAvailable, rbnDisplayName } from './rbn.js?v=20260801.8';
-import { analyzeWorkbook } from './excel-import.js?v=20260801.8';
+import { ABSENCE_TYPES, MONTH_NAMES, OPTION_TYPES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, normalizeBackupPayload, toIsoDate } from './defaults.js?v=20260801.9';
+import { state, bootstrapState, buildBackupPayload, getMonthData, getMonthLabel, isMonthDirty, isMonthMergeSafe, loadMonth, markBootstrapDirty, markBootstrapSynced, markMonthDirty, markMonthSynced, persistDirtyState, persistMonth, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260801.9';
+import { api } from './api.js?v=20260801.9';
+import { applyMonthTheme, prefersReducedMotion } from './theme.js?v=20260801.9';
+import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260801.9';
+import { assignmentLabel, buildStats, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getEffectiveAbsence, getPlanningStaff, getOptions, getPreference, getStaffById, isExternalAssignment, labelForAbsence, labelForOption, labelForPreference, setAbsence, setAssignment, setOptions, setPreference, toggleOption, weekdayLabel } from './rules.js?v=20260801.9';
+import { getRbnOptions, isRbnValueAllowed, isSecondRbnAvailable, rbnDisplayName } from './rbn.js?v=20260801.9';
+import { analyzeWorkbook } from './excel-import.js?v=20260801.9';
 
 const $ = selector => document.querySelector(selector);
 
@@ -306,7 +306,7 @@ function buildAssignmentButton(dateIso, role, staffId, monthData) {
   // In der Planungstabelle nur der Kurzname ohne Anrede/Titel: Die Spalten sind
   // schmal, der volle Name steht weiterhin im Tooltip und in der Statistik.
   // Namen aus Altimporten ohne bekannte Person bleiben als Text erhalten.
-  const name = person?.short || (staffId ? assignmentLabel(state.staff, staffId) : '—');
+  const name = staffId ? assignmentLabel(state.staff, staffId, { short: true }) : '—';
   const evaluation = (staffId && person) ? evaluateCandidate({ state, monthData, dateIso, role, staffId }) : { level: 'green', reasons: [] };
   const badgeMarkup = staffId
     ? ''

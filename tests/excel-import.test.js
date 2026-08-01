@@ -93,6 +93,10 @@ test('Externe Einträge bleiben lesbar und sind von Personal-IDs unterscheidbar'
   const value = externalAssignmentValue('Hr. Torki');
   assert.equal(isExternalAssignment(value), true);
   assert.equal(assignmentLabel(staff, value), 'Hr. Torki');
+  // In der Tabelle steht auch bei importierten Namen nur der Nachname.
+  assert.equal(assignmentLabel(staff, value, { short: true }), 'Torki');
+  assert.equal(assignmentLabel(staff, externalAssignmentValue('Fr. Thaler'), { short: true }), 'Thaler');
+  assert.equal(assignmentLabel(staff, externalAssignmentValue('Torki'), { short: true }), 'Torki');
   assert.equal(assignmentLabel(staff, 'lurz', { short: true }), 'Lurz');
   assert.equal(assignmentLabel(staff, 'lurz'), 'Dr. Lurz');
   assert.equal(assignmentLabel(staff, ''), '');

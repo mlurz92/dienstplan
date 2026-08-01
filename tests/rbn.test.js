@@ -82,7 +82,7 @@ test('app.js rendert die RBN-Selects direkt und koppelt 2. RBN ohne DOM-Nachbear
   const rulesFacade = fs.readFileSync(new URL('../js/rules.js', import.meta.url), 'utf8');
 
   assert.equal(await exists('js/rbn-ui.js'), false, 'kein nachgelagerter DOM-Postprozessor');
-  assert.match(app, /from '\.\/rbn\.js\?v=20260801\.8'/);
+  assert.match(app, /from '\.\/rbn\.js\?v=20260801\.9'/);
   assert.match(app, /function buildRbnSelect/);
   assert.match(app, /createElement\('select'\)/);
   assert.match(app, /isSecondRbnAvailable\(dateIso, firstSelect\.value\)/);
@@ -116,7 +116,7 @@ test('Die Planungstabelle zeigt Dienstnamen ohne Anrede und Titel', () => {
   const app = fs.readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
   const buttonSource = app.slice(app.indexOf('function buildAssignmentButton'), app.indexOf('function setRbnValue'));
 
-  assert.match(buttonSource, /const name = person\?\.short \|\| \(staffId \? assignmentLabel\(state\.staff, staffId\)/);
+  assert.match(buttonSource, /const name = staffId \? assignmentLabel\(state\.staff, staffId, \{ short: true \}\) : '—'/);
   assert.match(buttonSource, /button\.title = staffId/);
   assert.match(buttonSource, /assignmentLabel\(state\.staff, staffId\),/);
 });
