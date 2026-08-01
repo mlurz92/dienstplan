@@ -82,7 +82,7 @@ test('app.js rendert die RBN-Selects direkt und koppelt 2. RBN ohne DOM-Nachbear
   const rulesFacade = fs.readFileSync(new URL('../js/rules.js', import.meta.url), 'utf8');
 
   assert.equal(await exists('js/rbn-ui.js'), false, 'kein nachgelagerter DOM-Postprozessor');
-  assert.match(app, /from '\.\/rbn\.js\?v=20260801\.6'/);
+  assert.match(app, /from '\.\/rbn\.js\?v=20260801\.7'/);
   assert.match(app, /function buildRbnSelect/);
   assert.match(app, /createElement\('select'\)/);
   assert.match(app, /isSecondRbnAvailable\(dateIso, firstSelect\.value\)/);
@@ -148,7 +148,7 @@ test('Das Druckstylesheet hält den Monatsplan auf einer A4-Seite zusammen', () 
   // Kein Beschnitt an den Panel-Ecken und Kopf mit Eyebrow und Monatsbadge.
   assert.match(layout, /\.glass-panel, \.sheet-panel \{[\s\S]*?overflow: visible; border-radius: 0;/);
   assert.match(layout, /\.sheet-heading \.eyebrow \{\s*display: block;/);
-  assert.match(layout, /\.month-palette-label \{[\s\S]*?color: #3b4149;\s*background: none;\s*border: \.2mm solid rgba\(0,0,0,\.34\);/);
+  assert.match(layout, /\.month-palette-label \{[\s\S]*?color: var\(--month-accent-strong\);\s*background: none;\s*border: \.18mm solid rgba\(0,0,0,\.3\);/);
   assert.match(layout, /\.rbn-input\[data-rbn-empty="true"\] \{ visibility: hidden; \}/);
   assert.doesNotMatch(layout, /--saturday-row-bg: #/);
 });

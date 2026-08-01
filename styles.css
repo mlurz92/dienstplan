@@ -960,14 +960,14 @@ h3 { font-size: 1.05rem; }
   #monthTitle { font-size: 13pt; letter-spacing: .01em; margin: 0; line-height: 1.15; color: var(--month-ink); }
   .legend-stack { display: block; }
   .legend-stack .rule-legend, .legend-stack .calendar-legend { display: none !important; }
-  /* Zurückhaltend: keine Farbfläche, keine farbige Kontur, keine farbige
-     Schrift. Die Monatsfarbe gehört im Ausdruck der Tabelle. */
+  /* Zurückhaltend: keine Farbfläche, neutrale Kontur – die Beschriftung selbst
+     bleibt aber im Monatskontrast und benennt damit die Farbe, die sie trägt. */
   .month-palette-label {
-    display: inline-block; font-size: 7pt; font-weight: 600; line-height: 1.2;
-    letter-spacing: .02em; padding: .7mm 2.4mm; border-radius: 999px;
-    color: #3b4149;
+    display: inline-block; font-size: 6pt; font-weight: 600; line-height: 1.2;
+    letter-spacing: .02em; padding: .5mm 2mm; border-radius: 999px;
+    color: var(--month-accent-strong);
     background: none;
-    border: .2mm solid rgba(0,0,0,.34);
+    border: .18mm solid rgba(0,0,0,.3);
   }
 
   /* Planungstabelle ----------------------------------------------------- */
