@@ -932,16 +932,41 @@ h3 { font-size: 1.05rem; }
     contain: none !important;
     text-shadow: none !important;
   }
-  body::before, body::after, .topbar, .toolbar, .legend-stack, .ambient-layer { display: none !important; }
+  body::before, body::after, .topbar, .toolbar, .ambient-layer { display: none !important; }
   .glass-panel::after, .glass-panel::before { display: none !important; }
   .app-shell { max-width: none; padding: 0; gap: 0; display: block; }
   .sheet-layout { display: block; }
-  .glass-panel, .sheet-panel { backdrop-filter: none; box-shadow: none; border: none; background: #fff; padding: 0; margin: 0; }
+  /* `overflow: hidden` plus Eckenrundung der Glaspanels schnitt im Druck
+     Buchstaben an den Ecken ab – erster Buchstabe des Monatstitels, letzte
+     Zeile der Statistik. Im Druck gibt es weder Rundung noch Beschnitt. */
+  .glass-panel, .sheet-panel {
+    backdrop-filter: none; box-shadow: none; border: none; background: #fff;
+    padding: 0; margin: 0; overflow: visible; border-radius: 0;
+  }
+
+  /* Der Ausdruck nutzt bewusst nicht die volle Satzbreite: Ein ruhiger
+     Seitenrand wirkt aufgeräumter und entspricht der bisherigen Vorlage. */
+  .app-shell, .sheet-layout, .sheet-panel { width: 168mm; margin-left: auto; margin-right: auto; }
 
   /* Kopf ---------------------------------------------------------------- */
-  .sheet-heading { display: block; margin: 0 0 3.4mm; padding: 0 0 1.6mm; border-bottom: .5mm solid var(--month-accent); }
-  .sheet-heading .eyebrow { display: none; }
+  .sheet-heading {
+    display: flex; justify-content: space-between; align-items: flex-end; gap: 6mm;
+    margin: 0 0 3.4mm; padding: 0 0 1.6mm; border-bottom: .5mm solid var(--month-accent);
+  }
+  .sheet-heading .eyebrow {
+    display: block; margin: 0 0 .6mm; font-size: 7pt; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .16em; color: var(--month-accent-strong);
+  }
   #monthTitle { font-size: 13pt; letter-spacing: .01em; margin: 0; line-height: 1.15; color: var(--month-ink); }
+  .legend-stack { display: block; }
+  .legend-stack .rule-legend, .legend-stack .calendar-legend { display: none !important; }
+  .month-palette-label {
+    display: inline-block; font-size: 7pt; font-weight: 700; line-height: 1.2;
+    padding: .8mm 2.4mm; border-radius: 999px;
+    color: var(--month-accent-strong);
+    background: color-mix(in srgb, var(--month-accent) 16%, #fff);
+    border: .25mm solid color-mix(in srgb, var(--month-accent) 46%, #fff);
+  }
 
   /* Planungstabelle ----------------------------------------------------- */
   .plan-table-wrap { overflow: visible; box-shadow: none; border: .35mm solid var(--month-ink); border-radius: 0; background: #fff; }
@@ -977,7 +1002,7 @@ h3 { font-size: 1.05rem; }
   .holiday-name { font-size: 5.8pt; margin-top: 0; line-height: 1.05; }
 
   /* Statistik ------------------------------------------------------------ */
-  .below-plan { margin-top: 7mm; max-width: none; break-inside: avoid; page-break-inside: avoid; }
+  .below-plan { width: 168mm; margin-left: auto; margin-right: auto; margin-top: 7mm; max-width: none; break-inside: avoid; page-break-inside: avoid; }
   .below-plan .section-title-row { display: block; margin: 0 0 2mm; }
   .below-plan .section-title-row .eyebrow, .below-plan .section-note { display: none; }
   .below-plan h3 { font-size: 9.5pt; margin: 0; line-height: 1.15; color: var(--month-ink); }
