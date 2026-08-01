@@ -75,7 +75,7 @@ test('Belegte Dienstfelder zeigen keinen Badge, der Picker aber weiterhin die Be
   const occupiedBd = firstRow.locator('.assignment-btn').first();
   const openHg = firstRow.locator('.assignment-btn').nth(1);
 
-  await expect(occupiedBd.locator('.assignment-name')).toHaveText('Dr. Lurz');
+  await expect(occupiedBd.locator('.assignment-name')).toHaveText('Lurz');
   await expect(occupiedBd.locator('.assignment-badges')).toHaveCount(0);
   await expect(openHg.locator('.assignment-badges .small-chip')).toHaveText('offen');
 
