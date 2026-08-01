@@ -1,11 +1,11 @@
-import { ABSENCE_TYPES, MONTH_NAMES, OPTION_TYPES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, normalizeBackupPayload, toIsoDate } from './defaults.js?v=20260801.10';
-import { state, bootstrapState, buildBackupPayload, getMonthData, getMonthLabel, isMonthDirty, isMonthMergeSafe, loadMonth, markBootstrapDirty, markBootstrapSynced, markMonthDirty, markMonthSynced, persistDirtyState, persistMonth, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260801.10';
-import { api } from './api.js?v=20260801.10';
-import { applyMonthTheme, prefersReducedMotion } from './theme.js?v=20260801.10';
-import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260801.10';
-import { assignmentLabel, buildStats, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getEffectiveAbsence, getPlanningStaff, getOptions, getPreference, getStaffById, isExternalAssignment, labelForAbsence, labelForOption, labelForPreference, setAbsence, setAssignment, setOptions, setPreference, toggleOption, weekdayLabel } from './rules.js?v=20260801.10';
-import { getRbnOptions, isRbnValueAllowed, isSecondRbnAvailable, rbnDisplayName } from './rbn.js?v=20260801.10';
-import { analyzeWorkbook } from './excel-import.js?v=20260801.10';
+import { ABSENCE_TYPES, MONTH_NAMES, OPTION_TYPES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, normalizeBackupPayload, toIsoDate } from './defaults.js?v=20260801.11';
+import { state, bootstrapState, buildBackupPayload, getMonthData, getMonthLabel, isMonthDirty, isMonthMergeSafe, loadMonth, markBootstrapDirty, markBootstrapSynced, markMonthDirty, markMonthSynced, persistDirtyState, persistMonth, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260801.11';
+import { api } from './api.js?v=20260801.11';
+import { applyMonthTheme, prefersReducedMotion } from './theme.js?v=20260801.11';
+import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260801.11';
+import { assignmentLabel, buildStats, clearedMonthData, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getEffectiveAbsence, getPlanningStaff, getOptions, getPreference, getStaffById, isExternalAssignment, labelForAbsence, labelForOption, labelForPreference, monthContentSummary, setAbsence, setAssignment, setOptions, setPreference, toggleOption, weekdayLabel } from './rules.js?v=20260801.11';
+import { getRbnOptions, isRbnValueAllowed, isSecondRbnAvailable, rbnDisplayName } from './rbn.js?v=20260801.11';
+import { analyzeWorkbook } from './excel-import.js?v=20260801.11';
 
 const $ = selector => document.querySelector(selector);
 
@@ -114,6 +114,7 @@ function bindEvents() {
     openCurrentMonth(now.getFullYear(), now.getMonth() + 1);
   });
   $('#reloadBtn').addEventListener('click', () => openCurrentMonth(state.currentYear, state.currentMonth, true));
+  $('#clearMonthBtn').addEventListener('click', onClearMonth);
   $('#absenceManagerBtn').addEventListener('click', () => openBatchDialog('absence'));
   $('#preferenceManagerBtn').addEventListener('click', () => openBatchDialog('preference'));
   $('#clearAssignmentBtn').addEventListener('click', onClearAssignment);
@@ -236,6 +237,32 @@ async function openCurrentMonth(year, month, forceServer = false) {
 
   if (state.dirty || isMonthDirty(year, month)) setStatus('offline', 'Lokale Änderungen noch nicht synchronisiert');
   else setStatus(state.serverReady ? 'saved' : 'offline', state.serverReady ? 'Gespeichert' : 'Offline – lokaler Stand');
+  render();
+}
+
+/**
+ * Den angezeigten Monat vollständig leeren: Dienste, RBN, Abwesenheiten,
+ * Dienstwünsche und Optionen. Override- und Importprotokoll bleiben als
+ * Nachweis erhalten, ebenso Revision und Zeitstempel für die Serversynchronität.
+ */
+async function onClearMonth() {
+  const monthData = getMonthData(state.currentYear, state.currentMonth);
+  const label = getMonthLabel();
+  const { filledDays, markedStaff, empty } = monthContentSummary(monthData);
+  if (empty) {
+    alert(`${label} enthält bereits keine Einträge.`);
+    return;
+  }
+  if (!confirm(`${label} vollständig leeren?\n\nEntfernt werden ${filledDays} belegte Tage sowie sämtliche Abwesenheiten, Dienstwünsche und Optionen von ${markedStaff} Personen. Andere Monate bleiben unberührt. Das Override- und Importprotokoll bleibt erhalten.\n\nDieser Schritt lässt sich nur über eine JSON-Sicherung rückgängig machen.`)) return;
+
+  const cleared = clearedMonthData(monthData, state.currentYear, state.currentMonth);
+  setMonthData(state.currentYear, state.currentMonth, cleared, 'local');
+  markMonthDirty(state.currentYear, state.currentMonth);
+  render();
+
+  const result = await persistMonth(state.currentYear, state.currentMonth);
+  if (result.ok) setStatus(state.dirty ? 'saving' : 'saved', state.dirty ? 'Weitere Änderungen ausstehend …' : `${label} geleert und gespeichert`);
+  else setStatus('offline', `${label} nur lokal geleert – Serverfehler`);
   render();
 }
 
