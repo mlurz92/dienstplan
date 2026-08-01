@@ -6,7 +6,7 @@
 
 <p align="center"><strong>Manuelle, regelgestützte Monatsplanung für Bereitschaftsdienst, Hintergrunddienst und RBN</strong></p>
 
-> **Referenzstand:** Build `20260801.7` · Paketversion `0.2.0` · Datenregion Sachsen (`SN`)  
+> **Referenzstand:** Build `20260801.8` · Paketversion `0.2.0` · Datenregion Sachsen (`SN`)  
 > **Betriebsmodell:** Cloudflare Pages + Pages Functions + Cloudflare KV, ergänzt durch eine lokale Browser-Sicherung  
 > **Grundsatz:** Der Mensch plant. DienstplanRAD prüft, erklärt, speichert und dokumentiert.
 
@@ -284,7 +284,7 @@ Eine **offene** Zelle zeigt den neutralen Platzhalter und den sichtbaren Chip �
 
 ## 6.4 RBN-Zellen
 
-RBN-Felder werden direkt als native `<select>`-Elemente erzeugt. Es existiert keine nachträgliche DOM-Ersetzung, kein verstecktes Freitextfeld und keine gemeinsame Datalist. Historische Werte außerhalb des heutigen Fachpools können als deaktivierter „Altwert“ sichtbar bleiben.
+RBN-Felder werden direkt als native `<select>`-Elemente erzeugt. Es existiert keine nachträgliche DOM-Ersetzung, kein verstecktes Freitextfeld und keine gemeinsame Datalist. Historische Werte außerhalb des heutigen Fachpools bleiben als deaktivierter Eintrag sichtbar – mit dem reinen Namen ohne Anrede, Titel oder Zusatz. Dass sie nicht mehr wählbar sind, zeigt die gesperrte Auswahl; die Begründung steht in den offenen Punkten.
 
 ## 6.5 U/FZA-Zelle
 
@@ -577,7 +577,7 @@ Die Auswahl erscheint ausschließlich, wenn die erste RBN desselben Tages durch 
 
 ## 10.3 Wechsel der Erstbesetzung
 
-Wird eine freigebende Erstbesetzung bewusst durch eine nicht freigebende Person oder einen Leerwert ersetzt, wird ein vorhandener zweiter RBN-Wert entfernt und der Monat als geändert markiert. Beim bloßen Laden historischer inkonsistenter Daten erfolgt dagegen keine stille Löschung; ein vorhandener Wert bleibt als „Altwert“ lesbar.
+Wird eine freigebende Erstbesetzung bewusst durch eine nicht freigebende Person oder einen Leerwert ersetzt, wird ein vorhandener zweiter RBN-Wert entfernt und der Monat als geändert markiert. Beim bloßen Laden historischer inkonsistenter Daten erfolgt dagegen keine stille Löschung; ein vorhandener Wert bleibt mit seinem Namen lesbar.
 
 ## 10.4 Legacy-RBN-Namen
 
@@ -1313,7 +1313,7 @@ Das Repository wird aus dem Projektstamm bereitgestellt. Pages Functions werden 
 Alle releasekritischen Assets und relativen Browserimporte verwenden denselben `?v=`-Token. Der Build-Stempel in `index.html` muss exakt dazu passen. Für diesen Funktionsstand ist die Kennung:
 
 ```text
-20260801.7
+20260801.8
 ```
 
 Der laufende Stand ist im Browser über `document.documentElement.dataset.build` und im Tooltip des Speicherstatus sichtbar.
