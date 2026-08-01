@@ -82,7 +82,7 @@ test('app.js rendert die RBN-Selects direkt und koppelt 2. RBN ohne DOM-Nachbear
   const rulesFacade = fs.readFileSync(new URL('../js/rules.js', import.meta.url), 'utf8');
 
   assert.equal(await exists('js/rbn-ui.js'), false, 'kein nachgelagerter DOM-Postprozessor');
-  assert.match(app, /from '\.\/rbn\.js\?v=20260801\.5'/);
+  assert.match(app, /from '\.\/rbn\.js\?v=20260801\.6'/);
   assert.match(app, /function buildRbnSelect/);
   assert.match(app, /createElement\('select'\)/);
   assert.match(app, /isSecondRbnAvailable\(dateIso, firstSelect\.value\)/);
@@ -153,10 +153,15 @@ test('Das Druckstylesheet hält den Monatsplan auf einer A4-Seite zusammen', () 
   assert.doesNotMatch(layout, /--saturday-row-bg: #/);
 });
 
-test('Vor dem Drucken werden die Monatsfarben auf den Endzustand gesetzt', () => {
+test('Vor dem Drucken werden Monatsfarben und Dateiname gesetzt und danach zurückgenommen', () => {
   const app = fs.readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
 
   // Der Farbwechsel läuft als rAF-Interpolation; ohne dieses Setzen druckt ein
   // Wechsel mitten in der Bewegung die Farben des Vormonats.
-  assert.match(app, /window\.addEventListener\('beforeprint', \(\) => applyMonthTheme\(state\.currentMonth, \{ animate: false \}\)\)/);
+  assert.match(app, /function prepareForPrint\(\) \{[\s\S]*?applyMonthTheme\(state\.currentMonth, \{ animate: false \}\);/);
+  // Der PDF-Dateiname stammt aus dem Dokumenttitel.
+  assert.match(app, /return `Dienstplan \$\{state\.currentYear\}-\$\{String\(state\.currentMonth\)\.padStart\(2, '0'\)\}`/);
+  assert.match(app, /document\.title = printDocumentTitle\(\)/);
+  assert.match(app, /window\.addEventListener\('beforeprint', prepareForPrint\)/);
+  assert.match(app, /window\.addEventListener\('afterprint', restoreAfterPrint\)/);
 });
