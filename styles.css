@@ -500,9 +500,12 @@ h3 { font-size: 1.05rem; }
 .rbn-input { width: 100%; height: 29px; border: none; border-radius: 0; background: transparent; padding: 3px 5px; box-shadow: none; }
 .rbn2-inactive-note { width: 100%; padding: 3px 5px; color: var(--muted); font-size: .72rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rbn-input:focus { outline: 2px solid color-mix(in srgb, var(--month-accent) 75%, white); outline-offset: -2px; background: rgba(255,255,255,.88); }
-.cell-summary-button { width: 100%; min-height: 29px; border: none; border-radius: 0; background: transparent; padding: 3px 5px; text-align: left; color: #30363d; font-size: .8rem; font-weight: 400; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; box-shadow: none; }
+.cell-summary-button { width: 100%; min-height: 29px; border: none; border-radius: 0; background: transparent; padding: 2px 4px; text-align: left; color: #30363d; font-size: .8rem; font-weight: 400; box-shadow: none; display: flex; flex-wrap: wrap; align-content: flex-start; align-items: flex-start; gap: 2px 3px; white-space: normal; overflow: hidden; }
+/* Chips statt Fließtext: Ab etwa drei Einträgen reichte eine Zeile nicht mehr
+   aus, der Rest verschwand hinter dem Überlauf und war nur im Tooltip lesbar. */
+.summary-entry { display: inline-flex; align-items: baseline; gap: 2px; max-width: 100%; padding: 0 3px; border-radius: 3px; background: rgba(255,255,255,.52); box-shadow: inset 0 0 0 1px rgba(255,255,255,.6); font-size: .7rem; line-height: 1.25; white-space: nowrap; }
 .absence-summary-name { font-weight: 700; }
-.absence-summary-detail { font-weight: 400; }
+.absence-summary-detail { font-weight: 400; color: #4a525c; }
 
 .below-plan { margin-top: 12px; max-width: 920px; }
 .section-title-row { display: flex; justify-content: space-between; align-items: end; gap: 12px; margin-bottom: 5px; }
@@ -599,7 +602,9 @@ h3 { font-size: 1.05rem; }
   .plan-table-wrap, .excel-stats { box-shadow: none; border-color: #000; border-radius: 0; }
   .plan-table { min-width: 0; font-size: 8.3px; }
   .plan-table th, .plan-table td { height: 18px; border-color: #000; }
-  .assignment-btn, .rbn-field, .rbn-input, .cell-summary-button { min-height: 17px; height: 17px; font-size: 8px; }
+  .assignment-btn, .rbn-field, .rbn-input { min-height: 17px; height: 17px; font-size: 8px; }
+  .cell-summary-button { min-height: 17px; height: auto; font-size: 8px; padding: 1px 2px; gap: 1px 2px; }
+  .summary-entry { font-size: 7px; line-height: 1.15; padding: 0 1px; background: none; box-shadow: none; }
   .small-chip { display: none; }
   .below-plan { margin-top: 5mm; max-width: 120mm; }
   .holiday-name { font-size: 5.5px; }

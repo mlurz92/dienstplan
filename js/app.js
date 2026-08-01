@@ -1,10 +1,10 @@
-import { ABSENCE_TYPES, MONTH_NAMES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, normalizeBackupPayload, toIsoDate } from './defaults.js?v=20260731.3';
-import { state, bootstrapState, buildBackupPayload, getMonthData, getMonthLabel, isMonthDirty, isMonthMergeSafe, loadMonth, markBootstrapDirty, markBootstrapSynced, markMonthDirty, markMonthSynced, persistDirtyState, persistMonth, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260731.3';
-import { api } from './api.js?v=20260731.3';
-import { applyMonthTheme, prefersReducedMotion } from './theme.js?v=20260731.3';
-import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260731.3';
-import { buildStats, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getEffectiveAbsence, getPlanningStaff, getPreference, getStaffById, labelForAbsence, labelForPreference, setAbsence, setAssignment, setPreference, weekdayLabel } from './rules.js?v=20260731.3';
-import { getRbnOptions, isRbnValueAllowed, isSecondRbnAvailable } from './rbn.js?v=20260731.3';
+import { ABSENCE_TYPES, MONTH_NAMES, OPTION_TYPES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, normalizeBackupPayload, toIsoDate } from './defaults.js?v=20260801.1';
+import { state, bootstrapState, buildBackupPayload, getMonthData, getMonthLabel, isMonthDirty, isMonthMergeSafe, loadMonth, markBootstrapDirty, markBootstrapSynced, markMonthDirty, markMonthSynced, persistDirtyState, persistMonth, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260801.1';
+import { api } from './api.js?v=20260801.1';
+import { applyMonthTheme, prefersReducedMotion } from './theme.js?v=20260801.1';
+import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260801.1';
+import { buildStats, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getEffectiveAbsence, getPlanningStaff, getOptions, getPreference, getStaffById, labelForAbsence, labelForOption, labelForPreference, setAbsence, setAssignment, setOptions, setPreference, toggleOption, weekdayLabel } from './rules.js?v=20260801.1';
+import { getRbnOptions, isRbnValueAllowed, isSecondRbnAvailable } from './rbn.js?v=20260801.1';
 
 const $ = selector => document.querySelector(selector);
 
@@ -349,15 +349,22 @@ function isBeckerFzaAfterSaturdayBd(dateIso) {
   return isFirstRegularWorkdayAfter(dateIso, iso => parseIsoLocal(iso).getDay() === 6 && getAssignment(state, iso, 'bd') === 'becker');
 }
 
-function appendAbsenceSummaryEntry(wrapper, name, detail, index) {
-  if (index > 0) wrapper.appendChild(document.createTextNode(', '));
+/**
+ * Ein Eintrag der Tageszusammenfassung als kompakter Chip. Der frühere
+ * einzeilige Fließtext lief ab etwa drei Einträgen aus der Zelle heraus und war
+ * nur noch im Tooltip lesbar; die Chips brechen stattdessen um.
+ */
+function appendSummaryEntry(wrapper, name, detail) {
+  const entry = document.createElement('span');
+  entry.className = 'summary-entry';
   const nameSpan = document.createElement('span');
   nameSpan.className = 'absence-summary-name';
   nameSpan.textContent = name;
   const detailSpan = document.createElement('span');
   detailSpan.className = 'absence-summary-detail';
-  detailSpan.textContent = `: ${detail}`;
-  wrapper.append(nameSpan, detailSpan);
+  detailSpan.textContent = detail;
+  entry.append(nameSpan, detailSpan);
+  wrapper.appendChild(entry);
 }
 
 function buildAbsenceSummary(dateIso, monthData) {
@@ -390,7 +397,7 @@ function buildAbsenceSummary(dateIso, monthData) {
     details.push(`${person.short}: ${detail}`);
   }
 
-  entries.forEach((entry, index) => appendAbsenceSummaryEntry(wrapper, entry.name, entry.detail, index));
+  entries.forEach(entry => appendSummaryEntry(wrapper, entry.name, entry.detail));
   wrapper.title = details.length ? details.join('\n') : 'Abwesenheiten bearbeiten';
   wrapper.addEventListener('click', () => openDayMetaDialog(dateIso));
   return wrapper;
@@ -403,11 +410,15 @@ function buildPreferenceSummary(dateIso, monthData) {
   const entries = [];
   for (const person of state.staff.filter(item => item.includeInAbsenceList)) {
     const pref = getPreference(monthData, person.id, dateIso);
-    if (!pref) continue;
-    entries.push(`${person.short}: ${shortPreferenceLabel(pref)}`);
+    const options = getOptions(monthData, person.id, dateIso);
+    const parts = [];
+    if (pref) parts.push(shortPreferenceLabel(pref));
+    options.forEach(option => parts.push(shortOptionLabel(option)));
+    if (!parts.length) continue;
+    entries.push({ name: person.short, detail: parts.join('/') });
   }
-  wrapper.textContent = entries.length ? entries.join(', ') : '';
-  wrapper.title = entries.length ? entries.join('\n') : 'Dienstwünsche bearbeiten';
+  entries.forEach(entry => appendSummaryEntry(wrapper, entry.name, entry.detail));
+  wrapper.title = entries.length ? entries.map(entry => `${entry.name}: ${entry.detail}`).join('\n') : 'Dienstwünsche und Optionen bearbeiten';
   wrapper.addEventListener('click', () => openDayMetaDialog(dateIso));
   return wrapper;
 }
@@ -423,10 +434,12 @@ function shortPreferenceLabel(type) {
     'kein-dienst': 'kein Dienst',
     'bd-bevorzugt': '+BD',
     'hg-bevorzugt': '+HG',
-    'dienst-bevorzugt': '+Dienst',
-    'bd-moeglich': 'BD mögl.',
-    'hg-moeglich': 'HG mögl.'
+    'dienst-bevorzugt': '+Dienst'
   })[type] || labelForPreference(type);
+}
+
+function shortOptionLabel(type) {
+  return ({ 'bd-moeglich': 'BD mögl.', 'hg-moeglich': 'HG mögl.' })[type] || labelForOption(type);
 }
 
 function renderStats(monthData) {
@@ -614,8 +627,13 @@ function openDayMetaDialog(dateIso) {
     prefGroup.className = 'meta-group';
     PREFERENCE_TYPES.forEach(type => prefGroup.appendChild(buildMetaChip({ kind:'preference', dateIso, staffId: person.id, typeId: type.id, active: pref === type.id, label: type.label })));
     prefGroup.appendChild(buildMetaChip({ kind:'preference', dateIso, staffId: person.id, typeId: '', active: !pref, label: 'kein Wunsch' }));
+    const optionGroup = document.createElement('div');
+    optionGroup.className = 'meta-group';
+    const options = getOptions(monthData, person.id, dateIso);
+    OPTION_TYPES.forEach(type => optionGroup.appendChild(buildMetaChip({ kind:'option', dateIso, staffId: person.id, typeId: type.id, active: options.includes(type.id), label: type.label })));
     row.appendChild(labelWrap('Abwesenheit', absGroup));
     row.appendChild(labelWrap('Dienstwunsch', prefGroup));
+    row.appendChild(labelWrap('Optionen', optionGroup));
     $('#dayMetaList').appendChild(row);
   });
   $('#dayMetaDialog').showModal();
@@ -639,6 +657,7 @@ function buildMetaChip({ kind, dateIso, staffId, typeId, active, label }) {
   chip.addEventListener('click', () => {
     const monthData = getMonthData(state.currentYear, state.currentMonth);
     if (kind === 'absence') setAbsence(monthData, staffId, dateIso, typeId);
+    else if (kind === 'option') toggleOption(monthData, staffId, dateIso, typeId);
     else setPreference(monthData, staffId, dateIso, typeId);
     markDirty();
     openDayMetaDialog(dateIso);
@@ -649,8 +668,8 @@ function buildMetaChip({ kind, dateIso, staffId, typeId, active, label }) {
 
 function openBatchDialog(mode) {
   state.currentBatchMode = mode;
-  $('#batchEyebrow').textContent = mode === 'absence' ? 'Komforteingabe Abwesenheiten' : 'Komforteingabe Dienstwünsche';
-  $('#batchTitle').textContent = mode === 'absence' ? 'Abwesenheiten komfortabel setzen' : 'Dienstwünsche komfortabel setzen';
+  $('#batchEyebrow').textContent = mode === 'absence' ? 'Komforteingabe Abwesenheiten' : 'Komforteingabe Dienstwünsche & Optionen';
+  $('#batchTitle').textContent = mode === 'absence' ? 'Abwesenheiten komfortabel setzen' : 'Dienstwünsche und Optionen komfortabel setzen';
   $('#batchSubtitle').textContent = 'Beliebige einzelne Tage auswählen, Typ festlegen, gesammelt übernehmen.';
   $('#batchStaffSelect').innerHTML = '';
   state.staff.filter(item => item.includeInAbsenceList).forEach(person => {
@@ -660,7 +679,7 @@ function openBatchDialog(mode) {
     $('#batchStaffSelect').appendChild(option);
   });
   $('#batchTypeSelect').innerHTML = '';
-  const source = mode === 'absence' ? ABSENCE_TYPES : PREFERENCE_TYPES;
+  const source = mode === 'absence' ? ABSENCE_TYPES : [...PREFERENCE_TYPES, ...OPTION_TYPES];
   source.forEach(type => {
     const option = document.createElement('option');
     option.value = type.id;
@@ -685,11 +704,15 @@ function buildBatchGrid() {
     if (date.getDay() === 6) button.classList.add('saturday');
     if (date.getDay() === 0) button.classList.add('sunday');
     if (holidayName) button.classList.add('holiday');
-    const current = state.currentBatchMode === 'absence' ? getAbsence(monthData, staffId, iso) : getPreference(monthData, staffId, iso);
-    if (current === currentType) button.classList.add('selected');
+    const isOptionType = OPTION_TYPES.some(type => type.id === currentType);
+    const current = state.currentBatchMode === 'absence'
+      ? getAbsence(monthData, staffId, iso)
+      : (isOptionType ? '' : getPreference(monthData, staffId, iso));
+    const optionsForDay = state.currentBatchMode === 'absence' ? [] : getOptions(monthData, staffId, iso);
+    if (isOptionType ? optionsForDay.includes(currentType) : current === currentType) button.classList.add('selected');
     button.dataset.dateIso = iso;
     button.title = holidayName || '';
-    button.innerHTML = `<strong>${String(date.getDate()).padStart(2,'0')}</strong><small>${weekdayLabel(iso)}</small>${holidayName ? `<small class="batch-holiday-name">${esc(holidayName)}</small>` : ''}<small>${current ? (state.currentBatchMode === 'absence' ? labelForAbsence(current) : labelForPreference(current)) : '—'}</small>`;
+    button.innerHTML = `<strong>${String(date.getDate()).padStart(2,'0')}</strong><small>${weekdayLabel(iso)}</small>${holidayName ? `<small class="batch-holiday-name">${esc(holidayName)}</small>` : ''}<small>${batchDayLabel(current, optionsForDay)}</small>`;
     button.addEventListener('click', () => button.classList.toggle('selected'));
     $('#batchDayGrid').appendChild(button);
   });
@@ -697,13 +720,22 @@ function buildBatchGrid() {
   $('#batchTypeSelect').onchange = buildBatchGrid;
 }
 
+function batchDayLabel(current, optionsForDay) {
+  const parts = [];
+  if (current) parts.push(state.currentBatchMode === 'absence' ? labelForAbsence(current) : labelForPreference(current));
+  (optionsForDay || []).forEach(option => parts.push(labelForOption(option)));
+  return parts.length ? esc(parts.join(' / ')) : '—';
+}
+
 function onApplyBatch() {
   const monthData = getMonthData(state.currentYear, state.currentMonth);
   const staffId = $('#batchStaffSelect').value;
   const typeId = $('#batchTypeSelect').value;
+  const isOptionType = OPTION_TYPES.some(type => type.id === typeId);
   document.querySelectorAll('.batch-day.selected').forEach(el => {
     const iso = el.dataset.dateIso;
     if (state.currentBatchMode === 'absence') setAbsence(monthData, staffId, iso, typeId);
+    else if (isOptionType) setOptions(monthData, staffId, iso, [...new Set([...getOptions(monthData, staffId, iso), typeId])]);
     else setPreference(monthData, staffId, iso, typeId);
   });
   markDirty();

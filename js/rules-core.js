@@ -1,5 +1,5 @@
-import { MONTH_NAMES, PREFERENCE_TYPES, STAFF_ORDER, toIsoDate, WEEKDAYS } from './defaults.js?v=20260731.3';
-import { isFirstRegularWorkdayAfter } from './holidays.js?v=20260731.3';
+import { MONTH_NAMES, OPTION_TYPES, PREFERENCE_TYPES, STAFF_ORDER, toIsoDate, WEEKDAYS } from './defaults.js?v=20260801.1';
+import { isFirstRegularWorkdayAfter } from './holidays.js?v=20260801.1';
 
 export function parseIso(date) { return new Date(`${date}T00:00:00`); }
 export function addDays(date, days) { const d = new Date(date); d.setDate(d.getDate() + days); return d; }
@@ -99,6 +99,27 @@ export function setPreference(monthData, staffId, dateIso, type) {
   if (type) monthData.preferences[staffId][dateIso] = type;
   else delete monthData.preferences[staffId][dateIso];
 }
+
+export function getOptions(monthData, staffId, dateIso) {
+  const raw = monthData?.options?.[staffId]?.[dateIso];
+  return typeof raw === 'string' && raw ? raw.split(',').filter(Boolean) : [];
+}
+export function hasOption(monthData, staffId, dateIso, optionId) {
+  return getOptions(monthData, staffId, dateIso).includes(optionId);
+}
+export function setOptions(monthData, staffId, dateIso, optionIds) {
+  const known = OPTION_TYPES.map(type => type.id);
+  const clean = known.filter(id => optionIds.includes(id));
+  monthData.options ||= {};
+  monthData.options[staffId] ||= {};
+  if (clean.length) monthData.options[staffId][dateIso] = clean.join(',');
+  else delete monthData.options[staffId][dateIso];
+}
+export function toggleOption(monthData, staffId, dateIso, optionId) {
+  const current = getOptions(monthData, staffId, dateIso);
+  setOptions(monthData, staffId, dateIso, current.includes(optionId) ? current.filter(id => id !== optionId) : [...current, optionId]);
+}
+export function labelForOption(type) { return OPTION_TYPES.find(item => item.id === type)?.label || type; }
 
 export function countRoleInMonth(monthData, staffId, role) {
   return Object.values(monthData.days || {}).filter(day => day?.[role] === staffId).length;

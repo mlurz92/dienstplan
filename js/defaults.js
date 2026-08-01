@@ -34,7 +34,10 @@ export const PREFERENCE_TYPES = [
   { id: 'kein-dienst', label: 'Kein Dienst' },
   { id: 'bd-bevorzugt', label: 'BD bevorzugt' },
   { id: 'hg-bevorzugt', label: 'HG bevorzugt' },
-  { id: 'dienst-bevorzugt', label: 'Dienst bevorzugt' },
+  { id: 'dienst-bevorzugt', label: 'Dienst bevorzugt' }
+];
+
+export const OPTION_TYPES = [
   { id: 'bd-moeglich', label: 'BD möglich' },
   { id: 'hg-moeglich', label: 'HG möglich' }
 ];
@@ -195,6 +198,7 @@ export function createEmptyMonth(year, month) {
     absences: {},
     absenceSources: {},
     preferences: {},
+    options: {},
     overrideLog: [],
     importLog: []
   };
@@ -213,6 +217,40 @@ function normalizePerStaffDateMap(value, validDates) {
     if (Object.keys(clean).length) normalized[staffId] = clean;
   }
   return normalized;
+}
+
+const OPTION_IDS = new Set(OPTION_TYPES.map(type => type.id));
+
+function normalizeOptionMap(value, validDates) {
+  const base = normalizePerStaffDateMap(value, validDates);
+  const normalized = {};
+  for (const [staffId, entries] of Object.entries(base)) {
+    const clean = {};
+    for (const [iso, entry] of Object.entries(entries)) {
+      const ids = [...new Set(entry.split(',').map(item => item.trim()).filter(item => OPTION_IDS.has(item)))];
+      if (ids.length) clean[iso] = ids.join(',');
+    }
+    if (Object.keys(clean).length) normalized[staffId] = clean;
+  }
+  return normalized;
+}
+
+function normalizePreferencesAndOptions(source, validDates) {
+  const preferences = normalizePerStaffDateMap(source.preferences, validDates);
+  const options = normalizeOptionMap(source.options, validDates);
+  for (const [staffId, entries] of Object.entries(preferences)) {
+    for (const [iso, entry] of Object.entries(entries)) {
+      if (!OPTION_IDS.has(entry)) continue;
+      delete entries[iso];
+      const existing = options[staffId]?.[iso];
+      const ids = new Set(existing ? existing.split(',') : []);
+      ids.add(entry);
+      options[staffId] ||= {};
+      options[staffId][iso] = [...ids].join(',');
+    }
+    if (!Object.keys(entries).length) delete preferences[staffId];
+  }
+  return { preferences, options };
 }
 
 export function normalizeMonthData(year, month, payload) {
@@ -248,7 +286,7 @@ export function normalizeMonthData(year, month, payload) {
     days,
     absences: normalizePerStaffDateMap(source.absences, validDates),
     absenceSources: normalizePerStaffDateMap(source.absenceSources, validDates),
-    preferences: normalizePerStaffDateMap(source.preferences, validDates),
+    ...normalizePreferencesAndOptions(source, validDates),
     overrideLog: Array.isArray(source.overrideLog) ? source.overrideLog.filter(isPlainRecord) : [],
     importLog: Array.isArray(source.importLog) ? source.importLog.filter(isPlainRecord) : []
   };
