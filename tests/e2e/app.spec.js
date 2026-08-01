@@ -89,6 +89,7 @@ test('Belegte Dienstfelder zeigen keinen Badge, der Picker aber weiterhin die Be
 test('Werkzeugleiste ist semantisch gruppiert und das Farbbadge bleibt frei vom Editionsnamen', async ({ page }) => {
   const month = emptyMonth(2026, 1);
   await mockApi(page, month);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
   await page.selectOption('#yearSelect', '2026');
   await page.selectOption('#monthSelect', '1');
@@ -102,8 +103,13 @@ test('Werkzeugleiste ist semantisch gruppiert und das Farbbadge bleibt frei vom 
   await expect(page.locator('#clearMonthBtn')).toHaveClass(/tool-action--danger/);
   await expect(page.locator('#excelImportInput').locator('xpath=..')).toHaveAttribute('aria-label', 'Excel-Datei importieren');
 
+  await expect(page.locator('html')).toHaveAttribute('data-spectrum-key', '2026-01');
   const badge = page.locator('#monthPaletteLabel');
-  await expect(badge).toHaveText('Monatskontrast · Eisnebel');
+  await expect(badge).toHaveText(/^Monatskontrast · \S.+$/);
   await expect(badge).not.toContainText('Cloud Veil');
-  await expect(badge).toHaveAttribute('title', 'Winter · Frost · 2026');
+  await expect(badge).toHaveAttribute('title', /^Winter · Eis · Polarlicht · 2026 · \S.+$/);
+  await expect.poll(() => page.evaluate(() => {
+    const name = document.documentElement.dataset.spectrumPalette || '';
+    return document.getElementById('monthPaletteLabel')?.textContent === `Monatskontrast · ${name}`;
+  })).toBe(true);
 });
