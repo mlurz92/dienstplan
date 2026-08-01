@@ -1,52 +1,127 @@
 /**
- * Monatsfarbsystem.
+ * Saisonales Langzeit-Monatsfarbsystem.
  *
- * Der Farbwechsel wird bewusst NICHT über CSS-Transitions registrierter
- * Custom Properties gefahren. Deren Start hängt davon ab, ob der Main-Thread
- * im richtigen Frame frei ist – und genau dann wird der Monat neu gerendert.
- * Das Ergebnis war nicht reproduzierbar: mal ein weicher Verlauf, mal ein
- * Sprung am Ende. Zusätzlich lösen abgeleitete, nicht registrierte Variablen
- * (color-mix über var(--month-accent)) nicht in jeder Engine zuverlässig neu
- * auf, während die Basisvariable animiert wird.
+ * Die Auswahl ist deterministisch aus Jahr und Monat abgeleitet. Vier
+ * handkuratierte, jahreszeitlich passende Grundtöne je Kalendermonat werden mit
+ * 24 behutsamen Trend-Editionen kombiniert. Damit entstehen 288 eindeutige
+ * Monatspaletten und ein 24-jähriger Zyklus statt einer jährlichen Wiederholung.
  *
- * Stattdessen interpoliert dieses Modul selbst: eine rAF-Schleife schreibt in
- * jedem Frame fertige, konkrete Farbwerte. Das ist in jeder Engine identisch,
- * unabhängig von @property, und die Zeitbasis ist performance.now() – blockiert
- * ein langer Renderframe die Schleife, springt sie auf den korrekten Fortschritt
- * und läuft weich weiter, statt stehenzubleiben.
- *
- * Interpoliert wird in OKLab. Lineare sRGB-Mischung führt bei Farbtonwechseln
- * (Koralle → Bernstein, Pflaume → Kupfer) über ausgegraute Zwischentöne; OKLab
- * hält Helligkeit und Buntheit über den gesamten Weg konstant.
+ * Der Farbwechsel wird bewusst nicht über CSS-Transitions registrierter Custom
+ * Properties gefahren. Eine zeitbasierte rAF-Schleife schreibt in jedem Frame
+ * konkrete Werte und interpoliert in OKLCH, damit die Fläche beim Wechsel nicht
+ * über ausgegraute Zwischentöne läuft.
  */
 
-export const MONTH_PALETTES = [
-  { name: 'Eisblau',            accent: '#4f8fbd', accentStrong: '#1f5f8f', glow: 'rgba(78, 151, 205, .34)', panelTint: 'rgba(211, 235, 250, .24)' },
-  { name: 'Rubinrose',          accent: '#b46483', accentStrong: '#8d365d', glow: 'rgba(190, 91, 132, .30)', panelTint: 'rgba(249, 219, 232, .24)' },
-  { name: 'Salbeigrün',         accent: '#5d9476', accentStrong: '#377057', glow: 'rgba(76, 151, 112, .30)', panelTint: 'rgba(218, 239, 226, .24)' },
-  { name: 'Lavendel',           accent: '#8273bd', accentStrong: '#5b4a9c', glow: 'rgba(129, 105, 196, .31)', panelTint: 'rgba(232, 226, 250, .25)' },
-  { name: 'Frühlingsgrün',      accent: '#4d9b62', accentStrong: '#2f743f', glow: 'rgba(73, 164, 95, .30)', panelTint: 'rgba(214, 242, 220, .24)' },
-  { name: 'Türkis',             accent: '#3c9b9b', accentStrong: '#1f7476', glow: 'rgba(55, 171, 171, .30)', panelTint: 'rgba(207, 242, 241, .24)' },
-  { name: 'Koralle',            accent: '#c66c5a', accentStrong: '#9b4437', glow: 'rgba(211, 99, 79, .31)', panelTint: 'rgba(252, 223, 215, .24)' },
-  { name: 'Bernstein',          accent: '#bd812d', accentStrong: '#8c5b16', glow: 'rgba(213, 151, 49, .31)', panelTint: 'rgba(252, 236, 205, .24)' },
-  { name: 'Pflaume',            accent: '#94618f', accentStrong: '#6f3d6b', glow: 'rgba(157, 87, 151, .30)', panelTint: 'rgba(239, 220, 238, .24)' },
-  { name: 'Kupfer',             accent: '#aa6f45', accentStrong: '#7d4c2b', glow: 'rgba(182, 111, 60, .31)', panelTint: 'rgba(244, 225, 211, .24)' },
-  { name: 'Schieferblau',       accent: '#657b9d', accentStrong: '#455b7c', glow: 'rgba(92, 118, 159, .31)', panelTint: 'rgba(222, 229, 240, .24)' },
-  { name: 'Tannengrün & Rubin', accent: '#416f62', accentStrong: '#285247', glow: 'rgba(43, 115, 92, .30)', panelTint: 'rgba(214, 234, 226, .24)' }
+export const PALETTE_REFERENCE_YEAR = 2026;
+export const PALETTE_CYCLE_YEARS = 24;
+
+const MONTH_BASES = [
+  {
+    month: 1, season: 'Winter', family: 'Frost',
+    variants: [
+      ['Eisnebel', '#4f8fbd'], ['Polarlicht', '#3f94a8'], ['Winterflieder', '#777fbd'], ['Arktischer Stahl', '#607f9f']
+    ]
+  },
+  {
+    month: 2, season: 'Spätwinter', family: 'Beere',
+    variants: [
+      ['Rubinrose', '#b46483'], ['Winterbeere', '#a85b72'], ['Orchideenrauch', '#9a668f'], ['Granatapfel', '#b15f69']
+    ]
+  },
+  {
+    month: 3, season: 'Vorfrühling', family: 'Botanik',
+    variants: [
+      ['Salbeigrün', '#5d9476'], ['Eukalyptus', '#579083'], ['Junge Olive', '#7d935a'], ['Celadon', '#60998c']
+    ]
+  },
+  {
+    month: 4, season: 'Frühling', family: 'Blüte',
+    variants: [
+      ['Lavendel', '#8273bd'], ['Wisteria', '#8d6fb0'], ['Irisblau', '#697fc0'], ['Fliederregen', '#936fa5']
+    ]
+  },
+  {
+    month: 5, season: 'Frühling', family: 'Grün',
+    variants: [
+      ['Frühlingsgrün', '#4d9b62'], ['Minzblatt', '#4f9d78'], ['Chartreuse-Salbei', '#789847'], ['Maigrün', '#5b9b50']
+    ]
+  },
+  {
+    month: 6, season: 'Frühsommer', family: 'Wasser',
+    variants: [
+      ['Türkis', '#3c9b9b'], ['Lagune', '#3594a5'], ['Aqua Mineral', '#4796ad'], ['Meeresglas', '#4b9c8e']
+    ]
+  },
+  {
+    month: 7, season: 'Hochsommer', family: 'Sonnenfrucht',
+    variants: [
+      ['Koralle', '#c66c5a'], ['Persimone', '#c8734c'], ['Wassermelone', '#c7646c'], ['Sonnenuntergang', '#bf725f']
+    ]
+  },
+  {
+    month: 8, season: 'Spätsommer', family: 'Gold',
+    variants: [
+      ['Bernstein', '#bd812d'], ['Safran', '#b98932'], ['Aprikosengold', '#c57f43'], ['Ringelblume', '#b58b2c']
+    ]
+  },
+  {
+    month: 9, season: 'Frühherbst', family: 'Pflaume',
+    variants: [
+      ['Pflaume', '#94618f'], ['Feige', '#8f637f'], ['Aubergine', '#80617f'], ['Weinlese', '#9c5d72']
+    ]
+  },
+  {
+    month: 10, season: 'Herbst', family: 'Erde',
+    variants: [
+      ['Kupfer', '#aa6f45'], ['Terrakotta', '#b16a4f'], ['Zimt', '#9f754f'], ['Bronze', '#9a7a45']
+    ]
+  },
+  {
+    month: 11, season: 'Spätherbst', family: 'Mineral',
+    variants: [
+      ['Schieferblau', '#657b9d'], ['Sturmblau', '#5c7890'], ['Petrolgrau', '#557d82'], ['Indigonebel', '#68739a']
+    ]
+  },
+  {
+    month: 12, season: 'Winter', family: 'Immergrün',
+    variants: [
+      ['Tannengrün', '#416f62'], ['Wacholder', '#4b7469'], ['Smaragdnacht', '#3f7569'], ['Winterwald', '#50705d']
+    ]
+  }
 ];
 
 /**
- * Anteil der Grundfarbe an der jeweiligen Flächenfarbe (Rest ist Weiß).
- *
- * Die Wochentagsspalte trägt die kräftige, dunkle Nuance und bildet als
- * durchgehender senkrechter Streifen den Anker der Tabelle. Die Wochenend- und
- * Feiertagszeilen liegen als helle, waagerechte Wäschen darüber und behalten
- * untereinander ihre Wertigkeit: Samstag < Sonntag < Feiertag.
- *
- * Die Werte sind nicht geschätzt, sondern über alle zwölf Paletten auf
- * Textkontrast geprüft: 46 % ergeben mit --month-ink im schlechtesten Fall
- * 5,63:1 und halten damit durchgängig WCAG AA.
+ * Kleine, kontrollierte OKLCH-Modifikatoren. Sie greifen aktuelle Richtungen
+ * wie luftige Neutrals, kühle Blautöne, Jade, dunkle Pflaume, expressive
+ * Gelbgrüns und Persimone auf, ohne die saisonale Grundfamilie zu verlassen.
  */
+const TREND_EDITIONS = [
+  ['Cloud Veil',       -2,  0.030, 0.88],
+  ['Cool Current',    -10,  0.010, 1.02],
+  ['Botanical Jade',   -4,  0.000, 1.08],
+  ['Plum Noir',         7, -0.025, 1.07],
+  ['Wasabi Spark',     12,  0.005, 1.13],
+  ['Persimmon Pop',    -8,  0.010, 1.11],
+  ['Quiet Luxury',      1, -0.005, 0.80],
+  ['Neo Mineral',       5, -0.010, 0.91],
+  ['Digital Bloom',    15,  0.000, 1.05],
+  ['Soft Chrome',      -6,  0.020, 0.82],
+  ['Organic Modern',  -12, -0.005, 0.89],
+  ['Future Heritage',   4, -0.020, 0.97],
+  ['Airy Contrast',     8,  0.025, 0.93],
+  ['Glacial Pulse',   -15,  0.005, 1.04],
+  ['Verdant Signal',   -7, -0.005, 1.10],
+  ['Velvet Depth',     10, -0.030, 1.03],
+  ['Acid Botanical',   16,  0.000, 1.10],
+  ['Solar Fruit',     -11,  0.012, 1.08],
+  ['Calm Couture',      2,  0.012, 0.84],
+  ['Stone Future',      7, -0.012, 0.88],
+  ['Chromatic Mist',   18,  0.018, 0.98],
+  ['Liquid Metal',     -9,  0.008, 0.86],
+  ['Earth Digital',   -15, -0.010, 0.94],
+  ['Modern Heirloom',   6, -0.024, 1.00]
+].map(([name, hueDegrees, lightness, chroma]) => ({ name, hueDegrees, lightness, chroma }));
+
 const SURFACE_MIX = {
   '--weekday-field-bg': 0.46,
   '--saturday-row-bg': 0.14,
@@ -54,38 +129,13 @@ const SURFACE_MIX = {
   '--holiday-row-bg': 0.30
 };
 
-/** Zielhelligkeit (OKLab L) des Schrifttons auf farbigen Tabellenflächen. */
 const INK_LIGHTNESS = 0.34;
-
-/**
- * Die Farbwäsche läuft bewusst länger und ruhiger als die Inhaltsbewegung.
- *
- * Die sonst in der Oberfläche verwendete Kurve cubic-bezier(.22, 1, .36, 1)
- * legt rund 98 % des Weges im ersten Drittel zurück – gemessen war die
- * Zielfarbe nach 245 von 640 ms erreicht, der Rest der Dauer blieb wirkungslos.
- * Für eine großflächige Farbfläche liest sich das als Schnappen. Diese Kurve
- * verteilt die Bewegung über die volle Dauer: ruhiger Antritt, getragene Mitte,
- * weiches Auslaufen. Zusammen mit dem schnelleren Inhalts-Slide entstehen zwei
- * Geschwindigkeiten – der Plan ist sofort da, die Farbe zieht darunter nach.
- */
 export const THEME_DURATION_MS = 720;
 const EASE = [0.40, 0.00, 0.22, 1.00];
 
-/* -------------------------------------------------------------------------
-   Farbparsing und Farbraum
-   ------------------------------------------------------------------------- */
+const positiveMod = (value, divisor) => ((value % divisor) + divisor) % divisor;
+const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
-/**
- * Liest `#rgb`, `#rrggbb`, `rgb()`, `rgba()` und `color(srgb …)` → [r, g, b, a].
- *
- * Gibt `null` zurück, wenn der Wert nicht sicher zu deuten ist. Das ist wichtig:
- * Beim Auslesen bereits gesetzter Variablen kann eine Engine auch etwas
- * liefern, das hier nicht vorgesehen ist – etwa den noch unaufgelösten
- * `color-mix()`-Ausdruck aus dem Stylesheet oder die `color(srgb …)`-Notation.
- * Früher entstanden daraus stillschweigend NaN-Werte, aus denen `rgb(NaN, …)`
- * wurde; solche Deklarationen verwirft der Browser wortlos, und die Farbe blieb
- * einfach stehen. Ein klares `null` erlaubt stattdessen einen sauberen Rückfall.
- */
 export function parseColor(value) {
   const input = String(value ?? '').trim();
   if (!input) return null;
@@ -97,19 +147,18 @@ export function parseColor(value) {
     return [parseInt(full.slice(0, 2), 16), parseInt(full.slice(2, 4), 16), parseInt(full.slice(4, 6), 16), 1];
   }
 
-  // color(srgb 0.77 0.42 0.35 / 0.5) – Anteile 0–1
   const srgb = input.match(/^color\(\s*srgb\s+([^)]+)\)$/i);
   if (srgb) {
-    const teile = srgb[1].split(/[\s,/]+/).filter(Boolean).map(Number);
-    if (teile.length < 3 || teile.slice(0, 3).some(Number.isNaN)) return null;
-    return [teile[0] * 255, teile[1] * 255, teile[2] * 255, teile[3] === undefined || Number.isNaN(teile[3]) ? 1 : teile[3]];
+    const parts = srgb[1].split(/[\s,/]+/).filter(Boolean).map(Number);
+    if (parts.length < 3 || parts.slice(0, 3).some(Number.isNaN)) return null;
+    return [parts[0] * 255, parts[1] * 255, parts[2] * 255, parts[3] === undefined || Number.isNaN(parts[3]) ? 1 : parts[3]];
   }
 
   const rgb = input.match(/^rgba?\(([^)]+)\)$/i);
   if (!rgb) return null;
-  const teile = rgb[1].split(/[\s,/]+/).filter(Boolean).map(Number);
-  if (teile.length < 3 || teile.slice(0, 3).some(Number.isNaN)) return null;
-  return [teile[0], teile[1], teile[2], teile[3] === undefined || Number.isNaN(teile[3]) ? 1 : teile[3]];
+  const parts = rgb[1].split(/[\s,/]+/).filter(Boolean).map(Number);
+  if (parts.length < 3 || parts.slice(0, 3).some(Number.isNaN)) return null;
+  return [parts[0], parts[1], parts[2], parts[3] === undefined || Number.isNaN(parts[3]) ? 1 : parts[3]];
 }
 
 function toCss(color) {
@@ -118,13 +167,16 @@ function toCss(color) {
   const round = value => Math.max(0, Math.min(255, Math.round(value)));
   return a >= 1
     ? `rgb(${round(r)}, ${round(g)}, ${round(b)})`
-    : `rgba(${round(r)}, ${round(g)}, ${round(b)}, ${Math.round(Math.max(0, Math.min(1, a)) * 1000) / 1000})`;
+    : `rgba(${round(r)}, ${round(g)}, ${round(b)}, ${Math.round(clamp(a, 0, 1) * 1000) / 1000})`;
+}
+
+function toHex(color) {
+  return `#${color.slice(0, 3).map(value => clamp(Math.round(value), 0, 255).toString(16).padStart(2, '0')).join('')}`;
 }
 
 const toLinear = c => { const v = c / 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
 const fromLinear = v => 255 * (v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055);
 
-/** sRGB → OKLab (Björn Ottosson). */
 function rgbToOklab([r, g, b, a]) {
   const lr = toLinear(r), lg = toLinear(g), lb = toLinear(b);
   const l = Math.cbrt(0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb);
@@ -133,12 +185,11 @@ function rgbToOklab([r, g, b, a]) {
   return [
     0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s,
     1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s,
-    0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s,
+    0.0259040371 * l + 0.7827716620 * m - 0.8086757660 * s,
     a
   ];
 }
 
-/** OKLab → sRGB. */
 function oklabToRgb([L, A, B, a]) {
   const l = (L + 0.3963377774 * A + 0.2158037573 * B) ** 3;
   const m = (L - 0.1055613458 * A - 0.0638541728 * B) ** 3;
@@ -154,20 +205,9 @@ function oklabToRgb([L, A, B, a]) {
 const labToLch = ([L, a, b, alpha]) => [L, Math.hypot(a, b), Math.atan2(b, a), alpha];
 const lchToLab = ([L, C, h, alpha]) => [L, C * Math.cos(h), C * Math.sin(h), alpha];
 
-/**
- * Interpoliert in OKLCH und dreht den Farbton über den kürzeren Bogen.
- *
- * Eine Gerade durch OKLab ist bei gegenüberliegenden Farbtönen (Koralle →
- * Tannengrün) trotz gleichbleibender Helligkeit problematisch: Sie führt nahe
- * an der Neutralachse vorbei, gemessen fiel die Buntheit in der Mitte von 59
- * auf 11 – die Fläche wurde für einen Moment grau. Über den Farbtonwinkel
- * gedreht bleibt die Buntheit über den gesamten Weg erhalten; die Farbe wandert
- * sichtbar von einem Ton zum anderen, statt durch Grau zu tauchen.
- */
 function mixOklch(fromRgb, toRgb, t) {
   const [L1, C1, h1raw, a1] = labToLch(rgbToOklab(fromRgb));
   const [L2, C2, h2raw, a2] = labToLch(rgbToOklab(toRgb));
-  // Ist eine Seite unbunt, hat ihr Winkel keine Aussage – dann den der anderen übernehmen.
   const EPS = 1e-4;
   const h1 = C1 < EPS ? h2raw : h1raw;
   const h2 = C2 < EPS ? h1raw : h2raw;
@@ -182,32 +222,92 @@ function mixOklch(fromRgb, toRgb, t) {
   ]));
 }
 
-/** Mischt eine Farbe mit Weiß; `amount` ist der Anteil der Farbe (0–1). Der Farbton bleibt dabei exakt erhalten. */
 export function mixWithWhite(color, amount) {
   return mixOklch([255, 255, 255, 1], color, amount);
 }
 
-/** Interpoliert zwei sRGB-Farben farbtonerhaltend. */
 export function mixColors(fromRgb, toRgb, t) {
   return mixOklch(fromRgb, toRgb, t);
 }
 
-/**
- * Tiefer Schriftton der Palette: Farbton und Buntheit bleiben erhalten, nur die
- * Helligkeit wird auf einen festen Zielwert gezogen. Dadurch trägt die Schrift
- * sichtbar die Monatsfarbe und hält trotzdem in jeder Palette denselben
- * Kontrast – anders als ein je Palette von Hand gewählter Ton.
- */
 export function deepen(color, lightness = INK_LIGHTNESS) {
   const [, a, b, alpha] = rgbToOklab(color);
   return oklabToRgb([lightness, a * 0.95, b * 0.95, alpha]);
 }
 
-/* -------------------------------------------------------------------------
-   Zeitverlauf
-   ------------------------------------------------------------------------- */
+function transformAccent(baseAccent, edition, cycleIndex) {
+  const [L, C, h, alpha] = labToLch(rgbToOklab(parseColor(baseAccent)));
+  const transformed = oklabToRgb(lchToLab([
+    clamp(L + edition.lightness, 0.55, 0.72),
+    clamp(C * edition.chroma, 0.055, 0.19),
+    h + (edition.hueDegrees + cycleIndex * 0.43) * Math.PI / 180,
+    alpha
+  ]));
+  return transformed.map((value, index) => index < 3 ? clamp(value, 0, 255) : value);
+}
 
-/** Löst die CSS-Kurve cubic-bezier(EASE) numerisch nach y(x) auf. */
+function encodeCycleSignature(color, cycleIndex) {
+  const encoded = [...color];
+  encoded[0] = Math.floor(clamp(encoded[0], 0, 255) / 8) * 8 + (cycleIndex % 8);
+  encoded[1] = Math.floor(clamp(encoded[1], 0, 255) / 4) * 4 + Math.floor(cycleIndex / 8);
+  encoded[2] = clamp(encoded[2], 0, 255);
+  return encoded;
+}
+
+function buildPalette(year, month) {
+  const monthIndex = positiveMod(Math.trunc(Number(month)) - 1, 12);
+  const safeYear = Number.isFinite(Number(year)) ? Math.trunc(Number(year)) : PALETTE_REFERENCE_YEAR;
+  const cycleIndex = positiveMod(safeYear - PALETTE_REFERENCE_YEAR, PALETTE_CYCLE_YEARS);
+  const base = MONTH_BASES[monthIndex];
+  const edition = TREND_EDITIONS[cycleIndex];
+  const variantIndex = positiveMod(cycleIndex * 5 + monthIndex * 3, base.variants.length);
+  const [variantName, baseAccent] = base.variants[variantIndex];
+  const accentRgb = encodeCycleSignature(transformAccent(baseAccent, edition, cycleIndex), cycleIndex);
+  const strongRgb = deepen(accentRgb, 0.37);
+  const glowRgb = [...accentRgb.slice(0, 3), 0.32];
+  const panelRgb = [...mixWithWhite(accentRgb, 0.18).slice(0, 3), 0.24];
+  return Object.freeze({
+    key: `${safeYear}-${String(monthIndex + 1).padStart(2, '0')}`,
+    year: safeYear,
+    month: monthIndex + 1,
+    season: base.season,
+    family: base.family,
+    edition: edition.name,
+    name: `${variantName} · ${edition.name}`,
+    accent: toHex(accentRgb),
+    accentStrong: toHex(strongRgb),
+    glow: toCss(glowRgb),
+    panelTint: toCss(panelRgb)
+  });
+}
+
+export const MONTH_PALETTES = Object.freeze(
+  Array.from({ length: PALETTE_CYCLE_YEARS }, (_, yearOffset) =>
+    Array.from({ length: 12 }, (_, monthIndex) => buildPalette(PALETTE_REFERENCE_YEAR + yearOffset, monthIndex + 1))
+  ).flat()
+);
+
+export function paletteForMonth(month, year = PALETTE_REFERENCE_YEAR) {
+  return buildPalette(year, month);
+}
+
+export function paletteForDate(year, month) {
+  return buildPalette(year, month);
+}
+
+export function paletteVariables(palette) {
+  const accent = parseColor(palette.accent);
+  const values = {
+    '--month-accent': accent,
+    '--month-accent-strong': parseColor(palette.accentStrong),
+    '--month-ink': deepen(accent),
+    '--month-glow': parseColor(palette.glow),
+    '--month-panel-tint': parseColor(palette.panelTint)
+  };
+  for (const [name, amount] of Object.entries(SURFACE_MIX)) values[name] = mixWithWhite(accent, amount);
+  return values;
+}
+
 export function easeOut(t) {
   if (t <= 0) return 0;
   if (t >= 1) return 1;
@@ -226,29 +326,6 @@ export function easeOut(t) {
   return bezier(y1, y2, guess);
 }
 
-/* -------------------------------------------------------------------------
-   Anwendung
-   ------------------------------------------------------------------------- */
-
-/** Vollständiger Variablensatz einer Palette – alle Werte als konkrete Farben. */
-export function paletteVariables(palette) {
-  const accent = parseColor(palette.accent);
-  const values = {
-    '--month-accent': accent,
-    '--month-accent-strong': parseColor(palette.accentStrong),
-    '--month-ink': deepen(accent),
-    '--month-glow': parseColor(palette.glow),
-    '--month-panel-tint': parseColor(palette.panelTint)
-  };
-  for (const [name, amount] of Object.entries(SURFACE_MIX)) values[name] = mixWithWhite(accent, amount);
-  return values;
-}
-
-export function paletteForMonth(month) {
-  const index = ((Math.trunc(Number(month)) - 1) % 12 + 12) % 12;
-  return MONTH_PALETTES[Number.isFinite(index) ? index : 0] || MONTH_PALETTES[0];
-}
-
 function writeVariables(root, values) {
   for (const [name, color] of Object.entries(values)) {
     const css = toCss(color);
@@ -256,43 +333,49 @@ function writeVariables(root, values) {
   }
 }
 
-/** Liest die aktuell gesetzten Werte, damit ein laufender Wechsel weich weiterläuft. */
 function readVariables(root, fallback) {
   const computed = getComputedStyle(root);
   const current = {};
   for (const name of Object.keys(fallback)) {
-    const gelesen = parseColor(computed.getPropertyValue(name));
-    current[name] = gelesen || fallback[name];
+    const value = parseColor(computed.getPropertyValue(name));
+    current[name] = value || fallback[name];
   }
   return current;
 }
 
 let animationHandle = null;
-let activeMonth = null;
+let activeThemeKey = null;
 
 export function prefersReducedMotion() {
   return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
+export function resolveThemeYear(explicitYear) {
+  const numeric = Number(explicitYear);
+  if (Number.isInteger(numeric)) return numeric;
+  if (typeof document !== 'undefined') {
+    const selected = Number(document.getElementById('yearSelect')?.value);
+    if (Number.isInteger(selected)) return selected;
+    const dataYear = Number(document.documentElement?.dataset?.year);
+    if (Number.isInteger(dataYear)) return dataYear;
+  }
+  return new Date().getFullYear();
+}
+
 /**
  * Setzt die Palette des Monats und blendet weich dorthin über.
  *
- * @param {number} month              1–12
- * @param {object} [options]
- * @param {boolean} [options.animate] false setzt die Farben ohne Übergang
- * @returns {{palette: object, changed: boolean}}
+ * Bestehende Aufrufe `applyMonthTheme(month, { animate })` bleiben kompatibel;
+ * das Jahr wird aus dem Jahresselektor gelesen. Für Tests oder unabhängige
+ * Nutzung kann `options.year` explizit gesetzt werden.
  */
-export function applyMonthTheme(month, { animate = true } = {}) {
-  const palette = paletteForMonth(month);
-  const monthNumber = MONTH_PALETTES.indexOf(palette) + 1;
+export function applyMonthTheme(month, { animate = true, year } = {}) {
+  const themeYear = resolveThemeYear(year);
+  const palette = paletteForMonth(month, themeYear);
   const root = document.documentElement;
   const target = paletteVariables(palette);
-  const changed = activeMonth !== monthNumber;
+  const changed = activeThemeKey !== palette.key;
 
-  // Läuft bereits ein Übergang auf genau dieses Ziel, bleibt er unangetastet.
-  // Ohne diese Sperre killt der Sicherheitsnetz-Aufruf aus render() den gerade
-  // gestarteten Verlauf und die Farbe springt mitten in der Bewegung ans Ziel –
-  // exakt das Verhalten, das nach außen wie "gar keine Animation" aussah.
   if (!changed && animationHandle !== null && animate) return { palette, changed: false };
 
   if (animationHandle !== null) {
@@ -300,35 +383,36 @@ export function applyMonthTheme(month, { animate = true } = {}) {
     animationHandle = null;
   }
 
-  const finish = () => {
-    writeVariables(root, target);
-    root.dataset.month = String(monthNumber);
+  const updateMetadata = () => {
+    root.dataset.month = String(palette.month);
+    root.dataset.year = String(themeYear);
     root.dataset.palette = palette.name;
-    activeMonth = monthNumber;
+    root.dataset.paletteEdition = palette.edition;
+    activeThemeKey = palette.key;
     const label = document.getElementById('monthPaletteLabel');
-    if (label) label.textContent = `Monatskontrast · ${palette.name}`;
+    if (label) {
+      label.textContent = `Monatskontrast · ${palette.name}`;
+      label.title = `${palette.season} · ${palette.family} · Edition ${palette.edition} · ${themeYear}`;
+    }
   };
 
-  if (!animate || !changed || activeMonth === null || prefersReducedMotion() || typeof requestAnimationFrame !== 'function') {
+  const finish = () => {
+    writeVariables(root, target);
+    updateMetadata();
+  };
+
+  if (!animate || !changed || activeThemeKey === null || prefersReducedMotion() || typeof requestAnimationFrame !== 'function') {
     finish();
     return { palette, changed };
   }
 
-  // Ausgangspunkt ist der tatsächlich sichtbare Zustand – auch mitten in einem
-  // noch laufenden Übergang. Schnelles Blättern kettet dadurch weich, statt zu springen.
-  const from = readVariables(root, paletteVariables(paletteForMonth(activeMonth)));
+  const previousYear = Number(root.dataset.year) || themeYear;
+  const previousMonth = Number(root.dataset.month) || palette.month;
+  const from = readVariables(root, paletteVariables(paletteForMonth(previousMonth, previousYear)));
   const started = performance.now();
-
-  // Beschriftung und Datensätze sofort, damit die Oberfläche nie hinterherhinkt.
-  root.dataset.month = String(monthNumber);
-  root.dataset.palette = palette.name;
-  activeMonth = monthNumber;
-  const label = document.getElementById('monthPaletteLabel');
-  if (label) label.textContent = `Monatskontrast · ${palette.name}`;
+  updateMetadata();
 
   const step = now => {
-    // Zeitbasiert statt frameweise: ein blockierter Frame verschluckt den
-    // Übergang nicht, er läuft am korrekten Fortschritt weiter.
     const linear = Math.min(1, (now - started) / THEME_DURATION_MS);
     const eased = easeOut(linear);
     const frame = {};
