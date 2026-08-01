@@ -54,6 +54,8 @@ const VARIABLE_NAMES = Object.freeze([
   ...Object.keys(SURFACE_MIX)
 ]);
 
+const MIN_NEIGHBOUR_DISTANCE = .075;
+const MIN_ANNUAL_DISTANCE = .055;
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const positiveMod = (value, divisor) => ((value % divisor) + divisor) % divisor;
 const radians = degrees => degrees * Math.PI / 180;
@@ -140,31 +142,42 @@ export function perceptualDistance(first, second) {
   return Math.hypot((a[0] - b[0]) * 1.15, a[1] - b[1], a[2] - b[2]);
 }
 
+function hueSector(color) {
+  const [, a, b] = rgbToOklab(color);
+  const degrees = (Math.atan2(b, a) * 180 / Math.PI + 360) % 360;
+  return Math.floor(degrees / 30);
+}
+
 function candidateFor(profile, cycleIndex, phase) {
   const mood = YEAR_MOODS[cycleIndex];
   const sequence = cycleIndex * 17 + profile.month * 11 + phase * 7 + 1;
   const hueNoise = (radicalInverse(sequence, 2) - .5) * profile.hueSpan;
   const lightnessNoise = (radicalInverse(sequence, 3) - .5) * profile.lightnessSpan;
   const chromaNoise = (radicalInverse(sequence, 5) - .5) * profile.chromaSpan;
-  const lane = [-.34, .34, -.12, .12, -.48, .48, -.24, .24][phase % 8];
+  const lanes = [-.52, .52, -.36, .36, -.20, .20, -.08, .08];
+  const lane = lanes[phase % lanes.length];
   const hue = radians(profile.hue + hueNoise + mood.hue + lane * profile.hueSpan);
-  const lightness = clamp(profile.lightness + lightnessNoise + mood.lightness + lane * .025, .535, .755);
-  const chroma = clamp(profile.chroma + chromaNoise + mood.chroma + Math.abs(lane) * .018, .075, .245);
+  const lightness = clamp(profile.lightness + lightnessNoise + mood.lightness + lane * .03, .525, .765);
+  const chroma = clamp(profile.chroma + chromaNoise + mood.chroma + Math.abs(lane) * .022, .075, .25);
   const accent = oklchToRgb(lightness, chroma, hue);
-  const nameIndex = positiveMod(cycleIndex * 5 + profile.month * 3 + phase, profile.names.length);
-  return { accent, name: profile.names[nameIndex], mood: mood.name, hue, lightness, chroma, phase };
+  return { accent, mood: mood.name, hue, lightness, chroma, phase, sector: hueSector(accent) };
 }
 
-function selectCandidate(profile, cycleIndex, previous, sameMonthPreviousYear) {
-  const candidates = Array.from({ length: 8 }, (_, phase) => candidateFor(profile, cycleIndex, phase));
-  return candidates
+function selectCandidate(profile, cycleIndex, previous, sameMonthPreviousYear, usedSectors) {
+  const ranked = Array.from({ length: 24 }, (_, phase) => candidateFor(profile, cycleIndex, phase))
     .map(candidate => {
       const previousDistance = previous ? perceptualDistance(candidate.accent, previous.accent) : .4;
       const annualDistance = sameMonthPreviousYear ? perceptualDistance(candidate.accent, sameMonthPreviousYear.accent) : .4;
-      const score = Math.min(previousDistance * 1.1, annualDistance) + Math.max(previousDistance, annualDistance) * .18 + candidate.chroma * .08;
+      const sectorBonus = usedSectors.has(candidate.sector) ? 0 : .075;
+      const score = Math.min(previousDistance * 1.1, annualDistance) + Math.max(previousDistance, annualDistance) * .18 + candidate.chroma * .08 + sectorBonus;
       return { candidate, score, previousDistance, annualDistance };
     })
-    .sort((left, right) => right.score - left.score)[0];
+    .sort((left, right) => right.score - left.score);
+
+  const neighbourSafe = ranked.filter(entry => entry.previousDistance >= MIN_NEIGHBOUR_DISTANCE);
+  const neighbourPool = neighbourSafe.length ? neighbourSafe : ranked;
+  const fullySafe = neighbourPool.filter(entry => entry.annualDistance >= MIN_ANNUAL_DISTANCE);
+  return (fullySafe.length ? fullySafe : neighbourPool)[0];
 }
 
 function toHex(color) {
@@ -176,16 +189,18 @@ function buildCanonicalPalettes() {
   const sameMonth = new Map();
   let previous = null;
   for (let cycleIndex = 0; cycleIndex < SPECTRUM_CYCLE_YEARS; cycleIndex += 1) {
+    const usedSectors = new Set();
     for (const profile of MONTH_PROFILES) {
-      const selected = selectCandidate(profile, cycleIndex, previous, sameMonth.get(profile.month));
+      const selected = selectCandidate(profile, cycleIndex, previous, sameMonth.get(profile.month), usedSectors);
       const year = SPECTRUM_REFERENCE_YEAR + cycleIndex;
+      const name = profile.names[positiveMod(cycleIndex * 5 + profile.month * 3, profile.names.length)];
       const palette = Object.freeze({
         key: `${year}-${String(profile.month).padStart(2, '0')}`,
         year,
         month: profile.month,
         season: profile.season,
         family: profile.family,
-        name: selected.candidate.name,
+        name,
         mood: selected.candidate.mood,
         accent: selected.candidate.accent,
         accentHex: toHex(selected.candidate.accent),
@@ -198,6 +213,7 @@ function buildCanonicalPalettes() {
       result.push(palette);
       previous = palette;
       sameMonth.set(profile.month, palette);
+      usedSectors.add(selected.candidate.sector);
     }
   }
   return Object.freeze(result);
@@ -222,7 +238,7 @@ export function spectrumVariables(palette) {
     '--month-accent': accent,
     '--month-accent-strong': strong,
     '--month-ink': ink,
-    '--month-glow': [...oklchToRgb(clamp(L + .04, .60, .78), C * 1.04, h), .38],
+    '--month-glow': [...oklchToRgb(clamp(L + .04, .60, .78), C * 1.04, h).slice(0, 3), .38],
     '--month-panel-tint': [...mixWithWhite(accent, .22).slice(0, 3), .28]
   };
   for (const [name, amount] of Object.entries(SURFACE_MIX)) values[name] = mixWithWhite(accent, amount);
