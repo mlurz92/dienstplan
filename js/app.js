@@ -1,10 +1,10 @@
-import { ABSENCE_TYPES, MONTH_NAMES, OPTION_TYPES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, normalizeBackupPayload, toIsoDate } from './defaults.js?v=20260801.3';
-import { state, bootstrapState, buildBackupPayload, getMonthData, getMonthLabel, isMonthDirty, isMonthMergeSafe, loadMonth, markBootstrapDirty, markBootstrapSynced, markMonthDirty, markMonthSynced, persistDirtyState, persistMonth, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260801.3';
-import { api } from './api.js?v=20260801.3';
-import { applyMonthTheme, prefersReducedMotion } from './theme.js?v=20260801.3';
-import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260801.3';
-import { buildStats, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getEffectiveAbsence, getPlanningStaff, getOptions, getPreference, getStaffById, labelForAbsence, labelForOption, labelForPreference, setAbsence, setAssignment, setOptions, setPreference, toggleOption, weekdayLabel } from './rules.js?v=20260801.3';
-import { getRbnOptions, isRbnValueAllowed, isSecondRbnAvailable, rbnDisplayName } from './rbn.js?v=20260801.3';
+import { ABSENCE_TYPES, MONTH_NAMES, OPTION_TYPES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, normalizeBackupPayload, toIsoDate } from './defaults.js?v=20260801.4';
+import { state, bootstrapState, buildBackupPayload, getMonthData, getMonthLabel, isMonthDirty, isMonthMergeSafe, loadMonth, markBootstrapDirty, markBootstrapSynced, markMonthDirty, markMonthSynced, persistDirtyState, persistMonth, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260801.4';
+import { api } from './api.js?v=20260801.4';
+import { applyMonthTheme, prefersReducedMotion } from './theme.js?v=20260801.4';
+import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260801.4';
+import { buildStats, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getEffectiveAbsence, getPlanningStaff, getOptions, getPreference, getStaffById, labelForAbsence, labelForOption, labelForPreference, setAbsence, setAssignment, setOptions, setPreference, toggleOption, weekdayLabel } from './rules.js?v=20260801.4';
+import { getRbnOptions, isRbnValueAllowed, isSecondRbnAvailable, rbnDisplayName } from './rbn.js?v=20260801.4';
 
 const $ = selector => document.querySelector(selector);
 
@@ -125,6 +125,11 @@ function bindEvents() {
   $('#excelImportInput').addEventListener('change', onExcelImport);
   $('#exportExcelBtn').addEventListener('click', exportCurrentMonthToExcel);
   $('#exportPdfBtn').addEventListener('click', () => window.print());
+  // Der Monatsfarbwechsel läuft als rAF-Interpolation. Wird währenddessen
+  // gedruckt, friert die Ausgabe einen Zwischenstand ein und die Flächen passen
+  // nicht mehr zum Monatskontrast-Abzeichen. Vor jedem Druck werden die Farben
+  // daher auf den Endzustand des angezeigten Monats gesetzt.
+  window.addEventListener('beforeprint', () => applyMonthTheme(state.currentMonth, { animate: false }));
   $('#exportJsonBtn').addEventListener('click', exportJsonBackup);
   $('#jsonImportInput').addEventListener('change', onJsonImport);
 }
