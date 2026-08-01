@@ -1,11 +1,11 @@
-import { ABSENCE_TYPES, MONTH_NAMES, OPTION_TYPES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, normalizeBackupPayload, toIsoDate } from './defaults.js?v=20260801.9';
-import { state, bootstrapState, buildBackupPayload, getMonthData, getMonthLabel, isMonthDirty, isMonthMergeSafe, loadMonth, markBootstrapDirty, markBootstrapSynced, markMonthDirty, markMonthSynced, persistDirtyState, persistMonth, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260801.9';
-import { api } from './api.js?v=20260801.9';
-import { applyMonthTheme, prefersReducedMotion } from './theme.js?v=20260801.9';
-import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260801.9';
-import { assignmentLabel, buildStats, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getEffectiveAbsence, getPlanningStaff, getOptions, getPreference, getStaffById, isExternalAssignment, labelForAbsence, labelForOption, labelForPreference, setAbsence, setAssignment, setOptions, setPreference, toggleOption, weekdayLabel } from './rules.js?v=20260801.9';
-import { getRbnOptions, isRbnValueAllowed, isSecondRbnAvailable, rbnDisplayName } from './rbn.js?v=20260801.9';
-import { analyzeWorkbook } from './excel-import.js?v=20260801.9';
+import { ABSENCE_TYPES, MONTH_NAMES, OPTION_TYPES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, normalizeBackupPayload, toIsoDate } from './defaults.js?v=20260801.10';
+import { state, bootstrapState, buildBackupPayload, getMonthData, getMonthLabel, isMonthDirty, isMonthMergeSafe, loadMonth, markBootstrapDirty, markBootstrapSynced, markMonthDirty, markMonthSynced, persistDirtyState, persistMonth, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260801.10';
+import { api } from './api.js?v=20260801.10';
+import { applyMonthTheme, prefersReducedMotion } from './theme.js?v=20260801.10';
+import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260801.10';
+import { assignmentLabel, buildStats, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getEffectiveAbsence, getPlanningStaff, getOptions, getPreference, getStaffById, isExternalAssignment, labelForAbsence, labelForOption, labelForPreference, setAbsence, setAssignment, setOptions, setPreference, toggleOption, weekdayLabel } from './rules.js?v=20260801.10';
+import { getRbnOptions, isRbnValueAllowed, isSecondRbnAvailable, rbnDisplayName } from './rbn.js?v=20260801.10';
+import { analyzeWorkbook } from './excel-import.js?v=20260801.10';
 
 const $ = selector => document.querySelector(selector);
 
@@ -941,7 +941,7 @@ async function onExcelImport(event) {
     if (seenMonths.has(key)) duplicates.add(key);
     seenMonths.add(key);
   }
-  if (duplicates.size && !confirm(`Die Mappe enthält mehrere Blätter für ${[...duplicates].join(', ')}.\n\nAlle nacheinander übernehmen? Bereits gefüllte Felder bleiben dabei unangetastet.`)) { reset(); return; }
+  if (duplicates.size && !confirm(`Die Mappe enthält mehrere Blätter für ${[...duplicates].join(', ')}.\n\nAlle nacheinander übernehmen? Das zuletzt gelesene Blatt setzt sich dabei durch.`)) { reset(); return; }
 
   const undated = imports.filter(item => item.usedFallbackYear);
   if (undated.length && !confirm(`Für ${undated.map(item => item.sheetName).join(', ')} wurde keine Jahreszahl gefunden.\n\nDiese Blätter dem Jahr ${state.currentYear} zuordnen?`)) { reset(); return; }
@@ -960,20 +960,25 @@ async function onExcelImport(event) {
     return;
   }
 
+  // Vorabzählung an einer Kopie: Ein Import darf bestehende Werte ersetzen,
+  // aber der Umfang wird vorher benannt und bestätigt.
+  const replacing = imports.reduce((sum, item) => sum + mergeMonthData(structuredClone(getMonthData(item.year, item.month)), item.monthData).replaced, 0);
+  if (replacing > 0 && !confirm(`Der Import ersetzt ${replacing} bereits eingetragene Werte durch abweichende Werte aus der Datei.\n\nFortfahren?`)) { reset(); return; }
+
   const summaries = ignoredSheets.length ? [`Übersprungene Blätter: ${ignoredSheets.join(', ')}`] : [];
   const touched = new Map();
   for (const item of imports) {
     const targetMonth = getMonthData(item.year, item.month);
     const merge = mergeMonthData(targetMonth, item.monthData);
     setMonthData(item.year, item.month, targetMonth, 'local');
-    if (merge.added > 0) {
+    if (merge.changed > 0) {
       markMonthDirty(item.year, item.month);
       touched.set(`${item.year}-${String(item.month).padStart(2, '0')}`, [item.year, item.month]);
     }
     const notes = [
       `${item.sheetName} → ${MONTH_NAMES[item.month - 1]} ${item.year}`,
       `${item.assignments} Dienste, ${item.absences} Abwesenheiten, ${item.rbnValues} RBN-Werte gelesen`,
-      `${merge.added} ergänzt, ${merge.preserved} bestehende Werte bewahrt`
+      `${merge.added} ergänzt, ${merge.replaced} ersetzt, ${merge.unchanged} unverändert`
     ];
     if (item.unknownNames.length) notes.push(`als Text übernommen (nicht wieder auswählbar): ${item.unknownNames.join(', ')}`);
     if (item.skippedAbsenceNames.length) notes.push(`Abwesenheiten ohne bekannte Person übersprungen: ${item.skippedAbsenceNames.join(', ')}`);
@@ -992,28 +997,31 @@ async function onExcelImport(event) {
 }
 
 /**
- * Import ergänzt, er ersetzt nicht: Ein bereits gefülltes Feld bleibt in jedem
- * Fall stehen. Nur leere Felder und Abwesenheiten, die selbst aus einem Import
- * stammen, werden geschrieben.
+ * Der Import setzt sich gegen bestehende Werte durch: Wo die Datei einen
+ * anderen Wert trägt, wird der bisherige ersetzt. Was die Datei nicht kennt,
+ * bleibt jedoch unangetastet – ein leeres Feld löscht nie etwas.
  */
 function mergeMonthData(target, source) {
   let added = 0;
-  let preserved = 0;
+  let replaced = 0;
+  let unchanged = 0;
   for (const [iso, day] of Object.entries(source.days || {})) {
     if (!target.days[iso]) continue;
     for (const field of ['bd','hg','rbn1','rbn2']) {
       if (!day[field]) continue;
-      if (!target.days[iso][field]) { target.days[iso][field] = day[field]; added += 1; }
-      else preserved += 1;
+      const existing = target.days[iso][field];
+      if (!existing) { target.days[iso][field] = day[field]; added += 1; }
+      else if (existing !== day[field]) { target.days[iso][field] = day[field]; replaced += 1; }
+      else unchanged += 1;
     }
   }
   for (const [staffId, absMap] of Object.entries(source.absences || {})) for (const [iso, type] of Object.entries(absMap)) {
     const existing = getAbsence(target, staffId, iso);
-    const existingSource = getAbsenceSource(target, staffId, iso);
-    if (!existing || existingSource === 'import') { setAbsence(target, staffId, iso, type, 'import'); added += 1; }
-    else preserved += 1;
+    if (!existing) { setAbsence(target, staffId, iso, type, 'import'); added += 1; }
+    else if (existing !== type) { setAbsence(target, staffId, iso, type, 'import'); replaced += 1; }
+    else unchanged += 1;
   }
-  return { added, preserved };
+  return { added, replaced, unchanged, changed: added + replaced };
 }
 
 function exportCurrentMonthToExcel() {

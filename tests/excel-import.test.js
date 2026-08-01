@@ -140,3 +140,42 @@ test('Monat und Jahr werden auch aus Seriennummern und deutschen Datumstexten ge
   assert.deepEqual(detectPeriod([['Januar 2025']]), { year: 2025, month: 1 });
   assert.deepEqual(detectPeriod([['ohne Angabe']]), { year: null, month: null });
 });
+
+test('Der Merge ersetzt abweichende Werte, lässt aber nichts verschwinden', async () => {
+  const { createEmptyMonth } = await import('../js/defaults.js');
+  const { getAbsence: readAbsence, setAbsence, setAssignment } = await import('../js/rules.js');
+  const { readFile } = await import('node:fs/promises');
+
+  // mergeMonthData lebt in app.js und ist ohne DOM nicht importierbar; die
+  // Funktion wird deshalb aus dem Quelltext gelöst und einzeln geprüft.
+  const source = await readFile(new URL('../js/app.js', import.meta.url), 'utf8');
+  const start = source.indexOf('function mergeMonthData(target, source) {');
+  const end = source.indexOf('function exportCurrentMonthToExcel()');
+  const factory = new Function('getAbsence', 'setAbsence', `${source.slice(start, end)}; return mergeMonthData;`);
+  const mergeMonthData = factory(readAbsence, setAbsence);
+
+  const target = createEmptyMonth(2026, 3);
+  setAssignment(target, '2026-03-01', 'bd', 'lurz');
+  setAssignment(target, '2026-03-02', 'hg', 'becker');
+  target.days['2026-03-01'].rbn1 = 'Dr. Bailis';
+  setAbsence(target, 'martin', '2026-03-05', 'urlaub', 'manual');
+
+  const incoming = createEmptyMonth(2026, 3);
+  setAssignment(incoming, '2026-03-01', 'bd', 'becker');   // abweichend → ersetzt
+  setAssignment(incoming, '2026-03-02', 'hg', 'becker');   // gleich → unverändert
+  setAssignment(incoming, '2026-03-03', 'bd', 'martin');   // neu → ergänzt
+  setAbsence(incoming, 'martin', '2026-03-05', 'fza', 'import');
+
+  const result = mergeMonthData(target, incoming);
+
+  assert.equal(target.days['2026-03-01'].bd, 'becker');
+  assert.equal(target.days['2026-03-02'].hg, 'becker');
+  assert.equal(target.days['2026-03-03'].bd, 'martin');
+  // Leere Felder der Datei löschen nichts.
+  assert.equal(target.days['2026-03-01'].rbn1, 'Dr. Bailis');
+  assert.equal(readAbsence(target, 'martin', '2026-03-05'), 'fza');
+  assert.equal(result.added, 1);
+  assert.equal(result.replaced, 2);
+  assert.equal(result.unchanged, 1);
+  assert.equal(result.changed, 3);
+});
