@@ -1,0 +1,227 @@
+/* Kompakte, semantisch gruppierte Aktionsleiste. Separates Stylesheet, damit
+   die umfangreiche Tabellen- und Druckgestaltung in styles.css unberührt bleibt. */
+
+.toolbar.toolbar-organized {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 6px;
+  padding: 6px;
+}
+
+.toolbar-section {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px;
+  border: 1px solid color-mix(in srgb, var(--month-accent) 17%, rgba(154,166,179,.46));
+  border-radius: 11px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.91), rgba(245,248,251,.80)),
+    color-mix(in srgb, var(--month-accent) 4%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.98),
+    0 1px 2px rgba(9,14,20,.07);
+}
+
+.toolbar-section--data { justify-self: start; }
+.toolbar-section--output { justify-self: end; }
+
+.toolbar-section-label {
+  flex: 0 0 auto;
+  padding: 0 3px 0 4px;
+  color: #697480;
+  font-size: .57rem;
+  font-weight: 720;
+  line-height: 1;
+  letter-spacing: .075em;
+  text-transform: uppercase;
+  user-select: none;
+}
+
+.toolbar-actions {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.toolbar .tool-action,
+.toolbar .file-btn.tool-action {
+  min-width: 32px;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0 8px;
+  border-radius: 8px;
+  color: #28323d;
+  font-size: .76rem;
+  font-weight: 620;
+  line-height: 1;
+  white-space: nowrap;
+  background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(241,245,249,.91));
+  border: 1px solid color-mix(in srgb, var(--month-accent) 13%, rgba(142,155,169,.43));
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 1px 2px rgba(9,14,20,.07);
+  transition: transform .15s ease, border-color .15s ease, background .15s ease, box-shadow .15s ease, color .15s ease;
+}
+
+.toolbar .tool-action::before,
+.toolbar .file-btn.tool-action::before {
+  display: none;
+}
+
+.toolbar .tool-action:hover,
+.toolbar .file-btn.tool-action:hover {
+  transform: translateY(-1px);
+  color: #15202b;
+  border-color: color-mix(in srgb, var(--month-accent) 44%, rgba(142,155,169,.45));
+  background: linear-gradient(180deg, #fff, color-mix(in srgb, var(--month-accent) 9%, #f5f8fb));
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 3px 8px rgba(9,14,20,.10),
+    0 0 12px color-mix(in srgb, var(--month-glow) 24%, transparent);
+}
+
+.toolbar .tool-action:active,
+.toolbar .file-btn.tool-action:active {
+  transform: translateY(0);
+  box-shadow: inset 0 1px 2px rgba(9,14,20,.10);
+}
+
+.toolbar .tool-action--accent {
+  color: var(--month-accent-strong);
+  border-color: color-mix(in srgb, var(--month-accent) 39%, rgba(142,155,169,.42));
+  background: linear-gradient(180deg, #fff, color-mix(in srgb, var(--month-accent) 13%, #f6f9fb));
+}
+
+.toolbar .tool-action--quiet {
+  color: #52606d;
+}
+
+.toolbar .tool-action--danger {
+  color: #8e2830;
+  border-color: rgba(174,83,91,.27);
+  background: linear-gradient(180deg, #fff, rgba(250,239,240,.91));
+}
+
+.toolbar .tool-action--danger:hover {
+  color: #751d25;
+  border-color: rgba(174,83,91,.48);
+  background: linear-gradient(180deg, #fff, rgba(249,229,231,.94));
+}
+
+.tool-icon {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tool-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.toolbar .tool-action--file {
+  position: relative;
+  cursor: pointer;
+}
+
+.toolbar .tool-action--file input[type="file"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.toolbar .tool-action--file:focus-visible,
+.toolbar .tool-action:focus-visible {
+  outline: var(--app-focus-ring) solid var(--month-accent-strong);
+  outline-offset: var(--app-focus-offset);
+}
+
+/* Bei mittleren Desktopbreiten verschwinden zunächst nur die Gruppenüberschriften.
+   Die eigentlichen Aktionen bleiben weiterhin beschriftet und eindeutig. */
+@media (max-width: 1320px) {
+  .toolbar-section-label { display: none; }
+}
+
+/* Auf kompakten Ansichten werden die Aktionen zu echten Icon-Buttons. Die
+   vollständige Bezeichnung bleibt über title und aria-label verfügbar. */
+@media (max-width: 1120px) {
+  .toolbar.toolbar-organized {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .toolbar .tool-action,
+  .toolbar .file-btn.tool-action {
+    width: 34px;
+    min-width: 34px;
+    padding: 0;
+  }
+  .toolbar .tool-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .toolbar.toolbar-organized {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: stretch;
+    gap: 5px;
+  }
+  .toolbar-section,
+  .toolbar-section--data,
+  .toolbar-section--output {
+    width: 100%;
+    justify-self: stretch;
+    justify-content: space-between;
+  }
+  .toolbar-section-label {
+    display: block;
+    min-width: 58px;
+  }
+  .toolbar-actions {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 460px) {
+  .toolbar-section-label { display: none; }
+  .toolbar-actions { width: 100%; justify-content: space-between; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toolbar .tool-action,
+  .toolbar .file-btn.tool-action {
+    transition: none;
+  }
+  .toolbar .tool-action:hover,
+  .toolbar .file-btn.tool-action:hover {
+    transform: none;
+  }
+}
