@@ -268,7 +268,9 @@ function buildAssignmentButton(dateIso, role, staffId, monthData) {
   const button = document.createElement('button');
   button.className = 'assignment-btn';
   const person = getStaffById(state.staff, staffId);
-  const name = person?.name || (staffId ? `Unbekannte ID: ${staffId}` : '—');
+  // In der Planungstabelle nur der Kurzname ohne Anrede/Titel: Die Spalten sind
+  // schmal, der volle Name steht weiterhin im Tooltip und in der Statistik.
+  const name = person?.short || person?.name || (staffId ? `Unbekannte ID: ${staffId}` : '—');
   const evaluation = staffId ? evaluateCandidate({ state, monthData, dateIso, role, staffId }) : { level: 'green', reasons: [] };
   const badgeMarkup = staffId
     ? ''
@@ -276,7 +278,9 @@ function buildAssignmentButton(dateIso, role, staffId, monthData) {
   button.innerHTML = `
     <span class="assignment-name">${esc(name)}</span>
     ${badgeMarkup}`;
-  button.title = staffId ? evaluation.reasons.join('\n') : `${role.toUpperCase()} eintragen`;
+  button.title = staffId
+    ? [person?.name, ...evaluation.reasons].filter(Boolean).join('\n')
+    : `${role.toUpperCase()} eintragen`;
   button.addEventListener('click', () => openPicker(dateIso, role));
   return button;
 }

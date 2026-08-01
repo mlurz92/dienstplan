@@ -259,8 +259,8 @@ Alle Dialoge verwenden native `<dialog>`-Elemente. Damit übernimmt die Browserp
 |---|---|
 | **Tag** | numerischer Kalendertag |
 | **Wochentag** | ausgeschriebener Wochentag, bei Feiertagen zusätzlich der Feiertagsname |
-| **BD** | bewertete Bereitschaftsdienst-Einteilung |
-| **HG** | bewertete Hintergrunddienst-Einteilung |
+| **BD** | bewertete Bereitschaftsdienst-Einteilung, angezeigt als Kurzname ohne Anrede und Titel (vollständiger Name im Tooltip) |
+| **HG** | bewertete Hintergrunddienst-Einteilung, angezeigt als Kurzname ohne Anrede und Titel (vollständiger Name im Tooltip) |
 | **RBN** | feste, datumsabhängige Auswahl |
 | **2. RBN** | feste, bedingt sichtbare Auswahl |
 | **Urlaub / FZA** | kompakte Tageszusammenfassung, öffnet den Detaildialog |

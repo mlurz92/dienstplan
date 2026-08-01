@@ -108,3 +108,12 @@ test('U/FZA wird direkt als fetter Name und normal gewichtete Ausführung erzeug
   assert.match(css, /\.cell-summary-button\s*\{[^}]*flex-wrap:\s*wrap;/);
   assert.match(css, /\.summary-entry\s*\{/);
 });
+
+test('Die Planungstabelle zeigt Dienstnamen ohne Anrede und Titel', () => {
+  const app = fs.readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
+  const buttonSource = app.slice(app.indexOf('function buildAssignmentButton'), app.indexOf('function setRbnValue'));
+
+  assert.match(buttonSource, /const name = person\?\.short \|\| person\?\.name/);
+  assert.match(buttonSource, /button\.title = staffId/);
+  assert.match(buttonSource, /\[person\?\.name, \.\.\.evaluation\.reasons\]/);
+});
