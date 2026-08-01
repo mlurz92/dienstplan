@@ -82,7 +82,7 @@ test('app.js rendert die RBN-Selects direkt und koppelt 2. RBN ohne DOM-Nachbear
   const rulesFacade = fs.readFileSync(new URL('../js/rules.js', import.meta.url), 'utf8');
 
   assert.equal(await exists('js/rbn-ui.js'), false, 'kein nachgelagerter DOM-Postprozessor');
-  assert.match(app, /from '\.\/rbn\.js\?v=20260731\.3'/);
+  assert.match(app, /from '\.\/rbn\.js\?v=20260801\.1'/);
   assert.match(app, /function buildRbnSelect/);
   assert.match(app, /createElement\('select'\)/);
   assert.match(app, /isSecondRbnAvailable\(dateIso, firstSelect\.value\)/);
@@ -99,10 +99,12 @@ test('U/FZA wird direkt als fetter Name und normal gewichtete Ausführung erzeug
   const app = fs.readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
   const css = fs.readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
 
-  assert.match(app, /function appendAbsenceSummaryEntry/);
+  assert.match(app, /function appendSummaryEntry/);
+  assert.match(app, /entry\.className = 'summary-entry'/);
   assert.match(app, /nameSpan\.className = 'absence-summary-name'/);
   assert.match(app, /detailSpan\.className = 'absence-summary-detail'/);
-  assert.match(app, /detailSpan\.textContent = `: \$\{detail\}`/);
   assert.match(css, /\.absence-summary-name\s*\{\s*font-weight:\s*700;/);
   assert.match(css, /\.absence-summary-detail\s*\{\s*font-weight:\s*400;/);
+  assert.match(css, /\.cell-summary-button\s*\{[^}]*flex-wrap:\s*wrap;/);
+  assert.match(css, /\.summary-entry\s*\{/);
 });

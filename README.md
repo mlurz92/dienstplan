@@ -6,7 +6,7 @@
 
 <p align="center"><strong>Manuelle, regelgestützte Monatsplanung für Bereitschaftsdienst, Hintergrunddienst und RBN</strong></p>
 
-> **Referenzstand:** Build `20260731.3` · Paketversion `0.2.0` · Datenregion Sachsen (`SN`)  
+> **Referenzstand:** Build `20260801.1` · Paketversion `0.2.0` · Datenregion Sachsen (`SN`)  
 > **Betriebsmodell:** Cloudflare Pages + Pages Functions + Cloudflare KV, ergänzt durch eine lokale Browser-Sicherung  
 > **Grundsatz:** Der Mensch plant. DienstplanRAD prüft, erklärt, speichert und dokumentiert.
 
@@ -608,12 +608,20 @@ Jede eingetragene Abwesenheit erzeugt bei einer BD- oder HG-Auswahl am selben Ta
 | `bd-bevorzugt` | BD bevorzugt | starke positive Empfehlung bei BD |
 | `hg-bevorzugt` | HG bevorzugt | starke positive Empfehlung bei HG |
 | `dienst-bevorzugt` | Dienst bevorzugt | starke positive Empfehlung bei BD und HG |
+
+
+## 11.2a Optionen
+
+Optionen liegen in einem eigenen Datenfeld (`options`) und sind unabhängig vom Dienstwunsch. Pro Person und Tag sind beliebige Kombinationen möglich; „BD möglich“ und „HG möglich“ können gleichzeitig gesetzt sein.
+
+| ID | Anzeige | Wirkung |
+|---|---|---|
 | `bd-moeglich` | BD möglich | moderate positive Empfehlung bei BD |
 | `hg-moeglich` | HG möglich | moderate positive Empfehlung bei HG |
 
 ## 11.3 Einzelbearbeitung
 
-Ein Klick auf die U/FZA- oder Wunschzelle öffnet den Tagesdialog. Für jede in der Abwesenheitsliste geführte Person können Abwesenheit und Wunsch getrennt gesetzt oder entfernt werden.
+Ein Klick auf die U/FZA- oder Wunschzelle öffnet den Tagesdialog. Für jede in der Abwesenheitsliste geführte Person können Abwesenheit, Wunsch und Optionen getrennt gesetzt oder entfernt werden; Optionen sind Umschalter und mehrfach wählbar.
 
 ## 11.4 Sammelerfassung
 
@@ -1285,7 +1293,7 @@ Das Repository wird aus dem Projektstamm bereitgestellt. Pages Functions werden 
 Alle releasekritischen Assets und relativen Browserimporte verwenden denselben `?v=`-Token. Der Build-Stempel in `index.html` muss exakt dazu passen. Für diesen Funktionsstand ist die Kennung:
 
 ```text
-20260731.3
+20260801.1
 ```
 
 Der laufende Stand ist im Browser über `document.documentElement.dataset.build` und im Tooltip des Speicherstatus sichtbar.

@@ -92,3 +92,20 @@ test('JSON-Import speichert gültige Teilmonate normalisiert', async () => {
     notes: ''
   });
 });
+
+test('Optionen werden normalisiert und Alt-Wünsche „BD/HG möglich“ migriert', () => {
+  const normalized = normalizeMonthData(2026, 7, {
+    preferences: { martin: { '2026-07-01': 'bd-moeglich', '2026-07-02': 'kein-hg' } },
+    options: {
+      martin: { '2026-07-01': 'hg-moeglich', '2026-07-03': 'bd-moeglich,unsinn,hg-moeglich', '2026-08-01': 'bd-moeglich' },
+      lurz: { '2026-07-04': 'unbekannt' }
+    }
+  });
+
+  assert.equal(normalized.preferences.martin['2026-07-01'], undefined);
+  assert.equal(normalized.preferences.martin['2026-07-02'], 'kein-hg');
+  assert.equal(normalized.options.martin['2026-07-01'], 'hg-moeglich,bd-moeglich');
+  assert.equal(normalized.options.martin['2026-07-03'], 'bd-moeglich,hg-moeglich');
+  assert.equal(normalized.options.martin['2026-08-01'], undefined);
+  assert.equal(normalized.options.lurz, undefined);
+});

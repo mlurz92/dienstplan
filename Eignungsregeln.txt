@@ -8,7 +8,7 @@ GRUNDPRINZIPIEN & DATENBASIS:
 - Die Empfehlungen werden primär durch Qualifikation, harte Konflikte und die Ausgewogenheit innerhalb des aktuellen Monats bestimmt.
 - Die Feiertagsregion ist fachlich fest auf Sachsen (SN) gesetzt und keine frei konfigurierbare Einstellung.
 - Die Anwendung ist als Einzelbearbeiter-System ausgelegt. Ein paralleler Mehrbenutzerbetrieb mit konkurrierenden Schreibzugriffen ist nicht vorgesehen.
-- Positive Dienstwünsche werden als starke Empfehlung berücksichtigt. „Kein BD“, „Kein HG“ und „Kein Dienst“ erzeugen für die betroffene Rolle einen roten Konflikt. „BD möglich“ und „HG möglich“ sind Optionsangaben und erzeugen für die jeweilige Rolle eine moderate positive Empfehlung.
+- Positive Dienstwünsche werden als starke Empfehlung berücksichtigt. „Kein BD“, „Kein HG“ und „Kein Dienst“ erzeugen für die betroffene Rolle einen roten Konflikt. „BD möglich“ und „HG möglich“ sind vom Dienstwunsch unabhängige Optionen, beliebig kombinierbar, und erzeugen für die jeweilige Rolle eine moderate positive Empfehlung.
 
 BESETZUNG, PERSONALDATEN & QUALIFIKATION:
 - Pro Kalendertag existiert genau ein manuell zu besetzendes Feld für BD und genau ein manuell zu besetzendes Feld für HG.

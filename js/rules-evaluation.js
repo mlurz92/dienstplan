@@ -1,12 +1,12 @@
-import { holidayBlocks, isFirstRegularWorkdayAfter, isHoliday } from './holidays.js?v=20260731.3';
+import { holidayBlocks, isFirstRegularWorkdayAfter, isHoliday } from './holidays.js?v=20260801.1';
 import {
   addDays, basicallyEligiblePeers, countHgForAaBdExcept, countRoleInMonthExcept,
   countSaturdayBdExcept, countServicesInLoadedYearExcept, getAbsenceFromState, getEffectiveAbsence,
   getAssignment, getPlanningStaff, getPreference, getRoleProperties, getStaffById,
-  hasCompleteLoadedHistory, hasVacationInFollowingWeek, isAaOn, isFaOn, isPositivePreference,
+  hasCompleteLoadedHistory, hasOption, hasVacationInFollowingWeek, isAaOn, isFaOn, isPositivePreference,
   isStaffActiveOn, labelForAbsence, listOwnRoleDates, monthForIso, parseIso,
   projectedWeekendEquivalent, severityRank, toLocalIso, weekendEquivalentFromMap, weekendMap
-} from './rules-core.js?v=20260731.3';
+} from './rules-core.js?v=20260801.1';
 
 function hasCompletedDistributionRound(loads, unit = 1) {
   return loads.length > 0 && loads.reduce((sum, load) => sum + load, 0) >= loads.length * unit;
@@ -233,8 +233,8 @@ export function evaluateCandidate({ state, monthData, dateIso, role, staffId }) 
   if (preference === 'bd-bevorzugt' && role === 'bd') recommend('Wunsch: BD bevorzugt', 100);
   if (preference === 'hg-bevorzugt' && role === 'hg') recommend('Wunsch: HG bevorzugt', 100);
   if (preference === 'dienst-bevorzugt') recommend('Wunsch: Dienst bevorzugt', 100);
-  if (preference === 'bd-moeglich' && role === 'bd') recommend('Option: BD möglich', 45);
-  if (preference === 'hg-moeglich' && role === 'hg') recommend('Option: HG möglich', 45);
+  if (role === 'bd' && hasOption(monthData, staffId, dateIso, 'bd-moeglich')) recommend('Option: BD möglich', 45);
+  if (role === 'hg' && hasOption(monthData, staffId, dateIso, 'hg-moeglich')) recommend('Option: HG möglich', 45);
 
   if (role === 'hg' && !roleProps.canHg) push('red', 'HG nur für Fachärzte zulässig');
   if (role === 'bd' && weekday === 6 && !roleProps.canSaturdayBd) push('red', 'Samstags-BD nur für Fachärzte zulässig');

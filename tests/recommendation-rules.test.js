@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs, { readFileSync } from 'node:fs';
 import { createEmptyMonth, DEFAULT_STAFF } from '../js/defaults.js';
-import { collectIssues, evaluateCandidate, getAbsence, setAbsence, setAssignment, setPreference } from '../js/rules.js';
+import { collectIssues, evaluateCandidate, getAbsence, getOptions, setAbsence, setAssignment, setOptions, setPreference } from '../js/rules.js';
 
 process.env.TZ = 'Europe/Berlin';
 const key = (year, month) => `${year}-${String(month).padStart(2, '0')}`;
@@ -323,7 +323,7 @@ test('Jahresverlauf ist im Regelquelltext nicht bewertungswirksam verdrahtet', (
 
 test('Option „BD möglich“ wirkt nur auf BD und schwächer als ein positiver Wunsch', () => {
   const state = stateWith();
-  setPreference(month(state, 2026, 7), 'martin', '2026-07-08', 'bd-moeglich');
+  setOptions(month(state, 2026, 7), 'martin', '2026-07-08', ['bd-moeglich']);
   const bd = evalAt(state, '2026-07-08', 'bd', 'martin');
   const hg = evalAt(state, '2026-07-08', 'hg', 'martin');
   assert.ok(bd.reasons.includes('Option: BD möglich'));
@@ -333,9 +333,29 @@ test('Option „BD möglich“ wirkt nur auf BD und schwächer als ein positiver
 
 test('Option „HG möglich“ wirkt nur auf HG', () => {
   const state = stateWith();
-  setPreference(month(state, 2026, 7), 'martin', '2026-07-08', 'hg-moeglich');
+  setOptions(month(state, 2026, 7), 'martin', '2026-07-08', ['hg-moeglich']);
   const hg = evalAt(state, '2026-07-08', 'hg', 'martin');
   const bd = evalAt(state, '2026-07-08', 'bd', 'martin');
   assert.ok(hg.reasons.includes('Option: HG möglich'));
   assert.equal(has(bd, 'Option: HG möglich'), false);
+});
+
+test('„BD möglich“ und „HG möglich“ sind gleichzeitig setzbar und wirken auf beide Rollen', () => {
+  const state = stateWith();
+  const data = month(state, 2026, 7);
+  setOptions(data, 'martin', '2026-07-08', ['bd-moeglich', 'hg-moeglich']);
+  assert.deepEqual(getOptions(data, 'martin', '2026-07-08'), ['bd-moeglich', 'hg-moeglich']);
+  assert.ok(evalAt(state, '2026-07-08', 'bd', 'martin').reasons.includes('Option: BD möglich'));
+  assert.ok(evalAt(state, '2026-07-08', 'hg', 'martin').reasons.includes('Option: HG möglich'));
+});
+
+test('Optionen bestehen unabhängig neben einem Dienstwunsch', () => {
+  const state = stateWith();
+  const data = month(state, 2026, 7);
+  setPreference(data, 'martin', '2026-07-08', 'kein-hg');
+  setOptions(data, 'martin', '2026-07-08', ['bd-moeglich', 'hg-moeglich']);
+  const bd = evalAt(state, '2026-07-08', 'bd', 'martin');
+  const hg = evalAt(state, '2026-07-08', 'hg', 'martin');
+  assert.ok(bd.reasons.includes('Option: BD möglich'));
+  assert.equal(hg.level, 'red');
 });
