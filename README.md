@@ -6,7 +6,7 @@
 
 <p align="center"><strong>Manuelle, regelgestützte Monatsplanung für Bereitschaftsdienst, Hintergrunddienst und RBN</strong></p>
 
-> **Referenzstand:** Build `20260801.9` · Paketversion `0.2.0` · Datenregion Sachsen (`SN`)  
+> **Referenzstand:** Build `20260801.10` · Paketversion `0.2.0` · Datenregion Sachsen (`SN`)  
 > **Betriebsmodell:** Cloudflare Pages + Pages Functions + Cloudflare KV, ergänzt durch eine lokale Browser-Sicherung  
 > **Grundsatz:** Der Mensch plant. DienstplanRAD prüft, erklärt, speichert und dokumentiert.
 
@@ -961,7 +961,7 @@ Fehlt in einem Blatt jede Jahresangabe, muss die Zuordnung zum aktuell ausgewäh
 
 **RBN.** Importierte Rufbereitschaftsnamen werden auf den am jeweiligen Tag gültigen Pool abgebildet (`Schüngel` → `Dr. Schüngel`). Was dort nicht vorkommt, bleibt als Altwert erhalten und wird in den offenen Punkten angezeigt.
 
-**Nichts wird überschrieben.** Der Merge füllt ausschließlich leere Felder — BD, HG, RBN und 2. RBN. Ein bereits gefülltes Feld bleibt in jedem Fall stehen. Importierte Abwesenheiten dürfen durch einen späteren Import aktualisiert werden; manuelle Abwesenheiten bleiben erhalten. Gelesene Werte, ergänzte Werte, bewahrte Werte, unbekannte Namen und nur lokal gespeicherte Monate weist die Abschlussmeldung je Blatt aus. Dienstwünsche und Optionen werden aus Excel nicht importiert.
+**Der Import setzt sich durch, löscht aber nichts.** Trägt die Datei für ein Feld einen abweichenden Wert, ersetzt er den bisherigen — für BD, HG, RBN, 2. RBN und Abwesenheiten. Was die Datei nicht kennt, bleibt unangetastet: Ein leeres Feld löscht nie einen bestehenden Eintrag. Der Umfang wird vorab benannt; ersetzt wird erst nach ausdrücklicher Bestätigung. Gelesene, ergänzte, ersetzte und unveränderte Werte, unbekannte Namen und nur lokal gespeicherte Monate weist die Abschlussmeldung je Blatt aus. Dienstwünsche und Optionen werden aus Excel nicht importiert.
 
 ## 18.2 Excel-Export
 
@@ -1313,7 +1313,7 @@ Das Repository wird aus dem Projektstamm bereitgestellt. Pages Functions werden 
 Alle releasekritischen Assets und relativen Browserimporte verwenden denselben `?v=`-Token. Der Build-Stempel in `index.html` muss exakt dazu passen. Für diesen Funktionsstand ist die Kennung:
 
 ```text
-20260801.9
+20260801.10
 ```
 
 Der laufende Stand ist im Browser über `document.documentElement.dataset.build` und im Tooltip des Speicherstatus sichtbar.
