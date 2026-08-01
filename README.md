@@ -6,7 +6,7 @@
 
 <p align="center"><strong>Manuelle, regelgestützte Monatsplanung für Bereitschaftsdienst, Hintergrunddienst und RBN</strong></p>
 
-> **Referenzstand:** Build `20260801.1` · Paketversion `0.2.0` · Datenregion Sachsen (`SN`)  
+> **Referenzstand:** Build `20260801.2` · Paketversion `0.2.0` · Datenregion Sachsen (`SN`)  
 > **Betriebsmodell:** Cloudflare Pages + Pages Functions + Cloudflare KV, ergänzt durch eine lokale Browser-Sicherung  
 > **Grundsatz:** Der Mensch plant. DienstplanRAD prüft, erklärt, speichert und dokumentiert.
 
@@ -971,13 +971,19 @@ Der Server führt dieselbe Vorvalidierung vor seinem ersten KV-Schreibzugriff au
 
 ## 18.5 Drucken und PDF
 
-„PDF exportieren“ nutzt den nativen Druckdialog. Das Druckstylesheet:
+„PDF exportieren“ nutzt den nativen Druckdialog. Der Ausdruck ist auf genau eine Seite DIN A4 hochkant ausgelegt.
 
-- entfernt Ambient-Hintergrund, Werkzeugleisten, Dialoge und nicht benötigte Statusbereiche;
-- konzentriert die Ausgabe auf Monatskopf, Tabelle und Statistik;
-- optimiert für A4;
-- verhindert unnötige Glas- und Animationseffekte;
-- blendet den interaktiven Block „Offene Punkte“ aus.
+Das Druckstylesheet:
+
+- entfernt Ambient-Hintergrund, Werkzeugleisten, Dialoge, Legenden und den Block „Offene Punkte“;
+- druckt aus der Planungstabelle ausschließlich die Spalten Tag, Wochentag, BD, HG, RBN und 2. RBN; die Spalten „Urlaub / FZA“ und „Kein Dienst / Wünsche / Optionen“ entfallen;
+- setzt die Statistik mit deutlichem Abstand unter den Plan und reduziert sie auf Mitarbeitende, BD und HG;
+- erhält die Monatsfarben des jeweiligen Monats (Wochenend-, Feiertags- und Wochentagsflächen) über `print-color-adjust: exact`;
+- unterdrückt Verläufe, Filter, Containment und Animationen, weil Chromium sonst die gesamte Seite rastert;
+- blendet den Platzhalter „— auswählen —“ unbesetzter Rufbereitschaften aus;
+- rechnet mit festen Millimetermaßen: Satzspiegel 283 mm, Bedarf rund 262 mm inklusive zweizeiliger Feiertagszeilen.
+
+Das Stylesheet steht bewusst am Ende von `styles.css`, damit es die später notierten Glas- und Aero-Regeln ohne `!important` überschreibt.
 
 ---
 
@@ -1293,7 +1299,7 @@ Das Repository wird aus dem Projektstamm bereitgestellt. Pages Functions werden 
 Alle releasekritischen Assets und relativen Browserimporte verwenden denselben `?v=`-Token. Der Build-Stempel in `index.html` muss exakt dazu passen. Für diesen Funktionsstand ist die Kennung:
 
 ```text
-20260801.1
+20260801.2
 ```
 
 Der laufende Stand ist im Browser über `document.documentElement.dataset.build` und im Tooltip des Speicherstatus sichtbar.

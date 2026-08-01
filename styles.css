@@ -142,7 +142,8 @@ body.month-content-transition .plan-table tbody tr { animation: none; }
 }
 
 @media print {
-  .month-enter-next, .month-enter-prev { animation: none !important; opacity: 1 !important; transform: none !important; }
+  .month-enter-next, .month-enter-prev,
+  #monthTitle, #printArea, #statsGrid { animation: none !important; opacity: 1 !important; transform: none !important; }
 }
 
 * { box-sizing: border-box; }
@@ -585,31 +586,7 @@ h3 { font-size: 1.05rem; }
   .batch-day-grid { grid-template-columns: repeat(4, 1fr); }
 }
 
-@media print {
-  :root {
-    /* !important, weil js/theme.js die Werte als Inline-Style auf <html> setzt. */
-    --saturday-row-bg: #eaf1f6 !important;
-    --sunday-row-bg: #dae7f0 !important;
-    --holiday-row-bg: #c8dbe7 !important;
-    --weekday-field-bg: #9dbdd4 !important;
-    --month-ink: #10314a !important;
-  }
-  body { background: #fff; color: #000; }
-  body::before, body::after, .topbar, .toolbar, .legend-stack { display: none !important; }
-  .app-shell { max-width: none; padding: 0; }
-  .glass-panel, .sheet-panel { backdrop-filter: none; box-shadow: none; border: none; background: #fff; padding: 0; }
-  .glass-panel::after { display: none; }
-  .plan-table-wrap, .excel-stats { box-shadow: none; border-color: #000; border-radius: 0; }
-  .plan-table { min-width: 0; font-size: 8.3px; }
-  .plan-table th, .plan-table td { height: 18px; border-color: #000; }
-  .assignment-btn, .rbn-field, .rbn-input { min-height: 17px; height: 17px; font-size: 8px; }
-  .cell-summary-button { min-height: 17px; height: auto; font-size: 8px; padding: 1px 2px; gap: 1px 2px; }
-  .summary-entry { font-size: 7px; line-height: 1.15; padding: 0 1px; background: none; box-shadow: none; }
-  .small-chip { display: none; }
-  .below-plan { margin-top: 5mm; max-width: 120mm; }
-  .holiday-name { font-size: 5.5px; }
-  @page { size: A4 portrait; margin: 6mm; }
-}
+
 
 /* --------------------------------------------------------------------------
    Schwebende Aero-Peak-/Liquid-Glass-Verfeinerung
@@ -917,5 +894,118 @@ h3 { font-size: 1.05rem; }
 
 /* Im Druck steht der Plan selbst im Vordergrund. */
 @media print {
+  .issue-heading, .issue-list { display: none !important; }
+}
+
+/* --------------------------------------------------------------------------
+   Druck: ein vollständiger Monat auf genau einer DIN-A4-Seite hochkant.
+
+   Regeln, die das Layout tragen:
+   - Gedruckt werden ausschließlich Tag, Wochentag, BD, HG, RBN und 2. RBN;
+     die beiden Zusammenfassungsspalten entfallen.
+   - Die Statistik steht mit deutlichem Abstand unter dem Plan und ist auf
+     Mitarbeitende, BD und HG reduziert.
+   - Die Monatsfarben bleiben erhalten: Die früheren festen Blauwerte werden
+     nicht mehr erzwungen, stattdessen sorgt `print-color-adjust: exact` dafür,
+     dass die Flächen überhaupt gedruckt werden.
+   - Alle Höhen sind in Millimetern gesetzt, damit die Summe aus 31 Planzeilen,
+     Kopfzeile, Abstand und Statistik nachrechenbar innerhalb des Satzspiegels
+     bleibt (Satzspiegel 283 mm, Bedarf rund 262 mm inklusive Feiertagszeilen).
+   - Dieser Block steht bewusst am Dateiende: Er muss die später notierten
+     Glas- und Aero-Regeln überschreiben können, ohne überall !important zu
+     benötigen.
+   -------------------------------------------------------------------------- */
+@media print {
+  @page { size: A4 portrait; margin: 9mm 10mm; }
+
+  html, body { width: auto; height: auto; background: #fff !important; color: #000; background-attachment: scroll !important; isolation: auto; }
+  /* Verläufe, Filter und Containment zwingen Chromium sonst in eine
+     Rasterausgabe der gesamten Seite: unscharf und um ein Vielfaches größer. */
+  *, *::before, *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    filter: none !important;
+    mix-blend-mode: normal !important;
+    will-change: auto !important;
+    contain: none !important;
+    text-shadow: none !important;
+  }
+  body::before, body::after, .topbar, .toolbar, .legend-stack, .ambient-layer { display: none !important; }
+  .glass-panel::after, .glass-panel::before { display: none !important; }
+  .app-shell { max-width: none; padding: 0; gap: 0; display: block; }
+  .sheet-layout { display: block; }
+  .glass-panel, .sheet-panel { backdrop-filter: none; box-shadow: none; border: none; background: #fff; padding: 0; margin: 0; }
+
+  /* Kopf ---------------------------------------------------------------- */
+  .sheet-heading { display: block; margin: 0 0 3.4mm; padding: 0 0 1.6mm; border-bottom: .5mm solid var(--month-accent); }
+  .sheet-heading .eyebrow { display: none; }
+  #monthTitle { font-size: 13pt; letter-spacing: .01em; margin: 0; line-height: 1.15; color: var(--month-ink); }
+
+  /* Planungstabelle ----------------------------------------------------- */
+  .plan-table-wrap { overflow: visible; box-shadow: none; border: .35mm solid var(--month-ink); border-radius: 0; background: #fff; }
+  .plan-table { min-width: 0; width: 100%; table-layout: fixed; font-size: 8pt; }
+  .plan-table th, .plan-table td { height: auto; padding: 0; border-color: rgba(0,0,0,.55); }
+  .plan-table th {
+    position: static; box-shadow: none; padding: 1mm 1.4mm; font-size: 8pt; line-height: 1.1;
+    background: color-mix(in srgb, var(--month-accent) 26%, #fff);
+    color: var(--month-ink); border-bottom: .35mm solid var(--month-ink);
+  }
+  .plan-table td { height: 5.6mm; }
+  .plan-table th:nth-child(1), .plan-table td:nth-child(1) { width: 7%; }
+  .plan-table th:nth-child(2), .plan-table td:nth-child(2) { width: 21%; }
+  .plan-table th:nth-child(3), .plan-table td:nth-child(3),
+  .plan-table th:nth-child(4), .plan-table td:nth-child(4) { width: 18%; }
+  .plan-table th:nth-child(5), .plan-table td:nth-child(5),
+  .plan-table th:nth-child(6), .plan-table td:nth-child(6) { width: 18%; }
+  /* Urlaub/FZA und Wünsche/Optionen gehören nicht auf den Aushang. */
+  .plan-table th:nth-child(7), .plan-table td:nth-child(7),
+  .plan-table th:nth-child(8), .plan-table td:nth-child(8) { display: none; }
+
+  .assignment-btn, .rbn-field, .rbn-input, .cell-summary-button {
+    min-height: 0; height: 5.6mm; font-size: 8pt; padding: 0 1.4mm; line-height: 1.1;
+  }
+  .rbn-input { appearance: none; -webkit-appearance: none; color: #000; }
+  /* Der Platzhalter „— auswählen —“ ist eine Bedienhilfe; auf dem Ausdruck
+     bleibt eine unbesetzte Rufbereitschaft schlicht leer. */
+  .rbn-input[data-rbn-empty="true"] { visibility: hidden; }
+  .rbn2-inactive-note { font-size: 6.6pt; padding: 0 1.4mm; color: #000; }
+  .assignment-btn { display: block; }
+  .assignment-badges, .small-chip { display: none !important; }
+  .weekday-name { line-height: 1.1; }
+  .holiday-name { font-size: 5.8pt; margin-top: 0; line-height: 1.05; }
+
+  /* Statistik ------------------------------------------------------------ */
+  .below-plan { margin-top: 7mm; max-width: none; break-inside: avoid; page-break-inside: avoid; }
+  .below-plan .section-title-row { display: block; margin: 0 0 2mm; }
+  .below-plan .section-title-row .eyebrow, .below-plan .section-note { display: none; }
+  .below-plan h3 { font-size: 9.5pt; margin: 0; line-height: 1.15; color: var(--month-ink); }
+  .excel-stats { display: inline-block; width: auto; box-shadow: none; border: .35mm solid var(--month-ink); border-radius: 0; background: #fff; }
+  .distribution-table { width: 88mm; font-size: 8pt; }
+  .distribution-table th, .distribution-table td {
+    height: auto; padding: 0.75mm 1.6mm; border-color: rgba(0,0,0,.55); background: #fff; color: #000;
+  }
+  .distribution-table th {
+    font-weight: 700; color: var(--month-ink);
+    background: color-mix(in srgb, var(--month-accent) 26%, #fff);
+    border-bottom: .35mm solid var(--month-ink);
+  }
+  /* Nur Mitarbeitende, BD und HG. */
+  .distribution-table th:nth-child(n+4), .distribution-table td:nth-child(n+4) { display: none; }
+  .distribution-table th:first-child, .distribution-table td:first-child { width: 44mm; text-align: left; }
+  .distribution-table th:nth-child(2), .distribution-table td:nth-child(2),
+  .distribution-table th:nth-child(3), .distribution-table td:nth-child(3) { width: 22mm; text-align: center; }
+  .distribution-table th:nth-child(3), .distribution-table td:nth-child(3) { border-right: none; }
+  .distribution-table tbody tr:last-child td { border-bottom: none; }
+  .distribution-table .open-row td { background: color-mix(in srgb, var(--month-accent) 12%, #fff); font-weight: 700; }
+
+  /* Keine Verläufe, Filter oder Animationen im Druck. */
+  .plan-table tbody tr, .plan-table tbody tr td { animation: none !important; transition: none !important; filter: none !important; transform: none !important; }
+  .saturday-row td, .sunday-row td, .holiday-row td { background-image: none !important; }
+  .plan-table th, .distribution-table th { background-image: none !important; }
+  .month-enter-next, .month-enter-prev,
+  #monthTitle, #printArea, #statsGrid { animation: none !important; opacity: 1 !important; transform: none !important; }
+
   .issue-heading, .issue-list { display: none !important; }
 }

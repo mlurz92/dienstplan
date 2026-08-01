@@ -82,7 +82,7 @@ test('app.js rendert die RBN-Selects direkt und koppelt 2. RBN ohne DOM-Nachbear
   const rulesFacade = fs.readFileSync(new URL('../js/rules.js', import.meta.url), 'utf8');
 
   assert.equal(await exists('js/rbn-ui.js'), false, 'kein nachgelagerter DOM-Postprozessor');
-  assert.match(app, /from '\.\/rbn\.js\?v=20260801\.1'/);
+  assert.match(app, /from '\.\/rbn\.js\?v=20260801\.2'/);
   assert.match(app, /function buildRbnSelect/);
   assert.match(app, /createElement\('select'\)/);
   assert.match(app, /isSecondRbnAvailable\(dateIso, firstSelect\.value\)/);
@@ -129,4 +129,22 @@ test('RBN-Spalten zeigen Namen ohne Anrede und Titel, speichern aber den vollen 
   assert.equal(rbnDisplayName(''), '');
   assert.match(app, /new Option\(rbnDisplayName\(name\), name, false, name === currentValue\)/);
   assert.match(app, /select\.title = currentValue \|\| ''/);
+});
+
+test('Das Druckstylesheet hält den Monatsplan auf einer A4-Seite zusammen', () => {
+  const css = fs.readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
+  const printBlocks = css.split('@media print');
+  const layout = printBlocks.at(-1);
+
+  // Der maßgebliche Druckblock steht am Dateiende und überschreibt damit die
+  // später notierten Glas-Regeln ohne !important.
+  assert.match(layout, /@page \{ size: A4 portrait;/);
+  assert.match(layout, /print-color-adjust: exact !important/);
+  // Nur Tag, Wochentag, BD, HG, RBN und 2. RBN werden gedruckt.
+  assert.match(layout, /\.plan-table th:nth-child\(7\)[\s\S]*?\.plan-table td:nth-child\(8\) \{ display: none; \}/);
+  // Die Statistik bleibt auf Mitarbeitende, BD und HG reduziert.
+  assert.match(layout, /\.distribution-table th:nth-child\(n\+4\), \.distribution-table td:nth-child\(n\+4\) \{ display: none; \}/);
+  assert.match(layout, /\.below-plan \{ margin-top: 7mm;/);
+  assert.match(layout, /\.rbn-input\[data-rbn-empty="true"\] \{ visibility: hidden; \}/);
+  assert.doesNotMatch(layout, /--saturday-row-bg: #/);
 });

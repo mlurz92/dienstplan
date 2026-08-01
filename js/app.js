@@ -1,10 +1,10 @@
-import { ABSENCE_TYPES, MONTH_NAMES, OPTION_TYPES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, normalizeBackupPayload, toIsoDate } from './defaults.js?v=20260801.1';
-import { state, bootstrapState, buildBackupPayload, getMonthData, getMonthLabel, isMonthDirty, isMonthMergeSafe, loadMonth, markBootstrapDirty, markBootstrapSynced, markMonthDirty, markMonthSynced, persistDirtyState, persistMonth, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260801.1';
-import { api } from './api.js?v=20260801.1';
-import { applyMonthTheme, prefersReducedMotion } from './theme.js?v=20260801.1';
-import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260801.1';
-import { buildStats, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getEffectiveAbsence, getPlanningStaff, getOptions, getPreference, getStaffById, labelForAbsence, labelForOption, labelForPreference, setAbsence, setAssignment, setOptions, setPreference, toggleOption, weekdayLabel } from './rules.js?v=20260801.1';
-import { getRbnOptions, isRbnValueAllowed, isSecondRbnAvailable, rbnDisplayName } from './rbn.js?v=20260801.1';
+import { ABSENCE_TYPES, MONTH_NAMES, OPTION_TYPES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, normalizeBackupPayload, toIsoDate } from './defaults.js?v=20260801.2';
+import { state, bootstrapState, buildBackupPayload, getMonthData, getMonthLabel, isMonthDirty, isMonthMergeSafe, loadMonth, markBootstrapDirty, markBootstrapSynced, markMonthDirty, markMonthSynced, persistDirtyState, persistMonth, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260801.2';
+import { api } from './api.js?v=20260801.2';
+import { applyMonthTheme, prefersReducedMotion } from './theme.js?v=20260801.2';
+import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260801.2';
+import { buildStats, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getEffectiveAbsence, getPlanningStaff, getOptions, getPreference, getStaffById, labelForAbsence, labelForOption, labelForPreference, setAbsence, setAssignment, setOptions, setPreference, toggleOption, weekdayLabel } from './rules.js?v=20260801.2';
+import { getRbnOptions, isRbnValueAllowed, isSecondRbnAvailable, rbnDisplayName } from './rbn.js?v=20260801.2';
 
 const $ = selector => document.querySelector(selector);
 
@@ -315,8 +315,10 @@ function buildRbnSelect(dateIso, field, value) {
   }
   select.value = currentValue;
   select.title = currentValue || '';
+  select.dataset.rbnEmpty = String(!select.value);
   select.addEventListener('change', () => {
     select.title = select.value || '';
+    select.dataset.rbnEmpty = String(!select.value);
     setRbnValue(dateIso, field, select.value);
   });
 
