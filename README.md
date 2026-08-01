@@ -6,7 +6,7 @@
 
 <p align="center"><strong>Manuelle, regelgestützte Monatsplanung für Bereitschaftsdienst, Hintergrunddienst und RBN</strong></p>
 
-> **Referenzstand:** Build `20260801.10` · Paketversion `0.2.0` · Datenregion Sachsen (`SN`)  
+> **Referenzstand:** Build `20260801.11` · Paketversion `0.2.0` · Datenregion Sachsen (`SN`)  
 > **Betriebsmodell:** Cloudflare Pages + Pages Functions + Cloudflare KV, ergänzt durch eine lokale Browser-Sicherung  
 > **Grundsatz:** Der Mensch plant. DienstplanRAD prüft, erklärt, speichert und dokumentiert.
 
@@ -238,6 +238,7 @@ Die Monatsnavigation berücksichtigt Jahreswechsel über native Datumsarithmetik
 | **Aktueller Monat** | setzt Monat und Jahr auf das lokale aktuelle Datum |
 | **Abwesenheiten** | öffnet die Sammelerfassung für Abwesenheitstypen |
 | **Dienstwünsche** | öffnet die Sammelerfassung für Wunschtypen |
+| **Monat leeren** | entfernt nach Rückfrage sämtliche Eintragungen des angezeigten Monats |
 | **Serverstand neu laden** | lädt den angezeigten Monat erneut von der Serverquelle |
 | **Excel importieren** | liest `.xlsx` oder `.xls` |
 | **Excel exportieren** | erstellt eine Arbeitsmappe für den sichtbaren Monat |
@@ -963,6 +964,14 @@ Fehlt in einem Blatt jede Jahresangabe, muss die Zuordnung zum aktuell ausgewäh
 
 **Der Import setzt sich durch, löscht aber nichts.** Trägt die Datei für ein Feld einen abweichenden Wert, ersetzt er den bisherigen — für BD, HG, RBN, 2. RBN und Abwesenheiten. Was die Datei nicht kennt, bleibt unangetastet: Ein leeres Feld löscht nie einen bestehenden Eintrag. Der Umfang wird vorab benannt; ersetzt wird erst nach ausdrücklicher Bestätigung. Gelesene, ergänzte, ersetzte und unveränderte Werte, unbekannte Namen und nur lokal gespeicherte Monate weist die Abschlussmeldung je Blatt aus. Dienstwünsche und Optionen werden aus Excel nicht importiert.
 
+## 18.1a Monat leeren
+
+„Monat leeren“ entfernt im angezeigten Monat alle Dienste, RBN-Werte, Abwesenheiten, Dienstwünsche und Optionen. Andere Monate bleiben unberührt.
+
+Vor dem Ausführen nennt die Rückfrage den Umfang: die Zahl der belegten Tage und die Zahl der Personen mit Markierungen. Ist der Monat bereits leer, erscheint nur ein Hinweis.
+
+Erhalten bleiben Override- und Importprotokoll als Nachweis sowie Revision und Zeitstempel, damit die Serversynchronität nicht bricht. Der geleerte Monat wird sofort als geändert markiert und gespeichert; schlägt die Serverübertragung fehl, bleibt der lokale Stand mit ausdrücklichem Offline-Hinweis erhalten. Rückgängig machen lässt sich der Schritt nur über eine JSON-Sicherung.
+
 ## 18.2 Excel-Export
 
 Der sichtbare Monat wird in eine neue Arbeitsmappe übertragen. Die Ausgabe bildet die Tageszeilen und die für den Dienstplan relevanten Spalten ab. Der Export ist eine Momentaufnahme des dargestellten Monats, keine vollständige Systemsicherung.
@@ -1313,7 +1322,7 @@ Das Repository wird aus dem Projektstamm bereitgestellt. Pages Functions werden 
 Alle releasekritischen Assets und relativen Browserimporte verwenden denselben `?v=`-Token. Der Build-Stempel in `index.html` muss exakt dazu passen. Für diesen Funktionsstand ist die Kennung:
 
 ```text
-20260801.10
+20260801.11
 ```
 
 Der laufende Stand ist im Browser über `document.documentElement.dataset.build` und im Tooltip des Speicherstatus sichtbar.

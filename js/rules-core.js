@@ -1,5 +1,5 @@
-import { MONTH_NAMES, OPTION_TYPES, PREFERENCE_TYPES, STAFF_ORDER, toIsoDate, WEEKDAYS } from './defaults.js?v=20260801.10';
-import { isFirstRegularWorkdayAfter } from './holidays.js?v=20260801.10';
+import { MONTH_NAMES, OPTION_TYPES, PREFERENCE_TYPES, STAFF_ORDER, createEmptyMonth, toIsoDate, WEEKDAYS } from './defaults.js?v=20260801.11';
+import { isFirstRegularWorkdayAfter } from './holidays.js?v=20260801.11';
 
 export function parseIso(date) { return new Date(`${date}T00:00:00`); }
 export function addDays(date, days) { const d = new Date(date); d.setDate(d.getDate() + days); return d; }
@@ -156,6 +156,32 @@ export function toggleOption(monthData, staffId, dateIso, optionId) {
   setOptions(monthData, staffId, dateIso, current.includes(optionId) ? current.filter(id => id !== optionId) : [...current, optionId]);
 }
 export function labelForOption(type) { return OPTION_TYPES.find(item => item.id === type)?.label || type; }
+
+/**
+ * Ein leerer Monat, der die Nachweise des bisherigen behält: Dienste, RBN,
+ * Abwesenheiten, Wünsche und Optionen fallen weg; Override- und Importprotokoll
+ * sowie Revision und Zeitstempel bleiben für Nachvollziehbarkeit und
+ * Serversynchronität erhalten.
+ */
+export function clearedMonthData(monthData, year, month) {
+  const cleared = createEmptyMonth(year, month);
+  cleared.revision = monthData?.revision || 0;
+  cleared.updatedAt = monthData?.updatedAt ?? null;
+  cleared.overrideLog = Array.isArray(monthData?.overrideLog) ? monthData.overrideLog : [];
+  cleared.importLog = Array.isArray(monthData?.importLog) ? monthData.importLog : [];
+  return cleared;
+}
+
+/** Umfang dessen, was ein Leeren entfernen würde. */
+export function monthContentSummary(monthData) {
+  const filledDays = Object.values(monthData?.days || {}).filter(day => day?.bd || day?.hg || day?.rbn1 || day?.rbn2).length;
+  const markedStaff = new Set([
+    ...Object.keys(monthData?.absences || {}),
+    ...Object.keys(monthData?.preferences || {}),
+    ...Object.keys(monthData?.options || {})
+  ]).size;
+  return { filledDays, markedStaff, empty: !filledDays && !markedStaff };
+}
 
 export function countRoleInMonth(monthData, staffId, role) {
   return Object.values(monthData.days || {}).filter(day => day?.[role] === staffId).length;
