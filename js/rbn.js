@@ -66,6 +66,17 @@ export function getRbnOptions(field, dateIso) {
     .map(option => option.value);
 }
 
+/**
+ * Anzeigename ohne Anrede und akademischen Titel. Gespeichert, exportiert und
+ * fachlich ausgewertet wird weiterhin ausschließlich der vollständige Wert; die
+ * Kürzung betrifft nur die schmalen RBN-Spalten der Planungstabelle.
+ */
+export function rbnDisplayName(value) {
+  const normalized = String(value ?? '').trim();
+  const shortened = normalized.replace(/^(?:(?:Prof\.|Priv\.-Doz\.|PD|Dr\.|med\.|habil\.|Fr\.|Hr\.|Frau|Herr)\s+)+/u, '').trim();
+  return shortened || normalized;
+}
+
 export function isRbnValueAllowed(field, dateIso, value) {
   const normalized = String(value ?? '').trim();
   return normalized === '' || getRbnOptions(field, dateIso).includes(normalized);
