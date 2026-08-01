@@ -1,4 +1,4 @@
-name: Seasonal palette integration
+name: Seasonal palette one-shot integration
 
 on:
   push:
