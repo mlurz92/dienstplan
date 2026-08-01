@@ -82,7 +82,7 @@ test('app.js rendert die RBN-Selects direkt und koppelt 2. RBN ohne DOM-Nachbear
   const rulesFacade = fs.readFileSync(new URL('../js/rules.js', import.meta.url), 'utf8');
 
   assert.equal(await exists('js/rbn-ui.js'), false, 'kein nachgelagerter DOM-Postprozessor');
-  assert.match(app, /from '\.\/rbn\.js\?v=20260801\.7'/);
+  assert.match(app, /from '\.\/rbn\.js\?v=20260801\.8'/);
   assert.match(app, /function buildRbnSelect/);
   assert.match(app, /createElement\('select'\)/);
   assert.match(app, /isSecondRbnAvailable\(dateIso, firstSelect\.value\)/);
@@ -91,6 +91,9 @@ test('app.js rendert die RBN-Selects direkt und koppelt 2. RBN ohne DOM-Nachbear
   assert.match(app, /clearWhenUnavailable: true/);
   assert.match(app, /setRbnValue\(dateIso, 'rbn2', ''\)/);
   assert.match(app, /legacyOption\.disabled = true/);
+  // Kein „(Altwert)“ mehr im Feld – der Name allein genügt.
+  assert.match(app, /new Option\(rbnDisplayName\(currentValue\), currentValue, true, true\)/);
+  assert.doesNotMatch(app, /\(Altwert\)/);
   assert.doesNotMatch(app, /rbnSuggestions|saveRbnNames|createElement\('datalist'\)/);
   assert.doesNotMatch(rulesFacade, /rbn-ui|document|window/);
 });
