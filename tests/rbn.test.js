@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import { access } from 'node:fs/promises';
 import {
   HELLMANN_RBN_ACTIVE_FROM, RBN2_TRIGGER_NAMES, getRbnOptions,
-  isRbnValueAllowed, isSecondRbnAvailable
+  isRbnValueAllowed, isSecondRbnAvailable, rbnDisplayName
 } from '../js/rbn.js';
 
 const RBN1_BEFORE_OCTOBER = [
@@ -116,4 +116,17 @@ test('Die Planungstabelle zeigt Dienstnamen ohne Anrede und Titel', () => {
   assert.match(buttonSource, /const name = person\?\.short \|\| person\?\.name/);
   assert.match(buttonSource, /button\.title = staffId/);
   assert.match(buttonSource, /\[person\?\.name, \.\.\.evaluation\.reasons\]/);
+});
+
+test('RBN-Spalten zeigen Namen ohne Anrede und Titel, speichern aber den vollen Wert', () => {
+  const app = fs.readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
+
+  assert.equal(rbnDisplayName('Prof. Schob'), 'Schob');
+  assert.equal(rbnDisplayName('Dr. Maybaum'), 'Maybaum');
+  assert.equal(rbnDisplayName('Fr. Dalitz'), 'Dalitz');
+  assert.equal(rbnDisplayName('Hr. El Houba'), 'El Houba');
+  assert.equal(rbnDisplayName('Schob'), 'Schob');
+  assert.equal(rbnDisplayName(''), '');
+  assert.match(app, /new Option\(rbnDisplayName\(name\), name, false, name === currentValue\)/);
+  assert.match(app, /select\.title = currentValue \|\| ''/);
 });

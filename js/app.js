@@ -4,7 +4,7 @@ import { api } from './api.js?v=20260801.1';
 import { applyMonthTheme, prefersReducedMotion } from './theme.js?v=20260801.1';
 import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260801.1';
 import { buildStats, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getEffectiveAbsence, getPlanningStaff, getOptions, getPreference, getStaffById, labelForAbsence, labelForOption, labelForPreference, setAbsence, setAssignment, setOptions, setPreference, toggleOption, weekdayLabel } from './rules.js?v=20260801.1';
-import { getRbnOptions, isRbnValueAllowed, isSecondRbnAvailable } from './rbn.js?v=20260801.1';
+import { getRbnOptions, isRbnValueAllowed, isSecondRbnAvailable, rbnDisplayName } from './rbn.js?v=20260801.1';
 
 const $ = selector => document.querySelector(selector);
 
@@ -306,15 +306,19 @@ function buildRbnSelect(dateIso, field, value) {
 
   const currentValue = String(value ?? '').trim();
   if (currentValue && !isRbnValueAllowed(field, dateIso, currentValue)) {
-    const legacyOption = new Option(`${currentValue} (Altwert)`, currentValue, true, true);
+    const legacyOption = new Option(`${rbnDisplayName(currentValue)} (Altwert)`, currentValue, true, true);
     legacyOption.disabled = true;
     select.appendChild(legacyOption);
   }
   for (const name of getRbnOptions(field, dateIso)) {
-    select.appendChild(new Option(name, name, false, name === currentValue));
+    select.appendChild(new Option(rbnDisplayName(name), name, false, name === currentValue));
   }
   select.value = currentValue;
-  select.addEventListener('change', () => setRbnValue(dateIso, field, select.value));
+  select.title = currentValue || '';
+  select.addEventListener('change', () => {
+    select.title = select.value || '';
+    setRbnValue(dateIso, field, select.value);
+  });
 
   const inactiveNote = document.createElement('span');
   inactiveNote.className = 'rbn2-inactive-note';
@@ -335,7 +339,8 @@ function syncSecondRbnControl(dateIso, firstSelect, secondControl, { clearWhenUn
   secondControl.wrapper.toggleAttribute('data-rbn2-available', available);
 
   const storedValue = String(getMonthData(state.currentYear, state.currentMonth).days[dateIso]?.rbn2 ?? '').trim();
-  secondControl.inactiveNote.textContent = !available && storedValue ? `${storedValue} (Altwert)` : '';
+  secondControl.inactiveNote.textContent = !available && storedValue ? `${rbnDisplayName(storedValue)} (Altwert)` : '';
+  secondControl.inactiveNote.title = !available && storedValue ? storedValue : '';
   secondControl.inactiveNote.hidden = available || !storedValue;
 }
 
