@@ -6,109 +6,62 @@
 
 <p align="center"><strong>Manuelle, regelgestützte Monatsplanung für Bereitschaftsdienst, Hintergrunddienst und neuroradiologische Rufbereitschaft</strong></p>
 
-> **Referenzstand:** Build `20260801.14`  
+> **Release-Token:** `20260801.11`  
 > **Aktueller UI-Stand:** kompakte, semantisch gruppierte Icon-Werkzeugleiste  
 > **Monatsdesign:** saisonales Langzeit-Farbsystem mit **288 deterministischen Monatspaletten**  
 > **Paketversion:** `0.2.0` · **Datenregion:** Sachsen (`SN`)  
 > **Betrieb:** Cloudflare Pages · Pages Functions · Cloudflare KV · lokale Browser-Sicherung
 
-DienstplanRAD unterstützt die **bewusste manuelle Planung** von **Bereitschaftsdienst (BD)**, **Hintergrunddienst (HG)** sowie erster und zweiter **Rufbereitschaft Neuroradiologie (RBN)**. Die Anwendung nimmt keine automatische Gesamtplanung vor. Sie bewertet konkrete Einteilungen nachvollziehbar, erklärt Konflikte und Empfehlungen, speichert Monatsstände und hält Importe, Exporte sowie bestätigte Ausnahmen revisionsfähig.
+DienstplanRAD unterstützt die **bewusste manuelle Planung** von **Bereitschaftsdienst (BD)**, **Hintergrunddienst (HG)** sowie erster und zweiter **Rufbereitschaft Neuroradiologie (RBN)**. Es existiert keine automatische Gesamtplanung: Jede Einteilung entsteht durch eine ausdrückliche Benutzereingabe und wird gegen das fachliche Regelwerk geprüft.
 
-Die ausführliche Referenz vor Einführung des Langzeit-Farbsystems bleibt als historischer Snapshot erhalten: [`docs/README-20260801.11.md`](docs/README-20260801.11.md). Die vorliegende Haupt-README beschreibt den aktuellen produktiven Stand.
-
----
-
-## Inhaltsverzeichnis
-
-1. [Planungsprinzip](#1-planungsprinzip)
-2. [Benutzeroberfläche](#2-benutzeroberfläche)
-3. [Kompakte Icon-Werkzeugleiste](#3-kompakte-icon-werkzeugleiste)
-4. [Dienstarten und Personalpools](#4-dienstarten-und-personalpools)
-5. [Bewertungs- und Konfliktmodell](#5-bewertungs--und-konfliktmodell)
-6. [Saisonales Langzeit-Farbsystem](#6-saisonales-langzeit-farbsystem)
-7. [Abwesenheiten, Wünsche und Optionen](#7-abwesenheiten-wünsche-und-optionen)
-8. [RBN-Logik](#8-rbn-logik)
-9. [Statistik und offene Punkte](#9-statistik-und-offene-punkte)
-10. [Persistenz und Datensicherheit](#10-persistenz-und-datensicherheit)
-11. [Import und Export](#11-import-und-export)
-12. [Technische Architektur](#12-technische-architektur)
-13. [Tests und Qualitätssicherung](#13-tests-und-qualitätssicherung)
-14. [Lokale Entwicklung](#14-lokale-entwicklung)
-15. [Deployment](#15-deployment)
-16. [Projektstruktur](#16-projektstruktur)
-17. [Unveränderliche Grundsätze](#17-unveränderliche-grundsätze)
+Die ausführliche historische Referenz bleibt unter [`docs/README-20260801.11.md`](docs/README-20260801.11.md) erhalten. Diese Haupt-README beschreibt den aktuellen produktiven Stand.
 
 ---
 
-# 1. Planungsprinzip
-
-## 1.1 Assistierte manuelle Planung
-
-DienstplanRAD ist **kein automatischer Optimierer**. Es gibt:
+## 1. Planungsprinzip
 
 - keine automatische Monatsbelegung;
-- keine selbstständige Umbesetzung;
-- keine automatische Tauschlogik;
-- keine versteckte Gesamtoptimierung;
-- keine automatisch erzeugten Gegenposten bei Kopplungsregeln.
+- keine selbstständige Umbesetzung oder Tauschlogik;
+- keine verdeckte Gesamtoptimierung;
+- keine automatisch erzeugten Gegenposten bei Kopplungsregeln;
+- vollständige Klartextbegründung ausgelöster Regeln;
+- ausdrückliche Bestätigung und Protokollierung roter Ausnahmen;
+- lokale Sofortsicherung und zentrale Cloudflare-KV-Synchronisierung.
 
-Jede Besetzung entsteht durch eine ausdrückliche Auswahl. Die Anwendung prüft diese Auswahl gegen das fachliche Regelwerk und zeigt sämtliche ausgelösten Gründe in Klartext an.
-
-## 1.2 Chronologische Monatsansicht
-
-Der Monatsplan verwendet eine Zeile je Kalendertag. Dadurch liegen Datum, Wochentag, BD, HG, RBN, zweite RBN, Abwesenheiten sowie Wünsche und Optionen in einer gemeinsamen Leserichtung. Dienstfolgen, Wochenenden, Feiertage und Ruheabstände bleiben unmittelbar erkennbar.
-
-## 1.3 Erklärbarkeit
-
-Eine Kandidatenkarte enthält nicht nur eine Farbe, sondern alle relevanten Gründe. Die höchste Konfliktstufe bestimmt die sichtbare Bewertung; niedrigere Gründe und positive Hinweise bleiben erhalten. Positive Gründe können Konflikte nicht rechnerisch aufheben.
+Der Monatsplan verwendet eine chronologische Zeile je Kalendertag. Datum, Wochentag, BD, HG, RBN, zweite RBN, Abwesenheiten sowie Wünsche und Optionen liegen damit in einer gemeinsamen Leserichtung.
 
 ---
 
-# 2. Benutzeroberfläche
+## 2. Benutzeroberfläche
 
-## 2.1 Monatsnavigation
+### Monatsnavigation
 
 - Vormonat und Folgemonat;
 - direkte Monats- und Jahresauswahl;
 - Sprung zum aktuellen Monat;
-- dynamische Ergänzung historischer oder zukünftiger Jahre;
+- dynamische historische und zukünftige Jahresoptionen;
 - richtungsabhängige Monatswechselanimation;
 - Vorladen benachbarter Monate für monatsübergreifende Regeln.
 
-## 2.2 Planbearbeitung
+### Planbearbeitung
 
 - direkte Auswahl für BD und HG;
-- native Auswahlfelder für RBN;
-- bedingt eingeblendete zweite RBN;
-- Löschen vorhandener Einteilungen;
-- Einzelerfassung tagesbezogener Markierungen;
-- Sammelerfassung mehrerer Tage;
+- native Auswahlfelder für erste und zweite RBN;
+- Einzelerfassung und Sammelerfassung tagesbezogener Markierungen;
 - vollständiges Leeren des sichtbaren Monats nach Bestätigung;
-- automatische lokale Sicherung und Server-Synchronisierung.
+- Excel-, PDF- und JSON-Ausgabe;
+- Excel- und JSON-Import;
+- automatisches Speichern.
 
-## 2.3 Gestaltung
+### Gestaltung
 
-Die Oberfläche kombiniert eine Excel-nahe Tabellenlogik mit kontrollierter Glasoptik:
-
-- semitransparente, klar begrenzte Panels;
-- monatlich getönte Kanten und Akzente;
-- deckend weiße Eingabefelder für maximale Lesbarkeit;
-- tabellarische Ziffern;
-- definierte Fokusdarstellung;
-- reduzierte Bewegung über `prefers-reduced-motion`;
-- deckende Ersatzflächen über `prefers-reduced-transparency`.
+Die Oberfläche verbindet eine Excel-nahe Tabelle mit kontrollierter Glasoptik, monatlich getönten Kanten, deckend weißen Eingabefeldern, tabellarischen Ziffern und klarer Fokusdarstellung. `prefers-reduced-motion` und `prefers-reduced-transparency` werden berücksichtigt.
 
 ---
 
-# 3. Kompakte Icon-Werkzeugleiste
+## 3. Kompakte Icon-Werkzeugleiste
 
-## 3.1 Zielsetzung
-
-Die frühere Aktionsleiste bestand aus zwei unbenannten Reihen gleichartiger Textschaltflächen. Der aktuelle Stand ordnet sämtliche Aktionen nach ihrer Funktion, reduziert visuelles Gewicht und erhält dennoch die unmittelbare Erreichbarkeit aller Funktionen.
-
-Die Leiste wird durch `js/ui-controls.js` semantisch organisiert und durch `controls.css` gestaltet. Die bestehenden IDs und Ereignisbehandlungen bleiben unverändert; die UI-Schicht verschiebt die bereits vorhandenen Elemente lediglich in klar definierte Gruppen.
-
-## 3.2 Gruppen
+Die frühere Leiste aus zwei unbenannten Reihen gleichartiger Textschaltflächen wurde vollständig neu organisiert. `js/ui-controls.js` verschiebt die bestehenden Bedienelemente in drei semantische Gruppen; `controls.css` übernimmt die kompakte Darstellung. Die vorhandenen IDs und Ereignisbehandlungen bleiben unverändert.
 
 | Gruppe | Aktionen |
 |---|---|
@@ -116,156 +69,93 @@ Die Leiste wird durch `js/ui-controls.js` semantisch organisiert und durch `cont
 | **Daten** | Serverstand neu laden, Excel importieren, JSON laden |
 | **Ausgabe** | Excel exportieren, PDF-Ausgabe, JSON sichern |
 
-Die Trennung folgt dem Arbeitsablauf: zuerst planen, anschließend Daten laden oder synchronisieren, zuletzt Ergebnisse ausgeben beziehungsweise sichern.
+### Icon-System
 
-## 3.3 Icon-System
+Jede Aktion besitzt ein eigenes Inline-SVG-Icon ohne externe Bibliothek:
 
-Jede Aktion besitzt ein eigenes, funktional zugeordnetes Inline-SVG-Icon:
+- Kalender mit Bestätigung: **Aktueller Monat**;
+- Kalender mit Sperrmarkierung: **Abwesenheiten**;
+- Regler: **Wünsche / Optionen**;
+- Papierkorb: **Monat leeren**;
+- Kreispfeile: **Serverstand neu laden**;
+- Datei mit Einwärtspfeil: **Excel importieren**;
+- Datenbank mit Aufwärtspfeil: **JSON laden**;
+- Tabellenblatt: **Excel exportieren**;
+- Drucker: **PDF**;
+- Datenbank mit Sicherungspfeil: **JSON sichern**.
 
-- Kalender mit Bestätigung für **Aktueller Monat**;
-- Kalender mit Sperrmarkierung für **Abwesenheiten**;
-- Regler für **Wünsche / Optionen**;
-- Papierkorb für **Monat leeren**;
-- Kreispfeile für **Serverstand neu laden**;
-- Dateisymbol mit Einwärtspfeil für **Excel importieren**;
-- Datenbanksymbol mit Aufwärtspfeil für **JSON laden**;
-- Tabellenblatt für **Excel exportieren**;
-- Druckersymbol für **PDF**;
-- Datenbanksymbol mit Sicherungspfeil für **JSON sichern**.
+Alle Icons verwenden `currentColor`, identische Strichstärken und ein gemeinsames 24-Pixel-Raster.
 
-Die Icons verwenden ein einheitliches Linienraster, `currentColor`, identische Strichstärken und keine externe Icon-Bibliothek.
-
-## 3.4 Platzbedarf und Responsive Verhalten
+### Responsive Verhalten
 
 - große Desktopbreite: Icon und kurze Textbeschriftung;
-- mittlere Desktopbreite: Gruppenüberschriften entfallen zuerst;
+- mittlere Breite: Gruppenüberschriften entfallen zuerst;
 - kompakte Breite: echte Icon-only-Schaltflächen;
-- schmale Mobilansicht: Gruppen untereinander mit gleichmäßig verteilten Aktionen;
+- Mobilansicht: Gruppen untereinander mit gleichmäßig verteilten Aktionen;
 - Druck: Werkzeugleiste vollständig ausgeblendet.
 
-Der Wechsel erfolgt ausschließlich über CSS-Media-Queries. Funktion und DOM-IDs ändern sich dabei nicht.
+### Zugänglichkeit
 
-## 3.5 Zugänglichkeit
-
-- vollständige Aktionsbezeichnungen über `aria-label`;
+- vollständige Aktionsnamen über `aria-label`;
 - native Tooltips über `title`;
 - sichtbare Fokusrahmen;
-- Dateiaktionen per Maus, Touch sowie Enter- und Leertaste erreichbar;
+- Dateiaktionen per Maus, Touch, Enter und Leertaste;
 - dekorative SVGs mit `aria-hidden="true"`;
-- reduzierte Bewegung ohne Hover-Translation bei `prefers-reduced-motion`.
+- keine Hover-Translation bei reduzierter Bewegung.
 
-## 3.6 Visuelle Priorisierung
+### Visuelle Priorisierung
 
 - **Aktueller Monat:** dezenter Monatsakzent;
 - **Monat leeren:** zurückhaltender Gefahrenton;
-- **Serverstand neu laden:** sekundärer, ruhiger Ton;
+- **Serverstand neu laden:** ruhiger Sekundärton;
 - übrige Aktionen: neutrale weiße Werkzeugschaltflächen mit monatlich getöntem Rand.
 
----
-
-# 4. Dienstarten und Personalpools
-
-## 4.1 Bereitschaftsdienst
-
-BD wird monatlich gegen individuelle Sollwerte und gegebenenfalls harte Maxima bewertet. Die Kandidatenliste berücksichtigt die am konkreten Datum aktive Rolle, Abwesenheiten, Wünsche, Qualifikation, bestehende Einteilungen und relevante Dienstfolgen.
-
-## 4.2 Hintergrunddienst
-
-HG steht nur tagesgültig HG-berechtigten Personen zur Verfügung. Die Bewertung berücksichtigt unter anderem bestehende BD-Einteilungen, Diensthäufungen, Kopplungsregeln, Abwesenheiten und kombinierte Monatslast.
-
-## 4.3 Rufbereitschaft Neuroradiologie
-
-Die erste RBN besitzt einen datumsabhängigen festen Pool. Die zweite RBN wird ausschließlich eingeblendet, wenn die Erstbesetzung fachlich eine zusätzliche Absicherung erfordert. Historische oder importierte Altwerte bleiben lesbar, werden aber nicht automatisch als erneut wählbar behandelt.
-
-## 4.4 Tagesgültige Personalrollen
-
-Personaldefinitionen können Aktivierungsdaten, Deaktivierungsdaten, Beförderungsdaten, Grundrollen, BD-Sollwerte, Maxima und Planungsberechtigungen enthalten. Qualifikationen werden für den konkreten Kalendertag aufgelöst, nicht pauschal aus dem aktuellen Status abgeleitet.
+Die Erweiterung ist progressiv: Fällt das Zusatzmodul aus, bleiben die ursprünglichen Textschaltflächen vollständig funktionsfähig.
 
 ---
 
-# 5. Bewertungs- und Konfliktmodell
-
-## 5.1 Stufen
+## 4. Bewertungs- und Konfliktmodell
 
 | Stufe | Bedeutung |
 |---|---|
-| **Grün** | fachlich geeignet oder positiv empfohlen |
-| **Gelb** | Hinweis, Belastung oder nachrangige Konstellation |
-| **Orange** | relevanter Konflikt, der besonders geprüft werden soll |
-| **Rot** | schwerer Konflikt; Eintragung nur nach ausdrücklicher Bestätigung |
+| **Grün** | geeignet oder positiv empfohlen |
+| **Gelb** | Hinweis oder nachrangige Konstellation |
+| **Orange** | relevanter Konflikt |
+| **Rot** | schwerer Konflikt, Bestätigung erforderlich |
 | **Grau** | am konkreten Tag nicht auswählbar |
 
-## 5.2 Rote Ausnahmen
-
-Rote Einteilungen bleiben bewusst möglich, erfordern jedoch eine explizite Bestätigung. Protokolliert werden Datum, Rolle, Person, Gründe, Zeitpunkt und optionaler Kommentar.
-
-## 5.3 Regelgruppen
-
-Die Engine prüft unter anderem:
-
-- tagesgültige Aktivität und Qualifikation;
-- Urlaub, FZA und Sperrwünsche;
-- gleiche Person in inkompatiblen Rollen;
-- individuelle BD-Sollwerte und harte Maxima;
-- monatsbezogenen Ausgleich;
-- Dienstabstände und Dienstfolgen;
-- Wochenendnachbarschaften;
-- HG-Häufungen;
-- fachliche Kopplungen zwischen BD und HG;
-- personenspezifische Sonderregeln;
-- historische Monatsdaten, sofern sicher geladen;
-- reinen Jahreskontext ohne verdeckte Bewertungswirkung.
+Geprüft werden unter anderem Aktivität, Qualifikation, Urlaub, FZA, Sperrwünsche, Doppelbesetzungen, BD-Sollwerte, harte Maxima, Dienstabstände, Wochenendnachbarschaften, HG-Häufungen, Kopplungsregeln und personenspezifische Sonderregeln.
 
 ---
 
-# 6. Saisonales Langzeit-Farbsystem
+## 5. Saisonales Langzeit-Farbsystem
 
-## 6.1 Grundlagen
+Die Monatsidentität wird deterministisch aus **Jahr und Monat** abgeleitet:
 
-Die frühere Zuordnung von zwölf Farben ausschließlich nach Monatsnummer wurde durch eine deterministische Ableitung aus **Jahr und Monat** ersetzt.
+- 12 saisonale Monatsfamilien;
+- vier handkuratierte Grundvarianten je Monat;
+- 24 kontrollierte Trend-Editionen;
+- 288 eindeutige Monatspaletten;
+- 24-jähriger Zyklus ab Referenzjahr 2026;
+- keine Laufzeit-Zufallszahlen.
 
-Das System kombiniert:
+### Sichtbares Monatsbadge
 
-- **12 saisonale Monatsfamilien**;
-- **vier handkuratierte Grundvarianten je Monat**;
-- **24 kontrollierte Trend-Editionen**;
-- insgesamt **288 eindeutige Monatspaletten**;
-- einen definierten **24-Jahres-Zyklus** ab Referenzjahr **2026**.
-
-Derselbe Monat desselben Jahres erhält auf jedem Gerät und bei jedem Neuladen exakt dieselbe Palette. Laufzeit-Zufall wird nicht verwendet.
-
-## 6.2 Saisonale Familien
-
-| Monat | Farbfamilie | Grundvarianten |
-|---|---|---|
-| Januar | Frost | Eisnebel, Polarlicht, Winterflieder, Arktischer Stahl |
-| Februar | Beere | Rubinrose, Winterbeere, Orchideenrauch, Granatapfel |
-| März | Botanik | Salbeigrün, Eukalyptus, Junge Olive, Celadon |
-| April | Blüte | Lavendel, Wisteria, Irisblau, Fliederregen |
-| Mai | Grün | Frühlingsgrün, Minzblatt, Chartreuse-Salbei, Maigrün |
-| Juni | Wasser | Türkis, Lagune, Aqua Mineral, Meeresglas |
-| Juli | Sonnenfrucht | Koralle, Persimone, Wassermelone, Sonnenuntergang |
-| August | Gold | Bernstein, Safran, Aprikosengold, Ringelblume |
-| September | Pflaume | Pflaume, Feige, Aubergine, Weinlese |
-| Oktober | Erde | Kupfer, Terrakotta, Zimt, Bronze |
-| November | Mineral | Schieferblau, Sturmblau, Petrolgrau, Indigonebel |
-| Dezember | Immergrün | Tannengrün, Wacholder, Smaragdnacht, Winterwald |
-
-## 6.3 Sichtbares Monatsbadge
-
-Das Badge zeigt bewusst nur die **kuratierte Grundvariante**, beispielsweise:
+Das Badge zeigt ausschließlich die kuratierte Grundvariante:
 
 ```text
 Monatskontrast · Eisnebel
 ```
 
-Der technische Editionszusatz wie `Cloud Veil`, `Quiet Luxury` oder `Organic Modern` wird **nicht mehr im Badge angezeigt**. Er bleibt intern Bestandteil der deterministischen Palettenberechnung und der Metadaten, belastet aber die sichtbare Oberfläche nicht.
+Technische Editionsnamen wie `Cloud Veil`, `Quiet Luxury` oder `Organic Modern` erscheinen **nicht mehr im Badge** und **nicht mehr im Tooltip**. Sie bleiben intern Bestandteil der deterministischen Palettenberechnung und über `data-palette-edition` technisch nachvollziehbar.
 
-Auch der Tooltip wird reduziert und enthält nur noch Saison, Farbfamilie und Jahr. Die Edition bleibt weiterhin über `data-palette-edition` auf dem Wurzelelement technisch nachvollziehbar.
+Der reduzierte Tooltip enthält nur Saison, Farbfamilie und Jahr, beispielsweise:
 
-## 6.4 Farbwerte und Kontrast
+```text
+Winter · Frost · 2026
+```
 
-Jede Palette enthält Grundakzent, starken Akzent, Glow, Paneltönung, Saison, Familie, Edition und eindeutigen Kalenderschlüssel. Aus dem Akzent werden Schriftton sowie sämtliche Tabellenflächen berechnet.
+### Tabellenflächen und Kontrast
 
 | Fläche | Anteil Monatsfarbe |
 |---|---:|
@@ -274,180 +164,91 @@ Jede Palette enthält Grundakzent, starken Akzent, Glow, Paneltönung, Saison, F
 | Sonntag | 22 % |
 | Feiertag | 30 % |
 
-Die Tests prüfen alle 288 Paletten gegen sämtliche relevanten Flächen auf mindestens **WCAG AA mit 4,5:1**.
-
-## 6.5 Übergänge
-
-Monatswechsel werden zeitbasiert über `requestAnimationFrame` und `performance.now()` animiert. Die Interpolation erfolgt in OKLCH über den kürzeren Farbtonbogen. Bei reduzierter Bewegung wird die Zielpalette ohne Übergang gesetzt.
+Alle 288 Paletten werden gegen sämtliche relevanten Flächen auf mindestens **WCAG AA mit 4,5:1** geprüft. Monatswechsel werden zeitbasiert in OKLCH interpoliert; bei reduzierter Bewegung wird die Zielpalette unmittelbar gesetzt.
 
 ---
 
-# 7. Abwesenheiten, Wünsche und Optionen
+## 6. Abwesenheiten, Wünsche und Optionen
 
-Unterstützt werden tagesbezogene Abwesenheiten, FZA, Sperrwünsche sowie positive oder negative Dienstoptionen. Markierungen können einzeln oder gesammelt gesetzt werden. Wirksame Abwesenheiten entfernen eine Person aus der tagesbezogenen Vergleichsgruppe.
-
-Automatisch abgeleitete Freizeitausgleichsregeln werden ausschließlich dort erzeugt, wo sie fachlich ausdrücklich definiert sind. Manuelle und abgeleitete Quellen bleiben unterscheidbar; doppelte sichtbare Einträge werden vermieden.
+Unterstützt werden Urlaub, FZA, Sperrwünsche sowie positive oder negative Dienstoptionen. Markierungen können einzeln oder gesammelt gesetzt werden. Wirksame Abwesenheiten entfernen eine Person aus tagesbezogenen Vergleichsgruppen. Automatisch abgeleitetes FZA wird ausschließlich für ausdrücklich definierte Sonderregeln erzeugt.
 
 ---
 
-# 8. RBN-Logik
+## 7. RBN
 
 - getrennte Felder für erste und zweite RBN;
 - zweite RBN nur bei definierten Erstbesetzungen sichtbar;
 - datumsabhängige Pools;
 - defensive Behandlung importierter Altwerte;
-- keine Einbeziehung der RBN in die BD-/HG-Statistik;
-- vollständige Speicherung im Monatsdatensatz.
+- keine Einbeziehung der RBN in die BD-/HG-Statistik.
 
 ---
 
-# 9. Statistik und offene Punkte
+## 8. Persistenz, Import und Export
 
-Die Statistik wird unmittelbar aus dem sichtbaren Monatsplan berechnet. Sie zeigt insbesondere BD, HG, Sollwerte, Restwerte und Wochenendlast. Die Liste „Offene Punkte“ priorisiert unbesetzte Rollen und erkannte Inkonsistenzen, ohne selbst Einteilungen zu verändern.
-
----
-
-# 10. Persistenz und Datensicherheit
-
-## 10.1 Lokaler Zustand
-
-Jede Änderung wird unmittelbar lokal gesichert. Ein Debounce bündelt Serverspeicherungen, ohne die lokale Rückfallebene zu verzögern.
-
-## 10.2 Cloudflare KV
-
-Monatsdaten und Einstellungen werden über Pages Functions in Cloudflare KV gespeichert. Beim Öffnen eines Monats wird der aktuelle Serverstand geladen, sofern keine schützenswerten lokalen Änderungen entgegenstehen.
-
-## 10.3 Konfliktvermeidung
-
+- lokale Sofortsicherung jeder Änderung;
+- debouncte Cloudflare-KV-Synchronisierung;
 - getrennte Dirty-Zustände je Monat;
-- kein stilles Überschreiben lokaler Änderungen;
-- defensive Normalisierung importierter Daten;
-- Revision und Zeitstempel im Monatsobjekt;
-- JSON-Sicherung als manuell transportierbares Rückfallformat.
+- defensive Daten- und Importnormalisierung;
+- Excel-Import und Excel-Export;
+- A4-optimierte PDF-/Druckausgabe;
+- vollständige JSON-Sicherung und Wiederherstellung.
 
 ---
 
-# 11. Import und Export
+## 9. Technische Architektur
 
-## 11.1 Excel-Import
-
-Der Import analysiert den Jahresplaner, ordnet Personalnamen defensiv zu und übernimmt unterstützte Monatsinformationen. Abweichende vorhandene Werte werden nur im vorgesehenen Importmodus ersetzt.
-
-## 11.2 Excel-Export
-
-Der sichtbare Monatsplan wird in ein Excel-kompatibles Arbeitsblatt mit Tageszeilen, Diensten, RBN und Markierungen übertragen.
-
-## 11.3 PDF-/Druckausgabe
-
-Die Druckansicht ist auf eine kompakte A4-Ausgabe ausgelegt. Vor dem Druck wird eine laufende Farbanimation beendet, damit keine Zwischenfarbe eingefroren wird.
-
-## 11.4 JSON
-
-Vollständige Sicherung und Wiederherstellung von Stammdaten, Einstellungen und Monatsständen.
-
----
-
-# 12. Technische Architektur
-
-Die Anwendung verwendet native Webtechnologien ohne Frontend-Framework:
-
-- semantisches HTML;
-- CSS Custom Properties und moderne Farbfunktionen;
-- ES-Module;
-- Pages Functions;
-- Cloudflare KV;
-- SheetJS für Excel;
-- Node-Test-Runner;
-- Playwright für End-to-End-Tests.
-
-Wesentliche Module:
-
-| Modul | Aufgabe |
+| Datei/Modul | Aufgabe |
 |---|---|
-| `js/app.js` | UI, Navigation, Dialoge, Rendering, Import-/Exportsteuerung |
-| `js/ui-controls.js` | Werkzeugleistengruppen, Icon-Dekoration, Badge-Bereinigung, Tastaturzugang |
-| `js/theme.js` | Langzeit-Paletten, Farbräume, Kontrastflächen, Animation |
-| `js/state.js` | Laden, Speichern, Dirty-Zustände, Monatscache |
-| `js/rules*.js` | Regelengine, Auswertung, Statistik, offene Punkte |
+| `index.html` | App-Shell, Dialoge und versionierte Asset-Einbindung |
+| `styles.css` | Grundlayout, Tabelle, Glasoptik, Dialoge und Druck |
+| `controls.css` | kompakte Icon-Werkzeugleiste und responsive Zustände |
+| `js/app.js` | Navigation, Rendering, Dialoge sowie Import-/Exportsteuerung |
+| `js/ui-controls.js` | Werkzeugleistengruppen, Icons, Badge-Bereinigung und Tastaturzugang |
+| `js/theme.js` | Langzeit-Paletten, Farbräume, Kontrastflächen und Animation |
+| `js/state.js` | Laden, Speichern, Dirty-Zustände und Monatscache |
+| `js/rules*.js` | Regelengine, Statistik und offene Punkte |
 | `js/rbn.js` | RBN-Pools und zweite RBN |
 | `js/holidays.js` | sächsische Feiertage und Werktage |
-| `js/excel-import.js` | Arbeitsmappenanalyse und Zuordnung |
-| `controls.css` | kompakte Icon-Werkzeugleiste und responsive Zustände |
-| `styles.css` | Grundlayout, Tabelle, Glasoptik, Dialoge und Druck |
 | `functions/api/*` | Cloudflare-API und KV-Zugriff |
 
-`ui-controls.js` arbeitet progressiv: Fehlt das Zusatzmodul, bleiben die ursprünglichen Textschaltflächen vollständig funktionsfähig.
+Die Anwendung verwendet native Webtechnologien ohne Frontend-Framework: semantisches HTML, CSS Custom Properties, ES-Module, Pages Functions, Cloudflare KV, SheetJS, Node-Test-Runner und Playwright.
 
 ---
 
-# 13. Tests und Qualitätssicherung
-
-## 13.1 Syntaxprüfung
+## 10. Tests
 
 ```bash
 npm run check
-```
-
-Prüft sämtliche produktiven JavaScript-Module einschließlich `js/ui-controls.js`, Pages Functions und Testkonfigurationen.
-
-## 13.2 Unit- und Regressionstests
-
-```bash
 npm test
-```
-
-Zusätzlich zur fachlichen Regelengine und dem Farbsystem werden geprüft:
-
-- sichtbarer Palettenname ohne Editionszusatz;
-- Tooltip ohne Editionsbezeichnung;
-- exakt drei Werkzeugleistengruppen;
-- zehn eindeutige Aktionen;
-- vollständige Icon- und Beschriftungsmetadaten;
-- exakt 288 Langzeit-Paletten;
-- sichere Monatsüberläufe und 24-jähriger Zyklus;
-- WCAG-AA-Kontrast sämtlicher Monatsflächen;
-- farbtonerhaltende OKLCH-Interpolation.
-
-## 13.3 End-to-End
-
-```bash
 npm run test:e2e
-```
-
-Prüft die Anwendung im Browser einschließlich Navigation, Interaktion und zentraler Planungsabläufe.
-
-## 13.4 Vollständige Verifikation
-
-```bash
 npm run verify
 ```
 
-Führt Syntaxprüfung, Unit-/Regressionstests und Playwright-End-to-End-Tests aus.
+Zusätzlich zur vollständigen Regelengine und dem Farbsystem werden geprüft:
+
+- Palettenname ohne Editionszusatz;
+- Tooltip ohne Editionsbezeichnung;
+- drei Werkzeugleistengruppen;
+- zehn eindeutige Aktionen;
+- vollständige Icon- und Beschriftungsmetadaten;
+- reale Browserdarstellung der Gruppen und Icons;
+- Gefahrenton von „Monat leeren“;
+- Dateiaktion mit zugänglicher Beschriftung;
+- Badge `Monatskontrast · Eisnebel` ohne `Cloud Veil`;
+- 288 eindeutige Langzeit-Paletten und WCAG-AA-Kontrast.
 
 ---
 
-# 14. Lokale Entwicklung
+## 11. Deployment
 
-```bash
-npm ci
-npm run check
-npm test
-npm run test:e2e
-```
+Das Repository wird aus `main` über Cloudflare Pages bereitgestellt. Der bestehende Release-Token `20260801.11` wird im gesamten Modulgraphen konsistent verwendet; die neuen Dateien `controls.css` und `js/ui-controls.js` besitzen eigene, zuvor nicht vorhandene Asset-Pfade und werden damit trotz unverändertem Modulgraph-Token eindeutig ausgeliefert.
 
-Für die reine Oberfläche kann ein statischer lokaler Webserver verwendet werden. Backendfunktionen benötigen eine Cloudflare-kompatible Pages-Functions-Umgebung und die vorgesehenen KV-Bindings.
+Ein eigener Service Worker wird nicht verwendet. Historisch vorhandene Registrierungen und Caches werden defensiv entfernt.
 
 ---
 
-# 15. Deployment
-
-Das Repository wird aus `main` über Cloudflare Pages bereitgestellt. Der Build-Stempel und sämtliche direkt eingebundenen statischen Assets tragen die Version `20260801.14`, damit die neue Werkzeugleiste und Badge-Darstellung nicht aus einem älteren Browsercache geladen werden.
-
-Ein eigener Service Worker wird nicht verwendet; historisch vorhandene Registrierungen werden defensiv entfernt.
-
----
-
-# 16. Projektstruktur
+## 12. Projektstruktur
 
 ```text
 .
@@ -457,43 +258,35 @@ Ein eigener Service Worker wird nicht verwendet; historisch vorhandene Registrie
 ├── manifest.webmanifest
 ├── Eignungsregeln.txt
 ├── icons/
-│   ├── icon.svg
-│   └── icon-animated.svg
 ├── js/
 │   ├── app.js
 │   ├── ui-controls.js
 │   ├── theme.js
 │   ├── state.js
-│   ├── defaults.js
-│   ├── rules.js
-│   ├── rules-core.js
-│   ├── rules-evaluation.js
-│   ├── rules-reporting.js
+│   ├── rules*.js
 │   ├── rbn.js
 │   ├── holidays.js
 │   └── excel-import.js
-├── functions/
-│   └── api/
+├── functions/api/
 ├── tests/
+│   ├── e2e/app.spec.js
 │   ├── theme.test.js
 │   └── ui-controls.test.js
-├── docs/
-│   └── README-20260801.11.md
+├── docs/README-20260801.11.md
 ├── package.json
 └── playwright.config.js
 ```
 
 ---
 
-# 17. Unveränderliche Grundsätze
+## 13. Unveränderliche Grundsätze
 
 - Der Mensch plant; die Anwendung unterstützt und prüft.
 - Keine verdeckte automatische Gesamtoptimierung.
 - Konflikte werden erklärt, nicht nur eingefärbt.
 - Positive Hinweise heben Konflikte nicht auf.
 - Rote Ausnahmen bleiben möglich, aber protokollpflichtig.
-- Historische Daten werden defensiv behandelt.
 - Sachsen bleibt die fest definierte Feiertagsregion.
-- Monatsfarben sind deterministisch, saisonal, kontrastgeprüft und langfristig abwechslungsreich.
-- Sichtbare UI-Texte bleiben knapp; technische Metadaten dürfen die Oberfläche nicht unnötig belasten.
+- Monatsfarben bleiben deterministisch, saisonal und kontrastgeprüft.
+- Sichtbare UI-Texte bleiben knapp; technische Metadaten belasten die Oberfläche nicht unnötig.
 - Änderungen an Funktion, Tests und Dokumentation gehören in denselben Änderungsvorgang.
