@@ -960,12 +960,14 @@ h3 { font-size: 1.05rem; }
   #monthTitle { font-size: 13pt; letter-spacing: .01em; margin: 0; line-height: 1.15; color: var(--month-ink); }
   .legend-stack { display: block; }
   .legend-stack .rule-legend, .legend-stack .calendar-legend { display: none !important; }
+  /* Dezent: nur Kontur und Schriftfarbe tragen den Monatskontrast, keine
+     gefüllte Fläche. */
   .month-palette-label {
-    display: inline-block; font-size: 7pt; font-weight: 700; line-height: 1.2;
-    padding: .8mm 2.4mm; border-radius: 999px;
+    display: inline-block; font-size: 7pt; font-weight: 600; line-height: 1.2;
+    letter-spacing: .02em; padding: .7mm 2.4mm; border-radius: 999px;
     color: var(--month-accent-strong);
-    background: color-mix(in srgb, var(--month-accent) 16%, #fff);
-    border: .25mm solid color-mix(in srgb, var(--month-accent) 46%, #fff);
+    background: none;
+    border: .2mm solid color-mix(in srgb, var(--month-accent) 55%, #fff);
   }
 
   /* Planungstabelle ----------------------------------------------------- */

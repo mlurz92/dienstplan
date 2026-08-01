@@ -6,7 +6,7 @@
 
 <p align="center"><strong>Manuelle, regelgestützte Monatsplanung für Bereitschaftsdienst, Hintergrunddienst und RBN</strong></p>
 
-> **Referenzstand:** Build `20260801.3` · Paketversion `0.2.0` · Datenregion Sachsen (`SN`)  
+> **Referenzstand:** Build `20260801.4` · Paketversion `0.2.0` · Datenregion Sachsen (`SN`)  
 > **Betriebsmodell:** Cloudflare Pages + Pages Functions + Cloudflare KV, ergänzt durch eine lokale Browser-Sicherung  
 > **Grundsatz:** Der Mensch plant. DienstplanRAD prüft, erklärt, speichert und dokumentiert.
 
@@ -978,12 +978,14 @@ Das Druckstylesheet:
 - entfernt Ambient-Hintergrund, Werkzeugleisten, Dialoge, Legenden und den Block „Offene Punkte“;
 - druckt aus der Planungstabelle ausschließlich die Spalten Tag, Wochentag, BD, HG, RBN und 2. RBN; die Spalten „Urlaub / FZA“ und „Kein Dienst / Wünsche / Optionen“ entfallen;
 - setzt die Statistik mit deutlichem Abstand unter den Plan und reduziert sie auf Mitarbeitende, BD und HG;
-- führt den Kopf wie in der Anwendung: schmale Versalzeile „Bereitschaftsdienstplan“, darunter Monat und Jahr, rechtsbündig zur Tabelle das Monatskontrast-Abzeichen;
+- führt den Kopf wie in der Anwendung: schmale Versalzeile „Bereitschaftsdienstplan“, darunter Monat und Jahr, rechtsbündig zur Tabelle das Monatskontrast-Abzeichen — dezent als Kontur ohne Füllung;
 - setzt den Satz auf 168 mm Breite statt über die volle Seite und hebt Eckenrundung und `overflow: hidden` der Glaspanels auf, die sonst Buchstaben an den Ecken abschnitten;
 - erhält die Monatsfarben des jeweiligen Monats (Wochenend-, Feiertags- und Wochentagsflächen) über `print-color-adjust: exact`;
 - unterdrückt Verläufe, Filter, Containment und Animationen, weil Chromium sonst die gesamte Seite rastert;
 - blendet den Platzhalter „— auswählen —“ unbesetzter Rufbereitschaften aus;
 - rechnet mit festen Millimetermaßen: Satzspiegel 283 mm, Bedarf rund 262 mm inklusive zweizeiliger Feiertagszeilen.
+
+Vor jedem Druck setzt ein `beforeprint`-Hook die Monatsfarben auf den Endzustand des angezeigten Monats. Der Farbwechsel läuft sonst als rAF-Interpolation, und ein Druck mitten in der Bewegung fror Flächen des Vormonats ein, während das Abzeichen bereits den neuen Monatskontrast nannte.
 
 Das Stylesheet steht bewusst am Ende von `styles.css`, damit es die später notierten Glas- und Aero-Regeln ohne `!important` überschreibt.
 
@@ -1301,7 +1303,7 @@ Das Repository wird aus dem Projektstamm bereitgestellt. Pages Functions werden 
 Alle releasekritischen Assets und relativen Browserimporte verwenden denselben `?v=`-Token. Der Build-Stempel in `index.html` muss exakt dazu passen. Für diesen Funktionsstand ist die Kennung:
 
 ```text
-20260801.3
+20260801.4
 ```
 
 Der laufende Stand ist im Browser über `document.documentElement.dataset.build` und im Tooltip des Speicherstatus sichtbar.
