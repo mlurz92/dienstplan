@@ -82,7 +82,7 @@ test('app.js rendert die RBN-Selects direkt und koppelt 2. RBN ohne DOM-Nachbear
   const rulesFacade = fs.readFileSync(new URL('../js/rules.js', import.meta.url), 'utf8');
 
   assert.equal(await exists('js/rbn-ui.js'), false, 'kein nachgelagerter DOM-Postprozessor');
-  assert.match(app, /from '\.\/rbn\.js\?v=20260801\.2'/);
+  assert.match(app, /from '\.\/rbn\.js\?v=20260801\.3'/);
   assert.match(app, /function buildRbnSelect/);
   assert.match(app, /createElement\('select'\)/);
   assert.match(app, /isSecondRbnAvailable\(dateIso, firstSelect\.value\)/);
@@ -144,7 +144,11 @@ test('Das Druckstylesheet hält den Monatsplan auf einer A4-Seite zusammen', () 
   assert.match(layout, /\.plan-table th:nth-child\(7\)[\s\S]*?\.plan-table td:nth-child\(8\) \{ display: none; \}/);
   // Die Statistik bleibt auf Mitarbeitende, BD und HG reduziert.
   assert.match(layout, /\.distribution-table th:nth-child\(n\+4\), \.distribution-table td:nth-child\(n\+4\) \{ display: none; \}/);
-  assert.match(layout, /\.below-plan \{ margin-top: 7mm;/);
+  assert.match(layout, /\.below-plan \{ width: 168mm;[^}]*margin-top: 7mm;/);
+  // Kein Beschnitt an den Panel-Ecken und Kopf mit Eyebrow und Monatsbadge.
+  assert.match(layout, /\.glass-panel, \.sheet-panel \{[\s\S]*?overflow: visible; border-radius: 0;/);
+  assert.match(layout, /\.sheet-heading \.eyebrow \{\s*display: block;/);
+  assert.match(layout, /\.month-palette-label \{\s*display: inline-block;/);
   assert.match(layout, /\.rbn-input\[data-rbn-empty="true"\] \{ visibility: hidden; \}/);
   assert.doesNotMatch(layout, /--saturday-row-bg: #/);
 });
