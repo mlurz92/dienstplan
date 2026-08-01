@@ -6,7 +6,7 @@
 
 <p align="center"><strong>Manuelle, regelgestützte Monatsplanung für Bereitschaftsdienst, Hintergrunddienst und RBN</strong></p>
 
-> **Referenzstand:** Build `20260801.5` · Paketversion `0.2.0` · Datenregion Sachsen (`SN`)  
+> **Referenzstand:** Build `20260801.6` · Paketversion `0.2.0` · Datenregion Sachsen (`SN`)  
 > **Betriebsmodell:** Cloudflare Pages + Pages Functions + Cloudflare KV, ergänzt durch eine lokale Browser-Sicherung  
 > **Grundsatz:** Der Mensch plant. DienstplanRAD prüft, erklärt, speichert und dokumentiert.
 
@@ -241,7 +241,7 @@ Die Monatsnavigation berücksichtigt Jahreswechsel über native Datumsarithmetik
 | **Serverstand neu laden** | lädt den angezeigten Monat erneut von der Serverquelle |
 | **Excel importieren** | liest `.xlsx` oder `.xls` |
 | **Excel exportieren** | erstellt eine Arbeitsmappe für den sichtbaren Monat |
-| **PDF exportieren** | öffnet den nativen Druckdialog |
+| **PDF exportieren** | öffnet den nativen Druckdialog; der vorgeschlagene Dateiname lautet `Dienstplan JJJJ-MM` |
 | **JSON sichern** | exportiert den verfügbaren Gesamtstand |
 | **JSON laden** | validiert und importiert eine Sicherung |
 
@@ -993,6 +993,8 @@ Das Druckstylesheet:
 - blendet den Platzhalter „— auswählen —“ unbesetzter Rufbereitschaften aus;
 - rechnet mit festen Millimetermaßen: Satzspiegel 283 mm, Bedarf rund 262 mm inklusive zweizeiliger Feiertagszeilen.
 
+Der Dateiname des Exports stammt in allen gängigen Browsern aus dem Dokumenttitel. Für die Dauer des Drucks lautet er deshalb `Dienstplan JJJJ-MM`; danach wird der ursprüngliche Titel wiederhergestellt. Weil Safari kein `beforeprint` kennt, bereitet der Export zusätzlich ausdrücklich vor und räumt nach der Rückkehr aus dem Druckdialog auf.
+
 Vor jedem Druck setzt ein `beforeprint`-Hook die Monatsfarben auf den Endzustand des angezeigten Monats. Der Farbwechsel läuft sonst als rAF-Interpolation, und ein Druck mitten in der Bewegung fror Flächen des Vormonats ein, während das Abzeichen bereits den neuen Monatskontrast nannte.
 
 Das Stylesheet steht bewusst am Ende von `styles.css`, damit es die später notierten Glas- und Aero-Regeln ohne `!important` überschreibt.
@@ -1311,7 +1313,7 @@ Das Repository wird aus dem Projektstamm bereitgestellt. Pages Functions werden 
 Alle releasekritischen Assets und relativen Browserimporte verwenden denselben `?v=`-Token. Der Build-Stempel in `index.html` muss exakt dazu passen. Für diesen Funktionsstand ist die Kennung:
 
 ```text
-20260801.5
+20260801.6
 ```
 
 Der laufende Stand ist im Browser über `document.documentElement.dataset.build` und im Tooltip des Speicherstatus sichtbar.
