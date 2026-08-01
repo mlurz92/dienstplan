@@ -6,7 +6,7 @@
 
 <p align="center"><strong>Manuelle, regelgestützte Monatsplanung für Bereitschaftsdienst, Hintergrunddienst und RBN</strong></p>
 
-> **Referenzstand:** Build `20260801.8` · Paketversion `0.2.0` · Datenregion Sachsen (`SN`)  
+> **Referenzstand:** Build `20260801.9` · Paketversion `0.2.0` · Datenregion Sachsen (`SN`)  
 > **Betriebsmodell:** Cloudflare Pages + Pages Functions + Cloudflare KV, ergänzt durch eine lokale Browser-Sicherung  
 > **Grundsatz:** Der Mensch plant. DienstplanRAD prüft, erklärt, speichert und dokumentiert.
 
@@ -957,7 +957,7 @@ Erkannt werden zwei Dateiformate. Die Auswertung liegt in `js/excel-import.js` u
 
 Fehlt in einem Blatt jede Jahresangabe, muss die Zuordnung zum aktuell ausgewählten Jahr ausdrücklich bestätigt werden. Nicht auswertbare Blätter (etwa `Marker`) werden übersprungen und in der Abschlussmeldung genannt.
 
-**Namensauflösung.** Namen werden gegen ID, vollen Namen und Kurznamen geprüft, jeweils auch ohne Anrede und Titel (`Dr. Lurz`, `Lurz`, `Hr. El Houba`, `El Houba`). Personen, die die Anwendung nicht kennt, gehen nicht verloren: Ihr Name wird mit dem Präfix `extern:` in das Dienstfeld geschrieben, in Tabelle, Export und Ausdruck als Text angezeigt und in den offenen Punkten als Hinweis geführt. Wieder auswählbar ist ein solcher Eintrag nicht — die Auswahl kennt ausschließlich hinterlegte Personen; ein Klick auf das Feld ersetzt ihn durch eine echte Person. Abwesenheiten sind an eine Personal-ID gebunden und können für Unbekannte nicht abgelegt werden; sie werden gemeldet.
+**Namensauflösung.** Namen werden gegen ID, vollen Namen und Kurznamen geprüft, jeweils auch ohne Anrede und Titel (`Dr. Lurz`, `Lurz`, `Hr. El Houba`, `El Houba`). Personen, die die Anwendung nicht kennt, gehen nicht verloren: Ihr Name wird mit dem Präfix `extern:` in das Dienstfeld geschrieben und als Text angezeigt – in der Planungstabelle und im Ausdruck wie bei hinterlegten Personen ohne Anrede und Titel, im Excel-Export und im Tooltip vollständig und in den offenen Punkten als Hinweis geführt. Wieder auswählbar ist ein solcher Eintrag nicht — die Auswahl kennt ausschließlich hinterlegte Personen; ein Klick auf das Feld ersetzt ihn durch eine echte Person. Abwesenheiten sind an eine Personal-ID gebunden und können für Unbekannte nicht abgelegt werden; sie werden gemeldet.
 
 **RBN.** Importierte Rufbereitschaftsnamen werden auf den am jeweiligen Tag gültigen Pool abgebildet (`Schüngel` → `Dr. Schüngel`). Was dort nicht vorkommt, bleibt als Altwert erhalten und wird in den offenen Punkten angezeigt.
 
@@ -1313,7 +1313,7 @@ Das Repository wird aus dem Projektstamm bereitgestellt. Pages Functions werden 
 Alle releasekritischen Assets und relativen Browserimporte verwenden denselben `?v=`-Token. Der Build-Stempel in `index.html` muss exakt dazu passen. Für diesen Funktionsstand ist die Kennung:
 
 ```text
-20260801.8
+20260801.9
 ```
 
 Der laufende Stand ist im Browser über `document.documentElement.dataset.build` und im Tooltip des Speicherstatus sichtbar.

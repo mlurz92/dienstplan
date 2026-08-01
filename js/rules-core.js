@@ -1,5 +1,5 @@
-import { MONTH_NAMES, OPTION_TYPES, PREFERENCE_TYPES, STAFF_ORDER, toIsoDate, WEEKDAYS } from './defaults.js?v=20260801.8';
-import { isFirstRegularWorkdayAfter } from './holidays.js?v=20260801.8';
+import { MONTH_NAMES, OPTION_TYPES, PREFERENCE_TYPES, STAFF_ORDER, toIsoDate, WEEKDAYS } from './defaults.js?v=20260801.9';
+import { isFirstRegularWorkdayAfter } from './holidays.js?v=20260801.9';
 
 export function parseIso(date) { return new Date(`${date}T00:00:00`); }
 export function addDays(date, days) { const d = new Date(date); d.setDate(d.getDate() + days); return d; }
@@ -28,10 +28,20 @@ export function isExternalAssignment(value) {
 export function externalAssignmentLabel(value) {
   return isExternalAssignment(value) ? value.slice(EXTERNAL_ASSIGNMENT_PREFIX.length) : '';
 }
+const NAME_SALUTATIONS = /^(?:(?:Prof\.|Priv\.-Doz\.|PD|Dr\.|med\.|habil\.|Fr\.|Hr\.|Frau|Herr)\s+)+/iu;
+/** Name ohne Anrede und Titel – die Planungstabelle zeigt nur den Nachnamen. */
+export function bareName(value) {
+  const normalized = String(value ?? '').replace(/\s+/g, ' ').trim();
+  return normalized.replace(NAME_SALUTATIONS, '').trim() || normalized;
+}
+
 /** Anzeigetext eines Dienstfelds – für Personal-IDs, Altimporte und Unbekanntes. */
 export function assignmentLabel(staff, value, { short = false } = {}) {
   if (!value) return '';
-  if (isExternalAssignment(value)) return externalAssignmentLabel(value);
+  if (isExternalAssignment(value)) {
+    const label = externalAssignmentLabel(value);
+    return short ? bareName(label) : label;
+  }
   const person = getStaffById(staff, value);
   if (!person) return value;
   return short ? (person.short || person.name) : person.name;
