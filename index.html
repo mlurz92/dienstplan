@@ -25,10 +25,6 @@
       const cleanupKey = 'dienstplanrad:legacy-cleanup';
       const reloadKey = 'dienstplanrad:legacy-reload';
 
-      // Nur der historische eigene Worker wird abgemeldet. Eine originweite
-      // Bereinigung würde auch fremde Registrierungen desselben Hosts treffen –
-      // auf einer Pages-Domain ist das derzeit niemand, aber es ist nicht
-      // unsere Registrierung, über die wir verfügen dürfen.
       const istEigenerWorker = registration => {
         const worker = registration.active || registration.waiting || registration.installing;
         if (!worker) return false;
@@ -39,11 +35,6 @@
         }
       };
 
-      // Entscheidend: Ist dieses Dokument selbst von einem Worker ausgeliefert
-      // worden? `unregister()` löst den Controller eines bereits geöffneten Tabs
-      // NICHT ab – der Worker bedient diesen Tab bis zu seinem Ende weiter aus
-      // seinem Cache. Genau dann, und nur dann, ist ein einmaliger Neustart
-      // nötig, damit der Anwender wirklich den aktuellen Stand sieht.
       const wirdVonWorkerBedient = 'serviceWorker' in navigator && navigator.serviceWorker.controller !== null;
 
       const unregister = 'serviceWorker' in navigator
@@ -59,12 +50,8 @@
         try { return sessionStorage.getItem(reloadKey) === '1'; } catch { return true; }
       })();
 
-      // Läuft inline vor den ersten eigenen Asset-Anfragen. Selbst wenn ein
-      // früherer Worker app.js festhält, erreicht diese Bereinigung den Client.
       window.__dienstplanLegacyCleanup = Promise.allSettled([unregister, clearCaches]).then(() => {
         if (!wirdVonWorkerBedient || schonNeugestartet) return { neustart: false };
-        // Marke VOR dem Neuladen setzen: Damit ist eine Schleife auch dann
-        // unmöglich, wenn der Controller überraschend bestehen bleibt.
         try { sessionStorage.setItem(reloadKey, '1'); } catch { return { neustart: false }; }
         location.reload();
         return { neustart: true };
@@ -77,8 +64,10 @@
   <link rel="apple-touch-icon" href="/icons/icon.svg?icon=glass-spectrum-1" />
   <link rel="manifest" href="/manifest.webmanifest?v=20260801.11" />
   <link rel="stylesheet" href="/styles.css?v=20260801.11" />
+  <link rel="stylesheet" href="/controls.css?v=20260801.11" />
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" defer></script>
   <script type="module" src="/js/app.js?v=20260801.11"></script>
+  <script type="module" src="/js/ui-controls.js?v=20260801.11"></script>
 </head>
 <body>
   <div class="ambient-layer" aria-hidden="true">
@@ -110,7 +99,7 @@
       </div>
     </header>
 
-    <section class="toolbar glass-panel">
+    <section class="toolbar glass-panel" aria-label="Werkzeugleiste">
       <div class="toolbar-group">
         <button id="todayBtn">Aktueller Monat</button>
         <button id="absenceManagerBtn">Abwesenheiten</button>

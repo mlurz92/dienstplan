@@ -85,3 +85,25 @@ test('Belegte Dienstfelder zeigen keinen Badge, der Picker aber weiterhin die Be
   await expect(lurz.locator('.small-chip')).toHaveCount(1);
   await expect(lurz.locator('.reasons')).not.toBeEmpty();
 });
+
+test('Werkzeugleiste ist semantisch gruppiert und das Farbbadge bleibt frei vom Editionsnamen', async ({ page }) => {
+  const month = emptyMonth(2026, 1);
+  await mockApi(page, month);
+  await page.goto('/');
+  await page.selectOption('#yearSelect', '2026');
+  await page.selectOption('#monthSelect', '1');
+
+  const toolbar = page.locator('.toolbar.toolbar-organized');
+  await expect(toolbar).toBeVisible();
+  await expect(toolbar.locator('.toolbar-section')).toHaveCount(3);
+  await expect(toolbar.locator('.toolbar-section-label')).toHaveText(['Planung', 'Daten', 'Ausgabe']);
+  await expect(toolbar.locator('.tool-action')).toHaveCount(10);
+  await expect(page.locator('#todayBtn .tool-icon')).toHaveCount(1);
+  await expect(page.locator('#clearMonthBtn')).toHaveClass(/tool-action--danger/);
+  await expect(page.locator('#excelImportInput').locator('xpath=..')).toHaveAttribute('aria-label', 'Excel-Datei importieren');
+
+  const badge = page.locator('#monthPaletteLabel');
+  await expect(badge).toHaveText('Monatskontrast · Eisnebel');
+  await expect(badge).not.toContainText('Cloud Veil');
+  await expect(badge).toHaveAttribute('title', 'Winter · Frost · 2026');
+});
