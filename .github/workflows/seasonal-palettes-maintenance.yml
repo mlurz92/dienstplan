@@ -1,23 +1,22 @@
 name: Seasonal palette integration
 
 on:
-  push:
+  pull_request:
     branches:
-      - agent/seasonal-long-cycle-palettes
-    paths:
-      - .github/workflows/seasonal-palettes-maintenance.yml
+      - main
 
 permissions:
   contents: write
 
 jobs:
   integrate:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: agent/seasonal-long-cycle-palettes
+          ref: ${{ github.head_ref }}
 
       - uses: actions/setup-node@v4
         with:
@@ -135,4 +134,4 @@ Die Auswahl verwendet keine Laufzeit-Zufallszahlen. Derselbe Monat desselben Jah
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add README.md index.html js/app.js styles.css .github/workflows/seasonal-palettes-maintenance.yml
           git commit -m "Saisonales Langzeit-Farbsystem vollständig integrieren"
-          git push origin HEAD:agent/seasonal-long-cycle-palettes
+          git push origin HEAD:${{ github.head_ref }}
