@@ -82,7 +82,7 @@ test('app.js rendert die RBN-Selects direkt und koppelt 2. RBN ohne DOM-Nachbear
   const rulesFacade = fs.readFileSync(new URL('../js/rules.js', import.meta.url), 'utf8');
 
   assert.equal(await exists('js/rbn-ui.js'), false, 'kein nachgelagerter DOM-Postprozessor');
-  assert.match(app, /from '\.\/rbn\.js\?v=20260801\.4'/);
+  assert.match(app, /from '\.\/rbn\.js\?v=20260801\.5'/);
   assert.match(app, /function buildRbnSelect/);
   assert.match(app, /createElement\('select'\)/);
   assert.match(app, /isSecondRbnAvailable\(dateIso, firstSelect\.value\)/);
@@ -113,9 +113,9 @@ test('Die Planungstabelle zeigt Dienstnamen ohne Anrede und Titel', () => {
   const app = fs.readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
   const buttonSource = app.slice(app.indexOf('function buildAssignmentButton'), app.indexOf('function setRbnValue'));
 
-  assert.match(buttonSource, /const name = person\?\.short \|\| person\?\.name/);
+  assert.match(buttonSource, /const name = person\?\.short \|\| \(staffId \? assignmentLabel\(state\.staff, staffId\)/);
   assert.match(buttonSource, /button\.title = staffId/);
-  assert.match(buttonSource, /\[person\?\.name, \.\.\.evaluation\.reasons\]/);
+  assert.match(buttonSource, /assignmentLabel\(state\.staff, staffId\),/);
 });
 
 test('RBN-Spalten zeigen Namen ohne Anrede und Titel, speichern aber den vollen Wert', () => {
@@ -148,7 +148,7 @@ test('Das Druckstylesheet hält den Monatsplan auf einer A4-Seite zusammen', () 
   // Kein Beschnitt an den Panel-Ecken und Kopf mit Eyebrow und Monatsbadge.
   assert.match(layout, /\.glass-panel, \.sheet-panel \{[\s\S]*?overflow: visible; border-radius: 0;/);
   assert.match(layout, /\.sheet-heading \.eyebrow \{\s*display: block;/);
-  assert.match(layout, /\.month-palette-label \{[\s\S]*?background: none;/);
+  assert.match(layout, /\.month-palette-label \{[\s\S]*?color: #3b4149;\s*background: none;\s*border: \.2mm solid rgba\(0,0,0,\.34\);/);
   assert.match(layout, /\.rbn-input\[data-rbn-empty="true"\] \{ visibility: hidden; \}/);
   assert.doesNotMatch(layout, /--saturday-row-bg: #/);
 });

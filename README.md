@@ -6,7 +6,7 @@
 
 <p align="center"><strong>Manuelle, regelgestützte Monatsplanung für Bereitschaftsdienst, Hintergrunddienst und RBN</strong></p>
 
-> **Referenzstand:** Build `20260801.4` · Paketversion `0.2.0` · Datenregion Sachsen (`SN`)  
+> **Referenzstand:** Build `20260801.5` · Paketversion `0.2.0` · Datenregion Sachsen (`SN`)  
 > **Betriebsmodell:** Cloudflare Pages + Pages Functions + Cloudflare KV, ergänzt durch eine lokale Browser-Sicherung  
 > **Grundsatz:** Der Mensch plant. DienstplanRAD prüft, erklärt, speichert und dokumentiert.
 
@@ -949,11 +949,19 @@ JSON-Antworten verwenden UTF-8 und `Cache-Control: no-store`. Fehlende KV-Bindin
 
 Der Import verwendet SheetJS 0.20.3 aus dem externen CDN `cdn.sheetjs.com`. Das Skript wird mit `defer`, derzeit jedoch weder lokal vendort noch mit einem `integrity`-Attribut geladen. Ist die Bibliothek nicht verfügbar, bleiben Kernplanung, JSON-Sicherung und Druck funktionsfähig; nur Excel-Import und -Export melden einen Fehler. Vor dem Merge wird jeder erkannte Zielmonat geladen. Zulässig sind ausschließlich ein bestätigter aktueller Serverstand oder ein ausdrücklich als unsynchronisiert markierter lokaler Arbeitsstand. Ein bloß gecachter beziehungsweise frisch erzeugter Ersatzmonat nach fehlgeschlagenem Serverabruf führt zum sichtbaren Abbruch; dadurch bleiben unbekannte manuelle Serverwerte auch bei partiellen Netzstörungen erhalten.
 
-Unterstützte Monatsblätter heißen exakt `Jan`, `Feb`, `Mrz`, `Apr`, `Mai`, `Jun`, `Jul`, `Aug`, `Sep`, `Okt`, `Nov`, `Dez`. Die ersten zwölf Zeilen und zwölf Spalten werden nach einer Jahreszahl `20xx` durchsucht. Fehlt sie, muss die Zuordnung zum aktuell ausgewählten Jahr ausdrücklich bestätigt werden. Als Tageskopf gilt eine Zeile, die ab der dritten Spalte mindestens zwanzig ganzzahlige Tageswerte zwischen 1 und 31 enthält.
+Erkannt werden zwei Dateiformate. Die Auswertung liegt in `js/excel-import.js` und arbeitet auf reinen Zeilenmatrizen, damit sie ohne Browser und ohne die CDN-Bibliothek prüfbar bleibt.
 
-Eine Personalzeile wird über den Namen in der ersten Spalte und `Arbeitsplatz` in der zweiten Spalte erkannt; die unmittelbar folgende Zeile gilt als Dienstzeile. `D` wird als BD, `HG` als HG gelesen. Abwesenheitscodes: `U` → Urlaub, `F`/`FZA` → FZA, `WB` → Weiterbildung, `K`/`KK`/`ZU`/`§15C`/`DR` → sonstige Abwesenheit.
+**Jahresmappe mit Monatsblättern.** Blattnamen `Jan` … `Dez`; der März wird auch als `Mär` oder `März` erkannt. Als Tageskopf gilt eine Zeile, die ab der dritten Spalte mindestens fünfzehn Tageswerte zwischen 1 und 31 enthält (`1`, `1.` und Datumswerte gleichermaßen). Eine Personalzeile wird über den Namen in der ersten Spalte und `Arbeitsplatz` in der zweiten Spalte erkannt; die unmittelbar folgende Zeile mit `Dienst/Hintergrund` gilt als Dienstzeile. `D` wird als BD, `HG` als HG gelesen. Abwesenheitscodes: `U` → Urlaub, `F`/`FZA`/`Frei` → FZA, `WB`/`FB` → Weiterbildung, `K`/`KK`/`ZU`/`§15C`/`DR` → sonstige Abwesenheit.
 
-Bestehende geplante Dienste werden nicht überschrieben. Importierte Abwesenheiten dürfen durch einen späteren Import aktualisiert werden; manuelle Abwesenheiten bleiben erhalten. Unbekannte Namen, ergänzte Werte, bewahrte Werte und nur lokal gespeicherte Monate werden in der Abschlussmeldung ausdrücklich ausgewiesen. RBN und Dienstwünsche werden aus diesem Excel-Format nicht importiert.
+**Einzelner Monatsplan.** Ein Blatt mit einer Kopfzeile, die `BD` und `HG` enthält; zusätzlich werden `Tag`, `RBN` beziehungsweise `1. RBN` und `2. RBN` ausgewertet. Der Blattname trägt keine Information — Monat und Jahr stammen aus dem Kopfbereich und werden als echtes Datum, als Excel-Seriennummer, als `TT.MM.JJJJ`, als ISO-Datum oder als `Monatsname Jahr` erkannt. Tageszeilen sind Zeilen mit führender Tageszahl in der Tagesspalte und mindestens einem besetzten Feld; Statistikblöcke unterhalb der Tabelle werden dadurch nicht als Tage gelesen.
+
+Fehlt in einem Blatt jede Jahresangabe, muss die Zuordnung zum aktuell ausgewählten Jahr ausdrücklich bestätigt werden. Nicht auswertbare Blätter (etwa `Marker`) werden übersprungen und in der Abschlussmeldung genannt.
+
+**Namensauflösung.** Namen werden gegen ID, vollen Namen und Kurznamen geprüft, jeweils auch ohne Anrede und Titel (`Dr. Lurz`, `Lurz`, `Hr. El Houba`, `El Houba`). Personen, die die Anwendung nicht kennt, gehen nicht verloren: Ihr Name wird mit dem Präfix `extern:` in das Dienstfeld geschrieben, in Tabelle, Export und Ausdruck als Text angezeigt und in den offenen Punkten als Hinweis geführt. Wieder auswählbar ist ein solcher Eintrag nicht — die Auswahl kennt ausschließlich hinterlegte Personen; ein Klick auf das Feld ersetzt ihn durch eine echte Person. Abwesenheiten sind an eine Personal-ID gebunden und können für Unbekannte nicht abgelegt werden; sie werden gemeldet.
+
+**RBN.** Importierte Rufbereitschaftsnamen werden auf den am jeweiligen Tag gültigen Pool abgebildet (`Schüngel` → `Dr. Schüngel`). Was dort nicht vorkommt, bleibt als Altwert erhalten und wird in den offenen Punkten angezeigt.
+
+**Nichts wird überschrieben.** Der Merge füllt ausschließlich leere Felder — BD, HG, RBN und 2. RBN. Ein bereits gefülltes Feld bleibt in jedem Fall stehen. Importierte Abwesenheiten dürfen durch einen späteren Import aktualisiert werden; manuelle Abwesenheiten bleiben erhalten. Gelesene Werte, ergänzte Werte, bewahrte Werte, unbekannte Namen und nur lokal gespeicherte Monate weist die Abschlussmeldung je Blatt aus. Dienstwünsche und Optionen werden aus Excel nicht importiert.
 
 ## 18.2 Excel-Export
 
@@ -1303,7 +1311,7 @@ Das Repository wird aus dem Projektstamm bereitgestellt. Pages Functions werden 
 Alle releasekritischen Assets und relativen Browserimporte verwenden denselben `?v=`-Token. Der Build-Stempel in `index.html` muss exakt dazu passen. Für diesen Funktionsstand ist die Kennung:
 
 ```text
-20260801.4
+20260801.5
 ```
 
 Der laufende Stand ist im Browser über `document.documentElement.dataset.build` und im Tooltip des Speicherstatus sichtbar.

@@ -1,10 +1,11 @@
-import { ABSENCE_TYPES, MONTH_NAMES, OPTION_TYPES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, normalizeBackupPayload, toIsoDate } from './defaults.js?v=20260801.4';
-import { state, bootstrapState, buildBackupPayload, getMonthData, getMonthLabel, isMonthDirty, isMonthMergeSafe, loadMonth, markBootstrapDirty, markBootstrapSynced, markMonthDirty, markMonthSynced, persistDirtyState, persistMonth, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260801.4';
-import { api } from './api.js?v=20260801.4';
-import { applyMonthTheme, prefersReducedMotion } from './theme.js?v=20260801.4';
-import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260801.4';
-import { buildStats, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getEffectiveAbsence, getPlanningStaff, getOptions, getPreference, getStaffById, labelForAbsence, labelForOption, labelForPreference, setAbsence, setAssignment, setOptions, setPreference, toggleOption, weekdayLabel } from './rules.js?v=20260801.4';
-import { getRbnOptions, isRbnValueAllowed, isSecondRbnAvailable, rbnDisplayName } from './rbn.js?v=20260801.4';
+import { ABSENCE_TYPES, MONTH_NAMES, OPTION_TYPES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, normalizeBackupPayload, toIsoDate } from './defaults.js?v=20260801.5';
+import { state, bootstrapState, buildBackupPayload, getMonthData, getMonthLabel, isMonthDirty, isMonthMergeSafe, loadMonth, markBootstrapDirty, markBootstrapSynced, markMonthDirty, markMonthSynced, persistDirtyState, persistMonth, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260801.5';
+import { api } from './api.js?v=20260801.5';
+import { applyMonthTheme, prefersReducedMotion } from './theme.js?v=20260801.5';
+import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260801.5';
+import { assignmentLabel, buildStats, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getEffectiveAbsence, getPlanningStaff, getOptions, getPreference, getStaffById, isExternalAssignment, labelForAbsence, labelForOption, labelForPreference, setAbsence, setAssignment, setOptions, setPreference, toggleOption, weekdayLabel } from './rules.js?v=20260801.5';
+import { getRbnOptions, isRbnValueAllowed, isSecondRbnAvailable, rbnDisplayName } from './rbn.js?v=20260801.5';
+import { analyzeWorkbook } from './excel-import.js?v=20260801.5';
 
 const $ = selector => document.querySelector(selector);
 
@@ -20,7 +21,6 @@ let pendingConflict = null;
 let monthRequestId = 0;
 let requestedYear = null;
 let requestedMonth = null;
-const monthNameBySheet = Object.fromEntries(SHEET_NAMES.map((name, idx) => [name, idx + 1]));
 const MIN_YEAR = 2000;
 const MAX_YEAR = 2200;
 
@@ -273,10 +273,12 @@ function buildAssignmentButton(dateIso, role, staffId, monthData) {
   const button = document.createElement('button');
   button.className = 'assignment-btn';
   const person = getStaffById(state.staff, staffId);
+  const external = isExternalAssignment(staffId);
   // In der Planungstabelle nur der Kurzname ohne Anrede/Titel: Die Spalten sind
   // schmal, der volle Name steht weiterhin im Tooltip und in der Statistik.
-  const name = person?.short || person?.name || (staffId ? `Unbekannte ID: ${staffId}` : '—');
-  const evaluation = staffId ? evaluateCandidate({ state, monthData, dateIso, role, staffId }) : { level: 'green', reasons: [] };
+  // Namen aus Altimporten ohne bekannte Person bleiben als Text erhalten.
+  const name = person?.short || (staffId ? assignmentLabel(state.staff, staffId) : '—');
+  const evaluation = (staffId && person) ? evaluateCandidate({ state, monthData, dateIso, role, staffId }) : { level: 'green', reasons: [] };
   const badgeMarkup = staffId
     ? ''
     : '<span class="assignment-badges"><span class="small-chip">offen</span></span>';
@@ -284,7 +286,11 @@ function buildAssignmentButton(dateIso, role, staffId, monthData) {
     <span class="assignment-name">${esc(name)}</span>
     ${badgeMarkup}`;
   button.title = staffId
-    ? [person?.name, ...evaluation.reasons].filter(Boolean).join('\n')
+    ? [
+        assignmentLabel(state.staff, staffId),
+        external ? 'Übernommener Name aus einem Import – nicht erneut auswählbar' : '',
+        ...evaluation.reasons
+      ].filter(Boolean).join('\n')
     : `${role.toUpperCase()} eintragen`;
   button.addEventListener('click', () => openPicker(dateIso, role));
   return button;
@@ -875,48 +881,71 @@ async function onExcelImport(event) {
   const reset = () => { event.target.value = ''; };
   if (!window.XLSX) { alert('Excel-Bibliothek noch nicht geladen.'); reset(); return; }
   let workbook;
-  try { workbook = XLSX.read(await file.arrayBuffer(), { type: 'array' }); }
+  // cellDates: Kopfzeilen tragen den Monat teils als echtes Datum statt als Text.
+  try { workbook = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true }); }
   catch (error) { alert(`Excel-Datei konnte nicht gelesen werden: ${error.message}`); reset(); return; }
 
-  const recognized = workbook.SheetNames.filter(sheetName => monthNameBySheet[sheetName]);
-  if (!recognized.length) { alert(`Keine unterstützten Monatsblätter gefunden. Erwartet werden: ${SHEET_NAMES.join(', ')}.`); reset(); return; }
-  const missingYearSheets = recognized.filter(sheetName => !detectSheetYear(workbook.Sheets[sheetName]));
-  const fallbackYear = state.currentYear;
-  if (missingYearSheets.length && !confirm(`In ${missingYearSheets.join(', ')} wurde keine eindeutige Jahreszahl gefunden.\n\nDiese Blätter dem aktuell ausgewählten Jahr ${fallbackYear} zuordnen?`)) { reset(); return; }
-
-  const parsedImports = [];
-  const summaries = [];
-  for (const sheetName of recognized) {
-    const imported = importMonthSheet(sheetName, workbook.Sheets[sheetName], fallbackYear);
-    if (!imported) summaries.push(`${sheetName}: keine verwertbare Tageszeile gefunden`);
-    else parsedImports.push({ sheetName, imported });
+  const sheets = workbook.SheetNames.map(name => ({
+    name,
+    rows: XLSX.utils.sheet_to_json(workbook.Sheets[name], { header: 1, defval: '', raw: true })
+  }));
+  const { imports, ignoredSheets } = analyzeWorkbook(sheets, {
+    staff: state.staff,
+    fallbackYear: state.currentYear,
+    fallbackMonth: state.currentMonth
+  });
+  if (!imports.length) {
+    alert(`Kein auswertbares Blatt gefunden.\n\nUnterstützt werden Jahresmappen mit Monatsblättern (${SHEET_NAMES.join(', ')}) und einzelne Monatspläne mit den Spalten Tag, Wochentag, BD, HG, RBN und 2. RBN.\n\nÜbersprungen: ${ignoredSheets.join(', ') || '–'}`);
+    reset();
+    return;
   }
-  if (!parsedImports.length) { alert(`Excel-Import ohne Änderungen beendet.\n\n${summaries.join('\n')}`); reset(); return; }
+
+  // Derselbe Monat darf nicht zweimal aus einer Mappe geschrieben werden; der
+  // zweite Durchlauf sähe die Werte des ersten sonst als „bestehend“ an.
+  const duplicates = new Set();
+  const seenMonths = new Set();
+  for (const item of imports) {
+    const key = `${item.year}-${String(item.month).padStart(2, '0')}`;
+    if (seenMonths.has(key)) duplicates.add(key);
+    seenMonths.add(key);
+  }
+  if (duplicates.size && !confirm(`Die Mappe enthält mehrere Blätter für ${[...duplicates].join(', ')}.\n\nAlle nacheinander übernehmen? Bereits gefüllte Felder bleiben dabei unangetastet.`)) { reset(); return; }
+
+  const undated = imports.filter(item => item.usedFallbackYear);
+  if (undated.length && !confirm(`Für ${undated.map(item => item.sheetName).join(', ')} wurde keine Jahreszahl gefunden.\n\nDiese Blätter dem Jahr ${state.currentYear} zuordnen?`)) { reset(); return; }
 
   // Vor dem Merge jeden Zielmonat laden. Andernfalls würde ein noch nie
   // geöffneter Monat aus einem leeren Gerüst entstehen und bestehende manuelle
   // Serverwerte beim anschließenden PUT verlieren.
-  await Promise.all(parsedImports.map(({ imported }) => loadMonth(imported.year, imported.month)));
+  await Promise.all(imports.map(item => loadMonth(item.year, item.month)));
 
-  const unsafeTargets = parsedImports.filter(({ imported }) => !isMonthMergeSafe(imported.year, imported.month));
+  const unsafeTargets = imports.filter(item => !isMonthMergeSafe(item.year, item.month));
   if (unsafeTargets.length) {
-    const labels = unsafeTargets.map(({ sheetName, imported }) => `${sheetName} ${imported.year}`).join(', ');
+    const labels = unsafeTargets.map(item => `${item.sheetName} ${item.year}`).join(', ');
     setStatus('offline', 'Excel-Import abgebrochen – Zielmonat nicht verlässlich geladen');
     alert(`Excel-Import abgebrochen. Für ${labels} konnte weder ein aktueller Serverstand noch ein ausdrücklich unsynchronisierter lokaler Arbeitsstand bestätigt werden. Bestehende Serverwerte werden deshalb nicht mit einem möglicherweise veralteten oder leeren Ersatzstand überschrieben.`);
     reset();
     return;
   }
 
+  const summaries = ignoredSheets.length ? [`Übersprungene Blätter: ${ignoredSheets.join(', ')}`] : [];
   const touched = new Map();
-  for (const { sheetName, imported } of parsedImports) {
-    const targetMonth = getMonthData(imported.year, imported.month);
-    const merge = mergeMonthData(targetMonth, imported.monthData);
-    setMonthData(imported.year, imported.month, targetMonth, 'local');
+  for (const item of imports) {
+    const targetMonth = getMonthData(item.year, item.month);
+    const merge = mergeMonthData(targetMonth, item.monthData);
+    setMonthData(item.year, item.month, targetMonth, 'local');
     if (merge.added > 0) {
-      markMonthDirty(imported.year, imported.month);
-      touched.set(`${imported.year}-${String(imported.month).padStart(2, '0')}`, [imported.year, imported.month]);
+      markMonthDirty(item.year, item.month);
+      touched.set(`${item.year}-${String(item.month).padStart(2, '0')}`, [item.year, item.month]);
     }
-    summaries.push(`${sheetName} ${imported.year}: ${imported.assignments} Dienste, ${imported.absences} Abwesenheiten erkannt; ${merge.added} ergänzt, ${merge.preserved} bestehende manuelle Werte bewahrt${imported.unknownNames.length ? `; unbekannte Namen: ${imported.unknownNames.join(', ')}` : ''}`);
+    const notes = [
+      `${item.sheetName} → ${MONTH_NAMES[item.month - 1]} ${item.year}`,
+      `${item.assignments} Dienste, ${item.absences} Abwesenheiten, ${item.rbnValues} RBN-Werte gelesen`,
+      `${merge.added} ergänzt, ${merge.preserved} bestehende Werte bewahrt`
+    ];
+    if (item.unknownNames.length) notes.push(`als Text übernommen (nicht wieder auswählbar): ${item.unknownNames.join(', ')}`);
+    if (item.skippedAbsenceNames.length) notes.push(`Abwesenheiten ohne bekannte Person übersprungen: ${item.skippedAbsenceNames.join(', ')}`);
+    summaries.push(notes.join('; '));
   }
   if (!touched.size) { alert(`Excel-Import ohne Änderungen beendet.\n\n${summaries.join('\n')}`); reset(); return; }
 
@@ -930,61 +959,19 @@ async function onExcelImport(event) {
   reset();
 }
 
-function detectSheetYear(sheet) {
-  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-  for (const row of rows.slice(0, 12)) for (const cell of row.slice(0, 12)) {
-    const match = String(cell || '').match(/\b(20\d{2})\b/);
-    if (match) return Number(match[1]);
-  }
-  return null;
-}
-
-function importMonthSheet(sheetName, sheet, fallbackYear) {
-  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-  const dayRowIndex = rows.findIndex(row => row.slice(2).filter(cell => Number.isFinite(Number(cell)) && Number(cell) >= 1 && Number(cell) <= 31).length >= 20);
-  if (dayRowIndex < 0) return null;
-  const year = detectSheetYear(sheet) || fallbackYear;
-  const month = monthNameBySheet[sheetName];
-  const monthData = createEmptyMonth(year, month);
-  const daysInMonth = new Date(year, month, 0).getDate();
-  const dayCols = [];
-  rows[dayRowIndex].forEach((cell, index) => {
-    const day = Number(cell);
-    if (index >= 2 && Number.isInteger(day) && day >= 1 && day <= daysInMonth) dayCols.push({ col: index, iso: toIsoDate(year, month, day) });
-  });
-  const normalizeName = name => String(name || '').replace(/\s+/g, ' ').trim().toLowerCase();
-  const staffMap = new Map(state.staff.map(person => [normalizeName(person.name), person.id]));
-  [['dr. lurz','lurz'],['dr. martin','martin'],['fr. dalitz','dalitz'],['dr. becker','becker'],['dr. polednia','polednia'],['hr. el houba','elhouba'],['fr. licenji','licenji'],['hr. sebastian','sebastian'],['fr. hellmann','hellmann'],['prof. schäfer','schaefer']].forEach(([name,id]) => staffMap.set(name,id));
-  const absenceMap = { U:'urlaub', F:'fza', FZA:'fza', WB:'weiterbildung', K:'sonstige', KK:'sonstige', ZU:'sonstige', '§15C':'sonstige', DR:'sonstige' };
-  let assignments = 0;
-  let absences = 0;
-  const unknownNames = new Set();
-  for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
-    const name = normalizeName(rows[rowIndex]?.[0]);
-    const type = normalizeName(rows[rowIndex]?.[1]);
-    if (!name || type !== 'arbeitsplatz') continue;
-    const staffId = staffMap.get(name);
-    if (!staffId) { unknownNames.add(String(rows[rowIndex]?.[0] || '').trim()); continue; }
-    const dutyRow = rows[rowIndex + 1] || [];
-    dayCols.forEach(({ col, iso }) => {
-      const workplaceValue = String(rows[rowIndex][col] || '').trim().toUpperCase();
-      const dutyValue = String(dutyRow[col] || '').trim().toUpperCase();
-      if (absenceMap[workplaceValue]) { setAbsence(monthData, staffId, iso, absenceMap[workplaceValue], 'import'); absences += 1; }
-      if (dutyValue === 'D') { setAssignment(monthData, iso, 'bd', staffId); assignments += 1; }
-      else if (dutyValue === 'HG') { setAssignment(monthData, iso, 'hg', staffId); assignments += 1; }
-    });
-  }
-  return { year, month, monthData, assignments, absences, unknownNames: [...unknownNames] };
-}
-
+/**
+ * Import ergänzt, er ersetzt nicht: Ein bereits gefülltes Feld bleibt in jedem
+ * Fall stehen. Nur leere Felder und Abwesenheiten, die selbst aus einem Import
+ * stammen, werden geschrieben.
+ */
 function mergeMonthData(target, source) {
   let added = 0;
   let preserved = 0;
   for (const [iso, day] of Object.entries(source.days || {})) {
-    target.days[iso] ||= { bd:'', hg:'', rbn1:'', rbn2:'', notes:'' };
-    for (const role of ['bd','hg']) {
-      if (!day[role]) continue;
-      if (!target.days[iso][role]) { target.days[iso][role] = day[role]; added += 1; }
+    if (!target.days[iso]) continue;
+    for (const field of ['bd','hg','rbn1','rbn2']) {
+      if (!day[field]) continue;
+      if (!target.days[iso][field]) { target.days[iso][field] = day[field]; added += 1; }
       else preserved += 1;
     }
   }
@@ -1004,7 +991,7 @@ function exportCurrentMonthToExcel() {
   rows.push(['Bereitschaftsdienstplan', '', getMonthLabel()]);
   rows.push(['Tag', 'Wochentag', 'BD', 'HG', '1. RBN', '2. RBN']);
   Object.entries(monthData.days).forEach(([iso, day]) => {
-    rows.push([fmtGermanDate(iso).slice(0,5), weekdayLabel(iso), getStaffById(state.staff, day.bd)?.name || '', getStaffById(state.staff, day.hg)?.name || '', day.rbn1 || '', day.rbn2 || '']);
+    rows.push([fmtGermanDate(iso).slice(0,5), weekdayLabel(iso), assignmentLabel(state.staff, day.bd), assignmentLabel(state.staff, day.hg), day.rbn1 || '', day.rbn2 || '']);
   });
   rows.push([]);
   rows.push(['Statistik']);
