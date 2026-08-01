@@ -158,8 +158,8 @@ test('Backend unterscheidet ungültige Monatsparameter von Infrastrukturfehlern'
 
 test('Excel-Import lädt jeden Zielmonat vor dem Merge', async () => {
   const source = await readFile(new URL('../js/app.js', import.meta.url), 'utf8');
-  const loadPosition = source.indexOf('await Promise.all(parsedImports.map(({ imported }) => loadMonth');
-  const mergePosition = source.indexOf('const merge = mergeMonthData(targetMonth, imported.monthData)');
+  const loadPosition = source.indexOf('await Promise.all(imports.map(item => loadMonth(item.year, item.month)))');
+  const mergePosition = source.indexOf('const merge = mergeMonthData(targetMonth, item.monthData)');
   assert.ok(loadPosition >= 0 && mergePosition > loadPosition);
 });
 
@@ -237,8 +237,8 @@ test('Excel-Merge ist nur mit bestätigtem Serverstand oder bewusstem Dirty-Loka
 
 test('Excel-Import bricht vor dem Merge ab, wenn ein Zielmonat nicht verlässlich geladen wurde', async () => {
   const source = await readFile(new URL('../js/app.js', import.meta.url), 'utf8');
-  const guard = source.indexOf('const unsafeTargets = parsedImports.filter');
-  const merge = source.indexOf('const merge = mergeMonthData(targetMonth, imported.monthData)');
+  const guard = source.indexOf('const unsafeTargets = imports.filter');
+  const merge = source.indexOf('const merge = mergeMonthData(targetMonth, item.monthData)');
   assert.ok(guard >= 0 && merge > guard);
   assert.match(source, /Excel-Import abgebrochen – Zielmonat nicht verlässlich geladen/);
 });

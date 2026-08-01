@@ -1,5 +1,5 @@
-import { MONTH_NAMES, OPTION_TYPES, PREFERENCE_TYPES, STAFF_ORDER, toIsoDate, WEEKDAYS } from './defaults.js?v=20260801.4';
-import { isFirstRegularWorkdayAfter } from './holidays.js?v=20260801.4';
+import { MONTH_NAMES, OPTION_TYPES, PREFERENCE_TYPES, STAFF_ORDER, toIsoDate, WEEKDAYS } from './defaults.js?v=20260801.5';
+import { isFirstRegularWorkdayAfter } from './holidays.js?v=20260801.5';
 
 export function parseIso(date) { return new Date(`${date}T00:00:00`); }
 export function addDays(date, days) { const d = new Date(date); d.setDate(d.getDate() + days); return d; }
@@ -10,6 +10,32 @@ export const severityRank = { green: 0, yellow: 1, orange: 2, red: 3, gray: -1 }
 export const ABSENCE_FOR_CT_LEADERSHIP = new Set(['urlaub', 'fza']);
 
 export function getStaffById(staff, id) { return staff.find(item => item.id === id); }
+
+/**
+ * Dienstfelder können neben einer Personal-ID auch einen reinen Namenstext aus
+ * einem Altimport tragen. Solche Werte werden mit einem festen Präfix abgelegt:
+ * Sie bleiben lesbar erhalten, lassen sich aber nie mit einer echten Person
+ * verwechseln und sind in der Auswahl nicht wieder wählbar.
+ */
+export const EXTERNAL_ASSIGNMENT_PREFIX = 'extern:';
+export function externalAssignmentValue(name) {
+  const text = String(name ?? '').replace(/\s+/g, ' ').trim();
+  return text ? `${EXTERNAL_ASSIGNMENT_PREFIX}${text}` : '';
+}
+export function isExternalAssignment(value) {
+  return typeof value === 'string' && value.startsWith(EXTERNAL_ASSIGNMENT_PREFIX);
+}
+export function externalAssignmentLabel(value) {
+  return isExternalAssignment(value) ? value.slice(EXTERNAL_ASSIGNMENT_PREFIX.length) : '';
+}
+/** Anzeigetext eines Dienstfelds – für Personal-IDs, Altimporte und Unbekanntes. */
+export function assignmentLabel(staff, value, { short = false } = {}) {
+  if (!value) return '';
+  if (isExternalAssignment(value)) return externalAssignmentLabel(value);
+  const person = getStaffById(staff, value);
+  if (!person) return value;
+  return short ? (person.short || person.name) : person.name;
+}
 export function getPlanningStaff(staff, dateIso) {
   const fixedOrder = new Map(STAFF_ORDER.map((id, index) => [id, index]));
   return staff

@@ -1,10 +1,11 @@
-import { isRegularWorkdayIso } from './holidays.js?v=20260801.4';
-import { isRbnValueAllowed, isSecondRbnAvailable } from './rbn.js?v=20260801.4';
+import { isRegularWorkdayIso } from './holidays.js?v=20260801.5';
+import { isRbnValueAllowed, isSecondRbnAvailable } from './rbn.js?v=20260801.5';
 import {
   ABSENCE_FOR_CT_LEADERSHIP, computeWeekendEquivalent, countRoleInMonth, dayIso,
-  fmtGermanDate, getEffectiveAbsence, getRoleProperties, getStaffById, isStaffActiveDuringMonth, severityRank
-} from './rules-core.js?v=20260801.4';
-import { evaluateCandidate } from './rules-evaluation.js?v=20260801.4';
+  externalAssignmentLabel, fmtGermanDate, getEffectiveAbsence, getRoleProperties, getStaffById,
+  isExternalAssignment, isStaffActiveDuringMonth, severityRank
+} from './rules-core.js?v=20260801.5';
+import { evaluateCandidate } from './rules-evaluation.js?v=20260801.5';
 
 export function collectIssues(state, monthData) {
   const issues = [];
@@ -15,6 +16,16 @@ export function collectIssues(state, monthData) {
     for (const role of ['bd', 'hg']) {
       const staffId = day[role];
       if (!staffId) continue;
+      if (isExternalAssignment(staffId)) {
+        // Name aus einem Altimport: bewusst erhalten, aber ohne Personenbezug
+        // nicht bewertbar. Ein roter Datenfehler wäre hier irreführend.
+        issues.push({
+          level: 'yellow',
+          title: `${fmtGermanDate(iso)} · ${role.toUpperCase()} · ${externalAssignmentLabel(staffId)}`,
+          details: 'Aus einem Import übernommener Name ohne hinterlegte Person. Der Eintrag bleibt erhalten, ist aber nicht bewertbar und nicht erneut auswählbar.'
+        });
+        continue;
+      }
       if (!getStaffById(state.staff, staffId)) {
         issues.push({
           level: 'red',
