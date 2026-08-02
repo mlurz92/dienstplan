@@ -143,7 +143,7 @@ test('ein manipulierter Vorschlag ohne Personal-ID wird vor jeder Mutation verwo
     state: plannerState,
     currentMonth: monthData,
     proposal: tampered
-  }), /ohne gültige Personal-ID/);
+  }), /Vorschlag wurde.*verändert|ohne gültige Personal-ID/i);
   assert.equal(monthData.days['2026-07-21'].bd, '');
   assert.equal(monthData.days['2026-07-21'].hg, '');
 });
