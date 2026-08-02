@@ -9,7 +9,15 @@ import { applySpectrumProfile } from './color-director.js?v=20260801.11';
  * sowie eine Einblendanimation gleichzeitig starten. Dieses Modul beendet jede
  * noch laufende Spektruminterpolation innerhalb desselben Ereigniszyklus und
  * schreibt genau das endgültige Profil des ausgewählten Monats.
+ *
+ * Eine kurze Paint-Barriere wiederholt diesen Abschluss über wenige Frames.
+ * Damit gewinnt das endgültige Profil auch dann zuverlässig, wenn ein bereits
+ * registrierter Observer oder rAF-Callback nach dem synchronen Abschluss noch
+ * einmal eine Zwischenfarbe anfordert. Jeder Frame endet vor dem Paint wieder
+ * mit demselben finalen Monatsprofil.
  */
+
+const PAINT_GUARD_FRAMES = 4;
 
 function selectedDate() {
   const root = document.documentElement;
@@ -22,11 +30,43 @@ function selectedDate() {
   return { year, month };
 }
 
-export function settleMonthSpectrum() {
-  if (typeof document === 'undefined') return null;
+function writeFinalSpectrum() {
   const { year, month } = selectedDate();
   const palette = applySpectrumProfile(year, month, { animate: false });
   document.documentElement.dataset.monthTransition = 'atomic-spectrum-v1';
+  return palette;
+}
+
+let paintGuardHandle = null;
+let paintGuardGeneration = 0;
+
+function startPaintGuard() {
+  if (typeof requestAnimationFrame !== 'function') return;
+
+  paintGuardGeneration += 1;
+  const generation = paintGuardGeneration;
+  let remaining = PAINT_GUARD_FRAMES;
+
+  if (paintGuardHandle !== null && typeof cancelAnimationFrame === 'function') {
+    cancelAnimationFrame(paintGuardHandle);
+    paintGuardHandle = null;
+  }
+
+  const reinforce = () => {
+    if (generation !== paintGuardGeneration) return;
+    writeFinalSpectrum();
+    remaining -= 1;
+    if (remaining > 0) paintGuardHandle = requestAnimationFrame(reinforce);
+    else paintGuardHandle = null;
+  };
+
+  paintGuardHandle = requestAnimationFrame(reinforce);
+}
+
+export function settleMonthSpectrum() {
+  if (typeof document === 'undefined') return null;
+  const palette = writeFinalSpectrum();
+  startPaintGuard();
   return palette;
 }
 
