@@ -30,7 +30,10 @@ const candidate = (name, level, options = {}) => ({
     meta: {
       currentBd: options.currentBd ?? 0,
       currentHg: options.currentHg ?? 0,
+      combinedLoad: options.combinedLoad,
+      aaHgCount: options.aaHgCount ?? 0,
       recommendationScore: options.recommendationScore ?? 0,
+      recommendationVector: options.recommendationVector,
       historicalServices: options.historicalServices ?? 0
     }
   }
@@ -56,21 +59,34 @@ test('groups appear in decision order and empty groups disappear', () => {
   assert.ok(PICKER_GROUPS.every(group => group.label && group.hint));
 });
 
-test('inside a group the strongest recommendation and the lowest load come first', () => {
+test('recommendations follow the fixed lexicographic priority cascade', () => {
+  const model = buildPickerModel([
+    candidate('Viele niedrige Signale', 'green', { recommendationVector: [0, 0, 10, 10, 10, 10] }),
+    candidate('Expliziter Wunsch', 'green', { recommendationVector: [0, 1, 0, 0, 0, 0] }),
+    candidate('Kopplung', 'green', { recommendationVector: [1, 0, 0, 0, 0, 0] })
+  ]);
+  assert.deepEqual(model[0].entries.map(entry => entry.person.name), [
+    'Kopplung',
+    'Expliziter Wunsch',
+    'Viele niedrige Signale'
+  ]);
+});
+
+test('inside a group the lowest role-specific load comes first without annual-history tie-break', () => {
   const model = buildPickerModel([
     candidate('Viel Last', 'green', { currentBd: 3 }),
-    candidate('Wenig Last', 'green', { currentBd: 1 }),
-    candidate('Gleiche Last, mehr Verlauf', 'green', { currentBd: 1, historicalServices: 9 }),
+    candidate('Wenig Last', 'green', { currentBd: 1, historicalServices: 9 }),
+    candidate('Gleiche Last', 'green', { currentBd: 1, historicalServices: 0 }),
     candidate('Wunsch', 'green', { recommendationScore: 100, currentBd: 3 })
   ]);
   const [recommended, available] = model;
   assert.deepEqual(recommended.entries.map(entry => entry.person.name), ['Wunsch']);
   assert.deepEqual(available.entries.map(entry => entry.person.name), [
-    'Wenig Last', 'Gleiche Last, mehr Verlauf', 'Viel Last'
+    'Gleiche Last', 'Wenig Last', 'Viel Last'
   ]);
 });
 
-test('the load summary reports the role specific month count against the target', () => {
+test('the BD load summary reports the role count against the target', () => {
   const bd = loadSummary(candidate('A', 'green', { currentBd: 2, bdTarget: 4 }));
   assert.equal(bd.text, '2/4');
   assert.equal(bd.exceeded, false);
@@ -78,11 +94,28 @@ test('the load summary reports the role specific month count against the target'
 
   const full = loadSummary(candidate('B', 'green', { currentBd: 4, bdTarget: 4 }));
   assert.equal(full.exceeded, true);
+});
 
-  // HG kennt kein Sollwert-Ziel; dann steht nur die Anzahl.
-  const hg = loadSummary(candidate('C', 'green', { role: 'hg', currentHg: 3 }));
-  assert.equal(hg.text, '3');
+test('the HG load summary exposes combined load and AA-HG count', () => {
+  const hg = loadSummary(candidate('C', 'green', {
+    role: 'hg', currentBd: 4, currentHg: 1, combinedLoad: 5, aaHgCount: 2
+  }));
+  assert.equal(hg.text, '1 · Gesamt 5');
+  assert.equal(hg.sortLoad, 5);
+  assert.equal(hg.aaHg, 2);
   assert.equal(hg.ratio, null);
+  assert.match(hg.title, /HG für AA-BD: 2/);
+});
+
+test('HG candidates sort by combined load and then by AA-HG burden', () => {
+  const model = buildPickerModel([
+    candidate('Mehr Gesamt', 'green', { role: 'hg', currentBd: 4, currentHg: 1, combinedLoad: 5, aaHgCount: 0 }),
+    candidate('Mehr AA-HG', 'green', { role: 'hg', currentBd: 2, currentHg: 1, combinedLoad: 3, aaHgCount: 2 }),
+    candidate('Weniger AA-HG', 'green', { role: 'hg', currentBd: 2, currentHg: 1, combinedLoad: 3, aaHgCount: 1 })
+  ]);
+  assert.deepEqual(model[0].entries.map(entry => entry.person.name), [
+    'Weniger AA-HG', 'Mehr AA-HG', 'Mehr Gesamt'
+  ]);
 });
 
 test('the type filter ignores case, punctuation and German umlauts', () => {
@@ -90,8 +123,8 @@ test('the type filter ignores case, punctuation and German umlauts', () => {
   const person = candidate('Fr. Dalitz', 'green', { short: 'Dalitz', roleLabel: 'FÄ/OÄ' });
   assert.ok(candidateMatchesQuery(person, ''));
   assert.ok(candidateMatchesQuery(person, 'dal'));
-  assert.ok(candidateMatchesQuery(person, 'fr dal'), 'mehrere Begriffe müssen gemeinsam greifen');
-  assert.ok(candidateMatchesQuery(person, 'fä'), 'Funktionsbezeichnung bleibt durchsuchbar');
+  assert.ok(candidateMatchesQuery(person, 'fr dal'));
+  assert.ok(candidateMatchesQuery(person, 'fä'));
   assert.ok(!candidateMatchesQuery(person, 'lurz'));
 });
 
@@ -116,9 +149,9 @@ test('arrow keys skip blocked people and wrap around', () => {
   assert.equal(nextSelectableIndex(entries, -1, 1), 1);
   assert.equal(nextSelectableIndex(entries, -1, -1), 2);
   assert.equal(nextSelectableIndex(entries, 1, 1), 2);
-  assert.equal(nextSelectableIndex(entries, 2, 1), 1, 'am Ende wird umgebrochen');
-  assert.equal(nextSelectableIndex(entries, 1, -1), 2, 'am Anfang wird umgebrochen');
-  assert.equal(nextSelectableIndex(entries, 0, 1), 1, 'ein gesperrter Ausgangspunkt springt vorwärts');
+  assert.equal(nextSelectableIndex(entries, 2, 1), 1);
+  assert.equal(nextSelectableIndex(entries, 1, -1), 2);
+  assert.equal(nextSelectableIndex(entries, 0, 1), 1);
   assert.equal(nextSelectableIndex([candidate('Nur gesperrt', 'gray')], -1, 1), -1);
 });
 
