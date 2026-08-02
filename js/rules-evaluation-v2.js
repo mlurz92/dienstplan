@@ -3,10 +3,11 @@ import { addDays, getAssignment, parseIso, toLocalIso } from './rules-core.js?v=
 
 export * from './rules-evaluation.js?v=20260801.11';
 
-const REASON = 'HG am Werktag vor eigenem BD';
+const REASON = 'HG am Tag vor eigenem BD (HG am Werktag vor eigenem BD)';
 const LEGACY_REASONS = new Set([
   'Eigener HG am Vortag vor BD',
   'HG am Tag vor eigenem BD',
+  'HG am Werktag vor eigenem BD',
   `${REASON}: nicht zulässige werktägliche Dienstfolge.`
 ]);
 
@@ -27,7 +28,7 @@ function weekdayHgBeforeBdConflict({ state, dateIso, role, staffId }) {
 }
 
 function withWeekdayHgBeforeBdConflict(evaluation) {
-  if (!evaluation || evaluation.level === 'gray' || evaluation.canSelect === false) return evaluation;
+  if (!evaluation || evaluation.canSelect === false) return evaluation;
   const reasonDetails = (Array.isArray(evaluation.reasonDetails) ? evaluation.reasonDetails : [])
     .filter(item => !LEGACY_REASONS.has(item?.text));
   reasonDetails.unshift({
@@ -59,8 +60,8 @@ function withWeekdayHgBeforeBdConflict(evaluation) {
  * BD, damit die Farbe nicht von der Eingabereihenfolge abhängt.
  *
  * Freitag-HG vor Samstags-BD bleibt ausgenommen; hierfür gelten die definierten
- * Wochenendkopplungen. Bereits nicht wählbare oder graue Bewertungen werden
- * niemals durch diese Policy wieder freigeschaltet.
+ * Wochenendkopplungen. Bereits nicht wählbare Bewertungen werden niemals durch
+ * diese Policy wieder freigeschaltet oder in eine bestätigbare Auswahl verwandelt.
  */
 export function evaluateCandidate(parameters) {
   const evaluation = evaluateCandidateBase(parameters);
