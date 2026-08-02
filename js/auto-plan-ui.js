@@ -1,5 +1,15 @@
 import './auto-plan-studio-v3.js?v=20260801.11';
 
+function installAutoPlanV4Styles() {
+  const href = '/auto-plan-v4.css';
+  if (document.querySelector(`link[data-auto-plan-style="${href}"]`)) return;
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = `${href}?v=20260801.11`;
+  link.dataset.autoPlanStyle = href;
+  document.head.append(link);
+}
+
 function normalizeProposalCopy(root = document) {
   for (const status of root.querySelectorAll?.('.auto-plan-row-status') || []) {
     const corrected = status.textContent?.replace(/^(\d+) Vorschlage\b/, '$1 Vorschläge');
@@ -17,13 +27,14 @@ const copyObserver = new MutationObserver(records => {
   }
 });
 
-const startCopyObserver = () => {
+const initializeAutoPlanV4 = () => {
+  installAutoPlanV4Styles();
   normalizeProposalCopy();
   copyObserver.observe(document.documentElement, { childList: true, subtree: true });
 };
 
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', startCopyObserver, { once: true });
+  document.addEventListener('DOMContentLoaded', initializeAutoPlanV4, { once: true });
 } else {
-  startCopyObserver();
+  initializeAutoPlanV4();
 }
