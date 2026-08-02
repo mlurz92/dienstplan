@@ -100,9 +100,10 @@ test('eine bereits nicht wählbare Person wird durch die Zusatzpolicy niemals fr
     staffId: 'licenji'
   });
 
-  assert.equal(evaluation.level, 'gray');
+  assert.equal(evaluation.level, 'red');
   assert.equal(evaluation.canSelect, false);
   assert.ok(evaluation.reasons.some(reason => reason.includes('HG nur für Fachärzte')));
+  assert.equal(evaluation.reasons.some(reason => reason.includes('HG am Werktag vor eigenem BD')), false);
 });
 
 test('offene Punkte verwenden dieselbe rote Werktagsregel', () => {
