@@ -7,31 +7,12 @@
 <p align="center"><strong>Manuelle, regelgestützte Monatsplanung für Bereitschaftsdienst, Hintergrunddienst und neuroradiologische Rufbereitschaft</strong></p>
 
 > **Release-Token:** `20260801.11`  
-> **Farbarchitektur:** **Trend Atlas v3** mit 288 deterministischen Monatsprofilen  
-> **Wiederholungsschutz:** sechs Monate visuelles Farbgedächtnis, drei Monate Sektorengedächtnis, 18 Monate Namens-Cooldown  
-> **Animation:** High-Framerate-Monatswechsel mit OKLCH-Interpolation  
-> **Paketversion:** `0.2.0` · **Feiertagsregion:** Sachsen (`SN`)  
+> **Regelwerk:** Eignungsregeln `v4.6` mit gestuftem Override- und Prioritätsmodell  
+> **Farbarchitektur:** Trend Atlas v3 mit 288 deterministischen Monatsprofilen  
+> **Feiertagsregion:** Sachsen (`SN`)  
 > **Betrieb:** Cloudflare Pages · Pages Functions · Cloudflare KV · lokale Browser-Sicherung
 
-DienstplanRAD unterstützt die bewusste manuelle Planung von **Bereitschaftsdienst (BD)**, **Hintergrunddienst (HG)** sowie erster und zweiter **Rufbereitschaft Neuroradiologie (RBN)**. Die Anwendung erzeugt keinen automatischen Gesamtplan. Jede Einteilung wird vom Benutzer vorgenommen, transparent bewertet und gegen ein nachvollziehbares Regelwerk geprüft.
-
----
-
-## Inhaltsübersicht
-
-1. [Planungsprinzip](#1-planungsprinzip)
-2. [Benutzeroberfläche](#2-benutzeroberfläche)
-3. [Monatsnavigation und Animation](#3-monatsnavigation-und-animation)
-4. [Trend Atlas v3](#4-trend-atlas-v3)
-5. [Dienstarten und Personalpools](#5-dienstarten-und-personalpools)
-6. [Bewertungs- und Konfliktmodell](#6-bewertungs--und-konfliktmodell)
-7. [Abwesenheiten, Wünsche und RBN](#7-abwesenheiten-wünsche-und-rbn)
-8. [Speicherung, Import und Export](#8-speicherung-import-und-export)
-9. [Technische Architektur](#9-technische-architektur)
-10. [Tests und Qualitätssicherung](#10-tests-und-qualitätssicherung)
-11. [Lokale Entwicklung und Deployment](#11-lokale-entwicklung-und-deployment)
-12. [Projektstruktur](#12-projektstruktur)
-13. [Unveränderliche Grundsätze](#13-unveränderliche-grundsätze)
+DienstplanRAD unterstützt die bewusste manuelle Planung von **Bereitschaftsdienst (BD)**, **Hintergrunddienst (HG)** sowie erster und zweiter **Rufbereitschaft Neuroradiologie (RBN)**. Die Anwendung erzeugt keinen automatischen Gesamtplan. Jede Einteilung wird bewusst vorgenommen, transparent bewertet und gegen ein nachvollziehbares Regelwerk geprüft.
 
 ---
 
@@ -42,247 +23,240 @@ DienstplanRAD ist ein **assistiertes manuelles Planungssystem**, kein automatisc
 - keine automatische Monatsbelegung;
 - keine selbstständige Umbesetzung oder Tauschlogik;
 - keine verdeckte Gesamtoptimierung;
-- vollständige Klartextbegründung ausgelöster Regeln;
-- ausdrückliche Bestätigung und Protokollierung roter Ausnahmen;
+- vollständige Klartextbegründung jeder ausgelösten Regel;
+- ausdrückliche Bestätigung und Protokollierung zulässiger roter Ausnahmen;
 - lokale Sofortsicherung und zentrale Cloudflare-KV-Synchronisierung.
 
-Der Monatsplan verwendet eine chronologische Zeile je Kalendertag. Datum, Wochentag, BD, HG, RBN, zweite RBN, Abwesenheiten sowie Wünsche und Optionen liegen in einer gemeinsamen Leserichtung. Dienstfolgen, Feiertage und Wochenendbelastungen bleiben dadurch unmittelbar erkennbar.
+Die Eignungsprüfung ist seiteneffektfrei. Sie liest den vorhandenen Zustand, trägt aber keinen Gegenposten ein, verschiebt keine Einteilung und verändert weder Abwesenheiten noch Wünsche oder Protokolle. Erst eine bewusste Auswahl schreibt in den Monatsplan.
+
+Der Monatsplan verwendet eine chronologische Zeile je Kalendertag. Datum, Wochentag, BD, HG, RBN, zweite RBN, Abwesenheiten sowie Wünsche und Optionen liegen in einer gemeinsamen Leserichtung. Dienstfolgen, Feiertage und Wochenendbelastungen bleiben unmittelbar erkennbar.
 
 ---
 
 ## 2. Benutzeroberfläche
 
-### 2.1 Monatsansicht
+### Monatsansicht
 
-Die Oberfläche kombiniert eine Excel-nahe Tabellenlogik mit kontrollierter Glasoptik:
+Die Oberfläche verbindet eine Excel-nahe Tabellenlogik mit kontrollierter Glasoptik:
 
-- klar gefasste, semitransparente Panels;
-- monatlich gefärbte Kanten, Akzente und Tabellenflächen;
-- deckend weiße Eingabefelder für maximale Lesbarkeit;
+- semitransparente, klar gefasste Panels;
+- monatlich wechselnde Akzente und Tabellenflächen;
+- deckend weiße Eingabeflächen für hohe Lesbarkeit;
 - tabellarische Ziffern und kompakte Zeilenhöhen;
 - eindeutige Wochenend- und Feiertagsflächen;
 - reduzierte Bewegung über `prefers-reduced-motion`;
 - deckende Ersatzflächen über `prefers-reduced-transparency`.
 
-### 2.2 Adaptive Werkzeugleiste
+### Adaptive Werkzeugleiste
 
-Die Aktionsleiste gruppiert Planung, Daten und Ausgabe. Ihre Dichte wird aus dem tatsächlich verfügbaren Platz bestimmt:
+Die Werkzeugleiste passt ihre Dichte an den verfügbaren Platz an. Je nach Breite werden Gruppenüberschriften, Beschriftungen, reine Icons oder ein Überlaufmenü verwendet. Die vorhandenen Schaltflächen werden verschoben, nicht neu erzeugt; IDs, Ereignisbindungen und versteckte Datei-Eingaben bleiben erhalten.
 
-| Stufe | Darstellung |
-|---|---|
-| `full` | Gruppenüberschriften und alle Beschriftungen |
-| `groups` | vollständige Schaltflächen ohne Gruppenüberschriften |
-| `secondary` | nur Planungsaktionen bleiben beschriftet |
-| `icons` | reine Symbolschaltflächen |
-| `overflow` | Planung bleibt sichtbar, Daten und Ausgabe wechseln in ein Menü |
+### Dienst-Picker
 
-Die Schaltflächen werden im Überlaufmodus verschoben, nicht neu erzeugt. IDs, Ereignisbindungen und versteckte Datei-Eingaben bleiben erhalten. Alle Aktionen besitzen Tooltip, `aria-label`, Tastaturfokus und ein eigenständiges Inline-SVG-Icon.
-
-### 2.3 Tabellenbearbeitung und Dienst-Picker
-
-- direkte Auswahl für BD und HG;
-- native Auswahlfelder für RBN;
-- bedingt eingeblendete zweite RBN;
-- Löschen und vollständiges Leeren nach Bestätigung;
-- Einzel- und Sammeleingabe tagesbezogener Markierungen;
-- automatische lokale Sicherung und Server-Synchronisierung.
-
-Der Dienst-Picker sortiert alle Mitarbeitenden nach tatsächlicher Eignung statt alphabetisch:
+Der Picker gruppiert alle aktiven Mitarbeitenden nach der tatsächlichen Entscheidungslage:
 
 | Gruppe | Bedeutung |
 |---|---|
-| **Empfohlen** | Wunsch, Ausgleich oder Verlauf sprechen ausdrücklich dafür |
+| **Empfohlen** | eine fachlich priorisierte Empfehlung spricht dafür |
 | **Möglich** | keine relevanten Konflikte |
-| **Mit Hinweis** | wählbar, jedoch mit Anmerkung |
-| **Nachrangig** | nur bei fehlender besserer Besetzung |
-| **Bestätigung nötig** | roter Konflikt, ausdrückliche Bestätigung erforderlich |
-| **Nicht verfügbar** | nicht im Pool oder zum Termin nicht aktiv |
+| **Mit Hinweis** | wählbar, jedoch mit gelber Anmerkung |
+| **Nachrangig** | orange; nur bei fehlender besserer Besetzung |
+| **Bestätigung nötig** | roter, organisatorisch überschreibbarer Konflikt |
+| **Nicht verfügbar** | fachlich oder strukturell nicht überschreibbar |
 
-Tastatursteuerung: Sucheingabe filtert Name, Kurzname und Funktion; <kbd>↑</kbd>/<kbd>↓</kbd> wechseln die aktive Person, <kbd>Enter</kbd> übernimmt, <kbd>Esc</kbd> schließt. Semantisch ist die Auswahl als `combobox` mit `listbox`, gruppierten `option`-Elementen und `aria-activedescendant` umgesetzt.
+Die Suche filtert Name, Kurzname und Funktion. <kbd>↑</kbd>/<kbd>↓</kbd> wechseln die aktive Person, <kbd>Enter</kbd> übernimmt, <kbd>Esc</kbd> schließt. Die Auswahl ist semantisch als `combobox` mit gruppierter `listbox` umgesetzt.
 
----
+### Begründungsreihenfolge
 
-## 3. Monatsnavigation und Animation
+Die kompakte Kandidatenzeile zeigt immer zuerst den fachlich wichtigsten Grund:
 
-- Vormonat und Folgemonat über Pfeiltasten;
-- direkte Monats- und Jahresauswahl;
-- Sprung zum aktuellen Monat;
-- Vorladen benachbarter Monate für monatsübergreifende Regeln;
-- sauberer Abbruch überholter Navigationen bei schnellen Folgeeingaben.
+1. rote Konflikte;
+2. orange Konflikte;
+3. gelbe Konflikte;
+4. positive Empfehlungen;
+5. neutrale Struktur- und Kontexthinweise.
 
-Der Zielmonat wird vollständig vorbereitet, bevor er die alte Ansicht ersetzt. Unterstützte Chromium-Browser verwenden die native **View Transitions API** ausschließlich für `.sheet-panel`; sonst greift ein WAAPI-Fallback.
-
-### Performancevertrag
-
-- keine Tabellen-Neuberechnung pro Animationsframe;
-- keine animierten Filter oder Blur-Effekte;
-- ausschließlich compositorfähige Bewegungseigenschaften;
-- höchstens ein Monats-GET für die Zielnavigation;
-- kein nachgelagerter zweiter Render- oder Theme-Schritt;
-- deterministischer Abbruch veralteter Navigationen.
-
-Der Farbübergang dauert 760 ms, interpoliert alle Monatsvariablen in OKLCH und endet exakt auf dem kanonischen Zielprofil. Nur tatsächlich veränderte CSS-Custom-Properties werden geschrieben.
+Positive Wünsche, Optionen oder Ausgleichsempfehlungen können einen Konflikt weder verdecken noch vor ihn rücken. Alle weiteren Gründe bleiben im Detailbereich vollständig sichtbar.
 
 ---
 
-## 4. Trend Atlas v3
+## 3. Konflikt- und Bestätigungsmodell
 
-### 4.1 Zielsetzung
+### Nicht überschreibbar
 
-Die Monatsfarbe ist ein funktionaler Orientierungsträger. Zwei aufeinanderfolgende Monate müssen unmittelbar unterscheidbar sein; ähnlich gelagerte Töne sollen auch nach mehreren Monaten nicht unbemerkt wiederkehren.
+Folgende Konstellationen sind rot und im Picker technisch gesperrt:
 
-Trend Atlas v3 verbindet:
+- fehlende Qualifikation, insbesondere AA als HG oder Samstags-BD;
+- nicht aktive oder nicht planbare Person;
+- gleichzeitige Einteilung derselben Person in BD und HG;
+- eigener BD am unmittelbar vorhergehenden oder folgenden Kalendertag.
 
-1. kuratierte moderne Farbnamen und Referenzwerte;
-2. wahrnehmungsbasierte Berechnung in OKLab/OKLCH;
-3. zeitliche Wiederholungssperren über Monate und Jahre.
+Diese Konstellationen können nicht über einen Bestätigungsdialog umgangen werden.
 
-### 4.2 Recherchebasis
+### Besondere rote Bestätigung
 
-Der Atlas verwendet englische Originalnamen aus mehreren aktuellen Trendquellen:
+Folgende rote Konflikte bleiben auswählbar, verlangen aber eine **besondere Bestätigung mit begründendem Pflichtkommentar**:
 
-- [Pantone Color of the Year 2026 – Cloud Dancer](https://www.pantone.com/eu/en-eu/articles/press-releases/pantone-announces-color-of-the-year-2026-cloud-dancer)
-- [Pantone NYFW Spring/Summer 2026](https://www.pantone.com/eu/de-de/articles/fashion-color-trend-report/new-york-fashion-week-spring-summer-2026)
-- [Pantone LFW Spring/Summer 2026](https://www.pantone.com/eu/en-eu/articles/fashion-color-trend-report/london-fashion-week-spring-summer-2026)
-- [Pantone NYFW Autumn/Winter 2026/2027](https://www.pantone.com/uk/en-gb/articles/fashion-color-trend-report/new-york-fashion-week-autumn-winter-2026)
-- [WGSN × Coloro Key Colours A/W 2026/2027](https://www.wgsn.com/en/blogs/key-colours-aw-2627)
-- [Sherwin-Williams 2026 – Universal Khaki](https://www.sherwin-williams.com/en-us/color/color-of-the-year/2026)
-- [Benjamin Moore 2026 – Silhouette](https://www.benjaminmoore.com/en-us/paint-colors/color-of-the-year-2026)
-- [Behr 2026 – Hidden Gem](https://www.behr.com/consumer/inspiration/2026-color-of-the-year/)
+- eingetragene oder fachlich abgeleitete Abwesenheit;
+- Polednia-Sperre am Dienstag oder Sonntag;
+- ausdrücklich hinterlegtes hartes BD-Monatsmaximum.
 
-Im Atlas liegen unter anderem `Cloud Dancer`, `Mocha Mousse`, `Transformative Teal`, `Future Dusk`, `Electric Fuchsia`, `Blue Aura`, `Universal Khaki`, `Silhouette`, `Hidden Gem` und `Warm Eucalyptus`. Helle Neutralfarben bleiben Referenzanker; sie werden nicht als schwacher Tabellenkontrast erzwungen, wenn Abstands- oder Kontrastkriterien dagegen sprechen.
+Fr. Hellmann besitzt ein BD-Soll und BD-Maximum von zwei. Ein dritter BD bleibt möglich, erfordert aber diese besondere Bestätigung. Für die Summe aus BD und HG besteht keine zusätzliche harte Gesamtobergrenze.
 
-### 4.3 Datenmodell und Namenslogik
+### Normale rote Planabweichung
 
-Jeder Anker speichert:
+Organisatorisch lösbare rote Konflikte bleiben nach gewöhnlicher ausdrücklicher Bestätigung wählbar. Hierzu gehören insbesondere widersprüchliche Kopplungen und benachbarte BD-Wochenenden. Ein Kommentar ist möglich, aber nicht zwingend.
 
-- englischen Originalnamen;
-- sRGB-Referenzwert für die Browserdarstellung;
-- Quellengruppe;
-- saisonal geeignete Monate;
-- abgeleitete OKLCH-Werte.
+### Bestätigte Ausnahmen
 
-Der sichtbare Name wird aus dem tatsächlich gerenderten Farbwert bestimmt. Generische Editionszusätze wie `Cloud Veil` werden nicht angehängt. Das Badge zeigt ausschließlich `Monatskontrast · <Originalname>`. Der Tooltip ergänzt Saison, Farbfamilie, Toncharakter, Jahrescharakter und Jahr; Quelle und Referenzwert bleiben im Profil verfügbar.
-
-### 4.4 Auswahlalgorithmus
-
-Für jeden Monat und jedes der 24 Zyklusjahre werden 96 Kandidaten erzeugt. Die Auswahl bewertet gleichzeitig:
-
-- Abstand zum unmittelbar vorherigen Monat;
-- Farbton- und Helligkeitsabstand zum Vormonat;
-- Abstand desselben Monats zum Vorjahr;
-- kleinsten Abstand zu den sechs zuletzt verwendeten Farben;
-- Kollision mit den Farbsektoren der letzten drei Monate;
-- Helligkeitsrhythmus zwischen hellen und tieferen Monaten;
-- noch ungenutzte Farbsektoren im laufenden Jahr;
-- eindeutigen sRGB-Zielwert im vollständigen Zyklus.
-
-Sicherheitsgrenzen:
-
-| Kriterium | Mindestwert |
-|---|---:|
-| OKLab-Abstand zum Vormonat | `0.13` |
-| Farbtonabstand zum Vormonat | `42°` |
-| Helligkeitsabstand zum Vormonat | `0.038` |
-| Abstand zum Vorjahresmonat | `0.07` |
-| Abstand zu jedem der letzten sechs Monate | `0.075` |
-| Namens-Cooldown | `18 Monate` |
-
-Die kanonische Palette 2026–2049 umfasst **288 unterschiedliche Zielwerte**. Jahre außerhalb dieses Fensters werden deterministisch auf den 24-Jahres-Zyklus abgebildet.
-
-### 4.5 Oberflächen und Kontrast
-
-Aus dem Monatsakzent werden in OKLCH abgeleitet:
-
-- starker Akzent;
-- dunkle Schrift-/Linienfarbe;
-- transparenter Glow;
-- Panel-Tint;
-- Werktags-, Samstags-, Sonntags- und Feiertagsflächen.
-
-Alle Kombinationen werden gegen WCAG AA geprüft. Die Gamut-Anpassung reduziert Chroma schrittweise, bis ein gültiger sRGB-Wert vorliegt. Eine helligkeitsabhängige Chromaobergrenze verhindert fluoreszierende Flächen.
-
-### 4.6 Modulaufteilung
-
-| Modul | Aufgabe |
-|---|---|
-| `js/color-atlas-data.js` | Trendquellen, Anker, Jahrescharaktere und Grenzwerte |
-| `js/color-atlas-engine.js` | OKLab/OKLCH, Kandidaten, Farbgedächtnis und kanonische Palette |
-| `js/color-director.js` | öffentliche Fassade, Badge, CSS-Variablen und Animation |
-
-Die bisherige Importoberfläche von `color-director.js` bleibt kompatibel; Daten- und Engine-Exporte werden über die Fassade weitergereicht.
+Eine bestätigte rote Einteilung bleibt unter **Offene Punkte** sichtbar, trägt aber den eigenen Status **bestätigte rote Ausnahme**. Angezeigt werden Bestätigungsart, Zeitpunkt, Kommentar und aktuelle Begründungen. Damit ist sie klar von einem noch ungeprüften Regelverstoß getrennt.
 
 ---
 
-## 5. Dienstarten und Personalpools
+## 4. Fachliche Empfehlungskaskade
 
-### Bereitschaftsdienst
+Empfehlungen werden nicht über eine frei addierte Punktsumme gegeneinander aufgerechnet. Innerhalb derselben Konfliktgruppe gilt eine lexikografische Priorität:
 
-- maximal zwei BD-Einträge pro Kalendertag;
-- Richtwert grundsätzlich vier BD pro Monat;
+1. deterministische Kopplung;
+2. ausdrücklicher positiver Dienstwunsch;
+3. Option `BD möglich` beziehungsweise `HG möglich`;
+4. Monats-, BD/HG- und AA-HG-Ausgleich;
+5. Wochenendausgleich;
+6. sonstige positive Empfehlung, insbesondere Urlaubsverlängerer.
+
+Ein einzelnes höherrangiges Signal bleibt dadurch vor beliebig vielen schwächeren Signalen. Erst innerhalb derselben Kategorie entscheidet die jeweilige Signalstärke.
+
+Der **Jahresverlauf** bleibt ein reiner Klartexthinweis. Er verändert weder Farbe noch Empfehlungswert und ist vollständig aus der automatischen Picker-Sortierung entfernt.
+
+---
+
+## 5. Fairness und Lastverteilung
+
+Relative BD-, HG-, AA-HG-, Wochenend- und Überhangvergleiche berücksichtigen ausschließlich Personen, die am konkreten Tag **keinen roten Konflikt** besitzen. Orange und gelbe Kandidaten bleiben Teil der Vergleichsgruppe; rote oder technisch gesperrte Personen verfälschen den Tagesausgleich nicht.
+
+### BD-Monatsausgleich
+
+- persönlicher Richtwert grundsätzlich vier BD;
 - abweichende Sollwerte für definierte Personen;
-- Monatsausgleich erst, sobald mindestens eine Person ihr Soll erreicht hat;
-- Jahresverlauf als transparenter Hinweis ohne verdeckte Gewichtung.
+- relativer Monatsausgleich erst, wenn mindestens eine aktive Person ihr Soll erreicht hat;
+- größter Sollrückstand wird bevorzugt;
+- erreichtes Soll erzeugt einen gelben Richtwerthinweis;
+- hartes Maximum erzeugt beim zusätzlichen BD einen roten Konflikt mit besonderer Bestätigung;
+- erster notwendiger Überhang nach vollständigem Sollausgleich wird unter den dann nicht roten Personen bevorzugt Dr. Lurz angeboten, sofern kein positiver BD-Wunsch einer anderen Person entgegensteht.
 
-### Hintergrunddienst
+### HG-Ausgleich
 
-HG kann zusätzlich zum BD vergeben werden. Die Bewertung berücksichtigt Dienstfolgen, rollierende Zeitfenster, BD am Folgetag, FZA und personenspezifische Ausschlüsse.
+Für HG wird primär die kombinierte Monatslast `BD + HG` betrachtet. Bei einem HG zu einem Assistenzarzt-BD wird zusätzlich die bisherige Zahl belastender AA-HG ausgeglichen.
 
-### Rufbereitschaft Neuroradiologie
+Der Picker zeigt beispielsweise:
 
-Erste und zweite RBN werden getrennt geführt. Die zweite RBN erscheint nur bei einer ersten RBN, für die eine zusätzliche fachärztliche Rückfallebene vorgesehen ist. RBN fließt nicht in die BD/HG-Belastungsstatistik ein.
+```text
+HG 1 · Gesamt 5
+```
 
----
+Nach der fachlichen Empfehlung wird bei HG sortiert nach:
 
-## 6. Bewertungs- und Konfliktmodell
-
-Die Anwendung liefert zu jeder Bewertung eine Klartextbegründung. Positive Hinweise heben Konflikte nicht auf.
-
-Beispiele:
-
-- Urlaub oder „Kein Dienst“ sperrt BD;
-- HG am definierten FZA-Tag ausgeschlossen;
-- BD–FZA–BD unter der Woche als Hinweis;
-- drei aufeinanderfolgende HG nachrangig;
-- erneuter HG innerhalb von drei Kalendertagen mit Hinweis;
-- HG am Tag vor eigenem BD nachrangig, definierte Freitags-/Samstagsausnahme;
-- Rollen- und Aktivitätszeiträume;
-- individuelle Sollwerte und maximale Dienstzahlen;
-- rote Konflikte nur nach ausdrücklicher Bestätigung.
-
-Rote Ausnahmen werden mit Datum, Dienstart, Person und Begründung protokolliert.
+1. kombinierter Monatslast;
+2. Zahl bisheriger AA-HG;
+3. reiner HG-Zahl;
+4. Name.
 
 ---
 
-## 7. Abwesenheiten, Wünsche und RBN
+## 6. Dienstfolgen und personelle Sonderregeln
 
-Unterstützt werden Urlaub, FZA, „Kein Dienst“, Dienstwünsche und weitere tagesbezogene Optionen. Urlaubstage sperren BD. Bei der Sammeleingabe ist die Auswahl die vollständige Aussage für den gewählten Typ: markiert bedeutet gesetzt, nicht markiert bedeutet entfernt; andere Typen desselben Tages bleiben unberührt.
+- unmittelbar aufeinanderfolgende eigene BD: nicht überschreibbar rot;
+- BD mit zwei oder drei Kalendertagen Abstand: gelb;
+- werktägliches `BD–FZA–BD`: eigener gelber Hinweis;
+- erneuter HG innerhalb von drei Kalendertagen: gelb;
+- dritter HG in einer Dreierkette: orange;
+- HG unmittelbar vor eigenem BD: grundsätzlich orange, mit definierter Freitags-/Samstags- und Facharzt-Ausnahme;
+- nach gewöhnlichem BD kein automatisch erzeugtes FZA;
+- ausschließlich nach Becker-Samstags-BD wird am nächsten regulären Werktag ein echtes FZA abgeleitet;
+- Becker-Samstags-BD bleibt orange nachrangig;
+- Dalitz-HG an Sonntag oder Montag bei Sebastian-BD bleibt orange;
+- Becker und Martin dürfen an regulären Werktagen nicht gleichzeitig mit Urlaub oder FZA abwesend sein.
 
-RBN-Pools, Sichtbarkeit der zweiten RBN und historische Namen werden defensiv behandelt. Entfällt die Voraussetzung für eine zweite RBN, wird ein bestehender Eintrag entfernt.
+Prof. Schäfer ist nicht Bestandteil des aktiven Dienstpools. El Houba erhält ab dem hinterlegten Beförderungsdatum automatisch die entsprechenden Facharztberechtigungen. Fr. Hellmann ist ab Oktober 2026 aktiv.
 
 ---
 
-## 8. Speicherung, Import und Export
+## 7. Urlaub, Wochenenden und Kopplungen
+
+### Urlaubsnähe
+
+Ein Donnerstags-BD wird als Urlaubsverlängerer empfohlen, wenn der Montag der folgenden Kalenderwoche Bestandteil eines zusammenhängenden Urlaubsblocks ist. Ein Freitags-BD vor demselben Block bleibt orange nachrangig. Ein BD unmittelbar am Kalendertag vor einem eingetragenen Urlaubstag bleibt ebenfalls orange.
+
+### Wochenendäquivalente
+
+- Wochenende = Freitag bis Sonntag;
+- mindestens ein BD im Wochenende = `1,0`;
+- ausschließlich HG = `0,5`;
+- regelkonformes gekoppeltes Standardwochenende aus Freitag-HG, Samstags-BD und Sonntag-HG derselben Person bleibt insgesamt `1,0`;
+- zusätzliche, nicht durch die Kopplungsregeln erklärte Mehrfachbelastung erhält einen gesonderten gelben Hinweis;
+- zweiter Samstags-BD derselben Person im Monat bleibt orange;
+- zwei benachbarte BD-Wochenenden bleiben rot;
+- sonstige benachbarte Dienstwochenenden bleiben orange;
+- Oster- und Pfingstblock alternieren.
+
+### Deterministische Kopplungen
+
+- AA-BD am Freitag: Freitag-HG und Samstags-BD müssen personengleich sein;
+- Facharzt-BD am Samstag: Sonntag-HG muss dieselbe Person übernehmen;
+- AA-BD am Feiertagsvortag: Vortags-HG und Feiertags-BD müssen personengleich sein.
+
+Sind Gegenposten bereits widersprüchlich belegt, entsteht eine normale rote Planabweichung. Ist ein Gegenposten noch leer, erscheint bereits ein neutraler Hinweis, welche spätere Besetzung mit der aktuellen Auswahl übereinstimmen muss. Es erfolgt niemals eine automatische Gegenbelegung.
+
+---
+
+## 8. Abwesenheiten, Wünsche und RBN
+
+Unterstützt werden Urlaub, FZA, Weiterbildung, sonstige Abwesenheit, `Kein BD`, `Kein HG`, `Kein Dienst`, positive Dienstwünsche sowie die unabhängigen Optionen `BD möglich` und `HG möglich`.
+
+Bei der Sammeleingabe ist die Auswahl die vollständige Aussage für den gewählten Typ: markiert bedeutet gesetzt, nicht markiert bedeutet entfernt; andere Typen desselben Tages bleiben unberührt.
+
+Erste und zweite RBN werden getrennt geführt. Die zweite RBN erscheint nur bei einer dafür vorgesehenen Erstbesetzung. RBN fließt nicht in die BD/HG-Belastungsstatistik ein. Historische oder importierte Altwerte bleiben sichtbar, werden aber defensiv als nicht mehr gültiger Poolwert markiert.
+
+---
+
+## 9. Trend Atlas v3 und Monatswechsel
+
+Trend Atlas v3 erzeugt für 24 Zyklusjahre 288 deterministische Monatsprofile. Die Auswahl berücksichtigt wahrnehmungsbasierte Abstände in OKLab/OKLCH, Farbton- und Helligkeitsabstand zum Vormonat, sechsmonatiges Farbgedächtnis, Vorjahresabstand und 18-monatigen Namens-Cooldown.
+
+Die sichtbaren Namen stammen aus aktuellen Trendquellen und bleiben in ihrer englischen Originalform. Aus dem Monatsakzent werden kontrastgeprüfte Tabellen-, Panel-, Wochenend- und Feiertagsflächen abgeleitet.
+
+Der Monatswechsel:
+
+- lädt benachbarte Monate vor;
+- bricht überholte Navigationen deterministisch ab;
+- nutzt native View Transitions oder einen compositorbasierten Fallback;
+- interpoliert die Monatsfarben in OKLCH;
+- endet exakt auf dem kanonischen Zielprofil ohne nachgelagertes Blinken.
+
+---
+
+## 10. Speicherung, Import und Export
 
 ### Speicherung
 
-- sofortige lokale Sicherung;
-- Dirty-Schutz gegen später eintreffende ältere Serverstände;
-- zentrale Monatsdaten über Cloudflare Pages Functions und KV;
-- GET bleibt read-only, Datensätze entstehen erst durch PUT;
-- ganzzahlige Revisionen und defensive Normalisierung.
+- unmittelbare lokale Sicherung;
+- Dirty-Status je Monat;
+- Schutz gegen verspätete ältere Serverantworten;
+- zentrale Speicherung über Cloudflare Pages Functions und KV;
+- ganzzahlige Revisionen und defensive Normalisierung;
+- Einzelbearbeiterbetrieb ohne konkurrierende Mehrbenutzerschreibvorgänge.
 
 ### Excel
 
-Jahresplaner und Einzelpläne werden unterstützt. Monatsname, Blattstruktur und Kopfzeile werden unabhängig geprüft. Fehlende Jahres- oder Monatsangaben müssen bestätigt werden. Excel-Datumswerte werden als lokale Kalendertage verarbeitet.
+Jahresplaner und Einzelpläne werden unterstützt. Monatsname, Blattstruktur und Kopfzeile werden unabhängig geprüft. Fehlende Jahres- oder Monatsangaben müssen bestätigt werden. Bestehende manuelle Dienste und Abwesenheiten bleiben beim Merge geschützt; unbekannte Namen werden transparent ausgewiesen.
 
 ### JSON und PDF
 
-Der vollständige Zustand kann als JSON exportiert und validiert importiert werden. Dateinamen verwenden den lokalen Kalendertag. Die Druckansicht ist für eine kompakte A4-Ausgabe optimiert; laufende Animationen werden vor dem Druck auf den Zielzustand abgeschlossen.
+Der vollständige Zustand kann als JSON exportiert und streng validiert importiert werden. Ein fehlgeschlagener Serverimport versucht bereits geschriebene Schlüssel zurückzusetzen. Die Druckansicht ist für eine kompakte A4-Ausgabe optimiert; laufende Farbtransitionen werden vor dem Druck abgeschlossen.
 
 ---
 
-## 9. Technische Architektur
+## 11. Technische Architektur
 
 - semantisches HTML und modulare ES-Module;
 - CSS-Custom-Properties als visuelles System;
@@ -292,11 +266,25 @@ Der vollständige Zustand kann als JSON exportiert und validiert importiert werd
 - Cloudflare Pages Functions und KV;
 - Node-Test-Runner und Playwright.
 
-Zentrale Module: `app.js` koordiniert Render- und Interaktionsfluss, `state.js` Zustand und Persistenz, `rules*.js` Bewertung und Berichterstattung, `picker-view.js` den Dienst-Picker, `rbn.js` RBN-Abhängigkeiten, `month-transition-stability.js` Farbsignale und `month-view-transition.js` die Monatskartenanimation.
+| Modul | Verantwortung |
+|---|---|
+| `js/app.js` | Render- und Interaktionsfluss, Dialoge, Import und Export |
+| `js/state.js` | Zustand, lokale Sicherung, Serverabgleich und Dirty-Status |
+| `js/rules-core.js` | gemeinsame Datums-, Personal-, Last- und Zählfunktionen |
+| `js/rules-evaluation.js` | Konfliktmodell, Empfehlungskaskade, Fairness und Kopplungen |
+| `js/rules-reporting.js` | offene Punkte, bestätigte Ausnahmen und Statistik |
+| `js/picker-view.js` | Picker-Gruppen, lexikografische Sortierung und Lastanzeige |
+| `js/rbn.js` | RBN-Pools und Abhängigkeit der zweiten RBN |
+| `js/holidays.js` | Feiertage Sachsen und reguläre Werktage |
+| `js/color-atlas-data.js` | Trendquellen, Farbanker und Grenzwerte |
+| `js/color-atlas-engine.js` | OKLab/OKLCH, Kandidaten und Farbgedächtnis |
+| `js/color-director.js` | sichtbare Monatsfarben, Badge und Animation |
+
+Der App-Shell und der vollständige Browser-Modulgraph verwenden einen einheitlichen Release-Token. Cloudflare erzwingt zugleich Revalidierung des Shell- und Modulbestands; ein früherer Service Worker wird durch ein vorgelagertes Cleanup und einen serverseitigen `/sw.js`-Grabstein entfernt.
 
 ---
 
-## 10. Tests und Qualitätssicherung
+## 12. Tests und Qualitätssicherung
 
 ```bash
 npm run check
@@ -305,24 +293,27 @@ npm run test:e2e
 npm run verify
 ```
 
-Die bestehende Suite umfasst **216 Unit-/Regressionstests** und **22 Playwright-End-to-End-Tests**. Für Trend Atlas werden insbesondere geprüft:
+Die Suite umfasst **234 Unit-/Regressionstests** und **22 Chromium-End-to-End-Tests**. Geprüft werden unter anderem:
 
-- 288 deterministische und eindeutige Zielwerte;
-- mindestens neun 30°-Farbsektoren je Jahr;
-- Mindestabstände in OKLab, Farbton und Helligkeit;
-- sechsmonatiges visuelles Gedächtnis;
-- 18-monatiger Namens-Cooldown über Jahresgrenzen;
-- englische Originalnamen und Quellenzuordnung;
-- Gamut Mapping, Neonschranke und Helligkeitsrhythmus;
-- WCAG-AA-Kontrast aller abgeleiteten Tabellenflächen;
-- Monats- und Jahresvariation im Browser;
-- konstante finale Monatsfarbe ohne nachgelagertes Blinken.
-
-`npm run check` erfasst die beiden neuen Module `color-atlas-data.js` und `color-atlas-engine.js` ausdrücklich.
+- nicht überschreibbare Qualifikations-, Doppelrollen- und Folge-BD-Konflikte;
+- besondere Bestätigung für Abwesenheit, Polednia-Sperre und hartes Maximum;
+- normale rote Kopplungsabweichungen;
+- Konfliktgründe vor positiven Empfehlungen;
+- lexikografische Empfehlungskaskade;
+- Ausschluss roter Personen aus relativen Fairnessvergleichen;
+- kombinierte HG-Last und sekundärer AA-HG-Ausgleich;
+- Neutralität des Jahresverlaufs für Bewertung und Sortierung;
+- Donnerstag-/Freitag-Logik vor Urlaubsblock;
+- prospektive Hinweise bei offenen Kopplungen;
+- separat markierte bestätigte rote Ausnahmen;
+- Wochenendäquivalente und zusätzliche nicht gekoppelte Mehrfachbelastung;
+- Reihenfolgeunabhängigkeit und Selbstkonsistenz bestehender Einteilungen;
+- Datenvalidierung, Import-Rollback, Offline- und Dirty-Schutz;
+- 288 eindeutige Farbprofile, Kontrast, Farbgedächtnis und blinkfreier Monatswechsel.
 
 ---
 
-## 11. Lokale Entwicklung und Deployment
+## 13. Lokale Entwicklung und Deployment
 
 ```bash
 npm ci
@@ -331,11 +322,11 @@ npm run verify
 
 Für die reine Oberfläche genügt ein statischer lokaler Webserver. Backendfunktionen benötigen eine Cloudflare-kompatible Pages-Functions-Umgebung mit den vorgesehenen KV-Bindings.
 
-Das Repository wird aus `main` über Cloudflare Pages bereitgestellt. Der Release-Token `20260801.11` bleibt unverändert; die neuen Atlasmodule besitzen zuvor nicht ausgelieferte Pfade und werden über die bestehende `color-director.js`-Fassade geladen.
+Das Repository wird aus `main` über Cloudflare Pages bereitgestellt. Der sichtbare Buildstempel und der Modulgraph verwenden den Release-Token `20260801.11`.
 
 ---
 
-## 12. Projektstruktur
+## 14. Projektstruktur
 
 ```text
 .
@@ -346,17 +337,8 @@ Das Repository wird aus `main` über Cloudflare Pages bereitgestellt. Der Releas
 ├── manifest.webmanifest
 ├── Eignungsregeln.txt
 ├── icons/
-│   ├── icon.svg
-│   └── icon-animated.svg
 ├── js/
 │   ├── app.js
-│   ├── theme.js
-│   ├── color-atlas-data.js
-│   ├── color-atlas-engine.js
-│   ├── color-director.js
-│   ├── month-transition-stability.js
-│   ├── month-view-transition.js
-│   ├── ui-controls.js
 │   ├── state.js
 │   ├── defaults.js
 │   ├── rules.js
@@ -366,7 +348,12 @@ Das Repository wird aus `main` über Cloudflare Pages bereitgestellt. Der Releas
 │   ├── picker-view.js
 │   ├── rbn.js
 │   ├── holidays.js
-│   └── excel-import.js
+│   ├── excel-import.js
+│   ├── color-atlas-data.js
+│   ├── color-atlas-engine.js
+│   ├── color-director.js
+│   ├── month-transition-stability.js
+│   └── month-view-transition.js
 ├── functions/api/
 ├── tests/
 ├── docs/
@@ -376,18 +363,19 @@ Das Repository wird aus `main` über Cloudflare Pages bereitgestellt. Der Releas
 
 ---
 
-## 13. Unveränderliche Grundsätze
+## 15. Unveränderliche Grundsätze
 
 - Der Mensch plant; die Anwendung unterstützt und prüft.
 - Keine verdeckte automatische Gesamtoptimierung.
 - Konflikte werden erklärt, nicht nur eingefärbt.
 - Positive Hinweise heben Konflikte nicht auf.
-- Rote Ausnahmen bleiben möglich, aber protokollpflichtig.
-- Historische Daten werden defensiv behandelt.
+- Fachlich nicht überschreibbare Konstellationen dürfen nicht durch Bestätigung umgangen werden.
+- Besondere rote Ausnahmen verlangen einen begründenden Kommentar.
+- Bestätigte rote Ausnahmen bleiben revisionssicher und eindeutig markiert sichtbar.
+- Relative Fairness darf nicht durch am konkreten Tag rote Personen verzerrt werden.
+- Der Jahresverlauf bleibt reine Information ohne Sortier- oder Bewertungseinfluss.
+- Empfehlungen folgen der dokumentierten fachlichen Kaskade, nicht einer intransparenten Punktsumme.
 - Sachsen bleibt die fest definierte Feiertagsregion.
-- Monatsfarben sind deterministisch, saisonal, kontrastgeprüft und wahrnehmungsbasiert verschieden.
-- Ähnliche Farben dürfen sich weder unmittelbar noch innerhalb des rollierenden Farbgedächtnisses unbemerkt wiederholen.
-- Sichtbare Farbnamen bleiben belegte englische Originalnamen und beschreiben den tatsächlich gerenderten Ton.
-- Ein Monatswechsel darf keinen bereits sichtbaren Plan erneut ausblenden oder nachträglich umfärben.
+- Monatsfarben bleiben deterministisch, kontrastgeprüft und wahrnehmungsbasiert verschieden.
 - Überholte Navigationen dürfen keinen späteren Zustand festlegen.
 - Regelwerk, Tests und Dokumentation werden gemeinsam geändert.
