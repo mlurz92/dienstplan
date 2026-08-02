@@ -281,7 +281,7 @@ export function normalizeMonthData(year, month, payload) {
     schemaVersion: Number.isInteger(schemaVersion) && schemaVersion > 0 ? schemaVersion : base.schemaVersion,
     year: normalizedYear,
     month: normalizedMonth,
-    revision: Number.isFinite(revision) && revision >= 0 ? revision : base.revision,
+    revision: Number.isFinite(revision) && revision >= 0 ? Math.floor(revision) : base.revision,
     updatedAt: typeof source.updatedAt === 'string' || source.updatedAt === null ? source.updatedAt : base.updatedAt,
     days,
     absences: normalizePerStaffDateMap(source.absences, validDates),

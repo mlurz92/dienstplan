@@ -168,3 +168,23 @@ test('auch eine vollständige Belegschaft steht ohne Rollen gleichzeitig im Blic
   const box = await page.locator('#pickerDialog .picker-card').boundingBox();
   expect(box.height).toBeLessThanOrEqual(900);
 });
+
+test('ein aus einem Import übernommener Name wird im Kopf des Pickers benannt', async ({ page }) => {
+  await mockApi(page);
+  await page.route('**/api/month/2026/07', route => {
+    if (route.request().method() === 'PUT') return route.fulfill({ json: { ok: true } });
+    const payload = julyMonth();
+    payload.days['2026-07-05'].bd = 'extern:Dr. Fremd';
+    return route.fulfill({ json: { ok: true, month: payload } });
+  });
+  await page.goto('/');
+  await page.selectOption('#yearSelect', '2026');
+  await page.selectOption('#monthSelect', '7');
+  await expect(page.locator('#monthTitle')).toContainText('Juli 2026');
+
+  await openDay(page, 5).click();
+  // Fehlbild: Der Kopf meldete „Noch nicht besetzt“, obwohl der Tag belegt war
+  // und „Eintrag löschen“ gleichzeitig angeboten wurde.
+  await expect(page.locator('#pickerCurrent')).toContainText('Aktuell eingeteilt: Dr. Fremd');
+  await expect(page.locator('#clearAssignmentBtn')).toBeVisible();
+});

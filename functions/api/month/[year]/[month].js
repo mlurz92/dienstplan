@@ -1,5 +1,5 @@
 import {
-  ensureMonthShape, invalid, json, monthStorageKey, put, readJsonRequest, getOrInit, serverError
+  ensureMonthShape, invalid, json, kv, monthStorageKey, put, readJsonRequest, serverError
 } from '../../../_utils.js';
 
 export async function onRequestGet(context) {
@@ -13,8 +13,13 @@ export async function onRequestGet(context) {
     return invalid(error.message);
   }
   try {
-    const monthData = await getOrInit(context, key, empty);
-    return json({ ok: true, month: ensureMonthShape(year, month, monthData) });
+    // Lesen legt bewusst nichts an. Das Vorladen öffnet beim Monatswechsel bis
+    // zu dreizehn Monate; jeder unbekannte davon hätte sonst einen leeren
+    // Datensatz in den KV-Speicher geschrieben – Schreiblast und Einträge ohne
+    // jeden Inhalt. Gespeichert wird erst, wenn tatsächlich etwas eingetragen
+    // wurde, also beim PUT.
+    const stored = await kv(context).get(key, 'json');
+    return json({ ok: true, month: stored === null ? empty : ensureMonthShape(year, month, stored) });
   } catch (error) {
     return serverError(error);
   }
