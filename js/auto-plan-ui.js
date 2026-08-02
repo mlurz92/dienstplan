@@ -41,13 +41,16 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, character => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
 })[character]);
 
-function installStylesheet() {
-  if (document.querySelector('link[data-auto-plan-style]')) return;
-  const link = document.createElement('link');
-  link.rel = 'stylesheet';
-  link.href = `/auto-plan.css?v=${RELEASE}`;
-  link.dataset.autoPlanStyle = 'true';
-  document.head.append(link);
+function installStylesheets() {
+  const files = ['/auto-plan.css', '/auto-plan-review.css'];
+  for (const href of files) {
+    if (document.querySelector(`link[data-auto-plan-style="${href}"]`)) continue;
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = `${href}?v=${RELEASE}`;
+    link.dataset.autoPlanStyle = href;
+    document.head.append(link);
+  }
 }
 
 function createTrigger() {
@@ -61,7 +64,7 @@ function createTrigger() {
   button.type = 'button';
   button.id = 'autoPlanBtn';
   button.className = 'tool-action tool-action--accent auto-plan-trigger';
-  button.title = 'Alle noch offenen BD und HG regelkonform automatisch planen';
+  button.title = 'Alle noch offenen BD und HG fair und regelgebunden automatisch planen';
   button.setAttribute('aria-label', button.title);
   button.innerHTML = `${ICON}<span class="tool-label">Auto-Plan</span><span class="auto-plan-spark" aria-hidden="true"></span>`;
   actions.insertBefore(button, actions.children[1] || null);
@@ -76,7 +79,7 @@ function dialogTemplate() {
         <div>
           <div class="auto-plan-kicker">Constraint Intelligence · Globaler Monatslauf</div>
           <h2 id="autoPlanTitle">Auto-Plan Studio</h2>
-          <p id="autoPlanSubtitle">Regelkonforme Verteilung aller offenen BD und HG</p>
+          <p id="autoPlanSubtitle">Regelgebundene Verteilung aller offenen BD und HG</p>
         </div>
         <button type="button" class="auto-plan-close" id="autoPlanCloseBtn" aria-label="Auto-Plan schließen">✕</button>
       </header>
@@ -113,7 +116,7 @@ function dialogTemplate() {
           <div class="auto-plan-seal" id="autoPlanSeal"><span>✓</span></div>
           <div>
             <div class="auto-plan-kicker" id="autoPlanResultKicker">Optimierung abgeschlossen</div>
-            <h3 id="autoPlanResultTitle">Regelkonformer Vorschlag bereit</h3>
+            <h3 id="autoPlanResultTitle">Vorschlag bereit</h3>
             <p id="autoPlanResultText"></p>
           </div>
         </div>
@@ -128,9 +131,27 @@ function dialogTemplate() {
             <div class="auto-plan-load-table" id="autoPlanLoadTable"></div>
           </section>
         </div>
-        <div class="auto-plan-confirm-note" id="autoPlanConfirmNote">
-          Bestehende Einteilungen bleiben Fixpunkte. Erst „Vorschläge übernehmen“ schreibt die neuen BD/HG in den Monatsplan.
-        </div>
+
+        <section class="auto-plan-red-review" id="autoPlanRedReview" hidden aria-labelledby="autoPlanRedReviewTitle">
+          <div class="auto-plan-red-review-head">
+            <div>
+              <span>Bestätigungspflichtiger Fallback</span>
+              <h4 id="autoPlanRedReviewTitle">Rote Regelabweichungen einzeln prüfen</h4>
+            </div>
+            <strong id="autoPlanRedCount"></strong>
+          </div>
+          <div class="auto-plan-red-list" id="autoPlanRedList"></div>
+          <label class="auto-plan-comment-label" for="autoPlanOverrideComment">
+            Gemeinsamer Kommentar zur Entscheidung
+            <textarea id="autoPlanOverrideComment" rows="2" placeholder="Optionaler Grund für die bestätigte Minimal-Rot-Variante"></textarea>
+          </label>
+          <label class="auto-plan-confirm-red">
+            <input type="checkbox" id="autoPlanConfirmRed">
+            <span>Ich habe sämtliche oben aufgeführten roten Regelabweichungen geprüft und bestätige ihre gemeinsame Übernahme.</span>
+          </label>
+        </section>
+
+        <div class="auto-plan-confirm-note" id="autoPlanConfirmNote"></div>
       </section>
 
       <footer class="auto-plan-footer">
@@ -312,13 +333,16 @@ function updateProgress(update) {
 
 function resetDialog(monthData) {
   proposal = null;
-  dialog.classList.remove('show-result');
+  dialog.classList.remove('show-result', 'requires-confirmation');
   byId('autoPlanStage').hidden = false;
   byId('autoPlanResult').hidden = true;
   byId('autoPlanApplyBtn').hidden = true;
   byId('autoPlanApplyBtn').disabled = false;
   byId('autoPlanApplyBtn').textContent = 'Vorschläge übernehmen';
   byId('autoPlanCancelBtn').textContent = 'Abbrechen';
+  byId('autoPlanRedReview').hidden = true;
+  byId('autoPlanConfirmRed').checked = false;
+  byId('autoPlanOverrideComment').value = '';
   byId('autoPlanSubtitle').textContent = `${getMonthLabel(monthData.year, monthData.month)} · bestehende Einteilungen bleiben geschützt`;
   byId('autoPlanPercent').textContent = '0';
   byId('autoPlanMessage').textContent = 'Monatszustand wird vorbereitet …';
@@ -332,7 +356,7 @@ function resetDialog(monthData) {
 function planningStaffForResult(result) {
   const dates = Object.keys(result.plannedMonth.days || {}).sort();
   const unique = new Map();
-  for (const dateIso of [dates[0], dates[Math.floor(dates.length / 2)], dates.at(-1)].filter(Boolean)) {
+  for (const dateIso of dates) {
     for (const person of getPlanningStaff(state.staff, dateIso)) unique.set(person.id, person);
   }
   return [...unique.values()];
@@ -350,25 +374,54 @@ function loadRows(result) {
   }));
 }
 
+function renderRedReview(result) {
+  const review = byId('autoPlanRedReview');
+  const required = result.requiresConfirmation && result.redViolations.length > 0;
+  review.hidden = !required;
+  dialog.classList.toggle('requires-confirmation', required);
+  byId('autoPlanConfirmRed').checked = false;
+  byId('autoPlanOverrideComment').value = '';
+  if (!required) return;
+
+  byId('autoPlanRedCount').textContent = `${result.redViolations.length} rot`;
+  byId('autoPlanRedList').innerHTML = result.redViolations.map(violation => {
+    const person = getStaffById(state.staff, violation.staffId);
+    const type = violation.confirmationType === 'special' ? 'besondere Bestätigung' : 'Bestätigung';
+    return `<article class="auto-plan-red-item">
+      <div><time>${esc(weekdayLabel(violation.dateIso))}, ${esc(violation.dateIso)}</time><strong>${esc(violation.role.toUpperCase())} · ${esc(person?.short || assignmentLabel(state.staff, violation.staffId, { short: true }))}</strong></div>
+      <span>${esc(type)}</span>
+      <ul>${violation.reasons.map(reason => `<li>${esc(reason)}</li>`).join('')}</ul>
+    </article>`;
+  }).join('');
+}
+
 function renderResult(result) {
-  const success = result.success;
+  const complete = result.complete;
+  const confirmationRequired = result.requiresConfirmation;
   byId('autoPlanStage').hidden = true;
   byId('autoPlanResult').hidden = false;
   dialog.classList.add('show-result');
 
   const seal = byId('autoPlanSeal');
-  seal.classList.toggle('failed', !success);
-  seal.querySelector('span').textContent = success ? '✓' : '!';
-  byId('autoPlanResultKicker').textContent = success ? 'Optimierung abgeschlossen' : 'Vollständige Planung nicht möglich';
-  byId('autoPlanResultTitle').textContent = success
-    ? 'Regelkonformer Vorschlag bereit'
-    : 'Keine konfliktfreie Komplettbelegung gefunden';
-  byId('autoPlanResultText').textContent = success
-    ? `${result.changes.length} offene Felder wurden global optimiert. Vor der Übernahme bleibt der Monatsplan unverändert.`
-    : `${result.metrics.unfilled} Felder konnten ohne rote Regelverletzung nicht besetzt werden. Der Vorschlag wird nicht freigegeben.`;
+  seal.classList.toggle('failed', !complete);
+  seal.classList.toggle('warning', confirmationRequired);
+  seal.querySelector('span').textContent = !complete ? '!' : confirmationRequired ? '⚠' : '✓';
+  byId('autoPlanResultKicker').textContent = !complete
+    ? 'Planung blockiert'
+    : confirmationRequired ? 'Minimal-Rot-Fallback abgeschlossen' : 'Optimierung abgeschlossen';
+  byId('autoPlanResultTitle').textContent = !complete
+    ? 'Keine vollständige technisch wählbare Belegung'
+    : confirmationRequired
+      ? 'Vollständige Belegung mit roten Ausnahmen'
+      : 'Regelkonformer Vorschlag bereit';
+  byId('autoPlanResultText').textContent = !complete
+    ? `${result.metrics.unfilled} Felder konnten auch unter Nutzung bestätigbarer roter Abweichungen nicht besetzt werden.`
+    : confirmationRequired
+      ? `Eine vollständige Null-Rot-Variante wurde nicht gefunden. Die vorliegende Lösung minimiert rote Abweichungen und wird erst nach ihrer ausdrücklichen Gesamtbestätigung übernommen.`
+      : `${result.changes.length} offene Felder wurden ohne rote oder nicht überschreibbare Regelverletzung global optimiert.`;
 
   const cards = [
-    ['Regel-Audit', success ? '0 rot' : `${result.metrics.red} rot`, success ? 'verified' : 'failed'],
+    ['Regel-Audit', confirmationRequired ? `${result.metrics.red} rot` : complete ? '0 rot' : `${result.metrics.gray} gesperrt`, confirmationRequired ? 'warning' : complete ? 'verified' : 'failed'],
     ['Fairness', `${result.metrics.fairnessIndex}%`, 'fair'],
     ['Wünsche', `${result.metrics.wishesFulfilled}/${result.metrics.wishesPossible}`, 'wish'],
     ['Vorschläge', String(result.metrics.proposed), 'count'],
@@ -397,16 +450,24 @@ function renderResult(result) {
       <span>${row.beforeWeekend.toFixed(1)}<i>→</i><b>${row.afterWeekend.toFixed(1)}</b></span>
     </div>`).join('');
 
-  byId('autoPlanApplyBtn').hidden = !success || result.changes.length === 0;
-  byId('autoPlanCancelBtn').textContent = success ? 'Vorschläge verwerfen' : 'Schließen';
+  renderRedReview(result);
+  const apply = byId('autoPlanApplyBtn');
+  apply.hidden = !complete || result.changes.length === 0;
+  apply.disabled = confirmationRequired;
+  apply.textContent = confirmationRequired ? 'Rote Ausnahmen bestätigen und übernehmen' : 'Vorschläge übernehmen';
+  byId('autoPlanCancelBtn').textContent = complete ? 'Vorschläge verwerfen' : 'Schließen';
+
   const note = byId('autoPlanConfirmNote');
-  note.classList.toggle('failed', !success);
+  note.classList.toggle('failed', !complete);
+  note.classList.toggle('warning', confirmationRequired);
   note.classList.remove('accepted');
-  note.textContent = success
-    ? (result.changes.length
+  note.textContent = !complete
+    ? 'Es wurde nichts in den Monatsplan geschrieben. Nicht überschreibbare Sperren oder unauflösbare Fixpunktkonflikte verhindern die Komplettbelegung.'
+    : confirmationRequired
+      ? 'Der Monatsplan bleibt unverändert, bis die roten Abweichungen einzeln geprüft und über das Kontrollfeld ausdrücklich gemeinsam bestätigt wurden.'
+      : result.changes.length
         ? 'Bestehende Einteilungen bleiben Fixpunkte. Erst „Vorschläge übernehmen“ schreibt die neuen BD/HG in den Monatsplan.'
-        : 'Der Monat enthält keine offenen BD/HG-Felder. Es wurde nichts verändert.')
-    : 'Es wurde nichts in den Monatsplan geschrieben. Prüfe Abwesenheiten, harte Sperren oder bestehende Fixpunkte und starte Auto-Plan erneut.';
+        : 'Der Monat enthält keine offenen BD/HG-Felder. Es wurde nichts verändert.';
 }
 
 async function runPlanner() {
@@ -439,12 +500,16 @@ async function runPlanner() {
     if (error?.name === 'AbortError') return;
     proposal = {
       success: false,
+      complete: false,
+      requiresConfirmation: false,
+      status: 'blocked',
       changes: [],
+      redViolations: [],
       baseline: monthData,
       plannedMonth: monthData,
       audit: [],
       metrics: {
-        proposed: 0, unfilled: 0, red: 0, gray: 0, orange: 0, yellow: 0,
+        proposed: 0, unfilled: 0, red: 0, specialRed: 0, gray: 0, orange: 0, yellow: 0,
         wishesFulfilled: 0, wishesPossible: 0, fairnessIndex: 0
       }
     };
@@ -457,32 +522,49 @@ async function runPlanner() {
 }
 
 async function applyProposal() {
-  if (!proposal?.success || !proposal.changes.length) return;
+  if (!proposal?.success || !proposal.complete || !proposal.changes.length) return;
   const button = byId('autoPlanApplyBtn');
+  const confirmation = proposal.requiresConfirmation
+    ? {
+        accepted: byId('autoPlanConfirmRed').checked,
+        comment: byId('autoPlanOverrideComment').value.trim()
+      }
+    : null;
+
+  if (proposal.requiresConfirmation && !confirmation.accepted) {
+    byId('autoPlanConfirmNote').textContent = 'Die roten Regelabweichungen müssen vor der Übernahme ausdrücklich bestätigt werden.';
+    byId('autoPlanConfirmNote').classList.add('warning');
+    return;
+  }
+
   button.disabled = true;
-  button.textContent = 'Übernahme wird gesichert …';
+  button.textContent = 'Übernahme wird erneut geprüft und gesichert …';
 
   try {
     const current = getMonthData(proposal.year, proposal.month);
-    const merged = applyAutoPlanProposal(current, proposal);
+    const merged = applyAutoPlanProposal({ state, currentMonth: current, proposal, confirmation });
     setMonthData(proposal.year, proposal.month, merged, 'local');
     markMonthDirty(proposal.year, proposal.month);
     const saved = await persistMonth(proposal.year, proposal.month);
 
     button.textContent = saved.ok ? 'Übernommen und gespeichert' : 'Lokal übernommen · Server ausstehend';
     const note = byId('autoPlanConfirmNote');
-    note.classList.remove('failed');
+    note.classList.remove('failed', 'warning');
     note.classList.add('accepted');
     note.textContent = saved.ok
-      ? 'Auto-Plan wurde vollständig übernommen und zentral gespeichert.'
+      ? (proposal.requiresConfirmation
+          ? 'Auto-Plan und sämtliche bestätigten roten Ausnahmen wurden vollständig protokolliert und zentral gespeichert.'
+          : 'Auto-Plan wurde vollständig übernommen und zentral gespeichert.')
       : 'Auto-Plan wurde lokal übernommen. Die Serversynchronisierung wird nach Wiederherstellung der Verbindung nachgeholt.';
 
-    await new Promise(resolve => setTimeout(resolve, 420));
+    await new Promise(resolve => setTimeout(resolve, 520));
     dialog.close('applied');
     byId('reloadBtn')?.click();
   } catch (error) {
-    button.disabled = false;
-    button.textContent = 'Vorschläge übernehmen';
+    button.disabled = proposal.requiresConfirmation && !byId('autoPlanConfirmRed').checked;
+    button.textContent = proposal.requiresConfirmation
+      ? 'Rote Ausnahmen bestätigen und übernehmen'
+      : 'Vorschläge übernehmen';
     const note = byId('autoPlanConfirmNote');
     note.classList.add('failed');
     note.textContent = error?.message || 'Übernahme nicht möglich.';
@@ -501,6 +583,11 @@ function bind() {
   byId('autoPlanCloseBtn').addEventListener('click', closePlanner);
   byId('autoPlanCancelBtn').addEventListener('click', closePlanner);
   byId('autoPlanApplyBtn').addEventListener('click', applyProposal);
+  byId('autoPlanConfirmRed').addEventListener('change', event => {
+    if (!proposal?.requiresConfirmation) return;
+    byId('autoPlanApplyBtn').disabled = !event.currentTarget.checked;
+    byId('autoPlanConfirmNote').classList.toggle('confirmed-ready', event.currentTarget.checked);
+  });
   dialog.addEventListener('cancel', event => {
     event.preventDefault();
     closePlanner();
@@ -516,7 +603,7 @@ function bind() {
 
 function initialize() {
   if (installed) return;
-  installStylesheet();
+  installStylesheets();
   const attempt = () => {
     trigger = createTrigger();
     if (!trigger) {

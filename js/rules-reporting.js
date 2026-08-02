@@ -23,14 +23,26 @@ function matchingOverride(monthData, { dateIso, role, staffId, evaluation }) {
 function confirmedIssueDetails(evaluation, override) {
   const timestamp = override?.timestamp ? new Date(override.timestamp) : null;
   const validTimestamp = timestamp && !Number.isNaN(timestamp.getTime());
-  const confirmation = evaluation.meta?.confirmationType === 'special'
-    ? 'Besondere Bestätigung dokumentiert'
-    : 'Rote Planabweichung bestätigt';
+  const confirmation = override?.source === 'auto-plan'
+    ? (evaluation.meta?.confirmationType === 'special'
+        ? 'Besondere Auto-Plan-Ausnahme bestätigt'
+        : 'Rote Auto-Plan-Ausnahme bestätigt')
+    : (evaluation.meta?.confirmationType === 'special'
+        ? 'Besondere Bestätigung dokumentiert'
+        : 'Rote Planabweichung bestätigt');
   const dateText = validTimestamp
     ? ` am ${timestamp.toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })}`
     : '';
   const comment = String(override?.comment || '').trim();
   return `${confirmation}${dateText}${comment ? ` · Kommentar: ${comment}` : ''} · ${evaluation.reasons.join(' · ')}`;
+}
+
+function roleLabelForMonth(person, year, month) {
+  const firstIso = dayIso(year, month, 1);
+  const lastIso = dayIso(year, month, new Date(year, month, 0).getDate());
+  const first = getRoleProperties(person, firstIso).roleLabel || '';
+  const last = getRoleProperties(person, lastIso).roleLabel || first;
+  return first === last ? first : `${first} → ${last}`;
 }
 
 /**
@@ -129,7 +141,7 @@ export function buildStats(state, monthData) {
     .map(person => ({
       id: person.id,
       name: person.name,
-      roleLabel: getRoleProperties(person, dayIso(monthData.year, monthData.month, 15)).roleLabel,
+      roleLabel: roleLabelForMonth(person, monthData.year, monthData.month),
       bd: countRoleInMonth(monthData, person.id, 'bd'),
       hg: countRoleInMonth(monthData, person.id, 'hg'),
       weekendEq: Number(computeWeekendEquivalent(monthData, person.id).toFixed(1)),
