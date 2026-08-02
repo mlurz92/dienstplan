@@ -98,7 +98,9 @@ test('Werkzeugleiste ist semantisch gruppiert und das Farbbadge bleibt frei vom 
   await expect(toolbar).toBeVisible();
   await expect(toolbar.locator('.toolbar-section')).toHaveCount(3);
   await expect(toolbar.locator('.toolbar-section-label')).toHaveText(['Planung', 'Daten', 'Ausgabe']);
-  await expect(toolbar.locator('.toolbar-section .tool-action')).toHaveCount(10);
+  await expect(toolbar.locator('.toolbar-section .tool-action')).toHaveCount(11);
+  await expect(toolbar.locator('#autoPlanBtn')).toBeVisible();
+  await expect(toolbar.locator('#autoPlanBtn .tool-icon')).toHaveCount(1);
   // Die Überlauf-Schaltfläche gehört zur Leiste, aber zu keiner Gruppe.
   await expect(toolbar.locator('#toolbarOverflowBtn')).toHaveCount(1);
   await expect(page.locator('#todayBtn .tool-icon')).toHaveCount(1);
