@@ -164,7 +164,7 @@ const YEAR_MOODS = Object.freeze([
   ['Porzellan', -6, .045, -.030], ['Dämmerung', 14, -.060, .020], ['Frisch', -17, .035, .025],
   ['Metallisch', 7, -.035, -.020], ['Blüte', 20, .020, .040], ['Wald', -12, -.020, .015],
   ['Prisma', 28, .000, .045], ['Leinen', -3, .040, -.040], ['Atelier', 12, -.015, .025]
-].map(([name, hue, lightness, chroma]) => Object.freeze({ name, hue, lightness: lightness * .6, chroma: chroma * .5 })));
+].map(([name, hue, lightness, chroma]) => Object.freeze({ name, hue, lightness, chroma })));
 
 const SURFACE_MIX = Object.freeze({
   '--weekday-field-bg': .49,
@@ -187,10 +187,10 @@ const VARIABLE_NAMES = Object.freeze([
  * identischer Helligkeit**. Deshalb müssen jetzt drei Achsen gleichzeitig
  * auseinanderliegen: Gesamtabstand, Farbton und Helligkeit.
  */
-const MIN_NEIGHBOUR_DISTANCE = .075;
-const MIN_NEIGHBOUR_HUE = 38;
-const MIN_NEIGHBOUR_LIGHTNESS = .035;
-const MIN_ANNUAL_DISTANCE = .045;
+const MIN_NEIGHBOUR_DISTANCE = .12;
+const MIN_NEIGHBOUR_HUE = 42;
+const MIN_NEIGHBOUR_LIGHTNESS = .038;
+const MIN_ANNUAL_DISTANCE = .07;
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const positiveMod = (value, divisor) => ((value % divisor) + divisor) % divisor;
 const radians = degrees => degrees * Math.PI / 180;
@@ -262,28 +262,36 @@ export function oklchToRgb(L, C, h, alpha = 1) {
 }
 
 /**
- * Pastellfassung einer Trendfarbe.
+ * Arbeitsfassung einer Trendfarbe.
  *
- * Die recherchierten Originale reichen von `Primrose Pink` bis `Poseidon`. Für
- * die Arbeitsfläche werden sie in ein gemeinsames, helles Band gehoben und in
- * der Buntheit gedämpft: Der Farbton – das eigentlich Kennzeichnende – bleibt
- * dabei unverändert. Angezeigt wird damit die Pastellfassung genau dieser
- * Farbe, und genau so heißt sie auch.
+ * Die recherchierten Originale reichen von `Primrose Pink` bis `Poseidon`. Sie
+ * werden nicht mehr in ein blasses Pastellband gehoben, sondern in ihrer
+ * regulären Stärke übernommen: Der Farbton bleibt unverändert, die Buntheit
+ * bleibt erhalten, und die Helligkeit wird lediglich so weit geführt, dass die
+ * Fläche als Hintergrund tragfähig bleibt.
+ *
+ * Das Zielband ist bewusst weit: Von einem tiefen `Poseidon` bis zu einem
+ * lichten `Pale Banana` liegen über dreißig Helligkeitspunkte. Genau daraus
+ * entsteht das breitere Spektrum – nicht aus zusätzlichen Farbtönen, sondern
+ * aus der vollen Spanne, die jeder Ton tatsächlich besitzt.
  */
-const PASTEL_LIGHTNESS = Object.freeze({ min: .695, max: .895 });
+const TREND_LIGHTNESS = Object.freeze({ min: .555, max: .885 });
 const SOURCE_LIGHTNESS = Object.freeze({ min: .30, max: .93 });
-const PASTEL_CHROMA_MAX = .145;
+const TREND_CHROMA_MAX = .215;
 
-export function pastelize(color) {
+export function trendTone(color) {
   const [lightness, chroma, hue] = labToLch(rgbToOklab(color));
-  // Der Helligkeitsbereich der Originale wird als Ganzes in das Pastellband
-  // abgebildet. Die Reihenfolge bleibt damit erhalten: `Poseidon` ist auch als
-  // Pastellfassung der tiefere Ton, `Primrose Pink` der hellere.
+  // Der Helligkeitsbereich der Originale wird als Ganzes in das Arbeitsband
+  // abgebildet. Die Reihenfolge bleibt damit erhalten: `Poseidon` ist auch hier
+  // der tiefere Ton, `Primrose Pink` der hellere.
   const position = (clamp(lightness, SOURCE_LIGHTNESS.min, SOURCE_LIGHTNESS.max) - SOURCE_LIGHTNESS.min)
     / (SOURCE_LIGHTNESS.max - SOURCE_LIGHTNESS.min);
+  const target = TREND_LIGHTNESS.min + position * (TREND_LIGHTNESS.max - TREND_LIGHTNESS.min);
   return {
-    lightness: PASTEL_LIGHTNESS.min + position * (PASTEL_LIGHTNESS.max - PASTEL_LIGHTNESS.min),
-    chroma: clamp(chroma * .78, .045, PASTEL_CHROMA_MAX),
+    // Helle Töne werden nicht künstlich abgedunkelt: Liegt das Original bereits
+    // über dem Zielwert, behält es seine eigene Helligkeit.
+    lightness: clamp(Math.max(target, lightness * .82 + target * .18), TREND_LIGHTNESS.min, TREND_LIGHTNESS.max),
+    chroma: clamp(chroma * 1.06, .055, TREND_CHROMA_MAX),
     hue
   };
 }
@@ -300,7 +308,7 @@ const circularMean = angles => {
  * ist damit vollständig aus der Trendrecherche abgeleitet.
  */
 function corridorFromColors(colors) {
-  const tones = colors.map(([, hex]) => pastelize(parseHexColor(hex)));
+  const tones = colors.map(([, hex]) => trendTone(parseHexColor(hex)));
   const hues = tones.map(tone => degrees(tone.hue));
   const center = circularMean(hues);
   const spread = Math.max(...hues.map(hue => angularDistance(hue, center)));
@@ -315,11 +323,11 @@ function corridorFromColors(colors) {
     hue: center,
     // Enger Korridor: Nur so bleiben die Farbtonbereiche benachbarter Monate
     // getrennt. Die Vielfalt entsteht über Helligkeit, Buntheit und den Takt.
-    hueSpan: clamp(spread * 1.4, 30, 54),
+    hueSpan: clamp(spread * 1.5, 36, 64),
     lightness: average(lightnessValues),
-    lightnessSpan: clamp((Math.max(...lightnessValues) - Math.min(...lightnessValues)) * 1.1, .07, .15),
+    lightnessSpan: clamp((Math.max(...lightnessValues) - Math.min(...lightnessValues)) * 1.2, .12, .26),
     chroma: average(strongerHalf),
-    chromaSpan: clamp((Math.max(...chromaValues) - Math.min(...chromaValues)) * .9, .05, .10)
+    chromaSpan: clamp((Math.max(...chromaValues) - Math.min(...chromaValues)) * 1.0, .07, .16)
   };
 }
 
@@ -370,7 +378,7 @@ function hueSector(color) {
  */
 export const SPECTRUM_COLOR_ANCHORS = Object.freeze(MONTH_PROFILES.flatMap(profile =>
   profile.colors.map(([name, hex]) => {
-    const tone = pastelize(parseHexColor(hex));
+    const tone = trendTone(parseHexColor(hex));
     return Object.freeze({
       name,
       hex,
@@ -449,14 +457,19 @@ function candidateFor(profile, cycleIndex, phase) {
   );
   const hue = radians(hueDegrees);
   const lightness = clamp(
-    clamp(profile.lightness + lightnessNoise + mood.lightness + lightnessLane * .045,
-      profile.lightness - .07, profile.lightness + .07),
-    .68, .92
+    clamp(profile.lightness + lightnessNoise + mood.lightness + lightnessLane * .085,
+      profile.lightness - .13, profile.lightness + .13),
+    .545, .905
   );
+  // Die zulässige Buntheit hängt von der Helligkeit ab. Ohne diese Kopplung
+  // kippen sehr helle Töne bei voller Buntheit ins Neon – ein Ton, den keine
+  // der recherchierten Trendfarben trägt. Tiefe Töne dürfen dagegen ihre volle
+  // Sättigung behalten, dort liegt der kräftige Teil des Spektrums.
+  const chromaCeiling = .195 - Math.max(0, lightness - .78) * .80;
   const chroma = clamp(
-    clamp(profile.chroma + chromaNoise + mood.chroma * .6 + chromaLane * .028,
-      profile.chroma - .03, profile.chroma + .04),
-    .028, .135
+    clamp(profile.chroma + chromaNoise + mood.chroma * .6 + chromaLane * .050,
+      profile.chroma - .055, profile.chroma + .065),
+    .052, chromaCeiling
   );
   const accent = oklchToRgb(lightness, chroma, hue);
   const [actualLightness, actualChromaRaw, actualHue] = labToLch(rgbToOklab(accent));

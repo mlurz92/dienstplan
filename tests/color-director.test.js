@@ -9,7 +9,7 @@ import {
   SPECTRUM_REFERENCE_YEAR,
   colorProfileForDate,
   describeColor,
-  pastelize,
+  trendTone,
   perceptualDistance,
   rgbToOklab,
   spectrumVariables
@@ -52,9 +52,9 @@ test('every year uses a visibly broad spectrum instead of twelve muted neighbour
       const [, a, b] = rgbToOklab(palette.accent);
       return Math.hypot(a, b);
     });
-    assert.ok(sectors.size >= 8, `${year}: nur ${sectors.size} verschiedene 30°-Farbsektoren`);
-    assert.ok(Math.max(...lightnesses) - Math.min(...lightnesses) >= .075, `${year}: zu geringe Helligkeitsdynamik`);
-    assert.ok(Math.max(...chromas) - Math.min(...chromas) >= .055, `${year}: zu geringe Chromadynamik`);
+    assert.ok(sectors.size >= 9, `${year}: nur ${sectors.size} verschiedene 30°-Farbsektoren`);
+    assert.ok(Math.max(...lightnesses) - Math.min(...lightnesses) >= .24, `${year}: zu geringe Helligkeitsdynamik`);
+    assert.ok(Math.max(...chromas) - Math.min(...chromas) >= .08, `${year}: zu geringe Chromadynamik`);
   }
 });
 
@@ -73,11 +73,9 @@ test('benachbarte Monate liegen auf drei Achsen gleichzeitig auseinander', () =>
     minimumHue = Math.min(minimumHue, angularDistance(hueDegrees(previous.accent), hueDegrees(current.accent)));
     minimumLightness = Math.min(minimumLightness, Math.abs(previous.lightness - current.lightness));
   }
-  // Der Gesamtabstand fällt im Pastellband naturgemäß kleiner aus als bei
-  // kräftigen Tönen; die wahrnehmbare Trennung tragen Farbton und Helligkeit.
-  assert.ok(minimumDistance >= .095, `minimaler Abstand benachbarter Monate nur ${minimumDistance.toFixed(3)}`);
-  assert.ok(minimumHue >= 38, `minimaler Farbtonabstand benachbarter Monate nur ${minimumHue.toFixed(0)}°`);
-  assert.ok(minimumLightness >= .034, `minimaler Helligkeitsabstand benachbarter Monate nur ${minimumLightness.toFixed(3)}`);
+  assert.ok(minimumDistance >= .14, `minimaler Abstand benachbarter Monate nur ${minimumDistance.toFixed(3)}`);
+  assert.ok(minimumHue >= 42, `minimaler Farbtonabstand benachbarter Monate nur ${minimumHue.toFixed(0)}°`);
+  assert.ok(minimumLightness >= .038, `minimaler Helligkeitsabstand benachbarter Monate nur ${minimumLightness.toFixed(3)}`);
 });
 
 test('derselbe Monat bleibt auch von Jahr zu Jahr unterscheidbar', () => {
@@ -89,7 +87,7 @@ test('derselbe Monat bleibt auch von Jahr zu Jahr unterscheidbar', () => {
       minimumAnnual = Math.min(minimumAnnual, perceptualDistance(accents[index - 1], accents[index]));
     }
   }
-  assert.ok(minimumAnnual >= .04, `minimaler Abstand desselben Monats in Folgejahren nur ${minimumAnnual.toFixed(3)}`);
+  assert.ok(minimumAnnual >= .09, `minimaler Abstand desselben Monats in Folgejahren nur ${minimumAnnual.toFixed(3)}`);
 });
 
 test('der Takt wechselt zwischen hellen und tieferen Monaten', () => {
@@ -103,11 +101,25 @@ test('der Takt wechselt zwischen hellen und tieferen Monaten', () => {
   }
 });
 
-test('alle Monatsfarben bleiben im pastelligen Bereich', () => {
+test('die Monatsfarben sind reguläre Trendfarben, kein blasses Pastell', () => {
+  // Rückmeldung zur Pastellfassung: „etwas zu blass“. Die Farben tragen jetzt
+  // ihre reguläre Stärke – das Band bleibt aber begrenzt, damit die Fläche als
+  // Hintergrund tragfähig ist und sehr helle Töne nicht ins Neon kippen.
   for (const palette of SPECTRUM_PALETTES) {
-    assert.ok(palette.lightness >= .68, `${palette.key} ${palette.name}: zu dunkel (${palette.lightness.toFixed(3)})`);
-    assert.ok(palette.chroma <= .15, `${palette.key} ${palette.name}: zu bunt (${palette.chroma.toFixed(3)})`);
+    assert.ok(palette.lightness >= .54 && palette.lightness <= .91,
+      `${palette.key} ${palette.name}: außerhalb des Arbeitsbands (${palette.lightness.toFixed(3)})`);
+    assert.ok(palette.chroma <= .20, `${palette.key} ${palette.name}: zu bunt (${palette.chroma.toFixed(3)})`);
+    const ceiling = .195 - Math.max(0, palette.lightness - .78) * .80;
+    assert.ok(palette.chroma <= ceiling + .002,
+      `${palette.key} ${palette.name}: heller Ton mit Neonbuntheit (${palette.chroma.toFixed(3)})`);
   }
+
+  // Und die Palette schöpft dieses Band auch tatsächlich aus: Sie enthält
+  // kräftig gesättigte und deutlich tiefe Töne, nicht nur helle Mitteltöne.
+  assert.ok(SPECTRUM_PALETTES.filter(palette => palette.chroma >= .15).length >= 48,
+    'zu wenige kräftig gesättigte Monate');
+  assert.ok(SPECTRUM_PALETTES.filter(palette => palette.lightness <= .62).length >= 48,
+    'zu wenige tiefe Monate');
 });
 
 test('the same calendar month explores many distinct looks across the cycle', () => {
@@ -162,20 +174,20 @@ test('jede angezeigte Farbe trägt den Namen einer recherchierten Trendfarbe 202
   assert.ok(shown.size >= 40, `nur ${shown.size} verschiedene Trendfarben werden im Zyklus tatsächlich gezeigt`);
 });
 
-test('die Anker sind die Pastellfassung ihrer Originalfarbe', () => {
+test('die Anker sind die Arbeitsfassung ihrer Originalfarbe', () => {
   for (const anchor of SPECTRUM_COLOR_ANCHORS) {
     assert.match(anchor.hex, /^#[0-9a-f]{6}$/, `${anchor.name}: kein Originalwert hinterlegt`);
-    const original = pastelize([
+    const original = trendTone([
       parseInt(anchor.hex.slice(1, 3), 16),
       parseInt(anchor.hex.slice(3, 5), 16),
       parseInt(anchor.hex.slice(5, 7), 16),
       1
     ]);
-    // Der Farbton – das Kennzeichnende – bleibt unverändert; gehoben werden
-    // ausschließlich Helligkeit und gedämpfte Buntheit.
+    // Der Farbton – das Kennzeichnende – bleibt unverändert; geführt wird
+    // ausschließlich die Helligkeit, die Buntheit bleibt in voller Stärke.
     assert.ok(Math.abs(anchor.lightness - original.lightness) < 1e-9);
-    assert.ok(anchor.lightness >= .69 && anchor.lightness <= .90, `${anchor.name}: außerhalb des Pastellbands`);
-    assert.ok(anchor.chroma <= .145, `${anchor.name}: zu bunt für das Pastellband`);
+    assert.ok(anchor.lightness >= .55 && anchor.lightness <= .89, `${anchor.name}: außerhalb des Arbeitsbands`);
+    assert.ok(anchor.chroma <= .215, `${anchor.name}: zu bunt für die Arbeitsfläche`);
   }
 });
 

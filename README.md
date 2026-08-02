@@ -8,7 +8,7 @@
 
 > **Release-Token:** `20260801.11`  
 > **Farbarchitektur:** Seasonal Spectrum Director mit **288 deterministischen Spektrumprofilen**  
-> **Monatsfarben:** Pastellfassungen recherchierter Trendfarben 2026, Nachbarmonate auf drei Achsen getrennt  
+> **Monatsfarben:** reguläre recherchierte Trendfarben 2026 in voller Stärke, Nachbarmonate auf drei Achsen getrennt  
 > **Monatswechsel:** flüssige, richtungsabhängige High-Framerate-Transition mit durchgehendem OKLCH-Farbverlauf  
 > **Bedienung:** kompakte Icon-Werkzeugleiste · tastaturgeführter, nach Eignung sortierter Dienst-Picker  
 > **Paketversion:** `0.2.0` · **Feiertagsregion:** Sachsen (`SN`)  
@@ -344,7 +344,9 @@ Die hinterlegten Hexwerte sind die veröffentlichten sRGB-Näherungen dieser Far
 | November | Mineral · Sturm | 268° | Vapor Blue, Underworld, Future Dusk, Silhouette, Crown Blue, Evening Blue, Rhodonite, Retro Blue |
 | Dezember | Immergrün · Festlicht | 176° | Neptune Green, Satin Lagoon, Transformative Teal, Hidden Gem, Shale Green, Sycamore, Midnight Garden, Alexandrite |
 
-**Pastellfassung statt Originalton.** Die Originale reichen von `Primrose Pink` bis `Poseidon`. Für eine Arbeitsfläche, auf die man stundenlang schaut, werden sie als Ganzes in ein helles Band gehoben (OKLCH-Helligkeit 0,695–0,895) und in der Buntheit gedämpft (höchstens 0,145). Der **Farbton bleibt unverändert** – das Kennzeichnende der Farbe. Die Reihenfolge bleibt ebenfalls erhalten: `Poseidon` ist auch als Pastellfassung der tiefere Ton, `Primrose Pink` der hellere.
+**Reguläre Trendfarben, kein Pastell.** Eine frühere Fassung hob die Anker in ein helles Pastellband – das Ergebnis wirkte blass. Die Farben tragen deshalb jetzt ihre **reguläre Stärke**: Der Farbton bleibt unverändert, die Buntheit bleibt erhalten (bis 0,215 beim Anker, bis 0,195 auf der Fläche), und lediglich die Helligkeit wird in ein tragfähiges Arbeitsband geführt (OKLCH 0,555–0,885). Helle Originale werden dabei nicht künstlich abgedunkelt. Die Reihenfolge bleibt erhalten: `Poseidon` ist der tiefe Ton, `Primrose Pink` der lichte.
+
+**Weiteres Spektrum.** Das nutzbare Band ist gegenüber der Pastellfassung deutlich gewachsen – von 0,20 auf 0,36 Helligkeitspunkte und von 0,10 auf 0,14 Buntheitspunkte. Jedes Jahr überstreicht damit mindestens 0,24 Helligkeit, 0,08 Buntheit und neun der zwölf 30°-Farbsektoren. Damit sehr helle Töne nicht ins Neon kippen, ist die zulässige Buntheit an die Helligkeit gekoppelt: Oberhalb von 0,78 sinkt die Obergrenze linear (0,195 − 0,80 · (L − 0,78)). Tiefe Töne behalten ihre volle Sättigung – dort liegt der kräftige Teil des Spektrums.
 
 **Englische Originalnamen.** Das Badge nennt die Farbe so, wie sie in der Saisonpalette heißt: „Monatskontrast · Neptune Green“. Ein Name ist eine Bezeichnung, keine Beschreibung – er wird deshalb nicht übersetzt. Ein Test stellt sicher, dass jeder angezeigte Name tatsächlich aus der Recherche stammt.
 
@@ -369,13 +371,13 @@ Verbindliche Mindestabstände. Der reine OKLab-Abstand genügt dafür nicht: Zwe
 
 | Beziehung | Achse | Mindestabstand | tatsächlich erreicht |
 |---|---|---|---|
-| aufeinanderfolgende Kalendermonate | OKLab-Gesamtabstand | 0,095 | 0,097 |
-| aufeinanderfolgende Kalendermonate | Farbton | 38° | 40° |
-| aufeinanderfolgende Kalendermonate | Helligkeit | 0,034 | 0,035 |
-| derselbe Monat in Folgejahren | OKLab-Gesamtabstand | 0,040 | 0,044 |
+| aufeinanderfolgende Kalendermonate | OKLab-Gesamtabstand | 0,120 | 0,153 |
+| aufeinanderfolgende Kalendermonate | Farbton | 42° | 45° |
+| aufeinanderfolgende Kalendermonate | Helligkeit | 0,038 | 0,040 |
+| derselbe Monat in Folgejahren | OKLab-Gesamtabstand | 0,070 | 0,098 |
 | gleicher Farbname | Abstand in Monaten | 12 | 14 |
 
-Der Gesamtabstand fällt im Pastellband naturgemäß kleiner aus als bei kräftigen Tönen; die wahrnehmbare Trennung tragen dort Farbton und Helligkeit.
+Mit den regulären Trendfarben liegt der erreichte Gesamtabstand deutlich über der Pastellfassung: 0,153 statt 0,097. Farbton und Helligkeit bleiben trotzdem eigene Zusagen – ein Abstand, der allein über die Buntheit entsteht, liest sich als „dieselbe Farbe, nur kräftiger“.
 
 Zusätzlich darf jeder sRGB-Wert im gesamten Zyklus nur ein einziges Mal vorkommen. Kandidaten, die nach der Gamut-Begrenzung auf einen bereits vergebenen Wert fallen, scheiden aus.
 
@@ -394,16 +396,16 @@ Eigenschaften:
 
 ### 4.4 Farbnamen aus dem tatsächlichen Farbwert
 
-Der angezeigte Name wird **nicht** aus einer Reihenfolge gezogen, sondern aus dem tatsächlich gewählten OKLCH-Wert bestimmt. Jeder Monat besitzt ein Lexikon aus zwölf Farbankern. Ein Anker beschreibt einen Farbton sowie einen Helligkeits- und Buntheitscharakter, zum Beispiel `Gletscherblau` als hellen, leuchtenden Ton bei 232° oder `Stahlblau` als tiefen, gedämpften Ton bei derselben Lage.
+Der angezeigte Name wird **nicht** aus einer Reihenfolge gezogen, sondern aus dem tatsächlich gewählten OKLCH-Wert bestimmt. Jeder Monat besitzt ein Lexikon aus acht Farbankern; benannt wird über alle 96 Anker hinweg. Ein Anker beschreibt einen Farbton sowie einen Helligkeits- und Buntheitscharakter, zum Beispiel `Blue Aura` als hellen Ton bei 253° oder `Poseidon` als tiefen Ton bei derselben Lage.
 
 Bewertet werden Farbtonabstand, Helligkeit und Buntheit. Der nächstgelegene Anker benennt die Farbe; Anker des eigenen Monats werden bevorzugt. Dadurch kann das Badge nie einen Namen zeigen, der nicht zum sichtbaren Ton gehört. Ein automatischer Test prüft diese Zusage für alle 288 Profile.
 
-Die Anker sind die Pastellfassungen der recherchierten Trendfarben (Abschnitt 4.2). Verglichen wird im selben Farbraum, in dem auch die Fläche entsteht – Name und Ton können deshalb nicht auseinanderlaufen.
+Die Anker sind die Arbeitsfassungen der recherchierten Trendfarben (Abschnitt 4.2). Verglichen wird im selben Farbraum, in dem auch die Fläche entsteht – Name und Ton können deshalb nicht auseinanderlaufen.
 
 Das Badge zeigt weiterhin nur den Farbnamen:
 
 ```text
-Monatskontrast · Polarviolett
+Monatskontrast · Marina
 ```
 
 Der Tooltip ergänzt Saison, Spektralfamilie, **Tonbeschreibung**, Jahrescharakter und Jahr:
@@ -427,7 +429,7 @@ Am Wurzelelement werden unter anderem folgende Datenattribute gesetzt:
 
 Das App-Icon ist eine **Kalendertabelle ohne Schrift**: Binderringe, ein Spektrumkopf, sieben Spaltenmarken und ein Raster aus 7 × 5 Feldern.
 
-- die Feldfarben sind keine Dekoration, sondern die **zwölf tatsächlichen Monatsakzente** des Referenzjahres 2026, erzeugt aus demselben Modul wie die Oberfläche;
+- die Feldfarben sind keine Dekoration, sondern die **zwölf tatsächlichen Monatsakzente** des Referenzjahres 2026, erzeugt aus demselben Modul wie die Oberfläche – aktuell Marina, Primrose Pink, Green Envy, Orchid Bloom, Palm, Jelly Mint, Poppy Red, Pale Banana, Festival Fuchsia, Candied Ginger, Crown Blue und Neptune Green;
 - die Kopfleiste zeigt alle zwölf Farben als durchgehenden Verlauf;
 - Wochenendspalten und einzelne belegte Dienstfelder sind kräftiger gesetzt und geben dem Raster den Rhythmus eines Dienstplans;
 - `icons/icon-animated.svg` lässt die Felder zeitversetzt durch alle zwölf Monatsfarben wandern; bei `prefers-reduced-motion: reduce` steht die Bewegung still;
@@ -702,7 +704,7 @@ Aktuell umfasst die Suite **216 Unit- und Regressionstests**. Geprüft werden un
 - Gruppierung, Rangfolge und Tippfilter des Dienst-Pickers;
 - die Regressionen des Bughunts (Abschnitt 13.4);
 - das Hauptthread-Budget des Monatswechsels (Abschnitt 3.8);
-- Pastellbereich, Dreiachsen-Trennung und Helligkeitstakt der Monatsfarben;
+- Arbeitsband, Neonschranke, Dreiachsen-Trennung und Helligkeitstakt der Monatsfarben;
 - Herkunft jedes Farbnamens aus der Trendrecherche und die Zwölfmonatssperre gegen Wiederholungen.
 
 ### 13.2 End-to-End
