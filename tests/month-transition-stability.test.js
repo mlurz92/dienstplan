@@ -6,6 +6,8 @@ const stability = await readFile(new URL('../js/month-transition-stability.js', 
 const colorDirector = await readFile(new URL('../js/color-director.js', import.meta.url), 'utf8');
 const controls = await readFile(new URL('../controls.css', import.meta.url), 'utf8');
 const uiControls = await readFile(new URL('../js/ui-controls.js', import.meta.url), 'utf8');
+const theme = await readFile(new URL('../js/theme.js', import.meta.url), 'utf8');
+const transitions = await readFile(new URL('../transitions.css', import.meta.url), 'utf8');
 const packageJson = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
 
 test('month transition stability is loaded after the spectrum director', () => {
@@ -15,25 +17,30 @@ test('month transition stability is loaded after the spectrum director', () => {
   assert.ok(stabilityImport > spectrumImport, 'die Stabilisierung muss den Director nachgelagert abschließen');
 });
 
-test('automatic director updates are atomic while explicit API calls may still animate', () => {
+test('director updates run as one continuous transition instead of a hard write', () => {
   const initializer = colorDirector.slice(colorDirector.indexOf('function initializeColorDirector()'));
   assert.match(initializer, /const update = \(\) => \{/);
-  assert.match(initializer, /applySpectrumProfile\(year, month, \{ animate: false \}\)/);
+  assert.match(initializer, /applySpectrumProfile\(year, month, \{ animate: true \}\)/);
   assert.match(initializer, /new MutationObserver\(update\)/);
   assert.match(initializer, /monthSelect'\)\?\.addEventListener\('change', update\)/);
   assert.match(initializer, /yearSelect'\)\?\.addEventListener\('change', update\)/);
-  assert.doesNotMatch(initializer, /update\(\{ animate: true \}\)/);
   assert.match(colorDirector, /export function applySpectrumProfile\(year, month, \{ animate = true \} = \{\}\)/);
 });
 
-test('every synchronization cancels the base animation before writing the final spectrum', () => {
+test('a running transition towards the same month is never restarted', () => {
+  assert.match(colorDirector, /if \(animate && animatingKey === palette\.key && animationHandle !== null\) return palette;/);
+  assert.match(colorDirector, /animatingKey = palette\.key;/);
+  assert.match(colorDirector, /animatingKey = null;/);
+});
+
+test('every synchronization ends the base animation and hands the colour to the director', () => {
   assert.match(stability, /import \{ applyMonthTheme \} from '.\/theme\.js\?v=20260801\.11';/);
   assert.match(stability, /applyMonthTheme\(month, \{ animate: false, year \}\);/);
-  assert.match(stability, /applySpectrumProfile\(year, month, \{ animate: false \}\)/);
+  assert.match(stability, /applySpectrumProfile\(year, month, \{ animate: true \}\)/);
 
   const baseCall = stability.indexOf('applyMonthTheme(month, { animate: false, year });');
-  const spectrumCall = stability.indexOf('applySpectrumProfile(year, month, { animate: false });');
-  assert.ok(baseCall >= 0 && spectrumCall > baseCall, 'Basistheme muss vor dem priorisierten Spektrum abgeschlossen werden');
+  const spectrumCall = stability.indexOf('applySpectrumProfile(year, month, { animate: true });');
+  assert.ok(baseCall >= 0 && spectrumCall > baseCall, 'Basistheme muss vor dem priorisierten Spektrumverlauf abgeschlossen werden');
 
   assert.match(stability, /monthSelect'\)\?\.addEventListener\('change', settleMonthSpectrum\)/);
   assert.match(stability, /yearSelect'\)\?\.addEventListener\('change', settleMonthSpectrum\)/);
@@ -68,4 +75,14 @@ test('legacy month-enter classes can no longer hide the freshly rendered table',
 
 test('syntax verification covers the stability module', () => {
   assert.match(packageJson.scripts.check, /js\/month-transition-stability\.js/);
+});
+
+test('the base theme never overwrites the badge while the director is active', () => {
+  assert.match(theme, /root\.dataset\.colorDirector \? null : document\.getElementById\('monthPaletteLabel'\)/);
+});
+
+test('the spectrum sweep only animates compositor properties', () => {
+  assert.match(colorDirector, /sweep\.animate\(\[/);
+  assert.match(transitions, /\.month-spectrum-sweep \{[^}]*will-change: opacity, transform;/s);
+  assert.match(transitions, /prefers-reduced-motion: reduce\)[^}]*\{[\s\S]*?\.month-spectrum-sweep \{ display: none !important; \}/);
 });

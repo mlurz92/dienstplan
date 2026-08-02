@@ -106,6 +106,12 @@ test('native Monatsanimation bleibt durchgehend gefüllt und lädt den Zielmonat
   expect(transitionFrames.every(frame => frame.direction === 'forward')).toBe(true);
   expect(transitionFrames.every(frame => frame.fallbackSnapshots === 0)).toBe(true);
   expect(targetFrames.length).toBeGreaterThan(8);
-  expect(new Set(targetFrames.map(frame => frame.accent)).size).toBe(1);
+
+  // Die Monatsfarbe läuft als Verlauf mit, ohne dass ein Frame ohne Farbe
+  // gezeichnet wird, und steht am Ende exakt auf dem Zielprofil.
+  expect(targetFrames.every(frame => /^rgba?\(/.test(frame.accent))).toBe(true);
+  const finalAccent = await page.evaluate(() =>
+    getComputedStyle(document.documentElement).getPropertyValue('--month-accent').trim());
+  expect(targetFrames.at(-1).accent).toBe(finalAccent);
   expect(novemberRequests).toBe(1);
 });

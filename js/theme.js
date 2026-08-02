@@ -389,7 +389,10 @@ export function applyMonthTheme(month, { animate = true, year } = {}) {
     root.dataset.palette = palette.name;
     root.dataset.paletteEdition = palette.edition;
     activeThemeKey = palette.key;
-    const label = document.getElementById('monthPaletteLabel');
+    // Sobald der Seasonal Spectrum Director aktiv ist, gehört das Badge ihm.
+    // Das Basistheme würde sonst kurzzeitig einen Namen anzeigen, der nicht zur
+    // sichtbaren Farbe gehört.
+    const label = root.dataset.colorDirector ? null : document.getElementById('monthPaletteLabel');
     if (label) {
       label.textContent = `Monatskontrast · ${palette.name}`;
       label.title = `${palette.season} · ${palette.family} · Edition ${palette.edition} · ${themeYear}`;

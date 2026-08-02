@@ -42,7 +42,7 @@ async function mockApi(page) {
   });
 }
 
-test('Monatswechsel bleibt in jedem gezeichneten Frame sichtbar und farbstabil', async ({ page }) => {
+test('Monatswechsel bleibt sichtbar und läuft als flüssiger Farbverlauf', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await mockApi(page);
   await page.goto('/');
@@ -76,7 +76,7 @@ test('Monatswechsel bleibt in jedem gezeichneten Frame sichtbar und farbstabil',
   await page.selectOption('#monthSelect', '2');
   await expect(page.locator('html')).toHaveAttribute('data-spectrum-key', '2026-02');
   await expect(page.locator('#monthTitle')).toContainText('Februar 2026');
-  await page.waitForTimeout(760);
+  await page.waitForTimeout(1800);
 
   const frames = await page.evaluate(() => {
     window.__monthTransitionCapture = false;
@@ -85,12 +85,30 @@ test('Monatswechsel bleibt in jedem gezeichneten Frame sichtbar und farbstabil',
 
   const targetFrames = frames.filter(frame => frame.key === '2026-02' && frame.title.includes('Februar 2026'));
   expect(targetFrames.length).toBeGreaterThan(8);
+
+  // Der Inhalt bleibt während des gesamten Wechsels vollständig sichtbar.
   expect(targetFrames.every(frame => frame.opacity === 1)).toBe(true);
   expect(targetFrames.every(frame => frame.display !== 'none')).toBe(true);
   expect(targetFrames.every(frame => frame.rows === 28)).toBe(true);
-  expect(new Set(targetFrames.map(frame => frame.accent)).size).toBe(1);
+
+  // Das Badge nennt von der ersten Sekunde an den Zielmonat und wechselt nicht
+  // mehrfach hin und her.
   expect(new Set(targetFrames.map(frame => frame.badge)).size).toBe(1);
   expect(targetFrames[0].badge).toMatch(/^Monatskontrast · /);
 
-  await expect(page.locator('html')).toHaveAttribute('data-month-transition', 'atomic-spectrum-v1');
+  // Die Farbe läuft als kontinuierlicher Verlauf mit echten Zwischenschritten
+  // und endet exakt auf dem Zielprofil.
+  const accents = targetFrames.map(frame => frame.accent);
+  const startAccent = frames.find(frame => frame.key === '2026-01')?.accent;
+  const finalAccent = await page.evaluate(() =>
+    getComputedStyle(document.documentElement).getPropertyValue('--month-accent').trim());
+  expect(startAccent).toBeTruthy();
+  expect(accents.at(-1)).toBe(finalAccent);
+  expect(new Set(accents).size).toBeGreaterThan(3);
+
+  const intermediates = accents.filter(accent => accent !== startAccent && accent !== finalAccent);
+  expect(intermediates.length).toBeGreaterThan(2);
+
+  await expect(page.locator('html')).toHaveAttribute('data-month-transition', 'fluid-spectrum-v1');
+  await expect(page.locator('html')).toHaveAttribute('data-spectrum-motion', 'settled');
 });

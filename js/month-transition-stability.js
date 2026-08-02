@@ -2,22 +2,26 @@ import { applyMonthTheme } from './theme.js?v=20260801.11';
 import { applySpectrumProfile } from './color-director.js?v=20260801.11';
 
 /**
- * Stabilisiert den sichtbaren Monatswechsel als atomaren UI-Schritt.
+ * Führt die konkurrierenden Farbsignale eines Monatswechsels zu genau einem
+ * flüssigen Verlauf zusammen.
  *
- * app.js rendert den neuen Monat sofort und startet historisch zusätzlich einen
- * rAF-Verlauf des Basisthemes. Der Seasonal Spectrum Director schreibt dieselben
- * CSS-Variablen mit dem endgültigen Spektrumprofil. Ohne Koordination können
- * deshalb Basistheme, Spektrum und Inhaltsanimation nacheinander sichtbar werden.
+ * app.js rendert den neuen Monat sofort und startet zusätzlich einen eigenen
+ * rAF-Verlauf des Basisthemes. Der Seasonal Spectrum Director beschreibt
+ * dieselben CSS-Variablen. Ohne Koordination würden beide Pfade nacheinander
+ * sichtbar und der Wechsel wirkte sprunghaft.
  *
- * Dieses Modul beendet beide Farbpfade synchron: Zuerst wird das Basistheme ohne
- * Animation auf den Zielmonat gesetzt. Dadurch wird dessen privater rAF-Handle
- * abgebrochen. Unmittelbar danach schreibt der Spectrum Director ebenfalls ohne
- * Animation den endgültigen, priorisierten Zielzustand. Zwischen diesen beiden
- * synchronen Schritten kann der Browser keinen Frame zeichnen.
+ * Reihenfolge pro Wechsel:
+ * 1. Das Basistheme wird ohne eigene Animation gesetzt. Damit endet dessen
+ *    privater rAF-Handle sofort und es entsteht kein zweiter Verlauf.
+ * 2. Der Spectrum Director übernimmt als alleiniger Eigentümer der sichtbaren
+ *    Farbe und interpoliert in OKLCH bis zum Zielprofil. Er schreibt mit
+ *    `important` und gewinnt dadurch in jedem Frame gegen das Basistheme.
  *
- * Eine kurze Paint-Barriere wiederholt denselben Abschluss über wenige Frames.
- * Die idempotente Monatsschlüssel-Sperre verhindert dabei, dass die vom Modul
- * selbst gesetzten data-month-/data-year-Attribute den Observer erneut auslösen.
+ * Eine kurze Paint-Barriere wiederholt diesen Abschluss über wenige Frames.
+ * Sie kann den Verlauf nicht neu starten: Der Director erkennt ein bereits
+ * laufendes Ziel und bleibt in diesem Fall wirkungslos. Die idempotente
+ * Monatsschlüssel-Sperre verhindert zusätzlich, dass die selbst gesetzten
+ * data-month-/data-year-Attribute den Observer erneut auslösen.
  */
 
 const PAINT_GUARD_FRAMES = 4;
@@ -43,14 +47,15 @@ function writeFinalSpectrum() {
   const date = selectedDate();
   const { year, month } = date;
 
-  // Wichtig: Reihenfolge beibehalten. Der atomare Basistheme-Aufruf beendet
-  // dessen eventuell laufende rAF-Interpolation; anschließend besitzt das
-  // Spektrumprofil als letzter synchroner Schreibvorgang die sichtbare Priorität.
+  // Wichtig: Reihenfolge beibehalten. Der animationsfreie Basistheme-Aufruf
+  // beendet dessen eventuell laufende rAF-Interpolation; anschließend besitzt
+  // der Spectrum Director als einziger Schreiber mit `important` die sichtbare
+  // Priorität und fährt den Zielton als durchgehenden Verlauf an.
   applyMonthTheme(month, { animate: false, year });
-  const palette = applySpectrumProfile(year, month, { animate: false });
+  const palette = applySpectrumProfile(year, month, { animate: true });
 
   lastSettledKey = monthKey(date);
-  document.documentElement.dataset.monthTransition = 'atomic-spectrum-v1';
+  document.documentElement.dataset.monthTransition = 'fluid-spectrum-v1';
   return palette;
 }
 

@@ -1,14 +1,15 @@
 # DienstplanRAD
 
 <p align="center">
-  <img src="icons/icon.svg" alt="DienstplanRAD – abstrakte gläserne Dienstplantabelle" width="144">
+  <img src="icons/icon.svg" alt="DienstplanRAD – Kalendertabelle aus farbigen Monatsfeldern" width="144">
 </p>
 
 <p align="center"><strong>Manuelle, regelgestützte Monatsplanung für Bereitschaftsdienst, Hintergrunddienst und neuroradiologische Rufbereitschaft</strong></p>
 
 > **Release-Token:** `20260801.11`  
 > **Farbarchitektur:** Seasonal Spectrum Director mit **288 deterministischen Spektrumprofilen**  
-> **Monatswechsel:** flüssige, richtungsabhängige High-Framerate-Transition ohne Abschlussblinken  
+> **Monatsfarben:** deutlich getrennte Nachbarmonate, Farbnamen aus dem tatsächlichen OKLCH-Wert abgeleitet  
+> **Monatswechsel:** flüssige, richtungsabhängige High-Framerate-Transition mit durchgehendem OKLCH-Farbverlauf  
 > **Bedienung:** kompakte, semantisch gruppierte Icon-Werkzeugleiste  
 > **Paketversion:** `0.2.0` · **Feiertagsregion:** Sachsen (`SN`)  
 > **Betrieb:** Cloudflare Pages · Pages Functions · Cloudflare KV · lokale Browser-Sicherung
@@ -121,7 +122,12 @@ Die Oberfläche kombiniert eine Excel-nahe Tabellenlogik mit kontrollierter Glas
 
 ### 3.1 Ziel
 
-Der Monatswechsel soll wie eine zusammenhängende Bewegung wirken und nicht aus mehreren sichtbaren Render-, Farb- oder Ladephasen bestehen. Insbesondere darf nach dem Ende der Bewegung kein zweiter Tabellenaufbau und keine nachträgliche Farbkorrektur ein Blinken erzeugen.
+Der Monatswechsel soll wie eine zusammenhängende Bewegung wirken und nicht aus mehreren sichtbaren Render-, Farb- oder Ladephasen bestehen. Insbesondere darf nach dem Ende der Bewegung kein zweiter Tabellenaufbau ein Blinken erzeugen.
+
+Die Bewegung besteht aus zwei aufeinander abgestimmten Ebenen:
+
+- der **Kartenbewegung** über 430 ms, ausschließlich auf dem Compositor;
+- dem **Farbverlauf** über 760 ms, der alle Monatsvariablen in OKLCH überführt und exakt auf dem Zielprofil endet (Abschnitt 4.8).
 
 Die Umsetzung trennt deshalb klar zwischen:
 
@@ -204,9 +210,9 @@ Der Fallback benötigt keine externe Bibliothek und folgt demselben visuellen Be
 
 ### 3.7 Barrierefreiheit und Druck
 
-- `prefers-reduced-motion` wird respektiert; der Wechsel erfolgt dann praktisch unmittelbar.
+- `prefers-reduced-motion` wird respektiert; Kartenbewegung, Farbverlauf und Lichtwelle entfallen dann und der Zielzustand wird unmittelbar gesetzt.
 - Temporäre Snapshot-Ebenen sind `aria-hidden` und inert.
-- Beim Drucken werden View-Transition-Pseudoelemente und Fallback-Snapshots ausgeschlossen.
+- Beim Drucken werden View-Transition-Pseudoelemente, Fallback-Snapshots und die Lichtwelle ausgeschlossen.
 - Bedienelemente bleiben außerhalb der animierten Monatskarte und damit weiterhin fokussierbar.
 
 ### 3.8 Warum keine externe Animationsbibliothek verwendet wird
@@ -240,22 +246,24 @@ Die saisonale Identität bleibt erhalten. Januar wirkt weiterhin winterlich, Mai
 
 ### 4.2 Saisonale Farbkorridore
 
-Jeder Kalendermonat besitzt ein eigenes Spektrum mit kuratierten sichtbaren Farbnamen:
+Jeder Kalendermonat besitzt einen eigenen Farbkorridor:
 
-| Monat | Spektralfamilie | Beispiele |
-|---|---|---|
-| Januar | Eis · Polarlicht | Gletscherblau, Polarviolett, Fjordtürkis, Frostindigo |
-| Februar | Beere · Lack | Himbeerlack, Cassis, Rubin, Magentawein |
-| März | Keimgrün · Botanik | Keimgrün, Jade, Junge Olive, Frühlingspetrol |
-| April | Blüte · Himmel | Iris, Wisteria, Krokus, Frühlingshimmel |
-| Mai | Blattgrün · Zitrus | Maigrün, Chartreuse, Lindenblatt, Zitrusblatt |
-| Juni | Wasser · Küste | Lagune, Aqua, Küstenblau, Seegrün |
-| Juli | Frucht · Sonnenuntergang | Koralle, Persimone, Papaya, Hibiskus |
-| August | Gold · Ernte | Safran, Bernstein, Erntegelb, Goldolive |
-| September | Wein · Pflaume | Weinlese, Pflaume, Brombeere, Dahlie |
-| Oktober | Kupfer · Erde | Kupfer, Terrakotta, Rostrot, Ahorn |
-| November | Mineral · Sturm | Sturmblau, Schiefer, Graphitblau, Regentief |
-| Dezember | Immergrün · Festlicht | Tannengrün, Smaragdnacht, Mistel, Festpetrol |
+| Monat | Spektralfamilie | Farbtonmitte | Beispiele |
+|---|---|---|---|
+| Januar | Eis · Polarlicht | 245° | Gletscherblau, Polarviolett, Aquamarin, Frostindigo |
+| Februar | Beere · Lack | 5° | Himbeerlack, Karminrot, Fuchsia, Granatapfel |
+| März | Keimgrün · Botanik | 150° | Keimgrün, Kleegrün, Waldjade, Frühlingspetrol |
+| April | Blüte · Iris | 305° | Iris, Fliederblitz, Veilchenblau, Amethyst |
+| Mai | Blattgrün · Zitrus | 136° | Maigrün, Minzblatt, Lindenblatt, Farngrün |
+| Juni | Wasser · Küste | 208° | Lagune, Mineralblau, Küstenblau, Meeresglas |
+| Juli | Frucht · Sonnenglut | 34° | Koralle, Persimone, Tomatenrot, Pfirsichglut |
+| August | Gold · Ernte | 82° | Bernstein, Erntegelb, Honiggold, Goldolive |
+| September | Wein · Pflaume | 340° | Weinlese, Traubenviolett, Burgunder, Dahlienrot |
+| Oktober | Kupfer · Erde | 60° | Kupfer, Kürbis, Terrakotta, Strohgold |
+| November | Mineral · Sturm | 260° | Sturmblau, Schiefer, Nachtblau, Nebelblau |
+| Dezember | Immergrün · Festlicht | 182° | Tannengrün, Jadenacht, Wacholder, Polartürkis |
+
+Die Farbtonmitten sind so gewählt, dass **aufeinanderfolgende Monate weit auseinander liegen**. Farbton, Helligkeit und Buntheit werden unabhängig voneinander aufgespannt: Pro Monat stehen 48 Kandidaten aus sechs Farbton-Bahnen und acht Ton-Ecken zur Auswahl. Farbton, Helligkeit und Buntheit bleiben dabei fest im Korridor des Monats – ein Maigrün kann leuchten oder ruhig wirken, aber nie in ein herbstliches Oliv absinken.
 
 ### 4.3 24 Jahrescharaktere und 288 Profile
 
@@ -268,6 +276,15 @@ Für jeden der 288 kanonischen Kalendermonate werden mehrere Kandidaten innerhal
 
 Der Abstand wird im **OKLab-Farbraum** berechnet. Niedrig-diskrepante Zahlenfolgen verteilen Farbton, Helligkeit und Chroma deterministisch über den Zyklus.
 
+Verbindliche Mindestabstände:
+
+| Beziehung | Mindestabstand (OKLab) | tatsächlich erreicht |
+|---|---|---|
+| aufeinanderfolgende Kalendermonate | 0,120 | 0,120 |
+| derselbe Monat in Folgejahren | 0,090 | 0,095 |
+
+Zusätzlich darf jeder sRGB-Wert im gesamten Zyklus nur ein einziges Mal vorkommen. Kandidaten, die nach der Gamut-Begrenzung auf einen bereits vergebenen Wert fallen, scheiden aus.
+
 Eigenschaften:
 
 - derselbe Monat desselben Jahres bleibt auf jedem Gerät identisch;
@@ -276,29 +293,49 @@ Eigenschaften:
 - definierter 24-Jahres-Zyklus ab 2026;
 - sichere positive Modulo-Abbildung für frühere und spätere Jahre;
 - breite Verteilung innerhalb jedes Jahres;
-- starke Variation desselben Monats über aufeinanderfolgende Jahre.
+- starke Variation desselben Monats über aufeinanderfolgende Jahre;
+- mindestens sechs klar unterscheidbare Farbnamen je Kalendermonat über den Zyklus.
 
-### 4.4 Sichtbare und technische Metadaten
+### 4.4 Farbnamen aus dem tatsächlichen Farbwert
 
-Das Badge zeigt bewusst nur den kuratierten Farbnamen:
+Der angezeigte Name wird **nicht** aus einer Reihenfolge gezogen, sondern aus dem tatsächlich gewählten OKLCH-Wert bestimmt. Jeder Monat besitzt ein Lexikon aus zwölf Farbankern. Ein Anker beschreibt einen Farbton sowie einen Helligkeits- und Buntheitscharakter, zum Beispiel `Gletscherblau` als hellen, leuchtenden Ton bei 232° oder `Stahlblau` als tiefen, gedämpften Ton bei derselben Lage.
+
+Bewertet werden Farbtonabstand, Helligkeit und Buntheit. Der nächstgelegene Anker benennt die Farbe; Anker des eigenen Monats werden bevorzugt. Dadurch kann das Badge nie einen Namen zeigen, der nicht zum sichtbaren Ton gehört. Ein automatischer Test prüft diese Zusage für alle 288 Profile.
+
+Das Badge zeigt weiterhin nur den Farbnamen:
 
 ```text
 Monatskontrast · Polarviolett
 ```
 
-Der Tooltip ergänzt Saison, Spektralfamilie, Jahr und Jahrescharakter. Interne Editionsnamen wie „Cloud Veil“ erscheinen nicht im Badge.
+Der Tooltip ergänzt Saison, Spektralfamilie, **Tonbeschreibung**, Jahrescharakter und Jahr:
+
+```text
+Winter · Eis · Polarlicht · hell · leuchtend · Kristall · 2026
+```
+
+Die Tonbeschreibung stammt aus denselben Messwerten wie der Name (`tief`, `satt`, `mittelhell`, `hell`, `licht` beziehungsweise `zart`, `gedämpft`, `ausgewogen`, `kräftig`, `leuchtend`). Solange der Director aktiv ist, schreibt das Basistheme das Badge nicht mehr.
 
 Am Wurzelelement werden unter anderem folgende Datenattribute gesetzt:
 
-- `data-color-director="seasonal-spectrum-v1"`;
+- `data-color-director="seasonal-spectrum-v2"`;
 - `data-spectrum-key="JJJJ-MM"`;
 - `data-spectrum-palette`;
 - `data-spectrum-mood`;
-- `data-month-transition="atomic-spectrum-v1"`.
+- `data-spectrum-motion="running"` beziehungsweise `"settled"`;
+- `data-month-transition="fluid-spectrum-v1"`.
 
-Der Begriff `atomic-spectrum-v1` bezeichnet den atomaren **Farbabschluss**. Die sichtbare Monatsbewegung selbst ist eine kontinuierliche High-Framerate-Transition.
+### 4.5 App-Icon
 
-### 4.5 Vollständige Oberflächenableitung
+Das App-Icon ist eine **Kalendertabelle ohne Schrift**: Binderringe, ein Spektrumkopf, sieben Spaltenmarken und ein Raster aus 7 × 5 Feldern.
+
+- die Feldfarben sind keine Dekoration, sondern die **zwölf tatsächlichen Monatsakzente** des Referenzjahres 2026, erzeugt aus demselben Modul wie die Oberfläche;
+- die Kopfleiste zeigt alle zwölf Farben als durchgehenden Verlauf;
+- Wochenendspalten und einzelne belegte Dienstfelder sind kräftiger gesetzt und geben dem Raster den Rhythmus eines Dienstplans;
+- `icons/icon-animated.svg` lässt die Felder zeitversetzt durch alle zwölf Monatsfarben wandern; bei `prefers-reduced-motion: reduce` steht die Bewegung still;
+- beide Dateien sind reines SVG ohne externe Abhängigkeit, ohne Schrift und ohne Rasterbild.
+
+### 4.6 Vollständige Oberflächenableitung
 
 Aus dem gewählten Profil werden gemeinsam abgeleitet:
 
@@ -314,21 +351,31 @@ Aus dem gewählten Profil werden gemeinsam abgeleitet:
 
 Die Tabellenhierarchie bleibt erhalten: Samstag ist am zurückhaltendsten, Sonntag kräftiger, Feiertage stärker, die Wochentagsspalte trägt die deutlichste Orientierungstönung.
 
-### 4.6 Gamut Mapping und Kontrast
+### 4.7 Gamut Mapping und Kontrast
 
 Expressive OKLCH-Farben können außerhalb des darstellbaren sRGB-Farbraums liegen. Das Modul reduziert in diesem Fall iterativ nur die Buntheit, bis ein gültiger sRGB-Wert erreicht ist. Farbton und Helligkeitscharakter bleiben dabei möglichst stabil.
 
 Automatisierte Tests prüfen den WCAG-AA-Kontrast der abgeleiteten Tabellenflächen aller 288 Profile.
 
-### 4.7 Zusammenspiel mit der Monatsanimation
+### 4.8 Zusammenspiel mit der Monatsanimation
 
 Die Farbarchitektur bleibt dreistufig:
 
 1. `theme.js` liefert ein vollständiges Basistheme;
-2. `color-director.js` setzt das wahrnehmungsoptimierte Spektrumprofil;
-3. `month-transition-stability.js` beendet konkurrierende Farbübergänge und schreibt den endgültigen Zielzustand.
+2. `color-director.js` besitzt die sichtbare Farbe und fährt sie als Verlauf an;
+3. `month-transition-stability.js` beendet konkurrierende Farbsignale und übergibt den Wechsel an genau einen Verlauf.
 
-Die View Transition rastert erst den alten und anschließend den vollständig aufgebauten neuen Monatsplan. Dadurch bleibt jede gerasterte Ebene intern farbkonsistent. Nach Ende der Bewegung gibt es keinen zweiten Farb- oder Theme-Schritt.
+Ablauf eines Monatswechsels:
+
+- das Basistheme wird ohne eigene Animation gesetzt und beendet damit seinen privaten rAF-Handle;
+- der Director interpoliert anschließend alle neun Farbvariablen in **OKLCH** über 760 ms;
+- geschrieben wird mit `important`, dadurch gewinnt der Director in jedem Frame gegen das Basistheme;
+- ein bereits laufender Verlauf auf denselben Monat wird nie neu gestartet, wiederholte Synchronisationssignale bleiben wirkungslos;
+- die Interpolation nimmt den kürzeren Farbtonbogen, deshalb läuft der Wechsel nie über ausgegraute Zwischentöne;
+- die Zeitkurve ist ein Smootherstep und damit in erster und zweiter Ableitung stetig – auf 120-Hz-Displays gibt es keinen sichtbaren Einsatz- oder Abrisspunkt;
+- begleitend läuft eine kurze Lichtwelle (`.month-spectrum-sweep`), die ausschließlich `opacity` und `transform` bewegt und damit vollständig auf dem Compositor bleibt.
+
+Die View Transition rastert erst den alten und anschließend den neu aufgebauten Monatsplan; der Farbverlauf läuft live weiter und endet exakt auf dem Zielprofil. Bei `prefers-reduced-motion: reduce` entfällt der Verlauf samt Lichtwelle und die Zielfarbe wird sofort gesetzt.
 
 ---
 
@@ -477,7 +524,7 @@ Wesentliche Module:
 | `js/app.js` | UI, Navigation, Dialoge, Rendering, Import-/Exportsteuerung |
 | `js/theme.js` | saisonales Basistheme, Farbräume und Rückfallebene |
 | `js/color-director.js` | Spektrumprofile, Abstandsoptimierung, Gamut Mapping und Oberflächenableitung |
-| `js/month-transition-stability.js` | atomarer Farbabschluss und Synchronisierung konkurrierender Theme-Signale |
+| `js/month-transition-stability.js` | Übergabe des Monatswechsels an genau einen Farbverlauf |
 | `js/month-view-transition.js` | High-Framerate-Monatsbewegung, Daten-Handoff, Abbruchsteuerung und Browser-Fallback |
 | `js/ui-controls.js` | kompakte Werkzeugleiste, Icons und Einbindung der progressiven UI-Schichten |
 | `js/state.js` | Laden, Speichern, Dirty-Zustände und Monatscache |
@@ -491,7 +538,7 @@ Die progressive Darstellung wird in folgender Reihenfolge eingebunden:
 
 1. `month-view-transition.js` fängt Monatsnavigation vor den bisherigen UI-Handlern ab;
 2. `color-director.js` bestimmt das endgültige Spektrumprofil;
-3. `month-transition-stability.js` stabilisiert den Farbabschluss;
+3. `month-transition-stability.js` bündelt die Farbsignale zu einem Verlauf;
 4. `ui-controls.js` organisiert die bestehenden Bedienelemente in der kompakten Werkzeugleiste.
 
 Fällt die native View Transitions API aus, übernimmt der WAAPI-Fallback. Fällt die progressive Spektrumebene aus, bleibt die Anwendung mit dem Basistheme vollständig bedienbar.
@@ -608,8 +655,8 @@ Der Release-Token `20260801.11` bleibt bewusst einheitlich, da die Repositorytes
 ├── manifest.webmanifest
 ├── Eignungsregeln.txt
 ├── icons/
-│   ├── icon.svg
-│   └── icon-animated.svg
+│   ├── icon.svg              # Kalendertabelle in den zwölf Monatsfarben
+│   └── icon-animated.svg     # dieselbe Tabelle mit wandernden Monatsfarben
 ├── js/
 │   ├── app.js
 │   ├── theme.js
