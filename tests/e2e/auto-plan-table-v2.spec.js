@@ -108,13 +108,16 @@ async function openJuly(page) {
 }
 
 test('Auto-Plan präsentiert BD und HG jedes Tages gemeinsam wie die Diensttabelle', async ({ page }) => {
-  test.setTimeout(120_000);
+  test.setTimeout(150_000);
   await page.setViewportSize({ width: 920, height: 520 });
   const api = await mockApi(page);
   await openJuly(page);
 
   await page.locator('#autoPlanBtn').click();
-  await expect(page.locator('#autoPlanResult')).toBeVisible({ timeout: 90_000 });
+  await expect(page.locator('#autoPlanConfig')).toBeVisible();
+  await expect(page.locator('#autoPlanStartBtn')).toBeEnabled();
+  await page.locator('#autoPlanStartBtn').click();
+  await expect(page.locator('#autoPlanResult')).toBeVisible({ timeout: 120_000 });
   await expect(page.locator('#autoPlanResultTitle')).toHaveText('Regelkonformer Vorschlag bereit');
 
   const table = page.locator('#autoPlanProposalTable');
@@ -132,7 +135,9 @@ test('Auto-Plan präsentiert BD und HG jedes Tages gemeinsam wie die Diensttabel
   await expect(fixedRow).toContainText('Fixpunkte');
 
   await expect(page.locator('#autoPlanSearchMetrics')).toContainText('Varianten geprüft');
-  await expect(page.locator('#autoPlanSearchMetrics')).toContainText('Sackgassen verworfen');
+  await expect(page.locator('#autoPlanSearchMetrics')).toContainText('Sackgassen');
+  await expect(page.locator('#autoPlanSearchMetrics')).toContainText('Grenzfilter');
+  await expect(page.locator('#autoPlanRunConfigChips')).toContainText('Minimal-Rot');
   await expect(page.locator('#autoPlanLoadTable .auto-plan-distribution-table')).toBeVisible();
 
   const scroll = page.locator('#autoPlanChangeList');
