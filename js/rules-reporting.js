@@ -7,11 +7,19 @@ import {
 } from './rules-core.js?v=20260801.11';
 import { evaluateCandidate } from './rules-evaluation.js?v=20260801.11';
 
+/**
+ * Sammelbefund des Monats.
+ *
+ * Jeder Eintrag trägt neben Stufe und Text ein `kind`: `open` für eine noch
+ * fehlende Besetzung, `finding` für eine fachliche Auffälligkeit. Die Oberfläche
+ * zählte beides zuvor über eine Textsuche nach „offen“ im Titel – das brach
+ * still, sobald eine Meldung anders formuliert wurde.
+ */
 export function collectIssues(state, monthData) {
   const issues = [];
   for (const [iso, day] of Object.entries(monthData.days || {})) {
-    if (!day.hg) issues.push({ level: 'yellow', title: `${fmtGermanDate(iso)}: HG offen`, details: 'Kein HG eingetragen.' });
-    if (!day.bd) issues.push({ level: 'yellow', title: `${fmtGermanDate(iso)}: BD offen`, details: 'Kein BD eingetragen.' });
+    if (!day.hg) issues.push({ kind: 'open', level: 'yellow', title: `${fmtGermanDate(iso)}: HG offen`, details: 'Kein HG eingetragen.' });
+    if (!day.bd) issues.push({ kind: 'open', level: 'yellow', title: `${fmtGermanDate(iso)}: BD offen`, details: 'Kein BD eingetragen.' });
 
     for (const role of ['bd', 'hg']) {
       const staffId = day[role];
@@ -60,7 +68,7 @@ export function collectIssues(state, monthData) {
     if (day.rbn2 && !secondAvailable) {
       issues.push({ level: 'orange', title: `${fmtGermanDate(iso)} · 2. RBN ohne gültigen Trigger`, details: 'Die erste RBN schaltet an diesem Datum keine zweite RBN frei.' });
     } else if (secondAvailable && !day.rbn2) {
-      issues.push({ level: 'yellow', title: `${fmtGermanDate(iso)}: 2. RBN offen`, details: 'Die Erstbesetzung erfordert eine zweite RBN.' });
+      issues.push({ kind: 'open', level: 'yellow', title: `${fmtGermanDate(iso)}: 2. RBN offen`, details: 'Die Erstbesetzung erfordert eine zweite RBN.' });
     }
   }
 
@@ -71,7 +79,9 @@ export function collectIssues(state, monthData) {
     if (!ABSENCE_FOR_CT_LEADERSHIP.has(becker) || !ABSENCE_FOR_CT_LEADERSHIP.has(martin)) continue;
     issues.push({ level: 'red', title: `${fmtGermanDate(iso)} · Becker/Martin gleichzeitig abwesend`, details: 'CT-Leitungsbesetzung prüfen.' });
   }
-  return issues.sort((a, b) => severityRank[b.level] - severityRank[a.level]);
+  return issues
+    .map(issue => ({ kind: 'finding', ...issue }))
+    .sort((a, b) => severityRank[b.level] - severityRank[a.level]);
 }
 
 export function buildStats(state, monthData) {

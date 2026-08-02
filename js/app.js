@@ -125,6 +125,8 @@ function bindEvents() {
     document.querySelectorAll('.batch-day.selected').forEach(el => el.classList.remove('selected'));
   });
   $('#confirmConflictBtn').addEventListener('click', onConfirmConflict);
+  // Ein abgebrochener Konflikt darf nicht als offene Absicht zurückbleiben.
+  $('#conflictDialog').addEventListener('close', () => { pendingConflict = null; });
   $('#pickerSearch').addEventListener('input', renderPickerList);
   $('#pickerSearch').addEventListener('keydown', onPickerSearchKeydown);
   $('#excelImportInput').addEventListener('change', onExcelImport);
@@ -477,11 +479,10 @@ function buildAbsenceSummary(dateIso, monthData) {
     const absence = getAbsence(monthData, person.id, dateIso);
     if (!absence) continue;
 
+    // Ein nicht manuell gesetzter FZA am ersten regulären Werktag nach eigenem
+    // BD ist die Doppelung eines ohnehin abgeleiteten Tages.
     const absenceSource = getAbsenceSource(monthData, person.id, dateIso);
-    if (absence === 'fza' && absenceSource !== 'manual' && isFirstRegularWorkdayAfterOwnBd(person.id, dateIso)) {
-      if (person.id === 'becker' && derivedBeckerFza) continue;
-      continue;
-    }
+    if (absence === 'fza' && absenceSource !== 'manual' && isFirstRegularWorkdayAfterOwnBd(person.id, dateIso)) continue;
 
     const detail = shortAbsenceLabel(absence);
     entries.push({ name: person.short, detail });
@@ -585,8 +586,7 @@ function renderIssues(monthData) {
   if (!container) return;
 
   const issues = collectIssues(state, monthData);
-  const bySeverity = level => issues.filter(issue => issue.level === level).length;
-  const offen = issues.filter(issue => issue.title.includes('offen')).length;
+  const offen = issues.filter(issue => issue.kind === 'open').length;
   const auffaellig = issues.length - offen;
 
   if (summary) {
@@ -775,7 +775,10 @@ function onPickerSearchKeydown(event) {
 function openPicker(dateIso, role) {
   state.currentPicker = { dateIso, role };
   const assignedId = getAssignment(state, dateIso, role);
-  const assignedName = assignedId ? getStaffById(state.staff, assignedId)?.name : '';
+  // assignmentLabel deckt auch übernommene Namen aus Altimporten und nicht mehr
+  // bekannte IDs ab; `getStaffById(...)?.name` lieferte dort undefined und der
+  // Kopf meldete „Noch nicht besetzt“, obwohl der Tag belegt war.
+  const assignedName = assignedId ? assignmentLabel(state.staff, assignedId) : '';
 
   picker.candidates = pickerCandidates(dateIso, role)
     .map(candidate => ({ ...candidate, isAssigned: candidate.person.id === assignedId }));
@@ -806,7 +809,7 @@ async function onPickStaff(staffId, evaluation) {
   const { dateIso, role } = state.currentPicker;
   if (evaluation.level === 'red') {
     pendingConflict = { staffId, evaluation, dateIso, role };
-    $('#conflictDialogText').textContent = `${getStaffById(state.staff, staffId)?.name} wird für ${role.toUpperCase()} am ${fmtGermanDate(dateIso)} mit rotem Konflikt eingetragen.`;
+    $('#conflictDialogText').textContent = `${assignmentLabel(state.staff, staffId) || staffId} wird für ${role.toUpperCase()} am ${fmtGermanDate(dateIso)} mit rotem Konflikt eingetragen.`;
     $('#conflictReasons').innerHTML = evaluation.reasons.map(reason => `<div class="small-chip red">${esc(reason)}</div>`).join('');
     $('#conflictComment').value = '';
     $('#conflictDialog').showModal();
@@ -969,17 +972,38 @@ function batchDayLabel(current, optionsForDay) {
   return parts.length ? esc(parts.join(' / ')) : '—';
 }
 
+/**
+ * Die Auswahl im Raster ist die vollständige Aussage für den gewählten Typ.
+ *
+ * Das Raster markiert beim Öffnen bereits alle Tage, die den Typ schon tragen.
+ * Wurde nur ergänzt, blieb ein abgewählter Tag unverändert – ein bereits
+ * gesetzter Urlaub ließ sich in der Sammeleingabe also nie wieder entfernen.
+ * Jetzt gilt: markiert = gesetzt, nicht markiert = für diesen Typ entfernt.
+ * Andere Typen desselben Tages bleiben dabei unberührt.
+ */
 function onApplyBatch() {
   const monthData = getMonthData(state.currentYear, state.currentMonth);
   const staffId = $('#batchStaffSelect').value;
   const typeId = $('#batchTypeSelect').value;
+  if (!staffId || !typeId) { $('#batchDialog').close(); return; }
   const isOptionType = OPTION_TYPES.some(type => type.id === typeId);
-  document.querySelectorAll('.batch-day.selected').forEach(el => {
-    const iso = el.dataset.dateIso;
-    if (state.currentBatchMode === 'absence') setAbsence(monthData, staffId, iso, typeId);
-    else if (isOptionType) setOptions(monthData, staffId, iso, [...new Set([...getOptions(monthData, staffId, iso), typeId])]);
-    else setPreference(monthData, staffId, iso, typeId);
-  });
+  const selected = new Set([...document.querySelectorAll('.batch-day.selected')].map(el => el.dataset.dateIso));
+
+  for (const iso of Object.keys(monthData.days)) {
+    const isSelected = selected.has(iso);
+    if (state.currentBatchMode === 'absence') {
+      if (isSelected) setAbsence(monthData, staffId, iso, typeId);
+      else if (getAbsence(monthData, staffId, iso) === typeId) setAbsence(monthData, staffId, iso, '');
+    } else if (isOptionType) {
+      const options = getOptions(monthData, staffId, iso);
+      if (isSelected) setOptions(monthData, staffId, iso, [...new Set([...options, typeId])]);
+      else if (options.includes(typeId)) setOptions(monthData, staffId, iso, options.filter(option => option !== typeId));
+    } else {
+      if (isSelected) setPreference(monthData, staffId, iso, typeId);
+      else if (getPreference(monthData, staffId, iso) === typeId) setPreference(monthData, staffId, iso, '');
+    }
+  }
+
   markDirty();
   render();
   $('#batchDialog').close();
@@ -1134,6 +1158,11 @@ async function onExcelImport(event) {
   const undated = imports.filter(item => item.usedFallbackYear);
   if (undated.length && !confirm(`Für ${undated.map(item => item.sheetName).join(', ')} wurde keine Jahreszahl gefunden.\n\nDiese Blätter dem Jahr ${state.currentYear} zuordnen?`)) { reset(); return; }
 
+  // Ein Einzelblatt ohne Monatsangabe im Kopf landet sonst stillschweigend im
+  // gerade angezeigten Monat.
+  const monthless = imports.filter(item => item.usedFallbackMonth);
+  if (monthless.length && !confirm(`Für ${monthless.map(item => item.sheetName).join(', ')} wurde kein Monat gefunden.\n\nDiese Blätter dem angezeigten Monat ${MONTH_NAMES[state.currentMonth - 1]} zuordnen?`)) { reset(); return; }
+
   // Vor dem Merge jeden Zielmonat laden. Andernfalls würde ein noch nie
   // geöffneter Monat aus einem leeren Gerüst entstehen und bestehende manuelle
   // Serverwerte beim anschließenden PUT verlieren.
@@ -1235,7 +1264,11 @@ async function exportJsonBackup() {
   const serverPayload = await api.exportJson().catch(() => null);
   const payload = buildBackupPayload(serverPayload);
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-  triggerDownload(blob, `dienstplanrad_backup_${new Date().toISOString().slice(0,10)}.json`);
+  // Lokaler Kalendertag: `toISOString()` benennt eine abendliche Sicherung in
+  // Deutschland mit dem Vortag.
+  const now = new Date();
+  const stamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  triggerDownload(blob, `dienstplanrad_backup_${stamp}.json`);
 }
 
 async function onJsonImport(event) {

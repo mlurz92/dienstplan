@@ -57,7 +57,12 @@ export function monthFromSheetName(name) {
 
 const text = value => {
   if (value === null || value === undefined) return '';
-  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  // Bewusst lokale Kalenderwerte: `toISOString()` verschiebt eine Zelle mit
+  // lokaler Mitternacht in jeder Zone mit positivem UTC-Versatz auf den Vortag –
+  // aus dem 01. April würde der 31. März und damit der falsche Monat.
+  if (value instanceof Date) {
+    return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+  }
   return String(value);
 };
 const normalize = value => text(value).replace(/\s+/g, ' ').trim().toLowerCase();
@@ -158,7 +163,8 @@ function emptyResult(sheetName, year, month) {
     rbnValues: 0,
     unknownNames: [],
     skippedAbsenceNames: [],
-    usedFallbackYear: false
+    usedFallbackYear: false,
+    usedFallbackMonth: false
   };
 }
 
@@ -246,6 +252,10 @@ export function parsePlanSheet(sheetName, rows, { staff = [], fallbackYear, fall
 
   const result = emptyResult(sheetName, year, month);
   result.usedFallbackYear = !period.year;
+  // Der Monat eines Einzelblatts steht nur im Kopf. Fehlt er dort, wird der
+  // angezeigte Monat angenommen – das muss der Import genauso ausweisen wie
+  // eine fehlende Jahreszahl, sonst landen Daten unbemerkt im falschen Monat.
+  result.usedFallbackMonth = !period.month;
   const daysInMonth = new Date(year, month, 0).getDate();
   const unknownNames = new Set();
   const seenDays = new Set();
@@ -295,11 +305,24 @@ export function analyzeWorkbook(sheets, { staff = [], fallbackYear, fallbackMont
   const ignoredSheets = [];
   for (const sheet of sheets || []) {
     const rows = sheet?.rows || [];
-    const parsed = monthFromSheetName(sheet?.name)
-      ? parseMatrixSheet(sheet.name, rows, { staff, fallbackYear })
-      : parsePlanSheet(sheet?.name || '', rows, { staff, fallbackYear, fallbackMonth });
+    const name = sheet?.name || '';
+    // Der Blattname bestimmt nur die Reihenfolge der Versuche, nicht das Format.
+    // Ein Monatsblatt heißt „April“, ein Einzelplan darf aber ebenso heißen:
+    // Ohne den zweiten Versuch fiel ein vollständig lesbarer Einzelplan allein
+    // wegen seines Namens aus dem Import heraus.
+    const parsers = monthFromSheetName(name)
+      ? [() => parseMatrixSheet(name, rows, { staff, fallbackYear }),
+         () => parsePlanSheet(name, rows, { staff, fallbackYear, fallbackMonth: monthFromSheetName(name) || fallbackMonth })]
+      : [() => parsePlanSheet(name, rows, { staff, fallbackYear, fallbackMonth }),
+         () => parseMatrixSheet(name, rows, { staff, fallbackYear })];
+
+    let parsed = null;
+    for (const parse of parsers) {
+      parsed = parse();
+      if (parsed) break;
+    }
     if (parsed) imports.push(parsed);
-    else ignoredSheets.push(sheet?.name || '(ohne Namen)');
+    else ignoredSheets.push(name || '(ohne Namen)');
   }
   return { imports, ignoredSheets };
 }

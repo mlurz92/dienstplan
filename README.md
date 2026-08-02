@@ -128,7 +128,7 @@ Damit gibt es bei keiner Fensterbreite überlagerte, beschnittene oder unerreich
 - bedingt eingeblendete zweite RBN;
 - Löschen bestehender Einteilungen;
 - Einzelerfassung tagesbezogener Markierungen;
-- Sammelerfassung mehrerer Tage;
+- Sammelerfassung mehrerer Tage – die Auswahl im Raster ist dabei die vollständige Aussage für den gewählten Typ: markiert bedeutet gesetzt, nicht markiert bedeutet für diesen Typ entfernt, andere Typen desselben Tages bleiben unberührt;
 - vollständiges Leeren des sichtbaren Monats nach Bestätigung;
 - automatische lokale Sicherung und Server-Synchronisierung.
 
@@ -549,6 +549,10 @@ Ein eigener Service Worker wird nicht verwendet. Historische eigene Registrierun
 
 Der Import analysiert Jahresplaner, ordnet Personalnamen defensiv zu und übernimmt unterstützte Monatsinformationen. Zielmonate werden vor einem Merge verlässlich geladen. Abweichende vorhandene Werte werden nur im vorgesehenen Importmodus ersetzt.
 
+Unterstützt werden zwei Formate: die Jahresmappe mit Monatsblättern (Personenzeilen, Tage als Spaltenköpfe) und der Einzelmonatsplan mit den Spalten Tag, Wochentag, BD, HG, RBN und 2. RBN. **Der Blattname bestimmt nur die Reihenfolge der Versuche, nicht das Format**: Schlägt die zum Namen passende Auswertung fehl, wird die andere versucht. Ein Einzelplan auf einem Blatt namens „April“ wird dadurch ebenso gelesen wie auf einem Blatt namens „Plan“.
+
+Fehlt im Blattkopf die Jahreszahl oder der Monat, wird der angezeigte Zeitraum angenommen – beides wird vor dem Schreiben ausdrücklich bestätigt.
+
 ### Excel-Export
 
 Der sichtbare Monatsplan wird als Excel-kompatibles Arbeitsblatt mit Tageszeilen, Diensten, RBN und Markierungen ausgegeben.
@@ -633,13 +637,13 @@ npm run check
 
 Prüft sämtliche produktiven JavaScript-Module, Pages Functions und Testkonfigurationen, einschließlich `js/color-director.js`, `js/month-transition-stability.js` und `js/month-view-transition.js`.
 
-### Unit- und Regressionstests
+### 13.1 Unit- und Regressionstests
 
 ```bash
 npm test
 ```
 
-Aktuell umfasst die Suite **178 Unit- und Regressionstests**. Geprüft werden unter anderem:
+Aktuell umfasst die Suite **204 Unit- und Regressionstests**. Geprüft werden unter anderem:
 
 - Regelengine und personenspezifische Sonderregeln;
 - Persistenz, Dirty-Zustände und Offline-Schutz;
@@ -656,15 +660,17 @@ Aktuell umfasst die Suite **178 Unit- und Regressionstests**. Geprüft werden un
 - native View Transition und WAAPI-Fallback;
 - ausschließlich compositorfähige Animationsmerkmale;
 - Abbruch- und Generationensicherung;
-- Ausschluss eines framebasierten Deadlocks im Update-Callback.
+- Ausschluss eines framebasierten Deadlocks im Update-Callback;
+- Gruppierung, Rangfolge und Tippfilter des Dienst-Pickers;
+- die Regressionen des Bughunts (Abschnitt 13.4).
 
-### End-to-End
+### 13.2 End-to-End
 
 ```bash
 npm run test:e2e
 ```
 
-Aktuell umfasst die Browser-Suite **19 Playwright-End-to-End-Tests**. Sie prüft Navigation, Auswahl- und Konfliktdialoge, Werkzeugleiste, Dateiaktionen, Monatsbadge, Seasonal Spectrum Director, PDF-Export sowie Monats- und Jahresvariation.
+Aktuell umfasst die Browser-Suite **22 Playwright-End-to-End-Tests**. Sie prüft Navigation, Auswahl- und Konfliktdialoge, Werkzeugleiste, Dateiaktionen, Monatsbadge, Seasonal Spectrum Director, PDF-Export sowie Monats- und Jahresvariation.
 
 Die Werkzeugleiste wird über eine Breitenreihe von 1500 px bis 340 px geprüft: keine Überlagerung, kein Beschnitt, kein waagerechter Seitenbildlauf, mindestens drei tatsächlich genutzte Dichtestufen sowie Öffnen, Schließen und Rückführung des Überlaufmenüs.
 
@@ -684,7 +690,7 @@ Der spezielle High-Framerate-Regressionsfall verzögert die Monats-API bewusst u
 - korrekter Abschluss an Monats- und Jahresgrenzen;
 - sauberer Abbruch schneller, überholter Navigationen.
 
-### Vollständige Verifikation
+### 13.3 Vollständige Verifikation
 
 ```bash
 npm run verify
@@ -692,7 +698,29 @@ npm run verify
 
 Führt Syntaxprüfung, Unit-/Regressionstests und Playwright-End-to-End-Tests nacheinander aus.
 
-Der für diese Implementierung maßgebliche vollständige CI-Lauf **#127** bestand `npm ci`, Syntaxprüfung, alle 178 Unit-/Regressionstests und alle 10 Playwright-Tests.
+### 13.4 Bughunt vom 02.08.2026
+
+Die Anwendung wurde vollständig durchgesehen und aktiv auf Fehler untersucht: statische Durchsicht aller Module, Invarianten-Fuzzing der Regelengine (400 zufällige Monate, rund 280 000 Einzelbewertungen), feindliche Eingaben für Normalisierung, Sicherung und Excel-Import, die Unit-Suite unter fünf Zeitzonen von UTC−9 bis UTC+14, ein Zufallslauf über die Oberfläche mit Invariantenprüfung nach jeder Aktion sowie gezielte Szenarien für Offline-Betrieb, Jahres- und Schaltjahresgrenzen.
+
+Gefunden und behoben wurden:
+
+| Bereich | Fehlbild | Behebung |
+|---|---|---|
+| Excel-Import | Ein Einzelplan, dessen Blatt wie ein Monat heißt („April“), wurde ausschließlich als Matrixblatt versucht und dadurch **vollständig ignoriert** | Der Blattname bestimmt nur noch die Reihenfolge der Versuche; schlägt der erste fehl, greift der zweite |
+| Excel-Import | Fehlte der Monat im Blattkopf, landete das Blatt stillschweigend im angezeigten Monat | `usedFallbackMonth` wird gemeldet und ausdrücklich bestätigt |
+| Excel-Import | Datumszellen wurden über `toISOString()` gelesen – in Deutschland ganzjährig ein Tag zu früh | Lokale Kalenderformatierung |
+| Sammeleingabe | Das Raster markierte bestehende Einträge vor, übernahm aber nur Ergänzungen: **eine gesetzte Abwesenheit ließ sich per Sammeleingabe nie wieder entfernen** | Die Auswahl ist die vollständige Aussage für den gewählten Typ; andere Typen desselben Tages bleiben unberührt |
+| Dienst-Picker | Bei einem Namen aus einem Altimport meldete der Kopf „Noch nicht besetzt“, während „Eintrag löschen“ angeboten wurde | Benennung über `assignmentLabel`, das auch übernommene Namen und unbekannte IDs abdeckt |
+| Server | Der **Lesezugriff** auf einen Monat legte ihn im KV-Speicher an; das Vorladen schrieb dadurch bis zu dreizehn leere Monate pro Monatswechsel | Gelesen wird ohne Schreiben, angelegt wird erst beim PUT |
+| Offene Punkte | „Offene Einteilungen“ wurden über eine Textsuche nach „offen“ im Titel gezählt | Jede Meldung trägt ein `kind` (`open` / `finding`) |
+| Konfliktdialog | Ein abgebrochener roter Konflikt blieb als offene Absicht im Zustand zurück | Wird beim Schließen des Dialogs verworfen |
+| Sicherung | Der Dateiname der JSON-Sicherung entstand aus `toISOString()` und trug abends den Vortag | Lokaler Kalendertag |
+| Datenmodell | `revision` akzeptierte Kommazahlen | Ganzzahlig abgeschnitten |
+| Tabelle | Toter Zweig in der Abwesenheitszusammenfassung | Entfernt |
+
+Ohne Befund blieben unter anderem: Regelengine und Kopplungsregeln (keine Ausnahme, kein ungültiger Bewertungsgrad, keine fehlende Begründung über alle Fuzz-Läufe), Zeitzonenverhalten, Feiertagsberechnung, Offline- und Wiederherstellungspfad, Persistenz nach schnellem Monatswechsel, RBN-Kette, Schaltjahr- und Jahresgrenzen sowie Prototype-Pollution über Sicherungsdateien.
+
+Jede Behebung ist in `tests/bughunt-2026-08.test.js` und den zugehörigen End-to-End-Suiten festgehalten.
 
 ---
 
