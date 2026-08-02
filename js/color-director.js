@@ -333,15 +333,19 @@ function selectedDate() {
 }
 
 function initializeColorDirector() {
-  const update = ({ animate = true } = {}) => {
+  // Automatische Monats- und Jahreswechsel sind Teil eines vollständigen
+  // Tabellen-Renderings. Sie werden daher atomar abgeschlossen und starten
+  // niemals einen eigenen rAF-Farbverlauf. Die exportierte API behält die
+  // optionale Animation für ausdrücklich isolierte Aufrufe bei.
+  const update = () => {
     const { year, month } = selectedDate();
-    applySpectrumProfile(year, month, { animate });
+    applySpectrumProfile(year, month, { animate: false });
   };
 
-  update({ animate: false });
+  update();
   const root = document.documentElement;
   if (typeof MutationObserver === 'function') {
-    const rootObserver = new MutationObserver(() => update());
+    const rootObserver = new MutationObserver(update);
     rootObserver.observe(root, { attributes: true, attributeFilter: ['data-month', 'data-year'] });
 
     const label = document.getElementById('monthPaletteLabel');
@@ -355,8 +359,8 @@ function initializeColorDirector() {
     }
   }
 
-  document.getElementById('monthSelect')?.addEventListener('change', () => update());
-  document.getElementById('yearSelect')?.addEventListener('change', () => update());
+  document.getElementById('monthSelect')?.addEventListener('change', update);
+  document.getElementById('yearSelect')?.addEventListener('change', update);
 }
 
 if (typeof document !== 'undefined') {
