@@ -1,0 +1,105 @@
+/*
+ * Hochfrequenter Monatswechsel
+ *
+ * Der Browser bewegt ausschließlich zwei bereits gerasterte View-Transition-
+ * Ebenen. Tabellenlayout, Formularfelder und Farbvariablen werden nicht pro
+ * Animationsframe neu berechnet. Der Fallback verwendet dieselben ausschließlich
+ * compositorfähigen Eigenschaften über die Web Animations API.
+ */
+
+:root {
+  --month-motion-duration: 430ms;
+  --month-motion-ease: cubic-bezier(.22, 1, .36, 1);
+}
+
+::view-transition-group(root) {
+  animation-duration: var(--month-motion-duration);
+  animation-timing-function: var(--month-motion-ease);
+}
+
+::view-transition-image-pair(root) {
+  isolation: isolate;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--month-motion-duration);
+  animation-timing-function: var(--month-motion-ease);
+  animation-fill-mode: both;
+  backface-visibility: hidden;
+  mix-blend-mode: normal;
+  transform-origin: 50% 18%;
+}
+
+html[data-month-motion-direction="forward"]::view-transition-old(root) {
+  animation-name: month-motion-old-forward;
+}
+
+html[data-month-motion-direction="forward"]::view-transition-new(root) {
+  animation-name: month-motion-new-forward;
+}
+
+html[data-month-motion-direction="backward"]::view-transition-old(root) {
+  animation-name: month-motion-old-backward;
+}
+
+html[data-month-motion-direction="backward"]::view-transition-new(root) {
+  animation-name: month-motion-new-backward;
+}
+
+@keyframes month-motion-old-forward {
+  0% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+  44% { opacity: .72; }
+  100% { opacity: 0; transform: translate3d(-24px, 0, 0) scale(.996); }
+}
+
+@keyframes month-motion-new-forward {
+  0% { opacity: 0; transform: translate3d(30px, 0, 0) scale(.996); }
+  30% { opacity: .36; }
+  100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@keyframes month-motion-old-backward {
+  0% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+  44% { opacity: .72; }
+  100% { opacity: 0; transform: translate3d(24px, 0, 0) scale(.996); }
+}
+
+@keyframes month-motion-new-backward {
+  0% { opacity: 0; transform: translate3d(-30px, 0, 0) scale(.996); }
+  30% { opacity: .36; }
+  100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+.month-motion-fallback-snapshot,
+.month-motion-fallback-live {
+  transform-origin: 50% 18%;
+  backface-visibility: hidden;
+}
+
+.month-motion-fallback-snapshot {
+  contain: layout paint style;
+  box-sizing: border-box;
+}
+
+html[data-month-motion-state="preloading"] .month-selector {
+  cursor: progress;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --month-motion-duration: 1ms; }
+
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-name: none !important;
+  }
+}
+
+@media print {
+  ::view-transition-group(root),
+  ::view-transition-old(root),
+  ::view-transition-new(root),
+  .month-motion-fallback-snapshot {
+    display: none !important;
+  }
+}
