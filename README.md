@@ -8,7 +8,7 @@
 
 > **Release-Token:** `20260801.11`  
 > **Farbarchitektur:** Seasonal Spectrum Director mit **288 deterministischen Spektrumprofilen**  
-> **Monatsfarben:** pastelliges Spektrum, Nachbarmonate auf drei Achsen getrennt, Farbnamen aus dem tatsächlichen OKLCH-Wert abgeleitet  
+> **Monatsfarben:** Pastellfassungen recherchierter Trendfarben 2026, Nachbarmonate auf drei Achsen getrennt  
 > **Monatswechsel:** flüssige, richtungsabhängige High-Framerate-Transition mit durchgehendem OKLCH-Farbverlauf  
 > **Bedienung:** kompakte Icon-Werkzeugleiste · tastaturgeführter, nach Eignung sortierter Dienst-Picker  
 > **Paketversion:** `0.2.0` · **Feiertagsregion:** Sachsen (`SN`)  
@@ -321,28 +321,38 @@ Die saisonale Identität bleibt erhalten. Januar wirkt weiterhin winterlich, Mai
 
 ### 4.2 Saisonale Farbkorridore
 
-Jeder Kalendermonat besitzt einen eigenen Farbkorridor:
+Die Palette ist **recherchiert, nicht erfunden**. Die Anker jedes Monats sind Farben der Saisonpaletten 2026:
 
-| Monat | Spektralfamilie | Farbtonmitte | Beispiele |
+- **Pantone Fashion Color Trend Report** für die New Yorker und Londoner Fashion Week, S/S 26 und A/W 26/27 (u. a. Marina, Tea Rose, Acacia, Muskmelon, Alexandrite, Amethyst Orchid, Foxglove, Festival Fuchsia, Neptune Green, Arabian Spice, Poseidon, Underworld);
+- **Key Colours von WGSN und Coloro** (Transformative Teal als Colour of the Year 2026, Jelly Mint, Blue Aura, Amber Haze, Green Glow, Fresh Purple, Cocoa Powder, Future Dusk);
+- **Farben des Jahres 2026** der Hersteller (Cloud Dancer bei Pantone, Hidden Gem bei Behr, Universal Khaki bei Sherwin-Williams, Warm Eucalyptus bei Valspar, Divine Damson bei Graham & Brown, Epernay bei C2, Midnight Garden bei Dunn-Edwards, Satin Lagoon bei Rust-Oleum).
+
+Die hinterlegten Hexwerte sind die veröffentlichten sRGB-Näherungen dieser Farben. Jeder Monat trägt **acht Anker** aus seinem saisonalen Umfeld; Farbtonmitte, Korridorbreite, Helligkeit und Buntheit werden aus ihnen berechnet. Der Korridor ist damit vollständig aus der Recherche abgeleitet und nicht nachträglich daran angenähert.
+
+| Monat | Spektralfamilie | Farbtonmitte | Anker (Auswahl) |
 |---|---|---|---|
-| Januar | Eis · Polarlicht | 245° | Gletscherblau, Eisflieder, Aquamarin, Dämmerblau |
-| Februar | Beere · Lack | 5° | Rosenquarz, Himbeerlack, Altrosa, Korallrosa |
-| März | Keimgrün · Botanik | 150° | Keimgrün, Celadon, Waldjade, Frühlingsaqua |
-| April | Blüte · Iris | 305° | Iris, Fliederblitz, Glockenblau, Malve |
-| Mai | Blattgrün · Zitrus | 136° | Maigrün, Minzblatt, Lindenblatt, Salbei |
-| Juni | Wasser · Küste | 208° | Sommerhimmel, Poolblau, Meeresglas, Küstenblau |
-| Juli | Frucht · Sonnenglut | 34° | Pfirsichglut, Wassermelone, Papaya, Persimone |
-| August | Gold · Ernte | 82° | Honiggold, Limonengold, Erntegelb, Aprikosengold |
-| September | Wein · Pflaume | 340° | Mauve, Feige, Altrosé, Traubenlila |
-| Oktober | Kupfer · Erde | 60° | Lachsrot, Strohgold, Ocker, Ahornorange |
-| November | Mineral · Sturm | 260° | Nebelblau, Rauchblau, Schiefer, Amethystnebel |
-| Dezember | Immergrün · Festlicht | 182° | Mistelgrün, Festjade, Wacholder, Polartürkis |
+| Januar | Eis · Polarlicht | 245° | Ether, Vapor Blue, Dutch Canal, Blue Aura, Marina, All Aboard, Poseidon, Retro Blue |
+| Februar | Beere · Lack | 11° | Primrose Pink, Tickled Pink, Tea Rose, Dusky Rose, Foxglove, Teaberry, Festival Fuchsia, Cherry Lacquer |
+| März | Keimgrün · Botanik | 140° | Jelly Mint, Neptune Green, Sage Green, Warm Eucalyptus, Shale Green, Hidden Gem, Green Envy, Palm |
+| April | Blüte · Iris | 336° | Burnished Lilac, Amethyst Orchid, Fresh Purple, Orchid Bloom, Damson, Amaranth, Electric Fuchsia, Divine Damson |
+| Mai | Blattgrün · Zitrus | 115° | Pale Banana, Celestial Yellow, Acacia, Green Glow, Lemon Grass, Jelly Mint, Green Envy, Palm |
+| Juni | Wasser · Küste | 212° | Jelly Mint, Neptune Green, Satin Lagoon, Transformative Teal, Alexandrite, Dutch Canal, Blue Aura, Marina |
+| Juli | Frucht · Sonnenglut | 39° | Muskmelon, Mandarin Orange, Amber Haze, Brandied Melon, Burnt Sienna, Chili Oil, Poppy Red, Lava Falls |
+| August | Gold · Ernte | 97° | Epernay, Universal Khaki, Pale Banana, Acacia, Lemon Grass, Green Glow, Burnt Olive, Celestial Yellow |
+| September | Wein · Pflaume | 352° | Foxglove, Burnished Lilac, Amethyst Orchid, Damson, Mauve Wine, Amaranth, Festival Fuchsia, Divine Damson |
+| Oktober | Kupfer · Erde | 47° | Candied Ginger, Caramel, Amber Haze, Muted Clay, Toffee, Arabian Spice, Cocoa Powder, Warm Mahogany |
+| November | Mineral · Sturm | 268° | Vapor Blue, Underworld, Future Dusk, Silhouette, Crown Blue, Evening Blue, Rhodonite, Retro Blue |
+| Dezember | Immergrün · Festlicht | 176° | Neptune Green, Satin Lagoon, Transformative Teal, Hidden Gem, Shale Green, Sycamore, Midnight Garden, Alexandrite |
 
-Die Farbtonmitten sind so gewählt, dass **aufeinanderfolgende Monate weit auseinander liegen**. Farbton, Helligkeit und Buntheit werden unabhängig voneinander aufgespannt: Pro Monat stehen 96 Kandidaten aus acht Farbton-Bahnen und zwölf Ton-Stufen zur Auswahl. Alle drei Achsen bleiben dabei fest im Korridor des Monats – ein Maigrün kann leuchten oder ruhig wirken, aber nie in ein herbstliches Oliv absinken.
+**Pastellfassung statt Originalton.** Die Originale reichen von `Primrose Pink` bis `Poseidon`. Für eine Arbeitsfläche, auf die man stundenlang schaut, werden sie als Ganzes in ein helles Band gehoben (OKLCH-Helligkeit 0,695–0,895) und in der Buntheit gedämpft (höchstens 0,145). Der **Farbton bleibt unverändert** – das Kennzeichnende der Farbe. Die Reihenfolge bleibt ebenfalls erhalten: `Poseidon` ist auch als Pastellfassung der tiefere Ton, `Primrose Pink` der hellere.
 
-**Pastellbereich.** Sämtliche Monatsfarben liegen in einem hellen, zurückhaltenden Tonbereich: Helligkeit zwischen etwa 0,66 und 0,90, Buntheit höchstens 0,175 (OKLCH). Die Flächen bleiben damit ruhig genug für stundenlange Arbeit am Plan, ohne ihre Unterscheidbarkeit zu verlieren. Ein automatischer Test hält diesen Bereich für alle 288 Profile fest.
+**Englische Originalnamen.** Das Badge nennt die Farbe so, wie sie in der Saisonpalette heißt: „Monatskontrast · Neptune Green“. Ein Name ist eine Bezeichnung, keine Beschreibung – er wird deshalb nicht übersetzt. Ein Test stellt sicher, dass jeder angezeigte Name tatsächlich aus der Recherche stammt.
 
-**Takt zwischen hell und tief.** Die Monate wechseln reihum zwischen einem hellen und einem tieferen Pastellton; der Takt kippt zusätzlich mit jedem Jahr. Ohne diesen Wechsel wirkte ein Jahr trotz unterschiedlicher Farbtöne wie eine durchgehende Reihe gleich heller Flächen.
+**Takt zwischen hell und tief.** Die Monate wechseln reihum zwischen einem helleren und einem tieferen Ton; der Takt kippt zusätzlich mit jedem Jahr. Ohne diesen Wechsel wirkte ein Jahr trotz unterschiedlicher Farbtöne wie eine durchgehende Reihe gleich heller Flächen.
+
+**Keine schnellen Wiederholungen.** Ein Farbname kehrt frühestens nach zwölf Monaten zurück – über Jahresgrenzen hinweg gerechnet. Innerhalb eines Jahres trägt damit jeder Monat eine eigene Trendfarbe. Im gesamten Zyklus erscheinen 56 verschiedene Trendfarben.
+
+Farbton, Helligkeit und Buntheit werden unabhängig voneinander aufgespannt: Pro Monat stehen 96 Kandidaten aus acht Farbton-Bahnen und zwölf Ton-Stufen zur Auswahl, alle drei Achsen bleiben dabei im Korridor des Monats.
 
 ### 4.3 24 Jahrescharaktere und 288 Profile
 
@@ -359,10 +369,13 @@ Verbindliche Mindestabstände. Der reine OKLab-Abstand genügt dafür nicht: Zwe
 
 | Beziehung | Achse | Mindestabstand | tatsächlich erreicht |
 |---|---|---|---|
-| aufeinanderfolgende Kalendermonate | OKLab-Gesamtabstand | 0,110 | 0,117 |
-| aufeinanderfolgende Kalendermonate | Farbton | 38° | 44° |
-| aufeinanderfolgende Kalendermonate | Helligkeit | 0,040 | 0,045 |
-| derselbe Monat in Folgejahren | OKLab-Gesamtabstand | 0,070 | 0,072 |
+| aufeinanderfolgende Kalendermonate | OKLab-Gesamtabstand | 0,095 | 0,097 |
+| aufeinanderfolgende Kalendermonate | Farbton | 38° | 40° |
+| aufeinanderfolgende Kalendermonate | Helligkeit | 0,034 | 0,035 |
+| derselbe Monat in Folgejahren | OKLab-Gesamtabstand | 0,040 | 0,044 |
+| gleicher Farbname | Abstand in Monaten | 12 | 14 |
+
+Der Gesamtabstand fällt im Pastellband naturgemäß kleiner aus als bei kräftigen Tönen; die wahrnehmbare Trennung tragen dort Farbton und Helligkeit.
 
 Zusätzlich darf jeder sRGB-Wert im gesamten Zyklus nur ein einziges Mal vorkommen. Kandidaten, die nach der Gamut-Begrenzung auf einen bereits vergebenen Wert fallen, scheiden aus.
 
@@ -385,7 +398,7 @@ Der angezeigte Name wird **nicht** aus einer Reihenfolge gezogen, sondern aus de
 
 Bewertet werden Farbtonabstand, Helligkeit und Buntheit. Der nächstgelegene Anker benennt die Farbe; Anker des eigenen Monats werden bevorzugt. Dadurch kann das Badge nie einen Namen zeigen, der nicht zum sichtbaren Ton gehört. Ein automatischer Test prüft diese Zusage für alle 288 Profile.
 
-Die Anker sind relativ zur Mitte ihres Monatskorridors definiert und wandern deshalb mit ihm. Mit der Umstellung auf Pastell wurden zusätzlich alle Namen nachgezogen, die eine Tiefe versprachen, die es nicht mehr gibt: aus `Nachtblau` wurde `Dämmerungsblau`, aus `Rubinrot` `Himbeerrot`, aus `Aubergine` `Lavendelgrau`, aus `Smaragdnacht` `Tannenjade`.
+Die Anker sind die Pastellfassungen der recherchierten Trendfarben (Abschnitt 4.2). Verglichen wird im selben Farbraum, in dem auch die Fläche entsteht – Name und Ton können deshalb nicht auseinanderlaufen.
 
 Das Badge zeigt weiterhin nur den Farbnamen:
 
@@ -668,7 +681,7 @@ Prüft sämtliche produktiven JavaScript-Module, Pages Functions und Testkonfigu
 npm test
 ```
 
-Aktuell umfasst die Suite **213 Unit- und Regressionstests**. Geprüft werden unter anderem:
+Aktuell umfasst die Suite **216 Unit- und Regressionstests**. Geprüft werden unter anderem:
 
 - Regelengine und personenspezifische Sonderregeln;
 - Persistenz, Dirty-Zustände und Offline-Schutz;
@@ -689,7 +702,8 @@ Aktuell umfasst die Suite **213 Unit- und Regressionstests**. Geprüft werden un
 - Gruppierung, Rangfolge und Tippfilter des Dienst-Pickers;
 - die Regressionen des Bughunts (Abschnitt 13.4);
 - das Hauptthread-Budget des Monatswechsels (Abschnitt 3.8);
-- Pastellbereich, Dreiachsen-Trennung und Helligkeitstakt der Monatsfarben.
+- Pastellbereich, Dreiachsen-Trennung und Helligkeitstakt der Monatsfarben;
+- Herkunft jedes Farbnamens aus der Trendrecherche und die Zwölfmonatssperre gegen Wiederholungen.
 
 ### 13.2 End-to-End
 

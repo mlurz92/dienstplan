@@ -28,134 +28,132 @@ export const SPECTRUM_CYCLE_YEARS = 24;
 export const SPECTRUM_DURATION_MS = 760;
 
 /**
- * Farbanker: [Name, absoluter OKLCH-Farbton in Grad, Helligkeitscharakter,
- * Buntheitscharakter]. Die Charakterwerte sind -1 (tief/zart), 0 (ausgewogen)
- * und 1 (hell/leuchtend) relativ zur Mitte des jeweiligen Monatskorridors.
+ * Trendfarben 2026 als Anker der Monatspaletten.
+ *
+ * Die Anker sind keine erfundenen Töne, sondern recherchierte Farben der
+ * Saisonpaletten 2026: Pantone Fashion Color Trend Report für die New Yorker
+ * und Londoner Fashion Week (S/S 26 und A/W 26/27), die Key Colours von WGSN
+ * und Coloro sowie die Farben des Jahres 2026 der großen Farbhersteller. Die
+ * Hexwerte sind die veröffentlichten sRGB-Näherungen dieser Farben.
+ *
+ * Jeder Monat trägt acht Anker aus seinem saisonalen Umfeld. Aus ihnen ergeben
+ * sich Farbtonmitte, Breite, Helligkeit und Buntheit des Monatskorridors – die
+ * Palette ist damit vollständig aus der Trendrecherche abgeleitet und nicht
+ * nachträglich daran angenähert.
+ *
+ * Die Namen bleiben in ihrer englischen Originalform: „Neptune Green“ ist der
+ * Name der Farbe, nicht eine Beschreibung, die sich übersetzen ließe.
  */
-export const SPECTRUM_MONTH_PROFILES = Object.freeze([
+const TREND_COLORS = Object.freeze([
   {
     month: 1, season: 'Winter', family: 'Eis · Polarlicht',
-    hue: 245, hueSpan: 76, lightness: 0.765, lightnessSpan: 0.105, chroma: 0.085, chromaSpan: 0.075,
-    names: [
-      ['Eiscyan', 210, 1, 1], ['Petrolblau', 210, -1, 0], ['Aquamarin', 210, 1, -1],
-      ['Gletscherblau', 232, 1, 1], ['Azurblau', 232, 0, 1], ['Stahlblau', 232, -1, -1],
-      ['Nordlichtblau', 254, 1, 1], ['Wintergrau', 254, 0, -1], ['Frostindigo', 254, -1, 0],
-      ['Polarviolett', 280, 0, 1], ['Eisflieder', 280, 1, -1], ['Dämmerblau', 280, -1, 1]
+    colors: [
+      ['Ether', '#c7d3da'], ['Vapor Blue', '#b9c4cb'],
+      ['Dutch Canal', '#7fa9c9'], ['Blue Aura', '#8eb4de'],
+      ['Marina', '#5085c3'], ['All Aboard', '#3f7ca6'],
+      ['Poseidon', '#123651'], ['Retro Blue', '#5f7ea8']
     ]
   },
   {
     month: 2, season: 'Spätwinter', family: 'Beere · Lack',
-    hue: 5, hueSpan: 54, lightness: 0.745, lightnessSpan: 0.115, chroma: 0.105, chromaSpan: 0.08,
-    names: [
-      ['Magentarosa', 335, -1, 1], ['Orchidee', 335, 1, -1], ['Fuchsia', 335, 0, 1],
-      ['Himbeerlack', 352, 0, 1], ['Rosenquarz', 352, 1, -1], ['Beerenrosa', 352, -1, 1],
-      ['Rosenrot', 8, 0, 1], ['Altrosa', 8, 1, -1], ['Himbeerrot', 8, -1, 1],
-      ['Korallrot', 28, 0, 1], ['Kirschblüte', 28, -1, 0], ['Korallrosa', 28, 1, -1]
+    colors: [
+      ['Primrose Pink', '#f0d3d8'], ['Tickled Pink', '#e7b6c0'],
+      ['Tea Rose', '#dc7178'], ['Dusky Rose', '#ba7b7c'],
+      ['Foxglove', '#c49ba0'], ['Teaberry', '#c6455c'],
+      ['Festival Fuchsia', '#b8296a'], ['Cherry Lacquer', '#8e2436']
     ]
   },
   {
     month: 3, season: 'Vorfrühling', family: 'Keimgrün · Botanik',
-    hue: 150, hueSpan: 78, lightness: 0.775, lightnessSpan: 0.105, chroma: 0.095, chromaSpan: 0.075,
-    names: [
-      ['Chartreusegrün', 118, 1, 1], ['Wiesengrün', 118, 0, 0], ['Salbeioliv', 118, -1, -1],
-      ['Keimgrün', 142, 1, 1], ['Kleegrün', 142, 0, 1], ['Moosgrün', 142, -1, -1],
-      ['Celadon', 165, 1, -1], ['Jadegrün', 165, 0, 1], ['Waldjade', 165, -1, 0],
-      ['Eukalyptus', 188, 1, -1], ['Frühlingsaqua', 188, 0, 1], ['Türkisgrün', 188, -1, 1]
+    colors: [
+      ['Jelly Mint', '#a9dbc0'], ['Neptune Green', '#7fbc9c'],
+      ['Sage Green', '#b2ac88'], ['Warm Eucalyptus', '#98a189'],
+      ['Shale Green', '#79957f'], ['Hidden Gem', '#5e7a72'],
+      ['Green Envy', '#6e8b3d'], ['Palm', '#6f7c3f']
     ]
   },
   {
     month: 4, season: 'Frühling', family: 'Blüte · Iris',
-    hue: 305, hueSpan: 80, lightness: 0.755, lightnessSpan: 0.115, chroma: 0.1, chromaSpan: 0.08,
-    names: [
-      ['Veilchenblau', 275, 0, 1], ['Glockenblau', 275, 1, -1], ['Dämmerviolett', 275, -1, 0],
-      ['Iris', 295, 0, 1], ['Hyazinthe', 295, 1, 0], ['Purpurlila', 295, -1, 1],
-      ['Krokusviolett', 315, 0, 0], ['Fliederblitz', 315, 1, 1], ['Amethyst', 315, -1, 1],
-      ['Malve', 335, 0, -1], ['Blütenrosa', 335, 1, -1], ['Beerenmagenta', 335, -1, 1]
+    colors: [
+      ['Burnished Lilac', '#c5aeb1'], ['Amethyst Orchid', '#9f6ba0'],
+      ['Fresh Purple', '#8c63c8'], ['Orchid Bloom', '#c6a4ce'],
+      ['Damson', '#8e6f82'], ['Amaranth', '#6e3b4f'],
+      ['Electric Fuchsia', '#d2409a'], ['Divine Damson', '#4c2e48']
     ]
   },
   {
     month: 5, season: 'Frühling', family: 'Blattgrün · Zitrus',
-    hue: 136, hueSpan: 62, lightness: 0.785, lightnessSpan: 0.105, chroma: 0.105, chromaSpan: 0.08,
-    names: [
-      ['Zitrusgelb', 95, 1, 1], ['Limonengrün', 95, 0, 1], ['Senfoliv', 95, -1, -1],
-      ['Chartreuse', 118, 1, 1], ['Apfelgrün', 118, 0, 1], ['Lindenblatt', 118, 1, -1],
-      ['Maigrün', 140, 0, 1], ['Salbei', 140, 1, -1], ['Farngrün', 140, -1, 0],
-      ['Minzblatt', 162, 1, -1], ['Smaragdgrün', 162, 0, 1], ['Bambusgrün', 162, -1, 0]
+    colors: [
+      ['Pale Banana', '#f4e3a0'], ['Celestial Yellow', '#efe08c'],
+      ['Acacia', '#ded33c'], ['Green Glow', '#c3d63c'],
+      ['Lemon Grass', '#ddd5a5'], ['Jelly Mint', '#a9dbc0'],
+      ['Green Envy', '#6e8b3d'], ['Palm', '#6f7c3f']
     ]
   },
   {
     month: 6, season: 'Frühsommer', family: 'Wasser · Küste',
-    hue: 208, hueSpan: 80, lightness: 0.765, lightnessSpan: 0.105, chroma: 0.095, chromaSpan: 0.075,
-    names: [
-      ['Seegrün', 178, 0, 1], ['Meeresglas', 178, 1, -1], ['Meergrün', 178, -1, 1],
-      ['Türkisstrom', 198, 0, 1], ['Aqua', 198, 1, 1], ['Petroltürkis', 198, -1, 0],
-      ['Lagune', 218, 0, 1], ['Poolblau', 218, 1, 0], ['Mineralblau', 218, 0, -1],
-      ['Küstenblau', 242, -1, 0], ['Sommerhimmel', 242, 1, -1], ['Ozeanblau', 242, -1, 1]
+    colors: [
+      ['Jelly Mint', '#a9dbc0'], ['Neptune Green', '#7fbc9c'],
+      ['Satin Lagoon', '#2e7c84'], ['Transformative Teal', '#1c7e84'],
+      ['Alexandrite', '#3e7e8c'], ['Dutch Canal', '#7fa9c9'],
+      ['Blue Aura', '#8eb4de'], ['Marina', '#5085c3']
     ]
   },
   {
     month: 7, season: 'Hochsommer', family: 'Frucht · Sonnenglut',
-    hue: 34, hueSpan: 42, lightness: 0.745, lightnessSpan: 0.115, chroma: 0.115, chromaSpan: 0.08,
-    names: [
-      ['Hibiskusrot', 12, 0, 1], ['Wassermelone', 12, 1, 0], ['Kirschrosa', 12, -1, 1],
-      ['Koralle', 30, 1, 1], ['Erdbeerrot', 30, -1, 1], ['Terrakottarot', 30, 0, 0],
-      ['Persimone', 46, 0, 1], ['Pfirsichglut', 46, 1, -1], ['Rostorange', 46, -1, 0],
-      ['Mandarine', 62, 0, 1], ['Papaya', 62, 1, 1], ['Karamell', 62, -1, -1]
+    colors: [
+      ['Muskmelon', '#e8834a'], ['Mandarin Orange', '#e2703a'],
+      ['Amber Haze', '#e0a46b'], ['Brandied Melon', '#c86a4b'],
+      ['Burnt Sienna', '#b75b3f'], ['Chili Oil', '#b5462f'],
+      ['Poppy Red', '#be3a34'], ['Lava Falls', '#a32b31']
     ]
   },
   {
     month: 8, season: 'Spätsommer', family: 'Gold · Ernte',
-    hue: 82, hueSpan: 62, lightness: 0.8, lightnessSpan: 0.1, chroma: 0.105, chromaSpan: 0.075,
-    names: [
-      ['Bernstein', 58, 0, 1], ['Aprikosengold', 58, 1, 1], ['Karamellbraun', 58, -1, -1],
-      ['Safran', 76, 0, 1], ['Honiggold', 76, 1, 0], ['Bronzegold', 76, -1, 0],
-      ['Sonnenblume', 94, 1, 1], ['Currygelb', 94, 0, 1], ['Erntegelb', 94, 1, 0],
-      ['Goldolive', 112, -1, -1], ['Senfgrün', 112, -1, 0], ['Limonengold', 112, 1, -1]
+    colors: [
+      ['Epernay', '#d6b96c'], ['Universal Khaki', '#cbbba1'],
+      ['Pale Banana', '#f4e3a0'], ['Acacia', '#ded33c'],
+      ['Lemon Grass', '#ddd5a5'], ['Green Glow', '#c3d63c'],
+      ['Burnt Olive', '#8a7b4e'], ['Celestial Yellow', '#efe08c']
     ]
   },
   {
     month: 9, season: 'Frühherbst', family: 'Wein · Pflaume',
-    hue: 340, hueSpan: 68, lightness: 0.735, lightnessSpan: 0.12, chroma: 0.095, chromaSpan: 0.075,
-    names: [
-      ['Lavendelgrau', 312, -1, -1], ['Traubenlila', 312, -1, 1], ['Mauve', 312, 1, -1],
-      ['Brombeerrosa', 330, -1, 0], ['Pflaume', 330, 0, 0], ['Fuchsienrosa', 330, 1, 1],
-      ['Dahlienrot', 348, 0, 1], ['Weinrosé', 348, -1, 1], ['Feige', 348, 1, -1],
-      ['Altrosé', 6, 1, -1], ['Rosenholz', 6, 0, -1], ['Beerenrosé', 6, -1, 1]
+    colors: [
+      ['Foxglove', '#c49ba0'], ['Burnished Lilac', '#c5aeb1'],
+      ['Amethyst Orchid', '#9f6ba0'], ['Damson', '#8e6f82'],
+      ['Mauve Wine', '#734550'], ['Amaranth', '#6e3b4f'],
+      ['Festival Fuchsia', '#b8296a'], ['Divine Damson', '#4c2e48']
     ]
   },
   {
     month: 10, season: 'Herbst', family: 'Kupfer · Erde',
-    hue: 60, hueSpan: 62, lightness: 0.755, lightnessSpan: 0.115, chroma: 0.1, chromaSpan: 0.075,
-    names: [
-      ['Rostrosé', 32, -1, 1], ['Terrakotta', 32, 0, 1], ['Lachsrot', 32, 1, -1],
-      ['Kupfer', 50, 0, 1], ['Kürbis', 50, 1, 1], ['Zimtbraun', 50, -1, -1],
-      ['Ahornorange', 68, 1, 1], ['Bronze', 68, -1, 0], ['Karamellgold', 68, 0, 0],
-      ['Ocker', 88, 0, 0], ['Senfocker', 88, -1, -1], ['Strohgold', 88, 1, -1]
+    colors: [
+      ['Candied Ginger', '#d8a47f'], ['Caramel', '#c67c4e'],
+      ['Amber Haze', '#e0a46b'], ['Muted Clay', '#c08a78'],
+      ['Toffee', '#a2704f'], ['Arabian Spice', '#8b4a2f'],
+      ['Cocoa Powder', '#7b4a3a'], ['Warm Mahogany', '#7b473c']
     ]
   },
   {
     month: 11, season: 'Spätherbst', family: 'Mineral · Sturm',
-    hue: 260, hueSpan: 80, lightness: 0.725, lightnessSpan: 0.12, chroma: 0.07, chromaSpan: 0.065,
-    names: [
-      ['Petrolgrau', 212, -1, -1], ['Stahlpetrol', 212, 0, -1], ['Nebelblau', 212, 1, -1],
-      ['Graphitdunst', 240, -1, -1], ['Sturmblau', 240, -1, 0], ['Rauchblau', 240, 1, -1],
-      ['Schiefer', 268, 0, -1], ['Indigonebel', 268, 0, 0], ['Dämmerungsblau', 268, -1, 1],
-      ['Basaltlila', 298, -1, -1], ['Nebelviolett', 298, 1, -1], ['Amethystnebel', 298, 0, 1]
+    colors: [
+      ['Vapor Blue', '#b9c4cb'], ['Underworld', '#8c93a1'],
+      ['Future Dusk', '#57668b'], ['Silhouette', '#57504c'],
+      ['Crown Blue', '#3a3f63'], ['Evening Blue', '#2c3a4a'],
+      ['Rhodonite', '#3e3a55'], ['Retro Blue', '#5f7ea8']
     ]
   },
   {
     month: 12, season: 'Winter', family: 'Immergrün · Festlicht',
-    hue: 182, hueSpan: 52, lightness: 0.715, lightnessSpan: 0.115, chroma: 0.085, chromaSpan: 0.07,
-    names: [
-      ['Winterwald', 145, -1, -1], ['Tannengrün', 145, -1, 0], ['Mistelgrün', 145, 1, -1],
-      ['Tannenjade', 168, -1, 1], ['Wacholder', 168, 0, -1], ['Festjade', 168, 0, 1],
-      ['Pfauengrün', 188, 0, 1], ['Festpetrol', 188, 1, -1], ['Wintertürkis', 188, -1, 1],
-      ['Polartürkis', 208, 1, 0], ['Eisblaugrün', 208, 1, -1], ['Winterblau', 208, -1, 0]
+    colors: [
+      ['Neptune Green', '#7fbc9c'], ['Satin Lagoon', '#2e7c84'],
+      ['Transformative Teal', '#1c7e84'], ['Hidden Gem', '#5e7a72'],
+      ['Shale Green', '#79957f'], ['Sycamore', '#3f4c42'],
+      ['Midnight Garden', '#39463c'], ['Alexandrite', '#3e7e8c']
     ]
   }
-].map(profile => Object.freeze({ ...profile, names: Object.freeze(profile.names.map(entry => Object.freeze(entry))) })));
-
-const MONTH_PROFILES = SPECTRUM_MONTH_PROFILES;
+]);
 
 const YEAR_MOODS = Object.freeze([
   ['Kristall', -10, .030, -.010], ['Juwel', 8, -.030, .035], ['Botanisch', -14, .005, .020],
@@ -166,7 +164,7 @@ const YEAR_MOODS = Object.freeze([
   ['Porzellan', -6, .045, -.030], ['Dämmerung', 14, -.060, .020], ['Frisch', -17, .035, .025],
   ['Metallisch', 7, -.035, -.020], ['Blüte', 20, .020, .040], ['Wald', -12, -.020, .015],
   ['Prisma', 28, .000, .045], ['Leinen', -3, .040, -.040], ['Atelier', 12, -.015, .025]
-].map(([name, hue, lightness, chroma]) => Object.freeze({ name, hue, lightness, chroma })));
+].map(([name, hue, lightness, chroma]) => Object.freeze({ name, hue, lightness: lightness * .6, chroma: chroma * .5 })));
 
 const SURFACE_MIX = Object.freeze({
   '--weekday-field-bg': .49,
@@ -189,10 +187,10 @@ const VARIABLE_NAMES = Object.freeze([
  * identischer Helligkeit**. Deshalb müssen jetzt drei Achsen gleichzeitig
  * auseinanderliegen: Gesamtabstand, Farbton und Helligkeit.
  */
-const MIN_NEIGHBOUR_DISTANCE = .10;
+const MIN_NEIGHBOUR_DISTANCE = .075;
 const MIN_NEIGHBOUR_HUE = 38;
-const MIN_NEIGHBOUR_LIGHTNESS = .045;
-const MIN_ANNUAL_DISTANCE = .06;
+const MIN_NEIGHBOUR_LIGHTNESS = .035;
+const MIN_ANNUAL_DISTANCE = .045;
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const positiveMod = (value, divisor) => ((value % divisor) + divisor) % divisor;
 const radians = degrees => degrees * Math.PI / 180;
@@ -244,6 +242,11 @@ function oklabToRgbRaw([L, A, B, alpha = 1]) {
   ];
 }
 
+function parseHexColor(value) {
+  const hex = String(value).replace('#', '');
+  return [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16), 1];
+}
+
 const labToLch = ([L, a, b, alpha = 1]) => [L, Math.hypot(a, b), Math.atan2(b, a), alpha];
 const lchToLab = ([L, C, h, alpha = 1]) => [L, C * Math.cos(h), C * Math.sin(h), alpha];
 const inGamut = color => color.slice(0, 3).every(value => Number.isFinite(value) && value >= 0 && value <= 255);
@@ -257,6 +260,73 @@ export function oklchToRgb(L, C, h, alpha = 1) {
   }
   return rgb.map((value, index) => index < 3 ? clamp(value, 0, 255) : clamp(value, 0, 1));
 }
+
+/**
+ * Pastellfassung einer Trendfarbe.
+ *
+ * Die recherchierten Originale reichen von `Primrose Pink` bis `Poseidon`. Für
+ * die Arbeitsfläche werden sie in ein gemeinsames, helles Band gehoben und in
+ * der Buntheit gedämpft: Der Farbton – das eigentlich Kennzeichnende – bleibt
+ * dabei unverändert. Angezeigt wird damit die Pastellfassung genau dieser
+ * Farbe, und genau so heißt sie auch.
+ */
+const PASTEL_LIGHTNESS = Object.freeze({ min: .695, max: .895 });
+const SOURCE_LIGHTNESS = Object.freeze({ min: .30, max: .93 });
+const PASTEL_CHROMA_MAX = .145;
+
+export function pastelize(color) {
+  const [lightness, chroma, hue] = labToLch(rgbToOklab(color));
+  // Der Helligkeitsbereich der Originale wird als Ganzes in das Pastellband
+  // abgebildet. Die Reihenfolge bleibt damit erhalten: `Poseidon` ist auch als
+  // Pastellfassung der tiefere Ton, `Primrose Pink` der hellere.
+  const position = (clamp(lightness, SOURCE_LIGHTNESS.min, SOURCE_LIGHTNESS.max) - SOURCE_LIGHTNESS.min)
+    / (SOURCE_LIGHTNESS.max - SOURCE_LIGHTNESS.min);
+  return {
+    lightness: PASTEL_LIGHTNESS.min + position * (PASTEL_LIGHTNESS.max - PASTEL_LIGHTNESS.min),
+    chroma: clamp(chroma * .78, .045, PASTEL_CHROMA_MAX),
+    hue
+  };
+}
+
+const circularMean = angles => {
+  const x = angles.reduce((sum, angle) => sum + Math.cos(radians(angle)), 0);
+  const y = angles.reduce((sum, angle) => sum + Math.sin(radians(angle)), 0);
+  return degrees(Math.atan2(y, x));
+};
+
+/**
+ * Der Monatskorridor entsteht aus den Ankern selbst: Mitte und Breite des
+ * Farbtons, mittlere Helligkeit und Buntheit samt ihrer Streuung. Die Palette
+ * ist damit vollständig aus der Trendrecherche abgeleitet.
+ */
+function corridorFromColors(colors) {
+  const tones = colors.map(([, hex]) => pastelize(parseHexColor(hex)));
+  const hues = tones.map(tone => degrees(tone.hue));
+  const center = circularMean(hues);
+  const spread = Math.max(...hues.map(hue => angularDistance(hue, center)));
+  const average = values => values.reduce((sum, value) => sum + value, 0) / values.length;
+  const lightnessValues = tones.map(tone => tone.lightness);
+  const chromaValues = tones.map(tone => tone.chroma);
+  // Die Buntheit orientiert sich an der kräftigeren Hälfte der Anker. Ein
+  // schlichter Mittelwert zöge jeden Monat auf den blassesten Anker herunter,
+  // und benachbarte Monate wären am Ende kaum noch auseinanderzuhalten.
+  const strongerHalf = [...chromaValues].sort((left, right) => right - left).slice(0, Math.ceil(chromaValues.length / 2));
+  return {
+    hue: center,
+    // Enger Korridor: Nur so bleiben die Farbtonbereiche benachbarter Monate
+    // getrennt. Die Vielfalt entsteht über Helligkeit, Buntheit und den Takt.
+    hueSpan: clamp(spread * 1.4, 30, 54),
+    lightness: average(lightnessValues),
+    lightnessSpan: clamp((Math.max(...lightnessValues) - Math.min(...lightnessValues)) * 1.1, .07, .15),
+    chroma: average(strongerHalf),
+    chromaSpan: clamp((Math.max(...chromaValues) - Math.min(...chromaValues)) * .9, .05, .10)
+  };
+}
+
+export const SPECTRUM_MONTH_PROFILES = Object.freeze(TREND_COLORS.map(profile =>
+  Object.freeze({ ...profile, ...corridorFromColors(profile.colors) })));
+
+const MONTH_PROFILES = SPECTRUM_MONTH_PROFILES;
 
 function mixOklch(fromRgb, toRgb, amount) {
   const [L1, C1, h1Raw, a1] = labToLch(rgbToOklab(fromRgb));
@@ -299,13 +369,17 @@ function hueSector(color) {
  * abweichen.
  */
 export const SPECTRUM_COLOR_ANCHORS = Object.freeze(MONTH_PROFILES.flatMap(profile =>
-  profile.names.map(([name, anchorHue, lightnessBias, chromaBias]) => Object.freeze({
-    name,
-    month: profile.month,
-    hue: anchorHue,
-    lightness: profile.lightness + lightnessBias * profile.lightnessSpan * .42,
-    chroma: profile.chroma + chromaBias * profile.chromaSpan * .42
-  }))
+  profile.colors.map(([name, hex]) => {
+    const tone = pastelize(parseHexColor(hex));
+    return Object.freeze({
+      name,
+      hex,
+      month: profile.month,
+      hue: degrees(tone.hue),
+      lightness: tone.lightness,
+      chroma: tone.chroma
+    });
+  })
 ));
 
 const FOREIGN_ANCHOR_PENALTY = 1.15;
@@ -375,14 +449,14 @@ function candidateFor(profile, cycleIndex, phase) {
   );
   const hue = radians(hueDegrees);
   const lightness = clamp(
-    clamp(profile.lightness + lightnessNoise + mood.lightness + lightnessLane * .055,
-      profile.lightness - .075, profile.lightness + .075),
-    .66, .90
+    clamp(profile.lightness + lightnessNoise + mood.lightness + lightnessLane * .045,
+      profile.lightness - .07, profile.lightness + .07),
+    .68, .92
   );
   const chroma = clamp(
-    clamp(profile.chroma + chromaNoise + mood.chroma * .6 + chromaLane * .038,
-      profile.chroma - .045, profile.chroma + .05),
-    .045, .175
+    clamp(profile.chroma + chromaNoise + mood.chroma * .6 + chromaLane * .028,
+      profile.chroma - .03, profile.chroma + .04),
+    .028, .135
   );
   const accent = oklchToRgb(lightness, chroma, hue);
   const [actualLightness, actualChromaRaw, actualHue] = labToLch(rgbToOklab(accent));
@@ -406,7 +480,7 @@ function candidateFor(profile, cycleIndex, phase) {
  * der eigentliche Grund, warum aufeinanderfolgende Monate jetzt auch dann
  * verschieden wirken, wenn ihre Farbfamilien benachbart sind.
  */
-function selectCandidate(profile, cycleIndex, previous, sameMonthPreviousYear, usedSectors, usedHexes, brightPhase) {
+function selectCandidate(profile, cycleIndex, previous, sameMonthPreviousYear, usedSectors, usedHexes, brightPhase, usedNames) {
   const previousHue = previous ? degrees(previous.hue) : null;
   const ranked = Array.from({ length: SPECTRUM_CANDIDATES_PER_MONTH }, (_, phase) => candidateFor(profile, cycleIndex, phase))
     .map(candidate => {
@@ -434,7 +508,12 @@ function selectCandidate(profile, cycleIndex, previous, sameMonthPreviousYear, u
   // der Gamut-Begrenzung können zwei Kandidaten sonst auf denselben sRGB-Wert
   // fallen und der Zyklus verlöre sichtbar an Vielfalt.
   const unique = ranked.filter(entry => !usedHexes.has(toHex(entry.candidate.accent)));
-  const pool = unique.length ? unique : ranked;
+  // Ein Farbname darf sich frühestens nach zwölf Monaten wiederholen – über
+  // Jahresgrenzen hinweg gerechnet. Zweimal „Neptune Green“ innerhalb eines
+  // Jahres liest sich als Wiederholung, auch wenn die beiden Töne messbar
+  // auseinanderliegen.
+  const freshlyNamed = unique.filter(entry => !usedNames.has(entry.candidate.name));
+  const pool = freshlyNamed.length ? freshlyNamed : (unique.length ? unique : ranked);
   const separated = entry => entry.previousDistance >= MIN_NEIGHBOUR_DISTANCE
     && entry.hueSeparation >= MIN_NEIGHBOUR_HUE
     && entry.lightnessDelta >= MIN_NEIGHBOUR_LIGHTNESS;
@@ -474,13 +553,17 @@ function buildCanonicalPalettes() {
   const sameMonth = new Map();
   const usedHexes = new Set();
   let previous = null;
+  // Gleitendes Fenster über die zuletzt vergebenen Namen, unabhängig vom
+  // Jahreswechsel.
+  const recentNames = [];
+  const NAME_COOLDOWN_MONTHS = 12;
   for (let cycleIndex = 0; cycleIndex < SPECTRUM_CYCLE_YEARS; cycleIndex += 1) {
     const usedSectors = new Set();
     for (const profile of MONTH_PROFILES) {
       // Der Takt kippt mit jedem Monat und zusätzlich mit jedem Jahr: Ein Monat,
       // der 2026 hell ausfällt, ist 2027 der tiefe Ton seines Jahres.
       const brightPhase = (profile.month + cycleIndex) % 2 === 0;
-      const selected = selectCandidate(profile, cycleIndex, previous, sameMonth.get(profile.month), usedSectors, usedHexes, brightPhase);
+      const selected = selectCandidate(profile, cycleIndex, previous, sameMonth.get(profile.month), usedSectors, usedHexes, brightPhase, new Set(recentNames));
       const year = SPECTRUM_REFERENCE_YEAR + cycleIndex;
       const candidate = selected.candidate;
       const palette = Object.freeze({
@@ -505,6 +588,8 @@ function buildCanonicalPalettes() {
       sameMonth.set(profile.month, palette);
       usedSectors.add(candidate.sector);
       usedHexes.add(palette.accentHex);
+      recentNames.push(candidate.name);
+      if (recentNames.length > NAME_COOLDOWN_MONTHS) recentNames.shift();
     }
   }
   return Object.freeze(result);
