@@ -276,23 +276,24 @@ test('gewöhnlicher BD erzeugt keinerlei FZA-Seiteneffekt', () => {
   assert.equal(getAbsence(data, 'lurz', '2026-07-07'), '');
 });
 
-test('HG vor eigenem BD bleibt bei FA-BD am HG-Tag zulässig', () => {
+test('HG vor eigenem BD ist auch bei FA-BD einer anderen Person am HG-Tag rot', () => {
   const state = stateWith();
   const data = month(state, 2026, 7);
   setAssignment(data, '2026-07-08', 'bd', 'dalitz');
   setAssignment(data, '2026-07-09', 'bd', 'lurz');
   const result = evalAt(state, '2026-07-08', 'hg', 'lurz');
-  assert.equal(has(result, 'HG am Tag vor eigenem BD'), false);
+  assert.equal(result.level, 'red');
+  assert.ok(has(result, 'HG am Werktag vor eigenem BD'));
 });
 
-test('HG vor eigenem BD bleibt bei AA-BD am HG-Tag orange', () => {
+test('HG vor eigenem BD ist auch bei AA-BD einer anderen Person am HG-Tag rot', () => {
   const state = stateWith();
   const data = month(state, 2026, 7);
   setAssignment(data, '2026-07-08', 'bd', 'sebastian');
   setAssignment(data, '2026-07-09', 'bd', 'lurz');
   const result = evalAt(state, '2026-07-08', 'hg', 'lurz');
-  assert.equal(result.level, 'orange');
-  assert.ok(result.reasons.includes('HG am Tag vor eigenem BD'));
+  assert.equal(result.level, 'red');
+  assert.ok(has(result, 'HG am Werktag vor eigenem BD'));
 });
 
 test('Wochenendbewertung ist vor und nach Eintragung selbstkonsistent', () => {
@@ -305,11 +306,12 @@ test('Wochenendbewertung ist vor und nach Eintragung selbstkonsistent', () => {
   assert.deepEqual(existing.reasons, proposed.reasons);
 });
 
-test('kanonische Regeln beschreiben ausschließlich manuelle Empfehlungen', () => {
+test('kanonische Regeln beschreiben manuelle und bestätigungspflichtige automatische Planung', () => {
   const text = fs.readFileSync(new URL('../Eignungsregeln.txt', import.meta.url), 'utf8');
-  assert.match(text, /keinen automatischen Dienstplaner/i);
-  assert.match(text, /keine automatische Eintragung/i);
-  assert.doesNotMatch(text, /Neural Scheduler|Optimierungszyklen|Cross-Role-Tauschvorgänge/i);
+  assert.match(text, /bestätigungspflichtige automatische Komplettierung/i);
+  assert.match(text, /Kein automatischer Vorschlag/i);
+  assert.match(text, /AUTO-PLAN-STUDIO/i);
+  assert.doesNotMatch(text, /Neural Scheduler|Cross-Role-Tauschvorgänge/i);
 });
 
 
