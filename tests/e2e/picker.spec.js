@@ -31,12 +31,19 @@ function emptyMonth(year, month) {
   return { schemaVersion: 1, year, month, revision: 0, updatedAt: null, days, absences: {}, absenceSources: {}, preferences: {}, overrideLog: [], importLog: [] };
 }
 
-async function mockApi(page) {
+const LARGE_STAFF = [...STAFF, ...['Dr. Neumann', 'Fr. Ortlieb', 'Hr. Pahl', 'Fr. Quandt', 'Dr. Reuter', 'Dr. Simon', 'Fr. Thiel', 'Hr. Ulrich', 'Fr. Vogt', 'Dr. Werner']
+  .map((name, index) => ({
+    id: `zusatz${index}`, name, short: name.split(' ')[1], category: 'fa', roleLabel: 'FA',
+    activeFrom: '2025-01-01', activeUntil: null, includeInPlanning: true, includeInAbsenceList: true,
+    bdTarget: 4, maxBd: null, canHg: true, canSaturdayBd: true
+  }))];
+
+async function mockApi(page, staff = STAFF) {
   await page.route('https://cdn.sheetjs.com/**', route => route.fulfill({
     status: 200, contentType: 'application/javascript', body: 'window.XLSX = undefined;'
   }));
   await page.route('**/api/bootstrap', route => route.fulfill({
-    json: { ok: true, settings: { schemaVersion: 2 }, staff: STAFF, rbnNames: [] }
+    json: { ok: true, settings: { schemaVersion: 2 }, staff, rbnNames: [] }
   }));
   await page.route('**/api/month/**', route => {
     if (route.request().method() === 'PUT') return route.fulfill({ json: { ok: true } });
@@ -48,8 +55,8 @@ async function mockApi(page) {
   });
 }
 
-async function openJuly(page) {
-  await mockApi(page);
+async function openJuly(page, staff) {
+  await mockApi(page, staff);
   await page.goto('/');
   await page.selectOption('#yearSelect', '2026');
   await page.selectOption('#monthSelect', '7');
@@ -65,7 +72,7 @@ test('der Picker ist kompakt, nach Entscheidungsnähe gruppiert und wählt die E
 
   const card = page.locator('#pickerDialog .picker-card');
   const box = await card.boundingBox();
-  expect(box.width).toBeLessThanOrEqual(560);
+  expect(box.width).toBeLessThanOrEqual(600);
 
   await expect(page.locator('#pickerTitle')).toHaveText('Do, 09.07.2026');
   await expect(page.locator('#pickerEyebrow')).toHaveText('Bereitschaftsdienst');
@@ -89,6 +96,15 @@ test('der Picker ist kompakt, nach Entscheidungsnähe gruppiert und wählt die E
 
   // Jede Zeile trägt ihre Monatslast.
   await expect(active.locator('.picker-load')).toContainText('0/4');
+
+  // Die gesamte Belegschaft steht ohne Rollen gleichzeitig im Blick.
+  const list = await page.locator('#pickerList').evaluate(element => ({
+    scrollHeight: element.scrollHeight,
+    clientHeight: element.clientHeight,
+    items: element.querySelectorAll('.picker-item').length
+  }));
+  expect(list.items).toBe(4);
+  expect(list.scrollHeight).toBeLessThanOrEqual(list.clientHeight + 1);
 });
 
 test('Tippen filtert, Pfeiltasten wählen und Enter übernimmt', async ({ page }) => {
@@ -127,4 +143,28 @@ test('bei besetztem Tag zeigt der Picker die aktuelle Einteilung und das Lösche
   await page.locator('#clearAssignmentBtn').click();
   await expect(page.locator('#pickerDialog')).toBeHidden();
   await expect(openDay(page, 1).locator('.assignment-badges .small-chip')).toHaveText('offen');
+});
+
+test('auch eine vollständige Belegschaft steht ohne Rollen gleichzeitig im Blick', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await openJuly(page, LARGE_STAFF);
+  await openDay(page, 9).click();
+  await expect(page.locator('#pickerDialog')).toBeVisible();
+
+  const list = await page.locator('#pickerList').evaluate(element => ({
+    scrollHeight: element.scrollHeight,
+    clientHeight: element.clientHeight,
+    items: element.querySelectorAll('.picker-item').length
+  }));
+  expect(list.items).toBe(LARGE_STAFF.length);
+  expect(list.scrollHeight).toBeLessThanOrEqual(list.clientHeight + 1);
+
+  // Jede Person belegt genau eine Zeile.
+  const rowHeights = await page.locator('#pickerList .picker-item').evaluateAll(
+    items => items.map(item => Math.round(item.getBoundingClientRect().height)));
+  expect(Math.max(...rowHeights)).toBeLessThanOrEqual(34);
+
+  // Die Karte bleibt dabei innerhalb des Fensters.
+  const box = await page.locator('#pickerDialog .picker-card').boundingBox();
+  expect(box.height).toBeLessThanOrEqual(900);
 });

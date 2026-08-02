@@ -106,7 +106,9 @@ Dateiaktionen bleiben per Maus, Tastatur, Enter und Leertaste bedienbar. „Aktu
 
 ### 2.4 Dienst-Picker
 
-Der Picker beantwortet mitten in der Planung genau **eine** Frage: Wer übernimmt diesen Dienst? Er ist deshalb schmal (max. 560 px), dicht gesetzt und nach Entscheidungsnähe sortiert – nicht als vollständiger Prüfbericht angelegt.
+Der Picker beantwortet mitten in der Planung genau **eine** Frage: Wer übernimmt diesen Dienst? Er ist deshalb schmal (max. 600 px), dicht gesetzt und nach Entscheidungsnähe sortiert – nicht als vollständiger Prüfbericht angelegt.
+
+**Alle Mitarbeitenden gleichzeitig im Blick.** Jede Person belegt genau eine Zeile von rund 30 px Höhe. Damit steht die vollständige Belegschaft ohne Rollen auf einem Bild – die Rangfolge ist als Ganzes ablesbar, statt sie sich in mehreren Bildläufen zusammensuchen zu müssen. Erst wenn selbst das nicht mehr in das Fenster passt, rollt die Liste; eine Maske am unteren Rand zeigt das an. Unter 620 px Fensterbreite rückt die Begründung unter den Namen, die Übersicht bleibt erhalten.
 
 **Rangfolge statt Namensliste.** Alle bewerteten Personen werden in Entscheidungsgruppen einsortiert und innerhalb der Gruppe gereiht:
 
@@ -121,7 +123,7 @@ Der Picker beantwortet mitten in der Planung genau **eine** Frage: Wer übernimm
 
 Innerhalb einer Gruppe entscheidet die Empfehlungsstärke, danach die geringere Monatslast, danach der geringere Jahresverlauf, zuletzt der Name. Leere Gruppen erscheinen nicht.
 
-**Eine Zeile je Person.** Jede Zeile trägt Name, Funktion, Monatslast (`BD 2/4`, ohne den geöffneten Tag), die wichtigste Begründung und die Bewertung. Weitere Begründungen erscheinen als Zähler (`+2`); die **vollständige** Begründung steht im Detailbereich unter der Liste und wechselt mit der aktiven Zeile, ohne das Layout zu verschieben. Damit bleibt die fachliche Transparenz erhalten, ohne dass acht Textblöcke gleichzeitig um Aufmerksamkeit konkurrieren.
+**Was in der Zeile steht.** Name, Funktion, wichtigste Begründung, Monatslast (`BD 2/4`, ohne den geöffneten Tag) und Bewertung. Weitere Begründungen erscheinen als Zähler (`+2`); die **vollständige** Begründung steht im Detailbereich unter der Liste und wechselt mit der aktiven Zeile, ohne das Layout zu verschieben. Damit bleibt die fachliche Transparenz erhalten, ohne dass acht Textblöcke gleichzeitig um Aufmerksamkeit konkurrieren.
 
 **Tastaturgeführt.** Der Fokus liegt beim Öffnen im Suchfeld, die erste wählbare Person ist vorausgewählt:
 
@@ -634,9 +636,9 @@ Aktuell umfasst die Suite **178 Unit- und Regressionstests**. Geprüft werden un
 npm run test:e2e
 ```
 
-Aktuell umfasst die Browser-Suite **15 Playwright-End-to-End-Tests**. Sie prüft Navigation, Auswahl- und Konfliktdialoge, Werkzeugleiste, Dateiaktionen, Monatsbadge, Seasonal Spectrum Director, PDF-Export sowie Monats- und Jahresvariation.
+Aktuell umfasst die Browser-Suite **16 Playwright-End-to-End-Tests**. Sie prüft Navigation, Auswahl- und Konfliktdialoge, Werkzeugleiste, Dateiaktionen, Monatsbadge, Seasonal Spectrum Director, PDF-Export sowie Monats- und Jahresvariation.
 
-Der Dienst-Picker wird dabei vollständig durchgespielt: kompakte Breite, Gruppenreihenfolge, vorausgewählte Empfehlung, Tippfilter, Pfeiltasten, Übernahme per <kbd>⏎</kbd>, Anzeige der aktuellen Besetzung und Löschen des Eintrags.
+Der Dienst-Picker wird dabei vollständig durchgespielt: kompakte Breite, Gruppenreihenfolge, vorausgewählte Empfehlung, Tippfilter, Pfeiltasten, Übernahme per <kbd>⏎</kbd>, Anzeige der aktuellen Besetzung und Löschen des Eintrags. Ein eigener Fall prüft mit einer 14-köpfigen Belegschaft, dass die Liste ohne Bildlauf auskommt und keine Zeile höher als 34 px wird.
 
 Der spezielle High-Framerate-Regressionsfall verzögert die Monats-API bewusst und zeichnet den Übergang frameweise auf. Geprüft werden:
 
