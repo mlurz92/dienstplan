@@ -8,7 +8,7 @@
 
 > **Release-Token:** `20260801.11`  
 > **Farbarchitektur:** Seasonal Spectrum Director mit **288 deterministischen Spektrumprofilen**  
-> **Monatsfarben:** deutlich getrennte Nachbarmonate, Farbnamen aus dem tatsächlichen OKLCH-Wert abgeleitet  
+> **Monatsfarben:** pastelliges Spektrum, Nachbarmonate auf drei Achsen getrennt, Farbnamen aus dem tatsächlichen OKLCH-Wert abgeleitet  
 > **Monatswechsel:** flüssige, richtungsabhängige High-Framerate-Transition mit durchgehendem OKLCH-Farbverlauf  
 > **Bedienung:** kompakte Icon-Werkzeugleiste · tastaturgeführter, nach Eignung sortierter Dienst-Picker  
 > **Paketversion:** `0.2.0` · **Feiertagsregion:** Sachsen (`SN`)  
@@ -275,7 +275,22 @@ Der Fallback benötigt keine externe Bibliothek und folgt demselben visuellen Be
 - Beim Drucken werden View-Transition-Pseudoelemente, Fallback-Snapshots und die Lichtwelle ausgeschlossen.
 - Bedienelemente bleiben außerhalb der animierten Monatskarte und damit weiterhin fokussierbar.
 
-### 3.8 Warum keine externe Animationsbibliothek verwendet wird
+### 3.8 Hauptthread-Budget des Monatswechsels
+
+Eine Bewegung ist nur so flüssig wie der Thread, der sie zeichnet. Gemessen am gefüllten Monat lag die eigentliche Bremse nicht in der Animation, sondern in der Arbeit daneben. Vier Stellen wurden deshalb aus dem sichtbaren Pfad genommen:
+
+| Arbeit | vorher | jetzt |
+|---|---|---|
+| Regelbewertung belegter Zellen | Tabelle und Sammelprüfung bewerteten dieselben Zellen zweimal (rund 13 ms doppelt) | ein gemeinsamer Zwischenspeicher je Renderlauf |
+| Sammelprüfung (`collectIssues`, rund 18 ms) | im selben Block wie Tabelle und Statistik | erst im nächsten Leerlauf, mit Generationssperre gegen überholte Läufe |
+| Übernahme der vorgeladenen Monate | bis zu dreizehn Monate am Stück normalisiert | einzeln, mit `scheduler.yield()` zwischen zwei Monaten |
+| Lokale Sicherung | jedes `setMonthData` schrieb sofort in den Speicher | eigene Änderungen weiterhin sofort, Serverstände gebündelt im Leerlauf |
+
+Dazu entsteht die Tabelle in einem `DocumentFragment` und wird in einem Zug eingehängt; einzeln eingehängte Zeilen kosteten je Zeile einen Tabellenumbruch.
+
+Die Zusagen dazu stehen in `tests/rendering-performance.test.js`.
+
+### 3.9 Warum keine externe Animationsbibliothek verwendet wird
 
 Eine zusätzliche Bibliothek würde JavaScript-Gewicht, Initialisierungsaufwand und Main-Thread-Arbeit erhöhen. Native View Transitions und die Web Animations API bieten für diesen Anwendungsfall bereits:
 
@@ -310,20 +325,24 @@ Jeder Kalendermonat besitzt einen eigenen Farbkorridor:
 
 | Monat | Spektralfamilie | Farbtonmitte | Beispiele |
 |---|---|---|---|
-| Januar | Eis · Polarlicht | 245° | Gletscherblau, Polarviolett, Aquamarin, Frostindigo |
-| Februar | Beere · Lack | 5° | Himbeerlack, Karminrot, Fuchsia, Granatapfel |
-| März | Keimgrün · Botanik | 150° | Keimgrün, Kleegrün, Waldjade, Frühlingspetrol |
-| April | Blüte · Iris | 305° | Iris, Fliederblitz, Veilchenblau, Amethyst |
-| Mai | Blattgrün · Zitrus | 136° | Maigrün, Minzblatt, Lindenblatt, Farngrün |
-| Juni | Wasser · Küste | 208° | Lagune, Mineralblau, Küstenblau, Meeresglas |
-| Juli | Frucht · Sonnenglut | 34° | Koralle, Persimone, Tomatenrot, Pfirsichglut |
-| August | Gold · Ernte | 82° | Bernstein, Erntegelb, Honiggold, Goldolive |
-| September | Wein · Pflaume | 340° | Weinlese, Traubenviolett, Burgunder, Dahlienrot |
-| Oktober | Kupfer · Erde | 60° | Kupfer, Kürbis, Terrakotta, Strohgold |
-| November | Mineral · Sturm | 260° | Sturmblau, Schiefer, Nachtblau, Nebelblau |
-| Dezember | Immergrün · Festlicht | 182° | Tannengrün, Jadenacht, Wacholder, Polartürkis |
+| Januar | Eis · Polarlicht | 245° | Gletscherblau, Eisflieder, Aquamarin, Dämmerblau |
+| Februar | Beere · Lack | 5° | Rosenquarz, Himbeerlack, Altrosa, Korallrosa |
+| März | Keimgrün · Botanik | 150° | Keimgrün, Celadon, Waldjade, Frühlingsaqua |
+| April | Blüte · Iris | 305° | Iris, Fliederblitz, Glockenblau, Malve |
+| Mai | Blattgrün · Zitrus | 136° | Maigrün, Minzblatt, Lindenblatt, Salbei |
+| Juni | Wasser · Küste | 208° | Sommerhimmel, Poolblau, Meeresglas, Küstenblau |
+| Juli | Frucht · Sonnenglut | 34° | Pfirsichglut, Wassermelone, Papaya, Persimone |
+| August | Gold · Ernte | 82° | Honiggold, Limonengold, Erntegelb, Aprikosengold |
+| September | Wein · Pflaume | 340° | Mauve, Feige, Altrosé, Traubenlila |
+| Oktober | Kupfer · Erde | 60° | Lachsrot, Strohgold, Ocker, Ahornorange |
+| November | Mineral · Sturm | 260° | Nebelblau, Rauchblau, Schiefer, Amethystnebel |
+| Dezember | Immergrün · Festlicht | 182° | Mistelgrün, Festjade, Wacholder, Polartürkis |
 
-Die Farbtonmitten sind so gewählt, dass **aufeinanderfolgende Monate weit auseinander liegen**. Farbton, Helligkeit und Buntheit werden unabhängig voneinander aufgespannt: Pro Monat stehen 48 Kandidaten aus sechs Farbton-Bahnen und acht Ton-Ecken zur Auswahl. Farbton, Helligkeit und Buntheit bleiben dabei fest im Korridor des Monats – ein Maigrün kann leuchten oder ruhig wirken, aber nie in ein herbstliches Oliv absinken.
+Die Farbtonmitten sind so gewählt, dass **aufeinanderfolgende Monate weit auseinander liegen**. Farbton, Helligkeit und Buntheit werden unabhängig voneinander aufgespannt: Pro Monat stehen 96 Kandidaten aus acht Farbton-Bahnen und zwölf Ton-Stufen zur Auswahl. Alle drei Achsen bleiben dabei fest im Korridor des Monats – ein Maigrün kann leuchten oder ruhig wirken, aber nie in ein herbstliches Oliv absinken.
+
+**Pastellbereich.** Sämtliche Monatsfarben liegen in einem hellen, zurückhaltenden Tonbereich: Helligkeit zwischen etwa 0,66 und 0,90, Buntheit höchstens 0,175 (OKLCH). Die Flächen bleiben damit ruhig genug für stundenlange Arbeit am Plan, ohne ihre Unterscheidbarkeit zu verlieren. Ein automatischer Test hält diesen Bereich für alle 288 Profile fest.
+
+**Takt zwischen hell und tief.** Die Monate wechseln reihum zwischen einem hellen und einem tieferen Pastellton; der Takt kippt zusätzlich mit jedem Jahr. Ohne diesen Wechsel wirkte ein Jahr trotz unterschiedlicher Farbtöne wie eine durchgehende Reihe gleich heller Flächen.
 
 ### 4.3 24 Jahrescharaktere und 288 Profile
 
@@ -336,14 +355,18 @@ Für jeden der 288 kanonischen Kalendermonate werden mehrere Kandidaten innerhal
 
 Der Abstand wird im **OKLab-Farbraum** berechnet. Niedrig-diskrepante Zahlenfolgen verteilen Farbton, Helligkeit und Chroma deterministisch über den Zyklus.
 
-Verbindliche Mindestabstände:
+Verbindliche Mindestabstände. Der reine OKLab-Abstand genügt dafür nicht: Zwei Töne können ihn allein über die Buntheit erfüllen und trotzdem als „dieselbe Farbe, nur etwas kräftiger“ gelesen werden. Gemessen wurden benachbarte Paare mit **1° Farbtonabstand bei identischer Helligkeit**. Benachbarte Monate müssen deshalb auf **drei Achsen gleichzeitig** auseinanderliegen:
 
-| Beziehung | Mindestabstand (OKLab) | tatsächlich erreicht |
-|---|---|---|
-| aufeinanderfolgende Kalendermonate | 0,120 | 0,120 |
-| derselbe Monat in Folgejahren | 0,090 | 0,095 |
+| Beziehung | Achse | Mindestabstand | tatsächlich erreicht |
+|---|---|---|---|
+| aufeinanderfolgende Kalendermonate | OKLab-Gesamtabstand | 0,110 | 0,117 |
+| aufeinanderfolgende Kalendermonate | Farbton | 38° | 44° |
+| aufeinanderfolgende Kalendermonate | Helligkeit | 0,040 | 0,045 |
+| derselbe Monat in Folgejahren | OKLab-Gesamtabstand | 0,070 | 0,072 |
 
 Zusätzlich darf jeder sRGB-Wert im gesamten Zyklus nur ein einziges Mal vorkommen. Kandidaten, die nach der Gamut-Begrenzung auf einen bereits vergebenen Wert fallen, scheiden aus.
+
+Lässt sich in einem Fall nicht jede Zusage einhalten, gewinnt zuerst der Abstand zum Vormonat – er ist der sichtbarere – und unter den verbleibenden Kandidaten derjenige mit dem größten Jahresabstand.
 
 Eigenschaften:
 
@@ -361,6 +384,8 @@ Eigenschaften:
 Der angezeigte Name wird **nicht** aus einer Reihenfolge gezogen, sondern aus dem tatsächlich gewählten OKLCH-Wert bestimmt. Jeder Monat besitzt ein Lexikon aus zwölf Farbankern. Ein Anker beschreibt einen Farbton sowie einen Helligkeits- und Buntheitscharakter, zum Beispiel `Gletscherblau` als hellen, leuchtenden Ton bei 232° oder `Stahlblau` als tiefen, gedämpften Ton bei derselben Lage.
 
 Bewertet werden Farbtonabstand, Helligkeit und Buntheit. Der nächstgelegene Anker benennt die Farbe; Anker des eigenen Monats werden bevorzugt. Dadurch kann das Badge nie einen Namen zeigen, der nicht zum sichtbaren Ton gehört. Ein automatischer Test prüft diese Zusage für alle 288 Profile.
+
+Die Anker sind relativ zur Mitte ihres Monatskorridors definiert und wandern deshalb mit ihm. Mit der Umstellung auf Pastell wurden zusätzlich alle Namen nachgezogen, die eine Tiefe versprachen, die es nicht mehr gibt: aus `Nachtblau` wurde `Dämmerungsblau`, aus `Rubinrot` `Himbeerrot`, aus `Aubergine` `Lavendelgrau`, aus `Smaragdnacht` `Tannenjade`.
 
 Das Badge zeigt weiterhin nur den Farbnamen:
 
@@ -643,7 +668,7 @@ Prüft sämtliche produktiven JavaScript-Module, Pages Functions und Testkonfigu
 npm test
 ```
 
-Aktuell umfasst die Suite **204 Unit- und Regressionstests**. Geprüft werden unter anderem:
+Aktuell umfasst die Suite **213 Unit- und Regressionstests**. Geprüft werden unter anderem:
 
 - Regelengine und personenspezifische Sonderregeln;
 - Persistenz, Dirty-Zustände und Offline-Schutz;
@@ -662,7 +687,9 @@ Aktuell umfasst die Suite **204 Unit- und Regressionstests**. Geprüft werden un
 - Abbruch- und Generationensicherung;
 - Ausschluss eines framebasierten Deadlocks im Update-Callback;
 - Gruppierung, Rangfolge und Tippfilter des Dienst-Pickers;
-- die Regressionen des Bughunts (Abschnitt 13.4).
+- die Regressionen des Bughunts (Abschnitt 13.4);
+- das Hauptthread-Budget des Monatswechsels (Abschnitt 3.8);
+- Pastellbereich, Dreiachsen-Trennung und Helligkeitstakt der Monatsfarben.
 
 ### 13.2 End-to-End
 
@@ -670,7 +697,7 @@ Aktuell umfasst die Suite **204 Unit- und Regressionstests**. Geprüft werden un
 npm run test:e2e
 ```
 
-Aktuell umfasst die Browser-Suite **22 Playwright-End-to-End-Tests**. Sie prüft Navigation, Auswahl- und Konfliktdialoge, Werkzeugleiste, Dateiaktionen, Monatsbadge, Seasonal Spectrum Director, PDF-Export sowie Monats- und Jahresvariation.
+Aktuell umfasst die Browser-Suite **22 Playwright-End-to-End-Tests**, die vollständig grün laufen. Sie prüft Navigation, Auswahl- und Konfliktdialoge, Werkzeugleiste, Dateiaktionen, Monatsbadge, Seasonal Spectrum Director, PDF-Export sowie Monats- und Jahresvariation.
 
 Die Werkzeugleiste wird über eine Breitenreihe von 1500 px bis 340 px geprüft: keine Überlagerung, kein Beschnitt, kein waagerechter Seitenbildlauf, mindestens drei tatsächlich genutzte Dichtestufen sowie Öffnen, Schließen und Rückführung des Überlaufmenüs.
 

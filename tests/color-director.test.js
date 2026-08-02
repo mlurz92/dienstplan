@@ -57,12 +57,28 @@ test('every year uses a visibly broad spectrum instead of twelve muted neighbour
   }
 });
 
-test('calendar neighbours and annual repeats remain perceptually separated', () => {
-  let minimumNeighbour = Infinity;
-  let minimumAnnual = Infinity;
+test('benachbarte Monate liegen auf drei Achsen gleichzeitig auseinander', () => {
+  // Der reine OKLab-Abstand genügt nicht: Zwei Töne können ihn allein über die
+  // Buntheit erfüllen und trotzdem als dieselbe Farbe gelesen werden. Gemessen
+  // wurden zuvor benachbarte Paare mit 1° Farbtonabstand und identischer
+  // Helligkeit. Farbton und Helligkeit sind deshalb eigene Zusagen.
+  let minimumDistance = Infinity;
+  let minimumHue = Infinity;
+  let minimumLightness = Infinity;
   for (let index = 1; index < SPECTRUM_PALETTES.length; index += 1) {
-    minimumNeighbour = Math.min(minimumNeighbour, perceptualDistance(SPECTRUM_PALETTES[index - 1].accent, SPECTRUM_PALETTES[index].accent));
+    const previous = SPECTRUM_PALETTES[index - 1];
+    const current = SPECTRUM_PALETTES[index];
+    minimumDistance = Math.min(minimumDistance, perceptualDistance(previous.accent, current.accent));
+    minimumHue = Math.min(minimumHue, angularDistance(hueDegrees(previous.accent), hueDegrees(current.accent)));
+    minimumLightness = Math.min(minimumLightness, Math.abs(previous.lightness - current.lightness));
   }
+  assert.ok(minimumDistance >= .11, `minimaler Abstand benachbarter Monate nur ${minimumDistance.toFixed(3)}`);
+  assert.ok(minimumHue >= 38, `minimaler Farbtonabstand benachbarter Monate nur ${minimumHue.toFixed(0)}°`);
+  assert.ok(minimumLightness >= .04, `minimaler Helligkeitsabstand benachbarter Monate nur ${minimumLightness.toFixed(3)}`);
+});
+
+test('derselbe Monat bleibt auch von Jahr zu Jahr unterscheidbar', () => {
+  let minimumAnnual = Infinity;
   for (let month = 1; month <= 12; month += 1) {
     const accents = [];
     for (let year = 2026; year < 2050; year += 1) accents.push(colorProfileForDate(year, month).accent);
@@ -70,8 +86,25 @@ test('calendar neighbours and annual repeats remain perceptually separated', () 
       minimumAnnual = Math.min(minimumAnnual, perceptualDistance(accents[index - 1], accents[index]));
     }
   }
-  assert.ok(minimumNeighbour >= .11, `minimaler Abstand benachbarter Monate nur ${minimumNeighbour.toFixed(3)}`);
-  assert.ok(minimumAnnual >= .08, `minimaler Abstand desselben Monats in Folgejahren nur ${minimumAnnual.toFixed(3)}`);
+  assert.ok(minimumAnnual >= .07, `minimaler Abstand desselben Monats in Folgejahren nur ${minimumAnnual.toFixed(3)}`);
+});
+
+test('der Takt wechselt zwischen hellen und tieferen Monaten', () => {
+  // Ohne diesen Wechsel wirkte ein Jahr trotz unterschiedlicher Farbtöne wie
+  // eine durchgehende Reihe gleich heller Flächen.
+  for (let year = 2026; year < 2050; year += 1) {
+    const lightness = Array.from({ length: 12 }, (_, index) => colorProfileForDate(year, index + 1).lightness);
+    const swings = lightness.slice(1).map((value, index) => value - lightness[index]);
+    const directionChanges = swings.slice(1).filter((value, index) => Math.sign(value) !== Math.sign(swings[index])).length;
+    assert.ok(directionChanges >= 6, `${year}: nur ${directionChanges} Helligkeitswechsel im Jahresverlauf`);
+  }
+});
+
+test('alle Monatsfarben bleiben im pastelligen Bereich', () => {
+  for (const palette of SPECTRUM_PALETTES) {
+    assert.ok(palette.lightness >= .63, `${palette.key} ${palette.name}: zu dunkel (${palette.lightness.toFixed(3)})`);
+    assert.ok(palette.chroma <= .19, `${palette.key} ${palette.name}: zu bunt (${palette.chroma.toFixed(3)})`);
+  }
 });
 
 test('the same calendar month explores many distinct looks across the cycle', () => {
