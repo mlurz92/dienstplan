@@ -37,19 +37,29 @@ test('native view transitions and a compositor-only WAAPI fallback are both pres
   assert.doesNotMatch(css, /filter:\s*blur/);
 });
 
-test('target data is prefetched and handed to app without a duplicate month GET', () => {
-  assert.match(motion, /const monthLoadHandoffs = new Map\(\)/);
-  assert.match(motion, /api\.getMonth = \(year, month\) =>/);
-  assert.match(motion, /monthLoadHandoffs\.delete\(key\)/);
-  assert.match(motion, /primeAppLoadHandoff\(date\)/);
-  assert.match(motion, /loadMonth\(date\.year, date\.month\)/);
+test('app navigation starts inside the captured transition before readiness polling', () => {
+  const nativeStart = motion.indexOf('const transition = document.startViewTransition(async () => {');
+  const dispatch = motion.indexOf('dispatchAppNavigation(date);', nativeStart);
+  const readiness = motion.indexOf('await waitForTargetReady(date, generation);', nativeStart);
+  assert.ok(nativeStart >= 0 && dispatch > nativeStart);
+  assert.ok(readiness > dispatch, 'die App muss direkt nach dem alten Snapshot starten');
+  assert.match(motion, /function isLoadingStatus\(\)/);
+  assert.match(motion, /document\.getElementById\('saveStatus'\)/);
 });
 
-test('new view is stable for several animation frames before the snapshot handoff', () => {
-  assert.match(motion, /const STABILIZATION_FRAMES = [4-9];/);
-  assert.match(motion, /while \(consecutiveStableFrames < STABILIZATION_FRAMES\)/);
+test('new view remains stable for several frames after the load status has settled', () => {
+  assert.match(motion, /const STABILIZATION_FRAMES = [3-9];/);
+  assert.match(motion, /while \(stableFrames < STABILIZATION_FRAMES\)/);
   assert.match(motion, /rows === expectedRows/);
-  assert.match(motion, /await stabilizeNewView\(date, generation\)/);
+  assert.match(motion, /consistent && !loading/);
+  assert.match(motion, /await waitForTargetReady\(date, generation\)/);
+});
+
+test('native state begins at transition.ready and rapid navigation cancels the previous capture', () => {
+  assert.match(motion, /await transition\.ready;/);
+  assert.match(motion, /setMotionState\('animating', 'native-view-transition', direction\)/);
+  assert.match(motion, /activeViewTransition\?\.skipTransition/);
+  assert.match(motion, /generation !== navigationGeneration/);
 });
 
 test('transition stylesheet and syntax check are shipped', () => {
