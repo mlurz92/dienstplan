@@ -1,20 +1,23 @@
+import { applyMonthTheme } from './theme.js?v=20260801.11';
 import { applySpectrumProfile } from './color-director.js?v=20260801.11';
 
 /**
  * Stabilisiert den sichtbaren Monatswechsel als atomaren UI-Schritt.
  *
- * app.js rendert den neuen Monat sofort und setzt anschließend Metadaten des
- * Basisthemes. Der Seasonal Spectrum Director reagiert ebenfalls auf Auswahl-
- * und Metadatenänderungen. Ohne Koordination können dadurch zwei Farbübergänge
- * sowie eine Einblendanimation gleichzeitig starten. Dieses Modul beendet jede
- * noch laufende Spektruminterpolation innerhalb desselben Ereigniszyklus und
- * schreibt genau das endgültige Profil des ausgewählten Monats.
+ * app.js rendert den neuen Monat sofort und startet historisch zusätzlich einen
+ * rAF-Verlauf des Basisthemes. Der Seasonal Spectrum Director schreibt dieselben
+ * CSS-Variablen mit dem endgültigen Spektrumprofil. Ohne Koordination können
+ * deshalb Basistheme, Spektrum und Inhaltsanimation nacheinander sichtbar werden.
  *
- * Eine kurze Paint-Barriere wiederholt diesen Abschluss über wenige Frames.
- * Damit gewinnt das endgültige Profil auch dann zuverlässig, wenn ein bereits
- * registrierter Observer oder rAF-Callback nach dem synchronen Abschluss noch
- * einmal eine Zwischenfarbe anfordert. Jeder Frame endet vor dem Paint wieder
- * mit demselben finalen Monatsprofil.
+ * Dieses Modul beendet beide Farbpfade synchron: Zuerst wird das Basistheme ohne
+ * Animation auf den Zielmonat gesetzt. Dadurch wird dessen privater rAF-Handle
+ * abgebrochen. Unmittelbar danach schreibt der Spectrum Director ebenfalls ohne
+ * Animation den endgültigen, priorisierten Zielzustand. Zwischen diesen beiden
+ * synchronen Schritten kann der Browser keinen Frame zeichnen.
+ *
+ * Eine kurze Paint-Barriere wiederholt denselben Abschluss über wenige Frames.
+ * Damit gewinnt der identische Endzustand auch dann zuverlässig, wenn ein bereits
+ * registrierter Observer oder rAF-Callback später im selben Zyklus erneut schreibt.
  */
 
 const PAINT_GUARD_FRAMES = 4;
@@ -32,7 +35,13 @@ function selectedDate() {
 
 function writeFinalSpectrum() {
   const { year, month } = selectedDate();
+
+  // Wichtig: Reihenfolge beibehalten. Der atomare Basistheme-Aufruf beendet
+  // dessen eventuell laufende rAF-Interpolation; anschließend besitzt das
+  // Spektrumprofil als letzter synchroner Schreibvorgang die sichtbare Priorität.
+  applyMonthTheme(month, { animate: false, year });
   const palette = applySpectrumProfile(year, month, { animate: false });
+
   document.documentElement.dataset.monthTransition = 'atomic-spectrum-v1';
   return palette;
 }
@@ -91,8 +100,8 @@ function initializeMonthTransitionStability() {
   document.getElementById('yearSelect')?.addEventListener('change', settleMonthSpectrum);
 
   // applyMonthTheme aktualisiert data-month/data-year. MutationObserver laufen
-  // noch vor dem nächsten Paint; ein eventuell erneut gestarteter rAF-Verlauf
-  // wird deshalb ebenfalls ohne sichtbaren Zwischenframe beendet.
+  // noch vor dem nächsten Paint und beenden dadurch auch später gestartete
+  // Basistheme- oder Spektrumverläufe ohne sichtbaren Zwischenframe.
   if (typeof MutationObserver === 'function') {
     const observer = new MutationObserver(queueSettlement);
     observer.observe(document.documentElement, {
