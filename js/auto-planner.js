@@ -14,9 +14,13 @@ import {
 const LEVEL_RANK = Object.freeze({ green: 0, yellow: 1, orange: 2, red: 3, gray: 4 });
 const ROLE_ORDER = Object.freeze(['bd', 'hg']);
 const SEARCH_MODE = Object.freeze({ STRICT: 'strict', CONFIRMABLE: 'confirmable' });
-const DEFAULT_BEAM_WIDTH = 56;
-const DEFAULT_BRANCH_LIMIT = 12;
 const EPSILON = 1e-9;
+const DEFAULT_BEAM_WIDTH = 72;
+const DEFAULT_BRANCH_LIMIT = 14;
+const DEFAULT_EXACT_BUDGET = 12000;
+const MAX_EXACT_REMAINING = 8;
+const POLISH_PASSES = 2;
+const MAX_SWAP_CHECKS = 180;
 
 const clone = value => typeof structuredClone === 'function'
   ? structuredClone(value)
@@ -128,48 +132,89 @@ function compareVectors(left, right) {
   return 0;
 }
 
-function candidateKey(candidate, role) {
+function candidateKey(candidate, role, strategy = 'balanced') {
   const meta = candidate.evaluation?.meta || {};
+  const recommendation = vectorOf(candidate.evaluation);
+  const load = role === 'bd'
+    ? Number(meta.currentBd || 0)
+    : Number(meta.combinedLoad || 0);
+  const secondaryLoad = role === 'hg'
+    ? Number(meta.aaHgCount || 0)
+    : 0;
+  const pureRoleLoad = role === 'hg'
+    ? Number(meta.currentHg || 0)
+    : 0;
+
+  if (strategy === 'coverage') {
+    return [
+      LEVEL_RANK[candidate.evaluation?.level] ?? 9,
+      -recommendation[0],
+      load,
+      secondaryLoad,
+      pureRoleLoad,
+      -recommendation[1],
+      -recommendation[2],
+      -recommendation[3],
+      -recommendation[4],
+      -recommendation[5],
+      candidate.order
+    ];
+  }
+
   return [
     LEVEL_RANK[candidate.evaluation?.level] ?? 9,
-    ...vectorOf(candidate.evaluation).map(value => -value),
-    role === 'bd' ? Number(meta.currentBd || 0) : Number(meta.combinedLoad || 0),
-    role === 'hg' ? Number(meta.aaHgCount || 0) : 0,
-    role === 'hg' ? Number(meta.currentHg || 0) : 0,
+    ...recommendation.map(value => -value),
+    load,
+    secondaryLoad,
+    pureRoleLoad,
     candidate.order
   ];
 }
 
-function candidatesFor(state, monthData, dateIso, role, mode) {
-  const sandbox = simulatedState(state, monthData);
-  return getPlanningStaff(sandbox.staff, dateIso)
-    .map((person, order) => ({
-      person,
-      order,
-      evaluation: evaluateCandidate({
-        state: sandbox,
-        monthData,
-        dateIso,
-        role,
-        staffId: person.id
-      })
-    }))
-    .filter(candidate => candidate.evaluation?.canSelect !== false)
-    .filter(candidate => candidate.evaluation?.level !== 'gray')
-    .filter(candidate => mode === SEARCH_MODE.CONFIRMABLE || candidate.evaluation?.level !== 'red')
-    .sort((left, right) => compareVectors(candidateKey(left, role), candidateKey(right, role)));
+function createCandidateResolver(state, mode, strategy, stats) {
+  const cache = new WeakMap();
+
+  return function candidatesFor(monthData, dateIso, role) {
+    let monthCache = cache.get(monthData);
+    if (!monthCache) {
+      monthCache = new Map();
+      cache.set(monthData, monthCache);
+    }
+    const key = `${dateIso}|${role}|${mode}|${strategy}`;
+    if (monthCache.has(key)) return monthCache.get(key);
+
+    const sandbox = simulatedState(state, monthData);
+    const planningStaff = getPlanningStaff(sandbox.staff, dateIso);
+    const candidates = planningStaff
+      .map((person, order) => ({
+        person,
+        order,
+        evaluation: evaluateCandidate({
+          state: sandbox,
+          monthData,
+          dateIso,
+          role,
+          staffId: person.id
+        })
+      }))
+      .filter(candidate => candidate.evaluation?.canSelect !== false)
+      .filter(candidate => candidate.evaluation?.level !== 'gray')
+      .filter(candidate => mode === SEARCH_MODE.CONFIRMABLE || candidate.evaluation?.level !== 'red')
+      .sort((left, right) =>
+        compareVectors(candidateKey(left, role, strategy), candidateKey(right, role, strategy)));
+
+    stats.candidateEvaluations += planningStaff.length;
+    monthCache.set(key, candidates);
+    return candidates;
+  };
 }
 
 function emptyNode(monthData) {
   return {
     monthData,
-    red: 0,
-    specialRed: 0,
-    orange: 0,
-    yellow: 0,
-    unfilled: 0,
     recommendation: [0, 0, 0, 0, 0, 0],
-    trace: []
+    trace: [],
+    depth: 0
   };
 }
 
@@ -177,36 +222,17 @@ function assignNode(node, slot, candidate) {
   const monthData = clone(node.monthData);
   setAssignment(monthData, slot.dateIso, slot.role, candidate.person.id);
   const recommendation = vectorOf(candidate.evaluation);
-  const confirmationType = candidate.evaluation?.meta?.confirmationType || null;
   return {
     monthData,
-    red: node.red + Number(candidate.evaluation.level === 'red'),
-    specialRed: node.specialRed + Number(candidate.evaluation.level === 'red' && confirmationType === 'special'),
-    orange: node.orange + Number(candidate.evaluation.level === 'orange'),
-    yellow: node.yellow + Number(candidate.evaluation.level === 'yellow'),
-    unfilled: node.unfilled,
     recommendation: node.recommendation.map((value, index) => value + (recommendation[index] || 0)),
     trace: [...node.trace, {
       ...slot,
       staffId: candidate.person.id,
       level: candidate.evaluation.level,
-      confirmationType,
-      reasons: candidate.evaluation.reasons
-    }]
-  };
-}
-
-function leaveUnfilled(node, slot) {
-  return {
-    ...node,
-    unfilled: node.unfilled + 1,
-    trace: [...node.trace, {
-      ...slot,
-      staffId: '',
-      level: 'red',
-      confirmationType: null,
-      reasons: ['Keine technisch wählbare Besetzung gefunden']
-    }]
+      confirmationType: candidate.evaluation?.meta?.confirmationType || null,
+      reasons: candidate.evaluation.reasons || []
+    }],
+    depth: node.depth + 1
   };
 }
 
@@ -260,53 +286,6 @@ function fairnessSnapshot(state, monthData) {
   };
 }
 
-function partialNodeKey(state, node) {
-  const fairness = fairnessSnapshot(state, node.monthData);
-  return [
-    node.unfilled,
-    node.red,
-    node.specialRed,
-    node.orange,
-    node.yellow,
-    -node.recommendation[0],
-    -node.recommendation[1],
-    -node.recommendation[2],
-    fairness.bdPenalty,
-    fairness.combinedVariance,
-    fairness.aaHgVariance,
-    fairness.weekendVariance,
-    -node.recommendation[3],
-    -node.recommendation[4],
-    -node.recommendation[5]
-  ];
-}
-
-function nodeSignature(node, processedSlots) {
-  return processedSlots
-    .map(({ dateIso, role }) => node.monthData.days?.[dateIso]?.[role] || '')
-    .join('|');
-}
-
-function pruneBeam(state, expanded, processedSlots, beamWidth) {
-  const ranked = expanded.map(node => ({
-    node,
-    key: partialNodeKey(state, node),
-    signature: nodeSignature(node, processedSlots)
-  }));
-  ranked.sort((left, right) =>
-    compareVectors(left.key, right.key) || left.signature.localeCompare(right.signature));
-
-  const result = [];
-  const seen = new Set();
-  for (const entry of ranked) {
-    if (seen.has(entry.signature)) continue;
-    seen.add(entry.signature);
-    result.push(entry.node);
-    if (result.length >= beamWidth) break;
-  }
-  return result;
-}
-
 function proposedAssignments(monthData, baseline) {
   const changes = [];
   for (const dateIso of monthDates(monthData)) {
@@ -337,7 +316,8 @@ function auditProposal(state, monthData, baseline) {
     red: entries.filter(entry => entry.evaluation.level === 'red').length,
     specialRed: entries.filter(entry =>
       entry.evaluation.level === 'red' && entry.evaluation.meta?.confirmationType === 'special').length,
-    gray: entries.filter(entry => entry.evaluation.level === 'gray' || entry.evaluation.canSelect === false).length,
+    gray: entries.filter(entry =>
+      entry.evaluation.level === 'gray' || entry.evaluation.canSelect === false).length,
     orange: entries.filter(entry => entry.evaluation.level === 'orange').length,
     yellow: entries.filter(entry => entry.evaluation.level === 'yellow').length,
     recommendation: entries.reduce((sum, entry) => {
@@ -413,14 +393,46 @@ function finalObjective(state, monthData, baseline) {
   };
 }
 
-function completeSignature(monthData, baseline) {
-  return proposedAssignments(monthData, baseline)
-    .map(change => `${change.dateIso}:${change.role}:${change.staffId}`)
-    .join('|');
+function partialObjective(state, node, baseline, flexibility = null) {
+  const audit = auditProposal(state, node.monthData, baseline);
+  const fairness = fairnessSnapshot(state, node.monthData);
+  const remaining = openSlots(node.monthData).length;
+  return {
+    audit,
+    fairness,
+    remaining,
+    key: [
+      audit.gray,
+      remaining,
+      audit.red,
+      audit.specialRed,
+      audit.orange,
+      audit.yellow,
+      flexibility?.blocked ? 1 : 0,
+      -(flexibility?.minimumDomain || 0),
+      -(flexibility?.logDomainSum || 0),
+      -node.recommendation[0],
+      -node.recommendation[1],
+      -node.recommendation[2],
+      fairness.bdPenalty,
+      fairness.combinedVariance,
+      fairness.aaHgVariance,
+      fairness.weekendVariance,
+      -node.recommendation[3],
+      -node.recommendation[4],
+      -node.recommendation[5]
+    ]
+  };
 }
 
-function selectBestFinal(state, beam, baseline) {
-  const ranked = beam.map(node => ({ node, objective: finalObjective(state, node.monthData, baseline) }));
+function completeSignature(monthData, baseline) {
+  const slots = openSlots(baseline);
+  return slots.map(slot =>
+    `${slot.dateIso}:${slot.role}:${monthData.days?.[slot.dateIso]?.[slot.role] || ''}`).join('|');
+}
+
+function selectBestFinal(state, nodes, baseline) {
+  const ranked = nodes.map(node => ({ node, objective: finalObjective(state, node.monthData, baseline) }));
   ranked.sort((left, right) =>
     compareVectors(left.objective.key, right.objective.key)
       || completeSignature(left.node.monthData, baseline)
@@ -444,68 +456,246 @@ function slotCriticality(slot) {
   return 2;
 }
 
-function orderSlots(state, baseline, slots, role, mode) {
-  return slots
-    .filter(slot => slot.role === role)
-    .map(slot => ({
+function selectNextSlot(representative, remainingSlots, candidatesFor) {
+  const ranked = remainingSlots.map(slot => {
+    const domain = candidatesFor(representative.monthData, slot.dateIso, slot.role);
+    return {
       slot,
-      domain: candidatesFor(state, baseline, slot.dateIso, role, mode).length,
+      domain: domain.length,
       criticality: slotCriticality(slot)
-    }))
-    .sort((left, right) =>
-      left.domain - right.domain
+    };
+  });
+  ranked.sort((left, right) =>
+    left.domain - right.domain
       || left.criticality - right.criticality
-      || left.slot.dateIso.localeCompare(right.slot.dateIso))
-    .map(entry => entry.slot);
+      || left.slot.dateIso.localeCompare(right.slot.dateIso)
+      || ROLE_ORDER.indexOf(left.slot.role) - ROLE_ORDER.indexOf(right.slot.role));
+  return ranked[0] || null;
 }
 
-async function runBeamPass({
+function flexibilitySummary(node, futureSlots, candidatesFor, lookaheadLimit) {
+  if (!futureSlots.length) return { blocked: false, minimumDomain: 99, logDomainSum: 0 };
+  const checkedSlots = [...futureSlots]
+    .sort((left, right) =>
+      slotCriticality(left) - slotCriticality(right)
+        || left.dateIso.localeCompare(right.dateIso)
+        || ROLE_ORDER.indexOf(left.role) - ROLE_ORDER.indexOf(right.role))
+    .slice(0, Math.max(1, lookaheadLimit));
+  let minimumDomain = Infinity;
+  let logDomainSum = 0;
+  for (const slot of checkedSlots) {
+    const count = candidatesFor(node.monthData, slot.dateIso, slot.role).length;
+    if (count === 0) return { blocked: true, minimumDomain: 0, logDomainSum };
+    minimumDomain = Math.min(minimumDomain, count);
+    logDomainSum += Math.log1p(count);
+  }
+  return { blocked: false, minimumDomain, logDomainSum };
+}
+
+function pruneBeam({
+  state,
+  expanded,
+  baseline,
+  futureSlots,
+  candidatesFor,
+  mode,
+  beamWidth,
+  lookaheadLimit,
+  stats
+}) {
+  const preRanked = expanded.map(node => ({
+    node,
+    objective: partialObjective(state, node, baseline)
+  }));
+  preRanked.sort((left, right) =>
+    compareVectors(left.objective.key, right.objective.key)
+      || completeSignature(left.node.monthData, baseline)
+        .localeCompare(completeSignature(right.node.monthData, baseline)));
+
+  const preLimit = Math.max(beamWidth, Math.min(preRanked.length, Math.ceil(beamWidth * 1.75)));
+  const checked = [];
+  for (const entry of preRanked.slice(0, preLimit)) {
+    if (entry.objective.audit.gray > 0) {
+      stats.deadEnds += 1;
+      continue;
+    }
+    if (mode === SEARCH_MODE.STRICT && entry.objective.audit.red > 0) {
+      stats.deadEnds += 1;
+      continue;
+    }
+    const flexibility = flexibilitySummary(entry.node, futureSlots, candidatesFor, lookaheadLimit);
+    if (flexibility.blocked) {
+      stats.deadEnds += 1;
+      continue;
+    }
+    checked.push({
+      node: entry.node,
+      objective: partialObjective(state, entry.node, baseline, flexibility),
+      signature: completeSignature(entry.node.monthData, baseline)
+    });
+  }
+
+  checked.sort((left, right) =>
+    compareVectors(left.objective.key, right.objective.key)
+      || left.signature.localeCompare(right.signature));
+
+  const result = [];
+  const seen = new Set();
+  for (const entry of checked) {
+    if (seen.has(entry.signature)) continue;
+    seen.add(entry.signature);
+    result.push(entry.node);
+    if (result.length >= beamWidth) break;
+  }
+  stats.maxBeam = Math.max(stats.maxBeam, result.length);
+  return result;
+}
+
+function exactComplete({
+  state,
+  seedNodes,
+  baseline,
+  mode,
+  strategy,
+  nodeBudget,
+  signal,
+  stats
+}) {
+  const candidatesFor = createCandidateResolver(state, mode, strategy, stats);
+  let best = null;
+  let visited = 0;
+
+  function visit(node) {
+    abortIfRequested(signal);
+    if (visited >= nodeBudget) return;
+    visited += 1;
+    stats.exactNodes += 1;
+
+    const remaining = openSlots(node.monthData);
+    if (!remaining.length) {
+      const candidate = {
+        node,
+        objective: finalObjective(state, node.monthData, baseline)
+      };
+      if (candidate.objective.audit.gray > 0) return;
+      if (mode === SEARCH_MODE.STRICT && candidate.objective.audit.red > 0) return;
+      if (!best
+        || compareVectors(candidate.objective.key, best.objective.key) < 0
+        || (compareVectors(candidate.objective.key, best.objective.key) === 0
+          && completeSignature(candidate.node.monthData, baseline)
+            .localeCompare(completeSignature(best.node.monthData, baseline)) < 0)) {
+        best = candidate;
+      }
+      return;
+    }
+
+    const selected = selectNextSlot(node, remaining, candidatesFor);
+    if (!selected || selected.domain === 0) {
+      stats.deadEnds += 1;
+      return;
+    }
+    const slot = selected.slot;
+    const candidates = candidatesFor(node.monthData, slot.dateIso, slot.role);
+    for (const candidate of candidates) {
+      if (visited >= nodeBudget) break;
+      const next = assignNode(node, slot, candidate);
+      const audit = auditProposal(state, next.monthData, baseline);
+      if (audit.gray > 0 || (mode === SEARCH_MODE.STRICT && audit.red > 0)) {
+        stats.deadEnds += 1;
+        continue;
+      }
+      visit(next);
+    }
+  }
+
+  for (const seed of seedNodes) {
+    if (openSlots(seed.monthData).length > MAX_EXACT_REMAINING) continue;
+    visit(seed);
+    if (visited >= nodeBudget) break;
+  }
+  return best;
+}
+
+async function runSearchPass({
   state,
   baseline,
   slots,
   mode,
+  strategy,
   beamWidth,
   branchLimit,
+  exactBudget,
+  lookaheadLimit,
   onProgress,
   signal,
   progressStart,
   progressSpan,
-  label
+  label,
+  passIndex
 }) {
+  const stats = {
+    id: `${mode}-${strategy}-${passIndex}`,
+    mode,
+    strategy,
+    beamWidth,
+    branchLimit,
+    generatedNodes: 0,
+    exploredNodes: 0,
+    candidateEvaluations: 0,
+    deadEnds: 0,
+    exactNodes: 0,
+    maxBeam: 1,
+    complete: false
+  };
+  const candidatesFor = createCandidateResolver(state, mode, strategy, stats);
   let beam = [emptyNode(clone(baseline))];
-  const processedSlots = [];
   let processed = 0;
 
   for (const role of ROLE_ORDER) {
-    const roleSlots = orderSlots(state, baseline, slots, role, mode);
-    await report(onProgress, {
-      phase: role,
-      progress: progressStart + (processed / Math.max(1, slots.length)) * progressSpan,
-      message: `${label} · ${role === 'bd' ? 'BD-Verteilung' : 'HG-Verteilung'}`
-    });
-
-    for (const slot of roleSlots) {
+    let remaining = slots.filter(slot => slot.role === role);
+    while (remaining.length && beam.length) {
       abortIfRequested(signal);
+      const representative = beam[0];
+      const selected = selectNextSlot(representative, remaining, candidatesFor);
+      if (!selected) break;
+      const slot = selected.slot;
+      const afterCurrent = remaining.filter(candidate =>
+        candidate.dateIso !== slot.dateIso || candidate.role !== slot.role);
+      const futureSlots = [
+        ...afterCurrent,
+        ...slots.filter(candidate =>
+          ROLE_ORDER.indexOf(candidate.role) > ROLE_ORDER.indexOf(role))
+      ];
+
       const expanded = [];
       let candidateCount = 0;
-
       for (const node of beam) {
-        const candidates = candidatesFor(state, node.monthData, slot.dateIso, slot.role, mode);
+        const candidates = candidatesFor(node.monthData, slot.dateIso, slot.role);
         candidateCount = Math.max(candidateCount, candidates.length);
-        if (!candidates.length) {
-          expanded.push(leaveUnfilled(node, slot));
-          continue;
-        }
+        stats.exploredNodes += 1;
         for (const candidate of candidates.slice(0, Math.max(1, branchLimit))) {
           expanded.push(assignNode(node, slot, candidate));
+          stats.generatedNodes += 1;
         }
       }
 
-      processedSlots.push(slot);
-      beam = pruneBeam(state, expanded, processedSlots, Math.max(4, beamWidth));
+      beam = pruneBeam({
+        state,
+        expanded,
+        baseline,
+        futureSlots,
+        candidatesFor,
+        mode,
+        beamWidth: Math.max(4, beamWidth),
+        lookaheadLimit,
+        stats
+      });
+      remaining = afterCurrent;
       processed += 1;
+
       await report(onProgress, {
-        phase: role,
+        phase: 'search',
+        subphase: role,
         progress: progressStart + (processed / Math.max(1, slots.length)) * progressSpan,
         message: `${label} · ${role.toUpperCase()} ${slot.dateIso}: ${candidateCount} Kandidaten · ${beam.length} Varianten`,
         dateIso: slot.dateIso,
@@ -514,21 +704,144 @@ async function runBeamPass({
         total: slots.length,
         candidateCount,
         beamSize: beam.length,
-        searchMode: mode
+        exploredNodes: stats.exploredNodes,
+        generatedNodes: stats.generatedNodes,
+        deadEnds: stats.deadEnds,
+        searchMode: mode,
+        passIndex
       });
       await yieldToBrowser();
     }
   }
 
-  return selectBestFinal(state, beam, baseline);
+  let best = selectBestFinal(state, beam.length ? beam : [emptyNode(clone(baseline))], baseline);
+  if (best?.objective.unfilled > 0) {
+    const seeds = (beam.length ? beam : [best.node])
+      .slice(0, Math.min(8, beam.length || 1))
+      .filter(Boolean);
+    const exact = exactComplete({
+      state,
+      seedNodes: seeds,
+      baseline,
+      mode,
+      strategy,
+      nodeBudget: exactBudget,
+      signal,
+      stats
+    });
+    if (exact && (!best || compareVectors(exact.objective.key, best.objective.key) < 0)) {
+      best = exact;
+    }
+  }
+
+  stats.complete = Boolean(best
+    && best.objective.unfilled === 0
+    && best.objective.audit.gray === 0
+    && (mode === SEARCH_MODE.CONFIRMABLE || best.objective.audit.red === 0));
+  return { best, beam, stats };
 }
 
-function isCompleteAndSelectable(best, slots) {
-  if (!best) return false;
-  const changes = proposedAssignments(best.node.monthData, best.baseline || {});
-  return best.objective.audit.gray === 0
-    && best.objective.unfilled === 0
-    && (!slots || changes.length === slots.length);
+function betterObjective(candidate, current) {
+  return compareVectors(candidate.key, current.key) < 0;
+}
+
+function clearAssignment(monthData, dateIso, role) {
+  if (!monthData?.days?.[dateIso]) return;
+  monthData.days[dateIso][role] = '';
+}
+
+async function polishPlan({
+  state,
+  baseline,
+  best,
+  mode,
+  onProgress,
+  signal,
+  stats
+}) {
+  if (!best || best.objective.unfilled > 0 || best.objective.audit.gray > 0) return best;
+  let monthData = clone(best.node.monthData);
+  let objective = finalObjective(state, monthData, baseline);
+  let improvements = 0;
+  let swapChecks = 0;
+
+  for (let pass = 0; pass < POLISH_PASSES; pass += 1) {
+    let changed = false;
+    const changes = proposedAssignments(monthData, baseline);
+    for (const change of changes) {
+      abortIfRequested(signal);
+      const currentStaff = monthData.days[change.dateIso][change.role];
+      const cleared = clone(monthData);
+      clearAssignment(cleared, change.dateIso, change.role);
+      const resolverStats = {
+        candidateEvaluations: 0, exactNodes: 0, deadEnds: 0, maxBeam: 0
+      };
+      const candidatesFor = createCandidateResolver(state, mode, 'balanced', resolverStats);
+      const alternatives = candidatesFor(cleared, change.dateIso, change.role);
+      stats.candidateEvaluations += resolverStats.candidateEvaluations;
+
+      for (const candidate of alternatives) {
+        if (candidate.person.id === currentStaff) continue;
+        const trial = clone(cleared);
+        setAssignment(trial, change.dateIso, change.role, candidate.person.id);
+        const trialObjective = finalObjective(state, trial, baseline);
+        if (trialObjective.audit.gray > 0 || trialObjective.unfilled > 0) continue;
+        if (mode === SEARCH_MODE.STRICT && trialObjective.audit.red > 0) continue;
+        if (betterObjective(trialObjective, objective)) {
+          monthData = trial;
+          objective = trialObjective;
+          improvements += 1;
+          changed = true;
+          break;
+        }
+      }
+    }
+
+    const sameRole = proposedAssignments(monthData, baseline);
+    outer:
+    for (let left = 0; left < sameRole.length; left += 1) {
+      for (let right = left + 1; right < sameRole.length; right += 1) {
+        if (swapChecks >= MAX_SWAP_CHECKS) break outer;
+        const first = sameRole[left];
+        const second = sameRole[right];
+        if (first.role !== second.role || first.staffId === second.staffId) continue;
+        swapChecks += 1;
+        const trial = clone(monthData);
+        setAssignment(trial, first.dateIso, first.role, second.staffId);
+        setAssignment(trial, second.dateIso, second.role, first.staffId);
+        const trialObjective = finalObjective(state, trial, baseline);
+        if (trialObjective.audit.gray > 0 || trialObjective.unfilled > 0) continue;
+        if (mode === SEARCH_MODE.STRICT && trialObjective.audit.red > 0) continue;
+        if (betterObjective(trialObjective, objective)) {
+          monthData = trial;
+          objective = trialObjective;
+          improvements += 1;
+          changed = true;
+          break outer;
+        }
+      }
+    }
+
+    await report(onProgress, {
+      phase: 'polish',
+      progress: 0.93 + pass * 0.015,
+      message: `Fairness-Politur ${pass + 1}/${POLISH_PASSES} · ${improvements} Verbesserungen`,
+      improvements,
+      swapChecks
+    });
+    await yieldToBrowser();
+    if (!changed) break;
+  }
+
+  stats.improvements = improvements;
+  stats.swapChecks = swapChecks;
+  return {
+    node: {
+      ...best.node,
+      monthData
+    },
+    objective
+  };
 }
 
 function redViolation(entry) {
@@ -542,6 +855,47 @@ function redViolation(entry) {
   };
 }
 
+function buildProfiles(beamWidth, branchLimit, exactBudget) {
+  return [
+    {
+      id: 'strict-balanced',
+      mode: SEARCH_MODE.STRICT,
+      strategy: 'balanced',
+      beamWidth: Math.max(8, beamWidth),
+      branchLimit: Math.max(4, branchLimit),
+      exactBudget: Math.max(1200, Math.floor(exactBudget * 0.25)),
+      lookaheadLimit: 7,
+      progressStart: 0.06,
+      progressSpan: 0.31,
+      label: 'Null-Rot-Suche'
+    },
+    {
+      id: 'strict-coverage',
+      mode: SEARCH_MODE.STRICT,
+      strategy: 'coverage',
+      beamWidth: Math.max(96, beamWidth * 2),
+      branchLimit: Math.max(18, branchLimit + 6),
+      exactBudget: Math.max(5000, Math.floor(exactBudget * 0.75)),
+      lookaheadLimit: 11,
+      progressStart: 0.38,
+      progressSpan: 0.29,
+      label: 'Vertiefte Null-Rot-Suche'
+    },
+    {
+      id: 'confirmable-balanced',
+      mode: SEARCH_MODE.CONFIRMABLE,
+      strategy: 'balanced',
+      beamWidth: Math.max(160, beamWidth * 3),
+      branchLimit: Math.max(22, branchLimit + 10),
+      exactBudget: Math.max(9000, exactBudget),
+      lookaheadLimit: 9,
+      progressStart: 0.70,
+      progressSpan: 0.19,
+      label: 'Minimal-Rot-Suche'
+    }
+  ];
+}
+
 export async function buildAutoPlan({
   state,
   monthData,
@@ -549,6 +903,7 @@ export async function buildAutoPlan({
   month = monthData?.month,
   beamWidth = DEFAULT_BEAM_WIDTH,
   branchLimit = DEFAULT_BRANCH_LIMIT,
+  exactBudget = DEFAULT_EXACT_BUDGET,
   onProgress = null,
   signal = null
 }) {
@@ -561,99 +916,195 @@ export async function buildAutoPlan({
   const slots = openSlots(baseline);
   const fixed = fixedAssignmentCount(baseline);
   const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  const profiles = buildProfiles(beamWidth, branchLimit, exactBudget);
   const attempts = [];
+  let best = {
+    node: emptyNode(clone(baseline)),
+    objective: finalObjective(state, baseline, baseline)
+  };
+  let selectedProfile = profiles[0];
 
   await report(onProgress, {
     phase: 'analysis',
-    progress: 0.03,
+    progress: 0.025,
     message: `${fixed} Fixpunkte geschützt · ${slots.length} offene BD/HG-Felder`,
     fixed,
-    total: slots.length
+    total: slots.length,
+    exploredNodes: 0,
+    generatedNodes: 0,
+    deadEnds: 0
   });
   await yieldToBrowser();
 
-  let best = await runBeamPass({
-    state,
-    baseline,
-    slots,
-    mode: SEARCH_MODE.STRICT,
-    beamWidth,
-    branchLimit,
-    onProgress,
-    signal,
-    progressStart: 0.06,
-    progressSpan: 0.44,
-    label: 'Null-Rot-Suche'
-  });
-  attempts.push({ mode: SEARCH_MODE.STRICT, beamWidth, complete: Boolean(best && best.objective.unfilled === 0) });
-
-  if (!best || best.objective.unfilled > 0 || best.objective.audit.red > 0) {
-    const deepWidth = Math.max(112, beamWidth * 2);
-    best = await runBeamPass({
-      state,
+  if (slots.length === 0) {
+    const result = {
+      success: true,
+      complete: true,
+      requiresConfirmation: false,
+      status: 'clean',
+      year,
+      month,
+      baselineFingerprint: planningFingerprint(state, baseline),
       baseline,
-      slots,
-      mode: SEARCH_MODE.STRICT,
-      beamWidth: deepWidth,
-      branchLimit,
-      onProgress,
-      signal,
-      progressStart: 0.50,
-      progressSpan: 0.23,
-      label: 'Vertiefte Null-Rot-Suche'
+      plannedMonth: clone(baseline),
+      changes: [],
+      redViolations: [],
+      fixedAssignments: fixed,
+      openSlots: 0,
+      elapsedMs: 0,
+      metrics: {
+        proposed: 0,
+        unfilled: 0,
+        red: 0,
+        specialRed: 0,
+        gray: 0,
+        orange: 0,
+        yellow: 0,
+        wishesFulfilled: 0,
+        wishesPossible: 0,
+        fairnessIndex: fairnessIndex(best.objective),
+        bdTargetPenalty: Number(best.objective.fairness.bdPenalty.toFixed(2)),
+        combinedLoadVariance: Number(best.objective.fairness.combinedVariance.toFixed(3)),
+        aaHgVariance: Number(best.objective.fairness.aaHgVariance.toFixed(3)),
+        weekendVariance: Number(best.objective.fairness.weekendVariance.toFixed(3)),
+        exploredNodes: 0,
+        generatedNodes: 0,
+        candidateEvaluations: 0,
+        deadEnds: 0,
+        exactNodes: 0,
+        improvements: 0,
+        swapChecks: 0,
+        maxBeam: 1,
+        attempts: []
+      },
+      audit: []
+    };
+    await report(onProgress, {
+      phase: 'complete',
+      progress: 1,
+      message: 'Keine offenen BD/HG-Felder · bestehender Monat ist vollständig',
+      result
     });
-    attempts.push({ mode: SEARCH_MODE.STRICT, beamWidth: deepWidth, complete: Boolean(best && best.objective.unfilled === 0) });
+    return result;
   }
 
-  if (!best || best.objective.unfilled > 0 || best.objective.audit.red > 0) {
-    const fallbackWidth = Math.max(144, beamWidth * 3);
-    await report(onProgress, {
-      phase: 'analysis',
-      progress: 0.74,
-      message: 'Keine vollständige Null-Rot-Variante gefunden · Minimal-Rot-Fallback wird geprüft'
-    });
-    await yieldToBrowser();
-    best = await runBeamPass({
+  for (let index = 0; index < profiles.length; index += 1) {
+    const profile = profiles[index];
+    if (profile.mode === SEARCH_MODE.CONFIRMABLE
+      && best.objective.unfilled === 0
+      && best.objective.audit.red === 0
+      && best.objective.audit.gray === 0) {
+      break;
+    }
+
+    if (profile.mode === SEARCH_MODE.CONFIRMABLE) {
+      await report(onProgress, {
+        phase: 'repair',
+        progress: profile.progressStart - 0.015,
+        message: 'Keine vollständige Null-Rot-Variante gefunden · bestätigbarer Minimal-Rot-Fallback startet'
+      });
+      await yieldToBrowser();
+    } else if (index > 0) {
+      await report(onProgress, {
+        phase: 'propagate',
+        progress: profile.progressStart - 0.015,
+        message: 'Suchraum wird verbreitert · stärkere Constraint-Propagation und alternative Kandidatenordnung'
+      });
+      await yieldToBrowser();
+    }
+
+    const attempt = await runSearchPass({
       state,
       baseline,
       slots,
-      mode: SEARCH_MODE.CONFIRMABLE,
-      beamWidth: fallbackWidth,
-      branchLimit,
+      mode: profile.mode,
+      strategy: profile.strategy,
+      beamWidth: profile.beamWidth,
+      branchLimit: profile.branchLimit,
+      exactBudget: profile.exactBudget,
+      lookaheadLimit: profile.lookaheadLimit,
       onProgress,
       signal,
-      progressStart: 0.75,
-      progressSpan: 0.13,
-      label: 'Minimal-Rot-Suche'
+      progressStart: profile.progressStart,
+      progressSpan: profile.progressSpan,
+      label: profile.label,
+      passIndex: index + 1
     });
-    attempts.push({ mode: SEARCH_MODE.CONFIRMABLE, beamWidth: fallbackWidth, complete: Boolean(best && best.objective.unfilled === 0) });
+    attempts.push(attempt.stats);
+
+    if (attempt.best && (
+      compareVectors(attempt.best.objective.key, best.objective.key) < 0
+      || (profile.mode === SEARCH_MODE.STRICT
+        && attempt.best.objective.unfilled === 0
+        && attempt.best.objective.audit.red === 0
+        && attempt.best.objective.audit.gray === 0)
+    )) {
+      best = attempt.best;
+      selectedProfile = profile;
+    }
+
+    if (attempt.best
+      && attempt.best.objective.unfilled === 0
+      && attempt.best.objective.audit.gray === 0
+      && (profile.mode === SEARCH_MODE.CONFIRMABLE || attempt.best.objective.audit.red === 0)) {
+      best = attempt.best;
+      selectedProfile = profile;
+      if (profile.mode === SEARCH_MODE.STRICT) break;
+    }
   }
 
   abortIfRequested(signal);
-  await report(onProgress, {
-    phase: 'polish',
-    progress: 0.90,
-    message: 'Lexikografischer Gesamtvergleich und Fairness-Politur'
+  const aggregateStats = attempts.reduce((sum, attempt) => ({
+    exploredNodes: sum.exploredNodes + Number(attempt.exploredNodes || 0),
+    generatedNodes: sum.generatedNodes + Number(attempt.generatedNodes || 0),
+    candidateEvaluations: sum.candidateEvaluations + Number(attempt.candidateEvaluations || 0),
+    deadEnds: sum.deadEnds + Number(attempt.deadEnds || 0),
+    exactNodes: sum.exactNodes + Number(attempt.exactNodes || 0),
+    maxBeam: Math.max(sum.maxBeam, Number(attempt.maxBeam || 0)),
+    improvements: 0,
+    swapChecks: 0
+  }), {
+    exploredNodes: 0,
+    generatedNodes: 0,
+    candidateEvaluations: 0,
+    deadEnds: 0,
+    exactNodes: 0,
+    maxBeam: 0,
+    improvements: 0,
+    swapChecks: 0
   });
-  await yieldToBrowser();
 
-  if (!best) throw new Error('Der Auto-Planer konnte keine Variante erzeugen.');
+  best = await polishPlan({
+    state,
+    baseline,
+    best,
+    mode: selectedProfile.mode,
+    onProgress,
+    signal,
+    stats: aggregateStats
+  });
 
   await report(onProgress, {
     phase: 'audit',
-    progress: 0.95,
-    message: 'Vollständiger Schlussaudit aller vorgeschlagenen BD/HG-Einteilungen'
+    progress: 0.98,
+    message: 'Vollständiger Schlussaudit aller vorgeschlagenen BD/HG-Einteilungen',
+    exploredNodes: aggregateStats.exploredNodes,
+    generatedNodes: aggregateStats.generatedNodes,
+    deadEnds: aggregateStats.deadEnds,
+    exactNodes: aggregateStats.exactNodes,
+    improvements: aggregateStats.improvements
   });
   await yieldToBrowser();
 
   const changes = proposedAssignments(best.node.monthData, baseline);
+  const objective = finalObjective(state, best.node.monthData, baseline);
   const elapsed = (typeof performance !== 'undefined' ? performance.now() : Date.now()) - startedAt;
-  const complete = best.objective.audit.gray === 0
-    && best.objective.unfilled === 0
+  const complete = objective.audit.gray === 0
+    && objective.unfilled === 0
     && changes.length === slots.length;
-  const requiresConfirmation = complete && best.objective.audit.red > 0;
+  const requiresConfirmation = complete && objective.audit.red > 0;
   const status = !complete ? 'blocked' : requiresConfirmation ? 'confirmation_required' : 'clean';
-  const redViolations = best.objective.audit.entries
+  const redViolations = objective.audit.entries
     .filter(entry => entry.evaluation.level === 'red')
     .map(redViolation);
 
@@ -662,6 +1113,7 @@ export async function buildAutoPlan({
     complete,
     requiresConfirmation,
     status,
+    searchProfile: selectedProfile.id,
     year,
     month,
     baselineFingerprint: planningFingerprint(state, baseline),
@@ -674,29 +1126,37 @@ export async function buildAutoPlan({
     elapsedMs: Math.round(elapsed),
     metrics: {
       proposed: changes.length,
-      unfilled: best.objective.unfilled,
-      red: best.objective.audit.red,
-      specialRed: best.objective.audit.specialRed,
-      gray: best.objective.audit.gray,
-      orange: best.objective.audit.orange,
-      yellow: best.objective.audit.yellow,
-      wishesFulfilled: best.objective.wishes.fulfilled,
-      wishesPossible: best.objective.wishes.possible,
-      fairnessIndex: fairnessIndex(best.objective),
-      bdTargetPenalty: Number(best.objective.fairness.bdPenalty.toFixed(2)),
-      combinedLoadVariance: Number(best.objective.fairness.combinedVariance.toFixed(3)),
-      aaHgVariance: Number(best.objective.fairness.aaHgVariance.toFixed(3)),
-      weekendVariance: Number(best.objective.fairness.weekendVariance.toFixed(3)),
+      unfilled: objective.unfilled,
+      red: objective.audit.red,
+      specialRed: objective.audit.specialRed,
+      gray: objective.audit.gray,
+      orange: objective.audit.orange,
+      yellow: objective.audit.yellow,
+      wishesFulfilled: objective.wishes.fulfilled,
+      wishesPossible: objective.wishes.possible,
+      fairnessIndex: fairnessIndex(objective),
+      bdTargetPenalty: Number(objective.fairness.bdPenalty.toFixed(2)),
+      combinedLoadVariance: Number(objective.fairness.combinedVariance.toFixed(3)),
+      aaHgVariance: Number(objective.fairness.aaHgVariance.toFixed(3)),
+      weekendVariance: Number(objective.fairness.weekendVariance.toFixed(3)),
+      exploredNodes: aggregateStats.exploredNodes,
+      generatedNodes: aggregateStats.generatedNodes,
+      candidateEvaluations: aggregateStats.candidateEvaluations,
+      deadEnds: aggregateStats.deadEnds,
+      exactNodes: aggregateStats.exactNodes,
+      improvements: aggregateStats.improvements,
+      swapChecks: aggregateStats.swapChecks,
+      maxBeam: aggregateStats.maxBeam,
       attempts
     },
-    audit: best.objective.audit.entries.map(entry => ({
+    audit: objective.audit.entries.map(entry => ({
       dateIso: entry.dateIso,
       role: entry.role,
       staffId: entry.staffId,
       level: entry.evaluation.level,
       canSelect: entry.evaluation.canSelect,
       confirmationType: entry.evaluation.meta?.confirmationType || null,
-      reasons: entry.evaluation.reasons
+      reasons: entry.evaluation.reasons || []
     }))
   };
 
@@ -708,6 +1168,11 @@ export async function buildAutoPlan({
       : status === 'confirmation_required'
         ? `${changes.length} Vorschläge vollständig · ${result.metrics.red} rote Ausnahmen benötigen Bestätigung`
         : `Keine vollständige technisch wählbare Belegung · ${result.metrics.unfilled} Felder offen`,
+    exploredNodes: aggregateStats.exploredNodes,
+    generatedNodes: aggregateStats.generatedNodes,
+    deadEnds: aggregateStats.deadEnds,
+    exactNodes: aggregateStats.exactNodes,
+    improvements: aggregateStats.improvements,
     result
   });
   return result;
@@ -735,6 +1200,9 @@ export function applyAutoPlanProposal({
     if (!ROLE_ORDER.includes(change.role) || !merged.days?.[change.dateIso]) {
       throw new Error(`Ungültiger Auto-Plan-Vorschlag für ${key}.`);
     }
+    if (!change.staffId || typeof change.staffId !== 'string') {
+      throw new Error(`Auto-Plan-Vorschlag ohne gültige Personal-ID für ${key}.`);
+    }
     if (merged.days[change.dateIso][change.role]) {
       throw new Error(`Fixpunkt ${change.role.toUpperCase()} ${change.dateIso} wurde zwischenzeitlich belegt.`);
     }
@@ -748,6 +1216,9 @@ export function applyAutoPlanProposal({
   }
   if (audit.red > 0 && confirmation?.accepted !== true) {
     throw new Error(`${audit.red} rote Auto-Plan-Ausnahmen müssen ausdrücklich bestätigt werden.`);
+  }
+  if (audit.specialRed > 0 && !String(confirmation?.comment || '').trim()) {
+    throw new Error('Für besonders bestätigungspflichtige rote Auto-Plan-Ausnahmen ist ein begründender Kommentar erforderlich.');
   }
 
   if (audit.red > 0) {
