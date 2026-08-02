@@ -1,42 +1,37 @@
-import { api } from './api.js?v=20260801.11';
-import { loadMonth, monthKey, state } from './state.js?v=20260801.11';
 
 const MOTION_DURATION_MS = 430;
-const PREFETCH_TIMEOUT_MS = 4500;
-const STABILIZATION_FRAMES = 5;
+const READY_TIMEOUT_MS = 6000;
+const STABILIZATION_FRAMES = 4;
 const NAVIGATION_CONTROLS = new Set(['prevMonthBtn', 'nextMonthBtn', 'todayBtn']);
-const APP_LOAD_HANDOFF_MS = 900;
 const FROZEN_THEME_VARIABLES = [
   '--month-accent', '--month-accent-strong', '--month-ink', '--month-glow', '--month-panel-tint',
   '--weekday-field-bg', '--saturday-row-bg', '--sunday-row-bg', '--holiday-row-bg'
 ];
 
-// Der Übergangs-Preload und openCurrentMonth benötigen denselben Monatsstand.
-// Ein einmalig konsumierbarer Handoff verhindert einen zweiten identischen GET,
-// ohne den expliziten Button „Serverstand neu laden“ längerfristig zu cachen.
-const originalGetMonth = api.getMonth.bind(api);
-const monthLoadHandoffs = new Map();
-api.getMonth = (year, month) => {
-  const key = monthKey(year, month);
-  const handoff = monthLoadHandoffs.get(key);
-  if (handoff && handoff.expiresAt >= performance.now()) {
-    monthLoadHandoffs.delete(key);
-    return Promise.resolve(structuredClone(handoff.payload));
-  }
-  if (handoff) monthLoadHandoffs.delete(key);
-  return originalGetMonth(year, month);
-};
-
 function installTransitionStylesheet() {
-  if (typeof document === 'undefined' || document.querySelector('link[data-month-motion-styles]')) return;
-  const link = document.createElement('link');
-  link.rel = 'stylesheet';
-  link.href = '/transitions.css?v=20260801.11';
-  link.dataset.monthMotionStyles = 'true';
-  document.head.appendChild(link);
+  if (typeof document === 'undefined') return Promise.resolve();
+
+  const existing = document.querySelector('link[data-month-motion-styles]');
+  if (existing?.sheet) return Promise.resolve();
+
+  const link = existing || document.createElement('link');
+  if (!existing) {
+    link.rel = 'stylesheet';
+    link.href = '/transitions.css?v=20260801.11';
+    link.dataset.monthMotionStyles = 'true';
+    document.head.appendChild(link);
+  }
+
+  return new Promise(resolve => {
+    if (link.sheet) return resolve();
+    const finish = () => resolve();
+    link.addEventListener('load', finish, { once: true });
+    link.addEventListener('error', finish, { once: true });
+    setTimeout(finish, 1200);
+  });
 }
 
-installTransitionStylesheet();
+const transitionStylesReady = installTransitionStylesheet();
 
 let bypassInterception = false;
 let navigationGeneration = 0;
@@ -117,61 +112,44 @@ function prefersReducedMotion() {
   return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-function primeAppLoadHandoff(date) {
-  const key = monthKey(date.year, date.month);
-  const month = state.months.get(key);
-  if (!month) return;
-  monthLoadHandoffs.set(key, {
-    expiresAt: performance.now() + APP_LOAD_HANDOFF_MS,
-    payload: { ok: true, month: structuredClone(month) }
-  });
-  setTimeout(() => {
-    const current = monthLoadHandoffs.get(key);
-    if (current?.expiresAt <= performance.now()) monthLoadHandoffs.delete(key);
-  }, APP_LOAD_HANDOFF_MS + 50);
-}
-
-function sourceIsFresh(date) {
-  const key = monthKey(date.year, date.month);
-  if (!state.months.has(key)) return false;
-  const source = state.monthSources.get(key);
-  return source === 'server' || (source === 'local' && state.dirtyMonths.has(key));
-}
-
-async function preloadTarget(date, generation) {
-  if (sourceIsFresh(date)) {
-    primeAppLoadHandoff(date);
-    return;
-  }
-
-  const load = loadMonth(date.year, date.month).catch(() => null);
-  const timeout = new Promise(resolve => setTimeout(resolve, PREFETCH_TIMEOUT_MS, null));
-  await Promise.race([load, timeout]);
-  if (generation !== navigationGeneration) throw new DOMException('Navigation superseded', 'AbortError');
-  primeAppLoadHandoff(date);
-}
-
 function nextFrame() {
   return new Promise(resolve => requestAnimationFrame(resolve));
 }
 
-async function stabilizeNewView(date, generation) {
-  const expectedRows = new Date(date.year, date.month, 0).getDate();
-  let consecutiveStableFrames = 0;
+function isLoadingStatus() {
+  return /^Lädt(?:\s|…|$)/.test(document.getElementById('saveStatus')?.textContent?.trim() || '');
+}
 
-  while (consecutiveStableFrames < STABILIZATION_FRAMES) {
+function targetDomIsConsistent(date) {
+  const root = document.documentElement;
+  const rows = document.querySelectorAll('#planTableBody tr').length;
+  const expectedRows = new Date(date.year, date.month, 0).getDate();
+  const title = document.getElementById('monthTitle')?.textContent || '';
+  return Number(root.dataset.year) === date.year
+    && Number(root.dataset.month) === date.month
+    && rows === expectedRows
+    && title.includes(String(date.year));
+}
+
+async function waitForTargetReady(date, generation) {
+  const deadline = performance.now() + READY_TIMEOUT_MS;
+  let sawLoading = isLoadingStatus();
+  let stableFrames = 0;
+
+  while (stableFrames < STABILIZATION_FRAMES) {
     await nextFrame();
     if (generation !== navigationGeneration) throw new DOMException('Navigation superseded', 'AbortError');
 
-    const root = document.documentElement;
-    const rows = document.querySelectorAll('#planTableBody tr').length;
-    const title = document.getElementById('monthTitle')?.textContent || '';
-    const stable = Number(root.dataset.year) === date.year
-      && Number(root.dataset.month) === date.month
-      && rows === expectedRows
-      && title.includes(String(date.year));
+    const loading = isLoadingStatus();
+    sawLoading ||= loading;
+    const consistent = targetDomIsConsistent(date);
+    const ready = consistent && !loading && (sawLoading || performance.now() + 250 >= deadline);
+    stableFrames = ready ? stableFrames + 1 : 0;
 
-    consecutiveStableFrames = stable ? consecutiveStableFrames + 1 : 0;
+    if (performance.now() >= deadline) {
+      if (consistent) return;
+      throw new Error(`Monat ${date.year}-${String(date.month).padStart(2, '0')} wurde nicht rechtzeitig stabil.`);
+    }
   }
 }
 
@@ -255,9 +233,8 @@ function createFallbackSnapshot() {
 async function runFallbackTransition(date, direction, generation) {
   const snapshot = createFallbackSnapshot();
   if (!snapshot) {
-    await preloadTarget(date, generation);
     dispatchAppNavigation(date);
-    await stabilizeNewView(date, generation);
+    await waitForTargetReady(date, generation);
     return;
   }
 
@@ -280,10 +257,8 @@ async function runFallbackTransition(date, direction, generation) {
   };
 
   try {
-    await preloadTarget(date, generation);
-    if (cancelled) return;
     dispatchAppNavigation(date);
-    await stabilizeNewView(date, generation);
+    await waitForTargetReady(date, generation);
     if (cancelled) return;
 
     const sign = direction > 0 ? 1 : -1;
@@ -323,17 +298,15 @@ async function runNativeTransition(date, direction, generation) {
   setMotionState('preloading', 'native-view-transition', direction);
 
   const transition = document.startViewTransition(async () => {
-    await preloadTarget(date, generation);
     dispatchAppNavigation(date);
-    await stabilizeNewView(date, generation);
+    await waitForTargetReady(date, generation);
   });
   activeViewTransition = transition;
 
-  transition.updateCallbackDone.then(() => {
-    if (generation === navigationGeneration) setMotionState('animating', 'native-view-transition', direction);
-  }).catch(() => {});
-
   try {
+    await transition.ready;
+    if (generation !== navigationGeneration) throw new DOMException('Navigation superseded', 'AbortError');
+    setMotionState('animating', 'native-view-transition', direction);
     await transition.finished;
   } finally {
     if (activeViewTransition === transition) activeViewTransition = null;
@@ -347,13 +320,16 @@ async function navigate(date, fromDate) {
   const generation = ++navigationGeneration;
 
   cancelActiveTransition();
-  setMotionState('preloading', document.startViewTransition ? 'native-view-transition' : 'waapi-fallback', direction);
+  const engine = typeof document.startViewTransition === 'function' ? 'native-view-transition' : 'waapi-fallback';
+  setMotionState('preloading', engine, direction);
 
   try {
+    await transitionStylesReady;
+    if (generation !== navigationGeneration) throw new DOMException('Navigation superseded', 'AbortError');
+
     if (sameDate(origin, target) || prefersReducedMotion()) {
-      await preloadTarget(target, generation);
       dispatchAppNavigation(target);
-      await stabilizeNewView(target, generation);
+      await waitForTargetReady(target, generation);
       return;
     }
 
@@ -393,11 +369,6 @@ function interceptSelection(event) {
   const origin = committedDate();
   event.preventDefault();
   event.stopImmediatePropagation();
-
-  // Der Browser hat die Select-Auswahl bereits aktualisiert, der Monatsplan aber
-  // noch nicht. Für einen konsistenten alten Snapshot werden die Selects bis zum
-  // eigentlichen Update-Callback kurz auf den zuletzt dargestellten Monat gesetzt.
-  setSelectors(origin);
   void navigate(target, origin);
 }
 
