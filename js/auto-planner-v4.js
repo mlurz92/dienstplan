@@ -38,7 +38,7 @@ export function applyAutoPlanProposal(parameters) {
     return applyV3Proposal(parameters);
   } catch (error) {
     if (/nach der Optimierung verändert/.test(error?.message || '')) {
-      throw new Error(`${error.message} Erneute Regelprüfung erforderlich.`);
+      throw new Error(`${error.message} erneute Regelprüfung erforderlich.`);
     }
     throw error;
   }
