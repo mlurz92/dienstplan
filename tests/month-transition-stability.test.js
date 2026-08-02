@@ -26,8 +26,15 @@ test('automatic director updates are atomic while explicit API calls may still a
   assert.match(colorDirector, /export function applySpectrumProfile\(year, month, \{ animate = true \} = \{\}\)/);
 });
 
-test('every synchronization writes the final spectrum without another animation', () => {
+test('every synchronization cancels the base animation before writing the final spectrum', () => {
+  assert.match(stability, /import \{ applyMonthTheme \} from '.\/theme\.js\?v=20260801\.11';/);
+  assert.match(stability, /applyMonthTheme\(month, \{ animate: false, year \}\);/);
   assert.match(stability, /applySpectrumProfile\(year, month, \{ animate: false \}\)/);
+
+  const baseCall = stability.indexOf('applyMonthTheme(month, { animate: false, year });');
+  const spectrumCall = stability.indexOf('applySpectrumProfile(year, month, { animate: false });');
+  assert.ok(baseCall >= 0 && spectrumCall > baseCall, 'Basistheme muss vor dem priorisierten Spektrum abgeschlossen werden');
+
   assert.match(stability, /monthSelect'\)\?\.addEventListener\('change', settleMonthSpectrum\)/);
   assert.match(stability, /yearSelect'\)\?\.addEventListener\('change', settleMonthSpectrum\)/);
   assert.match(stability, /attributeFilter: \['data-month', 'data-year'\]/);
