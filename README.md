@@ -576,7 +576,7 @@ npm run verify
 
 Führt Syntaxprüfung, Unit-/Regressionstests und Playwright-End-to-End-Tests nacheinander aus.
 
-Der für diese Implementierung maßgebliche vollständige CI-Lauf **#125** bestand `npm ci`, Syntaxprüfung, alle 178 Unit-/Regressionstests und alle 10 Playwright-Tests.
+Der für diese Implementierung maßgebliche vollständige CI-Lauf **#126** bestand `npm ci`, Syntaxprüfung, alle 178 Unit-/Regressionstests und alle 10 Playwright-Tests.
 
 ---
 
