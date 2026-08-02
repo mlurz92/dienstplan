@@ -88,10 +88,38 @@ Alle Aktionen besitzen:
 - eine kurze sichtbare Beschriftung;
 - einen vollständigen Tooltip;
 - ein präzises `aria-label`;
-- sichtbare Tastaturfokussierung;
-- responsive Icon-only-Darstellung bei geringer Breite.
+- sichtbare Tastaturfokussierung.
 
 Dateiaktionen bleiben per Maus, Tastatur, Enter und Leertaste bedienbar. „Aktueller Monat“, „Neu laden“ und „Monat leeren“ werden über zurückhaltende Tonstufen priorisiert, ohne die Leiste visuell zu überladen.
+
+#### Gemessene Dichte statt fester Schwellen
+
+Die Leiste bestimmt ihre Dichte aus dem tatsächlich vorhandenen Platz. Feste Viewport-Schwellen waren die Ursache eines konkreten Fehlbilds: Zwischen etwa 1120 px und 1400 px behielten die drei Gruppen ihre volle Breite, überlagerten einander und schnitten Beschriftungen ab.
+
+`installToolbarDensity` in `js/ui-controls.js` misst dazu den Bedarf als Summe der Gruppenbreiten samt Abständen und vergleicht ihn mit der Innenbreite der Leiste. Von der reichsten Stufe abwärts gewinnt die erste, die vollständig hineinpasst:
+
+| Stufe | Darstellung |
+|---|---|
+| `full` | Gruppenüberschriften und alle Beschriftungen |
+| `groups` | ohne Gruppenüberschriften |
+| `secondary` | nur die Planungsaktionen bleiben beschriftet |
+| `icons` | reine Symbolschaltflächen |
+| `overflow` | Planung bleibt sichtbar, Daten und Ausgabe ziehen in ein Menü |
+
+Die gewählte Stufe steht als `data-toolbar-density` am Leistenelement und ist damit von außen prüfbar. Gemessen wird nach Größenänderung des Fensters und nach dem Laden der Schriften; Bezugsgröße ist die Fensterbreite, nicht die des Containers – ein Container kann bei waagerechtem Bildlauf breiter bleiben als das Fenster und die Leiste sonst in einer zu weiten Stufe festhalten.
+
+Die Gruppen schrumpfen dabei bewusst nicht. Nur so ist ihr Bedarf eindeutig messbar, statt dass die Schaltflächen zerdrückt werden.
+
+#### Überlaufmenü
+
+Reicht selbst die Symboldarstellung nicht, bleibt die Planungsgruppe in der Leiste und alles Weitere zieht in ein Menü hinter der Schaltfläche „Weitere Aktionen“ (`⋯`):
+
+- die Schaltflächen werden **verschoben, nicht neu erzeugt** – IDs, Ereignisbindungen und die versteckten Datei-Eingaben bleiben unverändert;
+- im Menü ist Platz, deshalb tragen die Aktionen dort wieder Gruppenüberschrift und volle Beschriftung;
+- das Menü ist `aria-haspopup`/`aria-expanded`-verknüpft, schließt bei Klick daneben, nach ausgelöster Aktion und mit <kbd>Esc</kbd> und gibt den Fokus an die Schaltfläche zurück;
+- es hängt am `<body>` und ist fest positioniert: Die Leiste klippt ihren Inhalt und ist wegen ihrer Einblendanimation zugleich Bezugsrahmen fest positionierter Nachfahren – nur außerhalb davon liegt das Menü zuverlässig über der Monatskarte.
+
+Damit gibt es bei keiner Fensterbreite überlagerte, beschnittene oder unerreichbare Aktionen.
 
 ### 2.3 Tabellenbearbeitung
 
@@ -636,7 +664,9 @@ Aktuell umfasst die Suite **178 Unit- und Regressionstests**. Geprüft werden un
 npm run test:e2e
 ```
 
-Aktuell umfasst die Browser-Suite **16 Playwright-End-to-End-Tests**. Sie prüft Navigation, Auswahl- und Konfliktdialoge, Werkzeugleiste, Dateiaktionen, Monatsbadge, Seasonal Spectrum Director, PDF-Export sowie Monats- und Jahresvariation.
+Aktuell umfasst die Browser-Suite **19 Playwright-End-to-End-Tests**. Sie prüft Navigation, Auswahl- und Konfliktdialoge, Werkzeugleiste, Dateiaktionen, Monatsbadge, Seasonal Spectrum Director, PDF-Export sowie Monats- und Jahresvariation.
+
+Die Werkzeugleiste wird über eine Breitenreihe von 1500 px bis 340 px geprüft: keine Überlagerung, kein Beschnitt, kein waagerechter Seitenbildlauf, mindestens drei tatsächlich genutzte Dichtestufen sowie Öffnen, Schließen und Rückführung des Überlaufmenüs.
 
 Der Dienst-Picker wird dabei vollständig durchgespielt: kompakte Breite, Gruppenreihenfolge, vorausgewählte Empfehlung, Tippfilter, Pfeiltasten, Übernahme per <kbd>⏎</kbd>, Anzeige der aktuellen Besetzung und Löschen des Eintrags. Ein eigener Fall prüft mit einer 14-köpfigen Belegschaft, dass die Liste ohne Bildlauf auskommt und keine Zeile höher als 34 px wird.
 

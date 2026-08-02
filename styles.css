@@ -724,6 +724,9 @@ h3 { font-size: 1.05rem; }
   .topbar, .toolbar, .sheet-heading { align-items: stretch; }
   .topbar, .toolbar { flex-direction: column; }
   .topbar-controls, .toolbar-group { width: 100%; }
+  /* Die organisierte Werkzeugleiste regelt ihre Dichte selbst (controls.css)
+     und bleibt deshalb auch schmal eine einzeilige Leiste. */
+  .toolbar.toolbar-organized { flex-direction: row; align-items: stretch; }
   .month-selector { flex: 1; }
   .month-selector select { flex: 1; min-width: 0; }
   .legend-stack { justify-items: start; }

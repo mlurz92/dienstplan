@@ -103,6 +103,209 @@ function decorateAction(element, item) {
   }
 }
 
+/**
+ * Dichtestufen der Werkzeugleiste.
+ *
+ * Die Leiste passt ihre Dichte an den tatsächlich vorhandenen Platz an, nicht an
+ * feste Viewport-Schwellen. Feste Schwellen waren der Grund für das frühere
+ * Fehlbild: Zwischen 1120 px und 1400 px behielten die drei Gruppen ihre volle
+ * Breite, überlagerten einander und schnitten Beschriftungen ab.
+ *
+ * Gemessen wird die Leiste selbst. Von der reichsten Stufe abwärts wird die
+ * erste genommen, die vollständig hineinpasst:
+ *
+ * 1. `full`      – Gruppenüberschriften und alle Beschriftungen;
+ * 2. `groups`    – ohne Gruppenüberschriften;
+ * 3. `secondary` – nur die Planungsaktionen bleiben beschriftet;
+ * 4. `icons`     – reine Symbolschaltflächen;
+ * 5. `overflow`  – Planung bleibt sichtbar, alles Weitere zieht in ein Menü.
+ */
+export const TOOLBAR_DENSITY_STEPS = Object.freeze(['full', 'groups', 'secondary', 'icons', 'overflow']);
+
+const OVERFLOW_SECTIONS = Object.freeze(['data', 'output']);
+
+function overflowButtonMarkup() {
+  return '<svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
+    + '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>'
+    + '<span class="tool-label">Mehr</span>';
+}
+
+/**
+ * Baut die Überlaufgruppe. Die Schaltflächen werden dabei verschoben, nicht neu
+ * erzeugt: IDs, Ereignisbindungen und die versteckten Datei-Eingaben bleiben
+ * dadurch unverändert bestehen.
+ */
+function createOverflow(toolbar) {
+  const host = document.createElement('div');
+  host.className = 'toolbar-overflow';
+
+  const trigger = document.createElement('button');
+  trigger.type = 'button';
+  trigger.id = 'toolbarOverflowBtn';
+  trigger.className = 'tool-action tool-action--overflow';
+  trigger.title = 'Weitere Aktionen';
+  trigger.setAttribute('aria-label', 'Weitere Aktionen');
+  trigger.setAttribute('aria-haspopup', 'true');
+  trigger.setAttribute('aria-expanded', 'false');
+  trigger.setAttribute('aria-controls', 'toolbarOverflowPanel');
+  trigger.innerHTML = overflowButtonMarkup();
+
+  const panel = document.createElement('div');
+  panel.id = 'toolbarOverflowPanel';
+  panel.className = 'toolbar-overflow-panel';
+  panel.hidden = true;
+
+  /**
+   * Das Menü liegt fest positioniert über der Seite.
+   *
+   * Die Leiste selbst klippt ihren Inhalt, damit eine noch nicht bestimmte
+   * Dichtestufe nie überstehen kann. Ein fest positioniertes Menü ist davon
+   * nicht betroffen und legt sich zugleich sauber über die Monatskarte.
+   */
+  const place = () => {
+    const anchor = trigger.getBoundingClientRect();
+    panel.style.top = `${Math.round(anchor.bottom + 7)}px`;
+    panel.style.left = 'auto';
+    panel.style.right = `${Math.round(window.innerWidth - anchor.right)}px`;
+  };
+
+  const close = () => {
+    if (panel.hidden) return;
+    panel.hidden = true;
+    trigger.setAttribute('aria-expanded', 'false');
+    window.removeEventListener('scroll', place, true);
+    window.removeEventListener('resize', place);
+  };
+  const open = () => {
+    panel.hidden = false;
+    place();
+    trigger.setAttribute('aria-expanded', 'true');
+    window.addEventListener('scroll', place, true);
+    window.addEventListener('resize', place);
+  };
+
+  trigger.addEventListener('click', event => {
+    event.stopPropagation();
+    if (panel.hidden) open(); else close();
+  });
+  panel.addEventListener('click', event => {
+    // Eine ausgelöste Aktion schließt das Menü; das Dateifeld selbst nicht,
+    // sonst verschwände der Auslöser noch vor dem Öffnen des Dateidialogs.
+    if (event.target instanceof HTMLInputElement) return;
+    close();
+  });
+  document.addEventListener('click', event => {
+    if (!host.contains(event.target) && !panel.contains(event.target)) close();
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key !== 'Escape' || panel.hidden) return;
+    close();
+    trigger.focus();
+  });
+
+  // Das Menü hängt bewusst am <body>: Die Leiste selbst klippt ihren Inhalt und
+  // ist wegen ihrer Einblend-Animation zugleich Bezugsrahmen für fest
+  // positionierte Nachfahren. Nur außerhalb dieses Rahmens kann das Menü
+  // zuverlässig über der Monatskarte liegen.
+  host.append(trigger);
+  toolbar.append(host);
+  document.body.append(panel);
+  return { host, trigger, panel, close };
+}
+
+function installToolbarDensity(toolbar, sections) {
+  if (typeof window === 'undefined') return;
+  const overflow = createOverflow(toolbar);
+  // Reihenfolge der auslagerbaren Gruppen. Beim Zurückholen werden sie in genau
+  // dieser Reihenfolge vor die Überlauf-Schaltfläche gesetzt. Ein gemerkter
+  // Nachbarknoten taugt dafür nicht: Beim Auslagern beider Gruppen wäre der
+  // Nachbar der ersten selbst schon im Menü und nicht mehr Kind der Leiste.
+  const movable = OVERFLOW_SECTIONS.map(key => sections.get(key)).filter(Boolean);
+
+  const setDensity = density => {
+    toolbar.dataset.toolbarDensity = density;
+    if (density === 'overflow') {
+      for (const section of movable) overflow.panel.append(section);
+    } else {
+      for (const section of movable) {
+        if (section.parentNode !== toolbar) toolbar.insertBefore(section, overflow.host);
+      }
+      overflow.close();
+    }
+  };
+
+  /**
+   * Breitenbedarf der aktuellen Stufe.
+   *
+   * Gemessen wird die Summe der Kinder samt Abständen, nicht `scrollWidth`:
+   * Die Gruppen schrumpfen nicht, deshalb ist diese Summe der tatsächliche
+   * Bedarf – und sie bleibt auch dann eindeutig, wenn `justify-content` die
+   * Elemente über die volle Breite verteilt.
+   */
+  const measurements = () => {
+    const style = getComputedStyle(toolbar);
+    const gap = parseFloat(style.columnGap) || 0;
+    const padding = (parseFloat(style.paddingLeft) || 0) + (parseFloat(style.paddingRight) || 0);
+    const visible = [...toolbar.children].filter(child => child.offsetParent !== null || child.offsetWidth > 0);
+    const required = visible.length
+      ? visible.reduce((total, child) => total + child.offsetWidth, 0) + gap * (visible.length - 1)
+      : 0;
+    // `clientWidth` schließt die Innenabstände ein, die Summe der Kinder nicht.
+    return { required, available: toolbar.clientWidth - padding };
+  };
+
+  const fits = () => {
+    const { required, available } = measurements();
+    return required <= available + 1;
+  };
+
+  let scheduled = false;
+  let measuredWidth = -1;
+
+  // Bezugsgröße ist die Fensterbreite. Der Container kann bei einem waagerechten
+  // Bildlauf breiter bleiben als das Fenster; eine Sperre auf seiner Breite
+  // ließe die Leiste dann in einer zu weiten Stufe stehen bleiben.
+  const availableWidth = () => window.innerWidth;
+
+  const measure = () => {
+    scheduled = false;
+    const width = availableWidth();
+    if (!width) return;
+    measuredWidth = width;
+    for (const density of TOOLBAR_DENSITY_STEPS) {
+      setDensity(density);
+      if (fits()) return;
+    }
+  };
+
+  /**
+   * Nur eine geänderte Containerbreite löst eine neue Messung aus.
+   *
+   * Die Messung ändert die Höhe und Breite der Leiste selbst. Ohne diese Sperre
+   * meldete der Beobachter diese eigenen Änderungen zurück, der Browser verwarf
+   * die Benachrichtigungen der Rückkopplung – und die Leiste blieb anschließend
+   * auf ihrer zuletzt gesetzten Stufe stehen.
+   */
+  const schedule = ({ force = false } = {}) => {
+    if (scheduled) return;
+    if (!force && availableWidth() === measuredWidth) return;
+    scheduled = true;
+    requestAnimationFrame(measure);
+  };
+
+  setDensity('full');
+  schedule({ force: true });
+  // Beobachtet wird bewusst der umgebende Container, nicht die Leiste selbst:
+  // Die Messung verändert die Breite der Leiste und würde den Beobachter sonst
+  // in eine Rückkopplung treiben, deren Benachrichtigungen der Browser
+  // anschließend verwirft.
+  const host = toolbar.parentElement;
+  if (typeof ResizeObserver === 'function' && host) new ResizeObserver(() => schedule()).observe(host);
+  window.addEventListener('resize', () => schedule());
+  // Schriftlieferung ändert die Textbreiten und damit die passende Stufe.
+  document.fonts?.ready?.then?.(() => schedule({ force: true }));
+}
+
 export function organizeToolbar() {
   const toolbar = document.querySelector('.toolbar');
   if (!toolbar || toolbar.dataset.organized === 'true') return false;
@@ -114,6 +317,7 @@ export function organizeToolbar() {
   if (resolved.some(group => group.items.some(entry => !entry.element))) return false;
 
   const fragment = document.createDocumentFragment();
+  const sections = new Map();
   for (const group of resolved) {
     const section = document.createElement('section');
     section.className = `toolbar-section toolbar-section--${group.key}`;
@@ -131,6 +335,7 @@ export function organizeToolbar() {
     }
 
     section.append(heading, actions);
+    sections.set(group.key, section);
     fragment.append(section);
   }
 
@@ -138,6 +343,7 @@ export function organizeToolbar() {
   toolbar.classList.add('toolbar-organized');
   toolbar.dataset.organized = 'true';
   toolbar.setAttribute('aria-label', 'Werkzeugleiste');
+  installToolbarDensity(toolbar, sections);
   return true;
 }
 
