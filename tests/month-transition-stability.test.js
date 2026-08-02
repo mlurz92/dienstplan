@@ -23,13 +23,14 @@ test('every synchronization writes the final spectrum without another animation'
 });
 
 test('legacy month-enter classes can no longer hide the freshly rendered table', () => {
-  const blockStart = controls.indexOf('Stabiler Monatswechsel');
-  assert.ok(blockStart >= 0, 'CSS-Schutzblock fehlt');
-  const block = controls.slice(blockStart);
-  assert.match(block, /\.month-enter-next,\s*\.month-enter-prev\s*\{[^}]*animation:\s*none\s*!important;/s);
-  assert.match(block, /opacity:\s*1\s*!important;/);
-  assert.match(block, /transform:\s*none\s*!important;/);
-  assert.doesNotMatch(block, /opacity:\s*0(?:\D|$)/);
+  const blockStart = controls.indexOf('.month-enter-next');
+  const blockEnd = controls.indexOf('body.month-content-transition .month-palette-label', blockStart);
+  assert.ok(blockStart >= 0, 'CSS-Schutzregel fehlt');
+  const rule = controls.slice(blockStart, blockEnd > blockStart ? blockEnd : undefined);
+  assert.match(rule, /\.month-enter-next,\s*\.month-enter-prev\s*\{[^}]*animation:\s*none\s*!important;/s);
+  assert.match(rule, /opacity:\s*1\s*!important;/);
+  assert.match(rule, /transform:\s*none\s*!important;/);
+  assert.doesNotMatch(rule, /opacity:\s*0(?:\D|$)/);
 });
 
 test('syntax verification covers the stability module', () => {
