@@ -89,6 +89,15 @@ function refreshFairnessMetrics(state, result) {
   return result;
 }
 
+function validateProposalStaff(parameters) {
+  const valid = new Set((parameters?.state?.staff || []).map(person => person.id));
+  for (const change of parameters?.proposal?.changes || []) {
+    if (!change?.staffId || !valid.has(change.staffId)) {
+      throw new Error(`Auto-Plan-Vorschlag ohne gültige Personal-ID für ${change?.role || 'Dienst'} ${change?.dateIso || 'unbekannt'}; erneute Regelprüfung erforderlich.`);
+    }
+  }
+}
+
 /**
  * Direkte API-Aufrufe aus Tests oder Integrationen erhalten eine kurze echte
  * iterative Prüfung, sofern sie die Rundenzahl nicht ausdrücklich festlegen.
@@ -111,11 +120,12 @@ export async function buildAutoPlan(parameters) {
 }
 
 export function applyAutoPlanProposal(parameters) {
+  validateProposalStaff(parameters);
   try {
     return applyV3Proposal(parameters);
   } catch (error) {
     if (/nach der Optimierung verändert/.test(error?.message || '')) {
-      throw new Error(`${error.message} Erneute Regelprüfung erforderlich.`);
+      throw new Error(`${error.message} erneute Regelprüfung erforderlich.`);
     }
     throw error;
   }
