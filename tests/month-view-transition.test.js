@@ -31,35 +31,42 @@ test('native view transitions and a compositor-only WAAPI fallback are both pres
   assert.match(motion, /willChange = 'transform, opacity'/);
   assert.doesNotMatch(motion, /setInterval\(/);
 
-  assert.match(css, /::view-transition-old\(root\)/);
-  assert.match(css, /::view-transition-new\(root\)/);
+  assert.match(css, /view-transition-name:\s*month-sheet/);
+  assert.match(css, /::view-transition-old\(month-sheet\)/);
+  assert.match(css, /::view-transition-new\(month-sheet\)/);
   assert.match(css, /translate3d\(/);
   assert.doesNotMatch(css, /filter:\s*blur/);
 });
 
-test('app navigation starts inside the captured transition before readiness polling', () => {
+test('target month is prefetched once and handed to the existing app loader', () => {
+  assert.match(motion, /const monthLoadHandoffs = new Map\(\)/);
+  assert.match(motion, /api\.getMonth = \(year, month\) =>/);
+  assert.match(motion, /loadMonth\(date\.year, date\.month\)/);
+  assert.match(motion, /primeAppLoadHandoff\(date\)/);
+  assert.match(motion, /monthLoadHandoffs\.delete\(key\)/);
+});
+
+test('view-transition callback waits on DOM mutations and never on requestAnimationFrame', () => {
   const nativeStart = motion.indexOf('const transition = document.startViewTransition(async () => {');
-  const dispatch = motion.indexOf('dispatchAppNavigation(date);', nativeStart);
-  const readiness = motion.indexOf('await waitForTargetReady(date, generation);', nativeStart);
-  assert.ok(nativeStart >= 0 && dispatch > nativeStart);
-  assert.ok(readiness > dispatch, 'die App muss direkt nach dem alten Snapshot starten');
-  assert.match(motion, /function isLoadingStatus\(\)/);
-  assert.match(motion, /document\.getElementById\('saveStatus'\)/);
+  const nativeEnd = motion.indexOf('activeViewTransition = transition;', nativeStart);
+  const callback = motion.slice(nativeStart, nativeEnd);
+  assert.match(callback, /waitForTargetDom\(date, generation, signal\)/);
+  assert.match(callback, /dispatchAppNavigation\(date\)/);
+  assert.doesNotMatch(callback, /requestAnimationFrame/);
+  assert.match(motion, /const observer = new MutationObserver\(check\)/);
+  assert.match(motion, /attributeFilter: \['data-month', 'data-year'\]/);
 });
 
-test('new view remains stable for several frames after the load status has settled', () => {
-  assert.match(motion, /const STABILIZATION_FRAMES = [3-9];/);
-  assert.match(motion, /while \(stableFrames < STABILIZATION_FRAMES\)/);
-  assert.match(motion, /rows === expectedRows/);
-  assert.match(motion, /consistent && !loading/);
-  assert.match(motion, /await waitForTargetReady\(date, generation\)/);
-});
-
-test('native state begins at transition.ready and rapid navigation cancels the previous capture', () => {
-  assert.match(motion, /await transition\.ready;/);
-  assert.match(motion, /setMotionState\('animating', 'native-view-transition', direction\)/);
+test('rapid navigation aborts preload, DOM wait and active visual transition', () => {
+  assert.match(motion, /activeAbortController\?\.abort\(\)/);
+  assert.match(motion, /signal\.addEventListener\('abort', onAbort/);
   assert.match(motion, /activeViewTransition\?\.skipTransition/);
   assert.match(motion, /generation !== navigationGeneration/);
+});
+
+test('native animation state begins only when transition layers are ready', () => {
+  assert.match(motion, /await transition\.ready;/);
+  assert.match(motion, /setMotionState\('animating', 'native-view-transition', direction\)/);
 });
 
 test('transition stylesheet and syntax check are shipped', () => {
