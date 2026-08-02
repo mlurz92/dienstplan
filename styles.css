@@ -555,7 +555,7 @@ h3 { font-size: 1.05rem; }
    unter der Liste und wechselt mit der aktiven Zeile, ohne das Layout zu
    verschieben.
    -------------------------------------------------------------------------- */
-.picker-card { width: min(560px, calc(100vw - 2rem)); padding: 0; overflow: hidden; }
+.picker-card { width: min(600px, calc(100vw - 2rem)); padding: 0; overflow: hidden; }
 
 .picker-header {
   display: grid; grid-template-columns: 1fr auto; align-items: start; gap: 4px 10px;
@@ -588,9 +588,12 @@ h3 { font-size: 1.05rem; }
   outline: 2px solid color-mix(in srgb, var(--month-accent) 62%, transparent); outline-offset: 1px;
 }
 
-/* Die Maske zeigt am unteren Rand an, dass die Liste weitergeht. */
+/* Ziel ist die vollständige Übersicht: Die Liste ist so hoch, dass die gesamte
+   Belegschaft ohne Rollen sichtbar bleibt. Erst wenn selbst das nicht mehr in
+   das Fenster passt, wird gerollt – dann zeigt die Maske am unteren Rand an,
+   dass es weitergeht. */
 .picker-list {
-  display: grid; gap: 6px; max-height: min(46vh, 380px); overflow: auto;
+  display: grid; gap: 5px; max-height: min(72vh, 720px); overflow: auto;
   padding: 0 13px 2px; scrollbar-gutter: stable;
   mask-image: linear-gradient(to bottom, #000 calc(100% - 14px), transparent);
   -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 14px), transparent);
@@ -610,10 +613,12 @@ h3 { font-size: 1.05rem; }
 .picker-group--recommended .picker-group-label { color: var(--green); }
 .picker-group--confirm .picker-group-label { color: var(--red); }
 
+/* Eine Person = eine Zeile. Das hält die gesamte Belegschaft gleichzeitig im
+   Blick; die vollständige Begründung liegt im Detailbereich unter der Liste. */
 .picker-item {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto auto; grid-template-rows: auto auto;
-  align-items: center; gap: 2px 8px; width: 100%; padding: 6px 9px; border-radius: 9px;
-  cursor: pointer; text-align: left;
+  display: grid; grid-template-columns: minmax(7.5rem, 12rem) minmax(0, 1fr) auto auto;
+  align-items: center; gap: 2px 9px; width: 100%; padding: 4px 9px; border-radius: 8px;
+  cursor: pointer; text-align: left; min-height: 30px;
   border: 1px solid rgba(151,163,176,.38); border-left-width: 3px; border-left-color: #b9c0c9;
   background: rgba(255,255,255,.66); box-shadow: inset 0 1px 0 rgba(255,255,255,.84);
 }
@@ -632,7 +637,7 @@ h3 { font-size: 1.05rem; }
 .picker-item:disabled { cursor: not-allowed; transform: none !important; box-shadow: none !important; }
 
 .picker-identity { grid-column: 1; grid-row: 1; display: flex; align-items: baseline; gap: 6px; min-width: 0; }
-.picker-item > .small-chip { grid-column: 3; grid-row: 1; justify-self: end; }
+.picker-item > .small-chip { grid-column: 4; grid-row: 1; justify-self: end; }
 .picker-name { font-weight: 680; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .picker-function { font-size: .66rem; letter-spacing: .04em; color: var(--muted); white-space: nowrap; }
 .picker-assigned {
@@ -641,7 +646,7 @@ h3 { font-size: 1.05rem; }
   background: color-mix(in srgb, var(--month-accent) 13%, #fff); white-space: nowrap;
 }
 .picker-load {
-  grid-column: 2; grid-row: 1; display: inline-flex; align-items: baseline; gap: 3px; padding: 1px 6px; border-radius: 6px;
+  grid-column: 3; grid-row: 1; display: inline-flex; align-items: baseline; gap: 3px; padding: 1px 6px; border-radius: 6px;
   font-size: .68rem; font-variant-numeric: tabular-nums; color: var(--muted);
   background: rgba(244,246,249,.9); border: 1px solid rgba(151,163,176,.34); white-space: nowrap;
 }
@@ -650,7 +655,7 @@ h3 { font-size: 1.05rem; }
 
 /* Zweite Zeile: wichtigste Begründung, alles Weitere als Zähler. */
 .picker-item .reasons {
-  grid-column: 1 / -1; grid-row: 2; display: flex; align-items: center; gap: 5px; min-width: 0;
+  grid-column: 2; grid-row: 1; display: flex; align-items: center; gap: 5px; min-width: 0;
   color: var(--muted); font-size: .74rem; line-height: 1.25;
 }
 .picker-item .reason-lead { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -687,12 +692,15 @@ h3 { font-size: 1.05rem; }
 .picker-footer .danger-ghost { color: var(--red); border-color: #e5aca7; }
 .picker-footer .danger-ghost[hidden] { display: none; }
 
-@media (max-width: 560px) {
+/* Auf schmalen Geräten reicht eine Zeile nicht für alle vier Spalten. Dann
+   rückt die Begründung unter den Namen, die Übersicht bleibt erhalten. */
+@media (max-width: 620px) {
   .picker-keys { display: none; }
   .picker-footer { justify-content: flex-end; }
-  .picker-item { grid-template-columns: minmax(0, 1fr) auto; }
-  .picker-item > .small-chip { grid-column: 2; }
-  .picker-load { grid-column: 1; grid-row: 3; justify-self: start; }
+  .picker-item { grid-template-columns: minmax(0, 1fr) auto auto; grid-template-rows: auto auto; }
+  .picker-item > .small-chip { grid-column: 3; grid-row: 1; }
+  .picker-load { grid-column: 2; grid-row: 1; }
+  .picker-item .reasons { grid-column: 1 / -1; grid-row: 2; }
 }
 
 .day-meta-list { display: grid; gap: 6px; max-height: 62vh; overflow: auto; }
