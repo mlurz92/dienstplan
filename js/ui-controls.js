@@ -1,3 +1,4 @@
+import './month-view-transition.js?v=20260801.11';
 import './color-director.js?v=20260801.11';
 import './month-transition-stability.js?v=20260801.11';
 
