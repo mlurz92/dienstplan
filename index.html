@@ -182,21 +182,38 @@
     </main>
   </div>
 
-  <dialog id="pickerDialog" class="app-dialog picker-dialog">
-    <form method="dialog" class="dialog-card">
-      <div class="dialog-header">
-        <div>
-          <div class="eyebrow" id="pickerEyebrow"></div>
+  <dialog id="pickerDialog" class="app-dialog picker-dialog" aria-labelledby="pickerTitle" aria-describedby="pickerCurrent">
+    <form method="dialog" class="dialog-card picker-card">
+      <div class="picker-header">
+        <div class="picker-heading">
+          <span class="picker-role" id="pickerEyebrow"></span>
           <h3 id="pickerTitle">Auswahl</h3>
-          <p id="pickerSubtitle"></p>
         </div>
-        <button class="icon-btn close-btn" value="cancel">✕</button>
+        <button class="icon-btn close-btn" value="cancel" aria-label="Auswahl schließen" title="Schließen">✕</button>
+        <p class="picker-current" id="pickerCurrent"></p>
       </div>
-      <div id="pickerList" class="picker-list"></div>
-      <menu class="dialog-actions">
-        <button value="cancel" class="secondary">Abbrechen</button>
-        <button id="clearAssignmentBtn" value="clear" class="secondary">Eintrag löschen</button>
-      </menu>
+
+      <div class="picker-search">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.2-4.2"/></svg>
+        <input id="pickerSearch" type="text" role="combobox" autocomplete="off" spellcheck="false"
+               placeholder="Name tippen zum Filtern …" aria-label="Mitarbeitende filtern"
+               aria-controls="pickerList" aria-expanded="true" aria-autocomplete="list" />
+      </div>
+
+      <div id="pickerList" class="picker-list" role="listbox" aria-label="Mitarbeitende"></div>
+
+      <p class="picker-detail" id="pickerDetail" aria-live="polite"></p>
+      <p class="picker-note" id="pickerSubtitle"></p>
+
+      <div class="picker-footer">
+        <p class="picker-keys" aria-hidden="true">
+          <kbd>↑</kbd><kbd>↓</kbd> wählen · <kbd>⏎</kbd> übernehmen · <kbd>Esc</kbd> schließen
+        </p>
+        <menu class="dialog-actions">
+          <button value="cancel" class="secondary">Abbrechen</button>
+          <button id="clearAssignmentBtn" value="clear" class="secondary danger-ghost">Eintrag löschen</button>
+        </menu>
+      </div>
     </form>
   </dialog>
 
