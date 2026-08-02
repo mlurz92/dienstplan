@@ -53,16 +53,17 @@ test('HG an drei aufeinanderfolgenden Tagen wird erkannt', () => {
   assert.ok(bewertung.reasons.includes('Dritter HG an drei aufeinanderfolgenden Tagen'), `Gründe: ${bewertung.reasons.join(' | ')}`);
 });
 
-test('HG am Tag vor eigenem BD wird erkannt (und Fr-HG/Sa-BD bleibt zulässig)', () => {
+test('HG am Werktag vor eigenem BD ist rot und Fr-HG vor Sa-BD bleibt ausgenommen', () => {
   const state = planungszustand();
   const juli = monat(state, 2026, 7);
   setAssignment(juli, '2026-07-08', 'bd', 'martin');          // Mittwoch
-  const mittwochsVorabend = evaluateCandidate({ state, monthData: juli, dateIso: '2026-07-07', role: 'hg', staffId: 'martin' });
-  assert.ok(mittwochsVorabend.reasons.includes('HG am Tag vor eigenem BD'), `Gründe: ${mittwochsVorabend.reasons.join(' | ')}`);
+  const dienstagHg = evaluateCandidate({ state, monthData: juli, dateIso: '2026-07-07', role: 'hg', staffId: 'martin' });
+  assert.equal(dienstagHg.level, 'red');
+  assert.ok(dienstagHg.reasons.some(reason => reason.includes('HG am Werktag vor eigenem BD')), `Gründe: ${dienstagHg.reasons.join(' | ')}`);
 
   setAssignment(juli, '2026-07-11', 'bd', 'lurz');            // Samstag
   const freitagHg = evaluateCandidate({ state, monthData: juli, dateIso: '2026-07-10', role: 'hg', staffId: 'lurz' });
-  assert.ok(!freitagHg.reasons.includes('HG am Tag vor eigenem BD'), 'Freitag-HG vor Samstags-BD ist gewolltes Muster');
+  assert.equal(freitagHg.reasons.some(reason => reason.includes('HG am Werktag vor eigenem BD')), false, 'Freitag-HG vor Samstags-BD ist gewolltes Muster');
 });
 
 test('BD unmittelbar vor Urlaubsbeginn wird erkannt', () => {
