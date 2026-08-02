@@ -92,7 +92,6 @@ async function mockApi(page) {
 test('Auto-Plan animiert den Optimierungslauf und schreibt erst nach Bestätigung', async ({ page }) => {
   test.setTimeout(60_000);
   const api = await mockApi(page);
-  await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
   await page.selectOption('#yearSelect', '2026');
   await page.selectOption('#monthSelect', '7');
