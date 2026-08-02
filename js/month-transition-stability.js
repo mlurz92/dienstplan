@@ -1,5 +1,5 @@
 import { applyMonthTheme } from './theme.js?v=20260801.11';
-import { applySpectrumProfile } from './color-director.js?v=20260801.11';
+import { applySpectrumProfile, spectrumMotionIsRunning } from './color-director.js?v=20260801.11';
 
 /**
  * Führt die konkurrierenden Farbsignale eines Monatswechsels zu genau einem
@@ -22,6 +22,12 @@ import { applySpectrumProfile } from './color-director.js?v=20260801.11';
  * laufendes Ziel und bleibt in diesem Fall wirkungslos. Die idempotente
  * Monatsschlüssel-Sperre verhindert zusätzlich, dass die selbst gesetzten
  * data-month-/data-year-Attribute den Observer erneut auslösen.
+ *
+ * Die Monatskarte darf erst dann in den Zustand `idle` wechseln, wenn auch der
+ * längere Spektrumverlauf seinen kanonischen Endwert geschrieben hat. Andernfalls
+ * kann nach dem vermeintlichen Abschluss noch ein einzelner interpolierter
+ * RGB-Frame folgen. Der Motion-Guard hält den Zustand deshalb ohne zusätzlichen
+ * Paint auf `animating`, bis der Director vollständig beendet ist.
  */
 
 const PAINT_GUARD_FRAMES = 4;
@@ -110,6 +116,61 @@ function queueSettlement() {
   });
 }
 
+let motionStateGuardHandle = null;
+let deferredMotionIdle = false;
+let lastMotionDirection = '';
+
+function finishDeferredMotionIdle() {
+  if (!deferredMotionIdle) return;
+  const root = document.documentElement;
+  deferredMotionIdle = false;
+  root.dataset.monthMotionState = 'idle';
+  delete root.dataset.monthMotionDirection;
+  root.dataset.monthMotionSpectrum = 'settled';
+}
+
+function watchSpectrumCompletion() {
+  if (motionStateGuardHandle !== null || typeof requestAnimationFrame !== 'function') return;
+
+  const check = () => {
+    motionStateGuardHandle = null;
+    const root = document.documentElement;
+
+    // Eine neue Navigation hat den alten Abschluss überholt. Ihr eigener
+    // Motion-Zustand bleibt unangetastet und erzeugt später einen neuen Guard.
+    if (!deferredMotionIdle || root.dataset.monthMotionState !== 'animating') {
+      deferredMotionIdle = false;
+      return;
+    }
+
+    if (spectrumMotionIsRunning()) {
+      motionStateGuardHandle = requestAnimationFrame(check);
+      return;
+    }
+
+    finishDeferredMotionIdle();
+  };
+
+  motionStateGuardHandle = requestAnimationFrame(check);
+}
+
+function coordinateMotionCompletion() {
+  const root = document.documentElement;
+  if (root.dataset.monthMotionDirection) lastMotionDirection = root.dataset.monthMotionDirection;
+
+  // clearMotionState() wird synchron ausgeführt. MutationObserver laufen noch
+  // vor dem nächsten Paint, sodass der vorzeitige idle-Zustand niemals sichtbar
+  // wird und die bestehende Richtung für die restlichen Spektrumframes erhalten
+  // bleibt.
+  if (root.dataset.monthMotionState !== 'idle' || !spectrumMotionIsRunning()) return;
+
+  deferredMotionIdle = true;
+  root.dataset.monthMotionState = 'animating';
+  if (lastMotionDirection) root.dataset.monthMotionDirection = lastMotionDirection;
+  root.dataset.monthMotionSpectrum = 'finishing';
+  watchSpectrumCompletion();
+}
+
 function initializeMonthTransitionStability() {
   settleMonthSpectrum();
 
@@ -128,6 +189,12 @@ function initializeMonthTransitionStability() {
     observer.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ['data-month', 'data-year']
+    });
+
+    const motionObserver = new MutationObserver(coordinateMotionCompletion);
+    motionObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-month-motion-state', 'data-month-motion-direction']
     });
   }
 }
