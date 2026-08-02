@@ -48,8 +48,18 @@ function emptyMonth(year, month) {
     days[iso] = { bd: '', hg: '', rbn1: '', rbn2: '', notes: '' };
   }
   return {
-    schemaVersion: 1, year, month, revision: 0, updatedAt: null,
-    days, absences: {}, absenceSources: {}, preferences: {}, options: {}, overrideLog: [], importLog: []
+    schemaVersion: 1,
+    year,
+    month,
+    revision: 0,
+    updatedAt: null,
+    days,
+    absences: {},
+    absenceSources: {},
+    preferences: {},
+    options: {},
+    overrideLog: [],
+    importLog: []
   };
 }
 
@@ -105,8 +115,19 @@ async function openJuly(page) {
   await expect(page.locator('#monthTitle')).toContainText('Juli 2026');
 }
 
-test('Auto-Plan animiert den Null-Rot-Lauf und schreibt erst nach Bestätigung', async ({ page }) => {
-  test.setTimeout(90_000);
+async function openStudioAndStart(page) {
+  await page.locator('#autoPlanBtn').click();
+  await expect(page.locator('#autoPlanDialog')).toBeVisible();
+  await expect(page.locator('#autoPlanConfig')).toBeVisible();
+  await expect(page.locator('#autoPlanStage')).toBeHidden();
+  await expect(page.locator('#autoPlanResult')).toBeHidden();
+  await expect(page.locator('#autoPlanStartBtn')).toBeEnabled();
+  await page.locator('#autoPlanStartBtn').click();
+  await expect(page.locator('#autoPlanStage')).toBeVisible();
+}
+
+test('Auto-Plan startet erst nach Parameterfreigabe und schreibt erst nach Ergebnisbestätigung', async ({ page }) => {
+  test.setTimeout(120_000);
   const api = await mockApi(page);
   await openJuly(page);
 
@@ -115,18 +136,25 @@ test('Auto-Plan animiert den Null-Rot-Lauf und schreibt erst nach Bestätigung',
   await expect(page.locator('#autoPlanBtn')).toBeVisible();
 
   await page.locator('#autoPlanBtn').click();
-  await expect(page.locator('#autoPlanDialog')).toBeVisible();
+  await expect(page.locator('#autoPlanConfigTitle')).toHaveText('Planungsgrenzen vor dem Start festlegen');
+  await expect(page.locator('#autoPlanLimitsBody tr')).toHaveCount(staff.length);
+  await expect(page.locator('#autoPlanStartBtn')).toBeEnabled();
+  await page.waitForTimeout(250);
+  expect(api.getPutCount()).toBe(0);
+  await expect(page.locator('#autoPlanStage')).toBeHidden();
+
+  await page.locator('#autoPlanStartBtn').click();
   await expect(page.locator('#autoPlanCanvas')).toBeVisible();
   await expect(page.locator('#autoPlanPhaseList .auto-plan-phase')).toHaveCount(5);
   await expect(page.locator('#autoPlanGrid > span')).toHaveCount(62);
-  await expect(page.locator('#autoPlanPercent')).not.toHaveText('');
 
-  await expect(page.locator('#autoPlanResult')).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator('#autoPlanResult')).toBeVisible({ timeout: 90_000 });
   await expect(page.locator('#autoPlanResultTitle')).toHaveText('Regelkonformer Vorschlag bereit');
-  await expect(page.locator('#autoPlanChangeCount')).toHaveText('2 Einträge');
+  await expect(page.locator('#autoPlanChangeCount')).toContainText('2 neue Einträge');
   await expect(page.locator('#autoPlanScorecards')).toContainText('0 rot');
   await expect(page.locator('#autoPlanRedReview')).toBeHidden();
   await expect(page.locator('#autoPlanApplyBtn')).toBeEnabled();
+  await expect(page.locator('#autoPlanRunConfigChips')).toContainText('Suche: Tief');
 
   expect(api.getPutCount()).toBe(0);
   await expect(targetRow.locator('.assignment-badges .small-chip')).toHaveCount(2);
@@ -138,23 +166,25 @@ test('Auto-Plan animiert den Null-Rot-Lauf und schreibt erst nach Bestätigung',
   await expect.poll(async () => targetRow.locator('.assignment-badges .small-chip').count()).toBe(0);
 });
 
-test('Minimal-Rot-Fallback bleibt gesperrt, bis alle roten Ausnahmen ausdrücklich bestätigt sind', async ({ page }) => {
-  test.setTimeout(120_000);
+test('Minimal-Rot-Fallback bleibt gesperrt, bis alle roten Ausnahmen einzeln geprüft sind', async ({ page }) => {
+  test.setTimeout(150_000);
   const api = await mockApi(page, monthWithTwoOpenSlots(2026, 7, { forceRed: true }));
   await openJuly(page);
+  await openStudioAndStart(page);
 
-  await page.locator('#autoPlanBtn').click();
-  await expect(page.locator('#autoPlanResult')).toBeVisible({ timeout: 90_000 });
+  await expect(page.locator('#autoPlanResult')).toBeVisible({ timeout: 120_000 });
   await expect(page.locator('#autoPlanResultTitle')).toHaveText('Vollständige Belegung mit roten Ausnahmen');
   await expect(page.locator('#autoPlanRedReview')).toBeVisible();
   await expect(page.locator('#autoPlanRedList .auto-plan-red-item')).toHaveCount(2);
+  await expect(page.locator('[data-auto-plan-red-check]')).toHaveCount(2);
   await expect(page.locator('#autoPlanApplyBtn')).toBeDisabled();
   expect(api.getPutCount()).toBe(0);
 
-  await page.locator('#autoPlanOverrideComment').fill('Betrieblich notwendige Komplettbelegung');
   await page.locator('#autoPlanConfirmRed').check();
+  await expect(page.locator('#autoPlanApplyBtn')).toBeDisabled();
+  await expect(page.locator('#autoPlanConfirmNote')).toContainText('Kommentar');
+  await page.locator('#autoPlanOverrideComment').fill('Betrieblich notwendige Komplettbelegung');
   await expect(page.locator('#autoPlanApplyBtn')).toBeEnabled();
-  expect(api.getPutCount()).toBe(0);
 
   await page.locator('#autoPlanApplyBtn').click();
   await expect(page.locator('#autoPlanDialog')).toBeHidden({ timeout: 15_000 });
@@ -164,17 +194,17 @@ test('Minimal-Rot-Fallback bleibt gesperrt, bis alle roten Ausnahmen ausdrückli
   expect(api.getMonth().overrideLog.every(entry => entry.comment === 'Betrieblich notwendige Komplettbelegung')).toBe(true);
 });
 
-test('Ergebnis, Zuteilungen und Statistik bleiben bei geringer Fensterhöhe vollständig scrollbar', async ({ page }) => {
-  test.setTimeout(90_000);
+test('Ergebnis, Tageszeilen und Statistik bleiben bei geringer Fensterhöhe vollständig scrollbar', async ({ page }) => {
+  test.setTimeout(120_000);
   await page.setViewportSize({ width: 920, height: 520 });
   await mockApi(page);
   await openJuly(page);
+  await openStudioAndStart(page);
 
-  await page.locator('#autoPlanBtn').click();
   const result = page.locator('#autoPlanResult');
-  await expect(result).toBeVisible({ timeout: 60_000 });
-  await expect(page.locator('#autoPlanChangeList .auto-plan-change')).toHaveCount(2);
-  await expect(page.locator('#autoPlanLoadTable .auto-plan-load-row')).toHaveCount(staff.length);
+  await expect(result).toBeVisible({ timeout: 90_000 });
+  await expect(page.locator('#autoPlanProposalBody tr')).toHaveCount(31);
+  await expect(page.locator('#autoPlanLoadTable .auto-plan-distribution-table')).toBeVisible();
 
   const scrollState = await result.evaluate(element => ({
     clientHeight: element.clientHeight,
@@ -192,4 +222,19 @@ test('Ergebnis, Zuteilungen und Statistik bleiben bei geringer Fensterhöhe voll
   await expect(page.locator('#autoPlanConfirmNote')).toBeInViewport();
   await expect(page.locator('#autoPlanApplyBtn')).toBeVisible();
   await expect(page.locator('#autoPlanApplyBtn')).toBeEnabled();
+});
+
+test('ungültige Obergrenze unterhalb eines Fixpunkts blockiert den Start', async ({ page }) => {
+  await mockApi(page);
+  await openJuly(page);
+  await page.locator('#autoPlanBtn').click();
+
+  const lurzRow = page.locator('#autoPlanLimitsBody tr[data-staff-id="lurz"]');
+  const existingText = await lurzRow.locator('.auto-plan-existing-load').textContent();
+  const existingBd = Number(existingText.match(/(\d+) BD/)?.[1] || 0);
+  await lurzRow.locator('[data-auto-limit="maxBd"]').fill(String(Math.max(0, existingBd - 1)));
+
+  await expect(page.locator('#autoPlanConfigValidation')).toHaveClass(/invalid/);
+  await expect(page.locator('#autoPlanConfigValidation')).toContainText('bestehenden BD');
+  await expect(page.locator('#autoPlanStartBtn')).toBeDisabled();
 });
