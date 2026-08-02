@@ -16,20 +16,22 @@ function refreshFairnessIndex(result) {
 }
 
 /**
- * Direkte API-Aufrufe aus Tests oder Integrationen ohne Studio-Konfiguration
- * erhalten eine kurze, aber echte iterative Prüfung. Das sichtbare Studio gibt
- * seine gewählte Rundenzahl immer ausdrücklich vor.
+ * Direkte API-Aufrufe aus Tests oder Integrationen erhalten eine kurze, aber
+ * echte iterative Prüfung, sofern sie die Rundenzahl nicht ausdrücklich
+ * festlegen. Das sichtbare Studio übergibt seine gewählten Parameter immer.
  */
 export async function buildAutoPlan(parameters) {
-  const normalized = parameters?.runConfig
-    ? parameters
-    : {
-        ...parameters,
-        runConfig: {
-          repairIterations: 2,
-          localRebuildBudget: 600
-        }
-      };
+  const supplied = parameters?.runConfig && typeof parameters.runConfig === 'object'
+    ? parameters.runConfig
+    : {};
+  const normalized = {
+    ...parameters,
+    runConfig: {
+      ...supplied,
+      repairIterations: supplied.repairIterations ?? 2,
+      localRebuildBudget: supplied.localRebuildBudget ?? 600
+    }
+  };
   return refreshFairnessIndex(await buildV3Plan(normalized));
 }
 
