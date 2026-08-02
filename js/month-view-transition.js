@@ -1,16 +1,35 @@
+import { api } from './api.js?v=20260801.11';
+import { loadMonth, monthKey, state } from './state.js?v=20260801.11';
 
 const MOTION_DURATION_MS = 430;
-const READY_TIMEOUT_MS = 6000;
-const STABILIZATION_FRAMES = 4;
+const PREFETCH_TIMEOUT_MS = 5000;
+const DOM_READY_TIMEOUT_MS = 1200;
+const HANDOFF_TTL_MS = 5000;
+const FALLBACK_SETTLE_FRAMES = 2;
 const NAVIGATION_CONTROLS = new Set(['prevMonthBtn', 'nextMonthBtn', 'todayBtn']);
 const FROZEN_THEME_VARIABLES = [
   '--month-accent', '--month-accent-strong', '--month-ink', '--month-glow', '--month-panel-tint',
   '--weekday-field-bg', '--saturday-row-bg', '--sunday-row-bg', '--holiday-row-bg'
 ];
 
+// Der Zielmonat wird vor dem visuellen Übergang geladen. openCurrentMonth erhält
+// exakt denselben Stand einmalig zurück, damit kein zweiter GET und kein späterer
+// Datentausch nach der Animation entsteht.
+const originalGetMonth = api.getMonth.bind(api);
+const monthLoadHandoffs = new Map();
+api.getMonth = (year, month) => {
+  const key = monthKey(year, month);
+  const handoff = monthLoadHandoffs.get(key);
+  if (handoff && handoff.expiresAt >= performance.now()) {
+    monthLoadHandoffs.delete(key);
+    return Promise.resolve(structuredClone(handoff.payload));
+  }
+  if (handoff) monthLoadHandoffs.delete(key);
+  return originalGetMonth(year, month);
+};
+
 function installTransitionStylesheet() {
   if (typeof document === 'undefined') return Promise.resolve();
-
   const existing = document.querySelector('link[data-month-motion-styles]');
   if (existing?.sheet) return Promise.resolve();
 
@@ -37,6 +56,7 @@ let bypassInterception = false;
 let navigationGeneration = 0;
 let activeViewTransition = null;
 let activeFallback = null;
+let activeAbortController = null;
 
 function selectedDate() {
   const now = new Date();
@@ -112,44 +132,93 @@ function prefersReducedMotion() {
   return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-function nextFrame() {
-  return new Promise(resolve => requestAnimationFrame(resolve));
+function primeAppLoadHandoff(date) {
+  const key = monthKey(date.year, date.month);
+  const month = state.months.get(key);
+  if (!month) return;
+  monthLoadHandoffs.set(key, {
+    expiresAt: performance.now() + HANDOFF_TTL_MS,
+    payload: { ok: true, month: structuredClone(month) }
+  });
 }
 
-function isLoadingStatus() {
-  return /^Lädt(?:\s|…|$)/.test(document.getElementById('saveStatus')?.textContent?.trim() || '');
+function sourceIsReady(date) {
+  const key = monthKey(date.year, date.month);
+  if (!state.months.has(key)) return false;
+  const source = state.monthSources.get(key);
+  return source === 'server' || (source === 'local' && state.dirtyMonths.has(key));
+}
+
+async function preloadTarget(date, generation, signal) {
+  if (sourceIsReady(date)) {
+    primeAppLoadHandoff(date);
+    return;
+  }
+
+  const timeout = new Promise(resolve => setTimeout(resolve, PREFETCH_TIMEOUT_MS, null));
+  await Promise.race([loadMonth(date.year, date.month).catch(() => null), timeout]);
+  if (signal.aborted || generation !== navigationGeneration) throw new DOMException('Navigation superseded', 'AbortError');
+  primeAppLoadHandoff(date);
 }
 
 function targetDomIsConsistent(date) {
   const root = document.documentElement;
-  const rows = document.querySelectorAll('#planTableBody tr').length;
   const expectedRows = new Date(date.year, date.month, 0).getDate();
   const title = document.getElementById('monthTitle')?.textContent || '';
   return Number(root.dataset.year) === date.year
     && Number(root.dataset.month) === date.month
-    && rows === expectedRows
+    && document.querySelectorAll('#planTableBody tr').length === expectedRows
     && title.includes(String(date.year));
 }
 
-async function waitForTargetReady(date, generation) {
-  const deadline = performance.now() + READY_TIMEOUT_MS;
-  let sawLoading = isLoadingStatus();
-  let stableFrames = 0;
+function waitForTargetDom(date, generation, signal) {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const observer = new MutationObserver(check);
+    const timeoutHandle = setTimeout(() => {
+      if (targetDomIsConsistent(date)) finish();
+      else finish(new Error(`Zielmonat ${date.year}-${String(date.month).padStart(2, '0')} wurde nicht gerendert.`));
+    }, DOM_READY_TIMEOUT_MS);
 
-  while (stableFrames < STABILIZATION_FRAMES) {
-    await nextFrame();
-    if (generation !== navigationGeneration) throw new DOMException('Navigation superseded', 'AbortError');
-
-    const loading = isLoadingStatus();
-    sawLoading ||= loading;
-    const consistent = targetDomIsConsistent(date);
-    const ready = consistent && !loading && (sawLoading || performance.now() + 250 >= deadline);
-    stableFrames = ready ? stableFrames + 1 : 0;
-
-    if (performance.now() >= deadline) {
-      if (consistent) return;
-      throw new Error(`Monat ${date.year}-${String(date.month).padStart(2, '0')} wurde nicht rechtzeitig stabil.`);
+    function finish(error = null) {
+      if (settled) return;
+      settled = true;
+      observer.disconnect();
+      clearTimeout(timeoutHandle);
+      signal.removeEventListener('abort', onAbort);
+      if (error) reject(error);
+      else resolve();
     }
+
+    function onAbort() {
+      finish(new DOMException('Navigation superseded', 'AbortError'));
+    }
+
+    function check() {
+      if (signal.aborted || generation !== navigationGeneration) return onAbort();
+      if (targetDomIsConsistent(date)) finish();
+    }
+
+    observer.observe(document.documentElement, {
+      subtree: true,
+      childList: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: ['data-month', 'data-year']
+    });
+    signal.addEventListener('abort', onAbort, { once: true });
+    queueMicrotask(check);
+  });
+}
+
+function nextFrame() {
+  return new Promise(resolve => requestAnimationFrame(resolve));
+}
+
+async function settleFallbackLayout(generation, signal) {
+  for (let frame = 0; frame < FALLBACK_SETTLE_FRAMES; frame += 1) {
+    await nextFrame();
+    if (signal.aborted || generation !== navigationGeneration) throw new DOMException('Navigation superseded', 'AbortError');
   }
 }
 
@@ -168,13 +237,12 @@ function clearMotionState(generation) {
 }
 
 function cancelActiveTransition() {
+  activeAbortController?.abort();
+  activeAbortController = null;
   if (activeViewTransition?.skipTransition) activeViewTransition.skipTransition();
   activeViewTransition = null;
-
-  if (activeFallback) {
-    activeFallback.cancel();
-    activeFallback = null;
-  }
+  activeFallback?.cancel();
+  activeFallback = null;
 }
 
 function syncFormState(source, clone) {
@@ -189,59 +257,39 @@ function syncFormState(source, clone) {
   });
 }
 
-function freezeThemeVariables(clone) {
-  const computed = getComputedStyle(document.documentElement);
-  for (const name of FROZEN_THEME_VARIABLES) {
-    const value = computed.getPropertyValue(name).trim();
-    if (value) clone.style.setProperty(name, value);
-  }
-}
-
-function stripCloneIdentity(root) {
-  root.removeAttribute('id');
-  root.querySelectorAll('[id]').forEach(element => element.removeAttribute('id'));
-  root.querySelectorAll('[name]').forEach(element => element.removeAttribute('name'));
-  root.setAttribute('aria-hidden', 'true');
-  root.inert = true;
-}
-
 function createFallbackSnapshot() {
   const source = document.querySelector('.sheet-panel');
   if (!source) return null;
-
   const rect = source.getBoundingClientRect();
   const clone = source.cloneNode(true);
   syncFormState(source, clone);
-  freezeThemeVariables(clone);
-  stripCloneIdentity(clone);
+  const computed = getComputedStyle(document.documentElement);
+  for (const name of FROZEN_THEME_VARIABLES) clone.style.setProperty(name, computed.getPropertyValue(name));
+  clone.querySelectorAll('[id]').forEach(element => element.removeAttribute('id'));
+  clone.querySelectorAll('[name]').forEach(element => element.removeAttribute('name'));
+  clone.setAttribute('aria-hidden', 'true');
+  clone.inert = true;
   clone.classList.add('month-motion-fallback-snapshot');
   Object.assign(clone.style, {
-    position: 'fixed',
-    zIndex: '2147483000',
-    top: `${rect.top}px`,
-    left: `${rect.left}px`,
-    width: `${rect.width}px`,
-    height: `${rect.height}px`,
-    margin: '0',
-    pointerEvents: 'none',
-    overflow: 'hidden'
+    position: 'fixed', zIndex: '2147483000', top: `${rect.top}px`, left: `${rect.left}px`,
+    width: `${rect.width}px`, height: `${rect.height}px`, margin: '0', pointerEvents: 'none', overflow: 'hidden'
   });
   document.body.appendChild(clone);
   return { source, clone };
 }
 
-async function runFallbackTransition(date, direction, generation) {
+async function runFallbackTransition(date, direction, generation, signal) {
   const snapshot = createFallbackSnapshot();
   if (!snapshot) {
+    const ready = waitForTargetDom(date, generation, signal);
     dispatchAppNavigation(date);
-    await waitForTargetReady(date, generation);
+    await ready;
     return;
   }
 
   const { source, clone } = snapshot;
   source.classList.add('month-motion-fallback-live');
   source.style.opacity = '0';
-
   let cancelled = false;
   activeFallback = {
     cancel() {
@@ -250,27 +298,21 @@ async function runFallbackTransition(date, direction, generation) {
       source.getAnimations().forEach(animation => animation.cancel());
       clone.remove();
       source.classList.remove('month-motion-fallback-live');
-      source.style.removeProperty('opacity');
-      source.style.removeProperty('transform');
-      source.style.removeProperty('will-change');
+      source.style.cssText = source.style.cssText.replace(/(?:opacity|transform|will-change):[^;]+;?/g, '');
     }
   };
 
   try {
+    const ready = waitForTargetDom(date, generation, signal);
     dispatchAppNavigation(date);
-    await waitForTargetReady(date, generation);
+    await ready;
+    await settleFallbackLayout(generation, signal);
     if (cancelled) return;
 
     const sign = direction > 0 ? 1 : -1;
-    source.style.opacity = '0';
     source.style.transform = `translate3d(${sign * 34}px, 0, 0) scale(.994)`;
     source.style.willChange = 'transform, opacity';
-
-    const options = {
-      duration: MOTION_DURATION_MS,
-      easing: 'cubic-bezier(.22, 1, .36, 1)',
-      fill: 'both'
-    };
+    const options = { duration: MOTION_DURATION_MS, easing: 'cubic-bezier(.22, 1, .36, 1)', fill: 'both' };
     const outgoing = clone.animate([
       { transform: 'translate3d(0, 0, 0) scale(1)', opacity: 1 },
       { transform: `translate3d(${-sign * 28}px, 0, 0) scale(.994)`, opacity: 0 }
@@ -279,7 +321,6 @@ async function runFallbackTransition(date, direction, generation) {
       { transform: `translate3d(${sign * 34}px, 0, 0) scale(.994)`, opacity: 0 },
       { transform: 'translate3d(0, 0, 0) scale(1)', opacity: 1 }
     ], options);
-
     setMotionState('animating', 'waapi-fallback', direction);
     await Promise.allSettled([outgoing.finished, incoming.finished]);
   } finally {
@@ -294,18 +335,16 @@ async function runFallbackTransition(date, direction, generation) {
   }
 }
 
-async function runNativeTransition(date, direction, generation) {
-  setMotionState('preloading', 'native-view-transition', direction);
-
+async function runNativeTransition(date, direction, generation, signal) {
   const transition = document.startViewTransition(async () => {
+    const ready = waitForTargetDom(date, generation, signal);
     dispatchAppNavigation(date);
-    await waitForTargetReady(date, generation);
+    await ready;
   });
   activeViewTransition = transition;
-
   try {
     await transition.ready;
-    if (generation !== navigationGeneration) throw new DOMException('Navigation superseded', 'AbortError');
+    if (signal.aborted || generation !== navigationGeneration) throw new DOMException('Navigation superseded', 'AbortError');
     setMotionState('animating', 'native-view-transition', direction);
     await transition.finished;
   } finally {
@@ -318,25 +357,27 @@ async function navigate(date, fromDate) {
   const origin = normalizeDate(fromDate.year, fromDate.month);
   const direction = directionBetween(origin, target);
   const generation = ++navigationGeneration;
-
   cancelActiveTransition();
+  const controller = new AbortController();
+  activeAbortController = controller;
+  const { signal } = controller;
   const engine = typeof document.startViewTransition === 'function' ? 'native-view-transition' : 'waapi-fallback';
-  setMotionState('preloading', engine, direction);
 
+  setSelectors(target);
+  setMotionState('preloading', engine, direction);
   try {
     await transitionStylesReady;
-    if (generation !== navigationGeneration) throw new DOMException('Navigation superseded', 'AbortError');
+    await preloadTarget(target, generation, signal);
+    if (signal.aborted || generation !== navigationGeneration) throw new DOMException('Navigation superseded', 'AbortError');
 
     if (sameDate(origin, target) || prefersReducedMotion()) {
+      const ready = waitForTargetDom(target, generation, signal);
       dispatchAppNavigation(target);
-      await waitForTargetReady(target, generation);
-      return;
-    }
-
-    if (typeof document.startViewTransition === 'function') {
-      await runNativeTransition(target, direction, generation);
+      await ready;
+    } else if (typeof document.startViewTransition === 'function') {
+      await runNativeTransition(target, direction, generation, signal);
     } else {
-      await runFallbackTransition(target, direction, generation);
+      await runFallbackTransition(target, direction, generation, signal);
     }
   } catch (error) {
     if (error?.name !== 'AbortError') {
@@ -344,6 +385,7 @@ async function navigate(date, fromDate) {
       console.warn('Monatsanimation wurde auf einen direkten Wechsel zurückgesetzt.', error);
     }
   } finally {
+    if (activeAbortController === controller) activeAbortController = null;
     clearMotionState(generation);
   }
 }
@@ -352,19 +394,16 @@ function interceptClick(event) {
   if (bypassInterception || event.defaultPrevented || event.button !== 0) return;
   const control = event.target instanceof Element ? event.target.closest('button') : null;
   if (!control || !NAVIGATION_CONTROLS.has(control.id)) return;
-
   const origin = selectedDate();
-  const target = targetFromControl(control);
   event.preventDefault();
   event.stopImmediatePropagation();
-  void navigate(target, origin);
+  void navigate(targetFromControl(control), origin);
 }
 
 function interceptSelection(event) {
   if (bypassInterception) return;
   const select = event.target;
   if (!(select instanceof HTMLSelectElement) || !['monthSelect', 'yearSelect'].includes(select.id)) return;
-
   const target = selectedDate();
   const origin = committedDate();
   event.preventDefault();
