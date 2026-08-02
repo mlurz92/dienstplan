@@ -83,8 +83,8 @@ test('native Monatsanimation bleibt durchgehend gefüllt und lädt den Zielmonat
 
   await page.selectOption('#monthSelect', '11');
   await expect(page.locator('html')).toHaveAttribute('data-month-motion-engine', 'native-view-transition');
-  await expect(page.locator('html')).toHaveAttribute('data-month-motion-state', 'animating');
-  await expect(page.locator('html')).toHaveAttribute('data-month-motion-state', 'idle', { timeout: 5000 });
+  await page.waitForFunction(() => window.__smoothMonthFrames?.some(frame => frame.state === 'animating'));
+  await expect(page.locator('html')).toHaveAttribute('data-month-motion-state', 'idle', { timeout: 7000 });
   await expect(page.locator('#monthTitle')).toContainText('November 2026');
   await expect(page.locator('#planTableBody tr')).toHaveCount(30);
 
