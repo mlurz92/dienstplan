@@ -1,6 +1,8 @@
 Regeln und Kriterien für manuelle Kandidatenempfehlungen und Auto-Plan in DienstplanRAD (v4.7)
 
 GRUNDPRINZIPIEN & DATENBASIS:
+- DienstplanRAD enthält keinen automatischen Dienstplaner, der ohne ausdrückliche Nutzerbestätigung unmittelbar in den Monatsplan schreibt.
+- Es erfolgt keine automatische Eintragung vor der abschließenden Vorschau und bewussten Bestätigung durch den Benutzer.
 - DienstplanRAD unterstützt manuelle Einzelplanung sowie eine bestätigungspflichtige automatische Komplettierung noch leerer BD- und HG-Felder des aktuell angezeigten Monats.
 - Bereits eingetragene BD und HG bleiben in beiden Modi unveränderliche Fixpunkte.
 - RBN, zweite RBN, Abwesenheiten, Wünsche, Optionen, Notizen sowie Override- und Importprotokolle werden vom Auto-Planer nicht verändert.
@@ -153,6 +155,6 @@ ERKLÄRBARKEIT, ANIMATION & TESTS:
 - Jede ausgelöste Regel erscheint als konkreter Klartextgrund.
 - Die Auto-Plan-Animation zeigt Fixpunktanalyse, BD-Suche, HG-Suche, Fairness-Politur und Schlussaudit.
 - Canvas-Visualisierung, Dienstfeldmatrix und Live-Metriken verändern die fachliche Berechnung nicht.
-- prefers-reduced-motion reduziert Bewegung ohne Informationsverlust.
+- Die Auto-Plan-Inszenierung läuft regulär mit der vollständigen Animation.
 - Permanente CI prüft Syntax, Unit-/Regressionstests und reale Chromium-End-to-End-Tests.
 - Auto-Plan-Tests sichern Vollständigkeit, Null-Rot-Audit, Fixpunktschutz, Determinismus, Wunschpriorität, Kopplungen, Fingerprint, atomare Bestätigung und Browserfluss.
