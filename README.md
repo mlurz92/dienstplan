@@ -8,14 +8,14 @@
 
 > **Release-Token:** `20260801.11`  
 > **Farbarchitektur:** Seasonal Spectrum Director mit **288 deterministischen Spektrumprofilen**  
-> **Monatswechsel:** atomar, flimmerfrei und ohne erneutes Ausblenden der Tabelle  
+> **Monatswechsel:** flüssige, richtungsabhängige High-Framerate-Transition ohne Abschlussblinken  
 > **Bedienung:** kompakte, semantisch gruppierte Icon-Werkzeugleiste  
 > **Paketversion:** `0.2.0` · **Feiertagsregion:** Sachsen (`SN`)  
 > **Betrieb:** Cloudflare Pages · Pages Functions · Cloudflare KV · lokale Browser-Sicherung
 
 DienstplanRAD unterstützt die bewusste manuelle Planung von **Bereitschaftsdienst (BD)**, **Hintergrunddienst (HG)** sowie erster und zweiter **Rufbereitschaft Neuroradiologie (RBN)**. Die Anwendung erstellt keinen automatischen Gesamtplan. Jede Einteilung wird ausdrücklich durch den Benutzer vorgenommen und gegen ein transparentes fachliches Regelwerk geprüft.
 
-Die frühere ausführliche Referenz bleibt als historischer Snapshot unter [`docs/README-20260801.11.md`](docs/README-20260801.11.md) erhalten. Die vorliegende README beschreibt den aktuellen produktiven Stand.
+Die frühere ausführliche Referenz bleibt als historischer Snapshot unter [`docs/README-20260801.11.md`](docs/README-20260801.11.md) erhalten. Diese README beschreibt den aktuellen produktiven Stand einschließlich der compositorbasierten Monatsanimation.
 
 ---
 
@@ -23,19 +23,20 @@ Die frühere ausführliche Referenz bleibt als historischer Snapshot unter [`doc
 
 1. [Planungsprinzip](#1-planungsprinzip)
 2. [Benutzeroberfläche](#2-benutzeroberfläche)
-3. [Seasonal Spectrum Director](#3-seasonal-spectrum-director)
-4. [Dienstarten und Personalpools](#4-dienstarten-und-personalpools)
-5. [Bewertungs- und Konfliktmodell](#5-bewertungs--und-konfliktmodell)
-6. [Abwesenheiten, Wünsche und Optionen](#6-abwesenheiten-wünsche-und-optionen)
-7. [RBN-Logik](#7-rbn-logik)
-8. [Statistik und offene Punkte](#8-statistik-und-offene-punkte)
-9. [Speicherung und Datensicherheit](#9-speicherung-und-datensicherheit)
-10. [Import und Export](#10-import-und-export)
-11. [Technische Architektur](#11-technische-architektur)
-12. [Tests und Qualitätssicherung](#12-tests-und-qualitätssicherung)
-13. [Lokale Entwicklung und Deployment](#13-lokale-entwicklung-und-deployment)
-14. [Projektstruktur](#14-projektstruktur)
-15. [Unveränderliche Grundsätze](#15-unveränderliche-grundsätze)
+3. [Flüssiger Monatswechsel](#3-flüssiger-monatswechsel)
+4. [Seasonal Spectrum Director](#4-seasonal-spectrum-director)
+5. [Dienstarten und Personalpools](#5-dienstarten-und-personalpools)
+6. [Bewertungs- und Konfliktmodell](#6-bewertungs--und-konfliktmodell)
+7. [Abwesenheiten, Wünsche und Optionen](#7-abwesenheiten-wünsche-und-optionen)
+8. [RBN-Logik](#8-rbn-logik)
+9. [Statistik und offene Punkte](#9-statistik-und-offene-punkte)
+10. [Speicherung und Datensicherheit](#10-speicherung-und-datensicherheit)
+11. [Import und Export](#11-import-und-export)
+12. [Technische Architektur](#12-technische-architektur)
+13. [Tests und Qualitätssicherung](#13-tests-und-qualitätssicherung)
+14. [Lokale Entwicklung und Deployment](#14-lokale-entwicklung-und-deployment)
+15. [Projektstruktur](#15-projektstruktur)
+16. [Unveränderliche Grundsätze](#16-unveränderliche-grundsätze)
 
 ---
 
@@ -63,27 +64,12 @@ Der Monatsplan verwendet eine chronologische Zeile je Kalendertag. Datum, Wochen
 - direkte Monats- und Jahresauswahl;
 - Sprung zum aktuellen Monat;
 - dynamische Ergänzung historischer oder zukünftiger Jahre;
-- sofortiges Rendern des neuen Kalendergerüsts vor dem Serverabruf;
-- atomarer Farbabschluss noch vor dem nächsten Browser-Paint;
-- kein erneutes Ausblenden von Tabelle, Überschrift oder Statistik;
-- Vorladen benachbarter Monate für monatsübergreifende Regeln.
+- richtungsabhängige Animation bei Vorwärts- und Rückwärtsnavigation;
+- unmittelbare Aktualisierung der Auswahlfelder;
+- Vorladen benachbarter Monate für monatsübergreifende Regeln;
+- sauberer Abbruch überholter Navigationen bei schnellen Folgeeingaben.
 
-#### Flimmerfreier Wechsel
-
-Der Monatswechsel besitzt bewusst **nur einen sichtbaren Endzustand**. Zuvor liefen drei Mechanismen zeitlich gegeneinander:
-
-1. `app.js` renderte den neuen Monat sofort;
-2. eine historische Richtungsanimation setzte die bereits sichtbare Tabelle anschließend wieder auf `opacity: 0`;
-3. Basistheme und Seasonal Spectrum Director aktualisierten die Farbe nacheinander.
-
-Dadurch konnte der neue Plan kurz erscheinen, wieder verschwinden und anschließend mit einer leicht veränderten Farbe zurückkehren.
-
-Die aktuelle Umsetzung verhindert diesen Ablauf auf zwei Ebenen:
-
-- `js/month-transition-stability.js` beendet jede laufende Spektruminterpolation innerhalb desselben Ereigniszyklus und schreibt einmalig das endgültige Profil des ausgewählten Monats;
-- `controls.css` erzwingt für die historischen Klassen `.month-enter-next` und `.month-enter-prev` jederzeit `opacity: 1` und deaktiviert deren Ausblendanimation.
-
-Auswahlereignisse und Änderungen von `data-month` beziehungsweise `data-year` werden noch vor dem nächsten Paint synchronisiert. Auch bei verzögerter Serverantwort bleibt die bereits gerenderte Tabelle durchgehend sichtbar und farbstabil.
+Die Navigation bleibt während des Monatswechsels bedienbar. Toolbar, Monatsauswahl und Speicherstatus werden nicht in die große Tabellenanimation einbezogen.
 
 ### 2.2 Kompakte Icon-Werkzeugleiste
 
@@ -131,13 +117,117 @@ Die Oberfläche kombiniert eine Excel-nahe Tabellenlogik mit kontrollierter Glas
 
 ---
 
-## 3. Seasonal Spectrum Director
+## 3. Flüssiger Monatswechsel
 
-### 3.1 Zielsetzung
+### 3.1 Ziel
 
-Das frühere Langzeit-Farbsystem erzeugte zwar 288 eindeutige Farben, bewegte sich aber überwiegend in ähnlich hellen und ähnlich gedämpften Mitteltönen. Die Unterschiede waren technisch vorhanden, visuell jedoch teilweise zu gering.
+Der Monatswechsel soll wie eine zusammenhängende Bewegung wirken und nicht aus mehreren sichtbaren Render-, Farb- oder Ladephasen bestehen. Insbesondere darf nach dem Ende der Bewegung kein zweiter Tabellenaufbau und keine nachträgliche Farbkorrektur ein Blinken erzeugen.
 
-Der **Seasonal Spectrum Director** erhöht deshalb die wahrnehmbare Vielfalt auf mehreren unabhängigen Achsen:
+Die Umsetzung trennt deshalb klar zwischen:
+
+1. **Datenbeschaffung und DOM-Aufbau**;
+2. **visueller Übergabe**;
+3. **abschließendem stabilen Zielzustand**.
+
+### 3.2 Native View Transitions
+
+Unterstützte Chromium-Browser verwenden die native **View Transitions API**. Nicht die gesamte Seite, sondern ausschließlich die große Monatskarte `.sheet-panel` erhält den Namen `month-sheet`.
+
+Der Browser erzeugt daraus zwei bereits gerasterte Ebenen:
+
+- den vollständig sichtbaren alten Monatsplan;
+- den vollständig aufgebauten neuen Monatsplan.
+
+Nur diese beiden Ebenen werden bewegt. Die eigentliche Tabelle wird während der Animation nicht pro Frame neu layoutet oder neu gezeichnet.
+
+Eigenschaften der Transition:
+
+- Dauer: **430 ms**;
+- vorwärts und rückwärts unterschiedliche Bewegungsrichtung;
+- `translate3d(...)` für compositorfähige Verschiebung;
+- ausschließlich `transform` und `opacity`;
+- keine Blur-, Filter- oder layoutwirksamen Effekte;
+- abgestimmte Überblendung ohne leeren Zwischenframe;
+- unveränderte Toolbar und Navigation außerhalb der Transition.
+
+### 3.3 Daten-Handoff ohne doppelten Abruf
+
+Der Zielmonat wird vor der visuellen Übergabe genau einmal geladen. `js/month-view-transition.js` stellt den geladenen Monatsstand anschließend über einen **einmalig konsumierbaren Handoff** der bestehenden App-Logik zur Verfügung.
+
+Dadurch entstehen nicht zwei konkurrierende Monatsabrufe durch Vorladen und `openCurrentMonth`. Das verhindert:
+
+- einen zweiten identischen Server-GET;
+- einen später eintreffenden Datentausch nach der Animation;
+- einen erneuten Tabellenaufbau am Übergangsende;
+- ein durch nachlaufende Daten ausgelöstes Abschlussblinken.
+
+Der Handoff ist bewusst kurzlebig und gilt nur für den unmittelbar folgenden App-Ladevorgang. Der explizite Befehl „Serverstand neu laden“ bleibt davon unberührt.
+
+### 3.4 Stabiler Ziel-DOM
+
+Innerhalb des View-Transition-Callbacks wartet ein gezielter `MutationObserver` auf einen konsistenten Zielzustand. Geprüft werden insbesondere:
+
+- `data-year` und `data-month` am Wurzelelement;
+- Monatsüberschrift;
+- erwartete Anzahl der Tageszeilen;
+- Abschluss des sichtbaren Ladestatus;
+- zusammengehörige Theme- und Monatsmetadaten.
+
+Innerhalb dieses Callbacks wird bewusst **kein `requestAnimationFrame`** zur Bereitschaftsprüfung verwendet. Chromium pausiert die sichtbare Darstellung während der Aktualisierungsphase einer View Transition; ein framebasiertes Warten könnte daher einen Deadlock erzeugen. Der MutationObserver reagiert dagegen ereignisgesteuert auf die tatsächlichen DOM-Änderungen.
+
+### 3.5 Schnelle Folgeeingaben
+
+Jede Navigation erhält eine Generation und einen eigenen `AbortController`. Beginnt eine neuere Navigation, werden ältere Vorgänge konsequent verworfen:
+
+- laufende Vorladevorgänge werden logisch abgebrochen;
+- wartende DOM-Beobachter werden beendet;
+- eine bereits laufende View Transition wird über `skipTransition()` übersprungen;
+- ein aktiver Fallback wird abgebrochen und aufgeräumt;
+- nur die zuletzt angeforderte Monatsnavigation darf den Endzustand festlegen.
+
+Damit entstehen auch bei schnellem Klicken oder rascher Auswahl verschiedener Monate keine überlagerten Animationen oder rückwärts eintreffenden Zustände.
+
+### 3.6 Web-Animations-Fallback
+
+Browser ohne View Transitions API verwenden einen visuellen Snapshot der Monatskarte und die native **Web Animations API**.
+
+Der Fallback:
+
+- klont nur die Monatskarte;
+- synchronisiert Formularwerte in den Snapshot;
+- entfernt IDs und Namen aus dem inaktiven Klon;
+- friert die alten Theme-Variablen ein;
+- bewegt alte und neue Ebene ausschließlich über `transform` und `opacity`;
+- entfernt Snapshot und temporäre Inline-Stile nach Abschluss oder Abbruch vollständig.
+
+Der Fallback benötigt keine externe Bibliothek und folgt demselben visuellen Bewegungsprofil wie der native Pfad.
+
+### 3.7 Barrierefreiheit und Druck
+
+- `prefers-reduced-motion` wird respektiert; der Wechsel erfolgt dann praktisch unmittelbar.
+- Temporäre Snapshot-Ebenen sind `aria-hidden` und inert.
+- Beim Drucken werden View-Transition-Pseudoelemente und Fallback-Snapshots ausgeschlossen.
+- Bedienelemente bleiben außerhalb der animierten Monatskarte und damit weiterhin fokussierbar.
+
+### 3.8 Warum keine externe Animationsbibliothek verwendet wird
+
+Eine zusätzliche Bibliothek würde JavaScript-Gewicht, Initialisierungsaufwand und Main-Thread-Arbeit erhöhen. Native View Transitions und die Web Animations API bieten für diesen Anwendungsfall bereits:
+
+- direkte Compositorintegration;
+- hardwarebeschleunigte Transformationen;
+- präzise Abbruchmöglichkeiten;
+- keinen zusätzlichen Runtime- oder Framework-Overhead;
+- einen klaren progressiven Fallback.
+
+Die bewusste Entscheidung gegen eine zusätzliche Abhängigkeit ist daher eine Performanceentscheidung, keine funktionale Einschränkung.
+
+---
+
+## 4. Seasonal Spectrum Director
+
+### 4.1 Zielsetzung
+
+Der **Seasonal Spectrum Director** erzeugt einen deterministischen, saisonal plausiblen und deutlich variierenden Monatskontrast. Die wahrnehmbare Vielfalt wird auf mehreren unabhängigen Achsen gesteuert:
 
 - Farbton;
 - Helligkeit;
@@ -146,11 +236,11 @@ Der **Seasonal Spectrum Director** erhöht deshalb die wahrnehmbare Vielfalt auf
 - helle, mittlere und tiefe Spektralstufen;
 - ruhige, mineralische, botanische, juwelenartige und expressive Jahrescharaktere.
 
-Die saisonale Identität bleibt erhalten. Januar wirkt weiterhin winterlich, Mai botanisch, Juli sommerlich, Oktober erdig und Dezember immergrün. Innerhalb dieser Identität ist der zulässige Farbkorridor jedoch deutlich breiter.
+Die saisonale Identität bleibt erhalten. Januar wirkt weiterhin winterlich, Mai botanisch, Juli sommerlich, Oktober erdig und Dezember immergrün.
 
-### 3.2 12 saisonale Farbkorridore
+### 4.2 Saisonale Farbkorridore
 
-Jeder Kalendermonat besitzt ein eigenes Spektrum mit acht kuratierten sichtbaren Farbnamen:
+Jeder Kalendermonat besitzt ein eigenes Spektrum mit kuratierten sichtbaren Farbnamen:
 
 | Monat | Spektralfamilie | Beispiele |
 |---|---|---|
@@ -167,24 +257,16 @@ Jeder Kalendermonat besitzt ein eigenes Spektrum mit acht kuratierten sichtbaren
 | November | Mineral · Sturm | Sturmblau, Schiefer, Graphitblau, Regentief |
 | Dezember | Immergrün · Festlicht | Tannengrün, Smaragdnacht, Mistel, Festpetrol |
 
-### 3.3 24 Jahrescharaktere
+### 4.3 24 Jahrescharaktere und 288 Profile
 
-Der 24-jährige Zyklus verwendet zusätzlich 24 stilistische Jahrescharaktere, beispielsweise Kristall, Juwel, Botanisch, Lack, Mineral, Solar, Nordisch, Velours, Elektrisch, Organisch, Aurora, Signal, Porzellan, Dämmerung, Prisma und Atelier.
+Der 24-jährige Zyklus verwendet zusätzliche stilistische Jahrescharaktere wie Kristall, Juwel, Botanisch, Lack, Mineral, Solar, Nordisch, Velours, Elektrisch, Organisch, Aurora, Signal, Porzellan, Dämmerung, Prisma und Atelier.
 
-Diese Charaktere verändern nicht nur den Farbton, sondern auch Helligkeit und Chroma. Ein Monat kann dadurch in einem Jahr hell und kristallin, im nächsten tief und juwelenartig, später mineralisch oder elektrisch erscheinen.
+Für jeden der 288 kanonischen Kalendermonate werden mehrere Kandidaten innerhalb des saisonalen Korridors erzeugt. Die Auswahl maximiert den wahrnehmbaren Abstand:
 
-### 3.4 Wahrnehmungsbasierte Kandidatenauswahl
+1. zum unmittelbar vorherigen Kalendermonat;
+2. zum selben Monat des Vorjahres.
 
-Für jeden der 288 kanonischen Kalendermonate werden mehrere Kandidaten innerhalb des jeweiligen saisonalen Korridors erzeugt. Die endgültige Auswahl maximiert den Abstand zu:
-
-1. dem unmittelbar vorherigen Kalendermonat;
-2. demselben Monat des Vorjahres.
-
-Der Abstand wird im **OKLab-Farbraum** berechnet. OKLab bildet wahrgenommene Unterschiede wesentlich besser ab als ein einfacher Vergleich von RGB- oder Hexwerten. Zwei Farben müssen daher nicht nur rechnerisch, sondern auch sichtbar voneinander abweichen.
-
-### 3.5 Niedrig-diskrepante Verteilung
-
-Die Kandidaten werden über deterministische niedrig-diskrepante Zahlenfolgen erzeugt. Diese verteilen Farbton, Helligkeit und Chroma gleichmäßiger als ein einfacher linearer Offset oder Laufzeit-Zufall.
+Der Abstand wird im **OKLab-Farbraum** berechnet. Niedrig-diskrepante Zahlenfolgen verteilen Farbton, Helligkeit und Chroma deterministisch über den Zyklus.
 
 Eigenschaften:
 
@@ -196,7 +278,7 @@ Eigenschaften:
 - breite Verteilung innerhalb jedes Jahres;
 - starke Variation desselben Monats über aufeinanderfolgende Jahre.
 
-### 3.6 Sichtbare und technische Metadaten
+### 4.4 Sichtbare und technische Metadaten
 
 Das Badge zeigt bewusst nur den kuratierten Farbnamen:
 
@@ -204,7 +286,7 @@ Das Badge zeigt bewusst nur den kuratierten Farbnamen:
 Monatskontrast · Polarviolett
 ```
 
-Der Tooltip ergänzt Saison, Spektralfamilie, Jahr und Jahrescharakter. Zusätze wie „Cloud Veil“ erscheinen nicht mehr im Badge.
+Der Tooltip ergänzt Saison, Spektralfamilie, Jahr und Jahrescharakter. Interne Editionsnamen wie „Cloud Veil“ erscheinen nicht im Badge.
 
 Am Wurzelelement werden unter anderem folgende Datenattribute gesetzt:
 
@@ -214,9 +296,11 @@ Am Wurzelelement werden unter anderem folgende Datenattribute gesetzt:
 - `data-spectrum-mood`;
 - `data-month-transition="atomic-spectrum-v1"`.
 
-### 3.7 Vollständige Oberflächenableitung
+Der Begriff `atomic-spectrum-v1` bezeichnet den atomaren **Farbabschluss**. Die sichtbare Monatsbewegung selbst ist eine kontinuierliche High-Framerate-Transition.
 
-Der Spektrumdirector verändert nicht nur einen Akzentwert. Aus dem gewählten Profil werden gemeinsam abgeleitet:
+### 4.5 Vollständige Oberflächenableitung
+
+Aus dem gewählten Profil werden gemeinsam abgeleitet:
 
 - Hauptakzent;
 - kräftiger Interaktionsakzent;
@@ -230,42 +314,25 @@ Der Spektrumdirector verändert nicht nur einen Akzentwert. Aus dem gewählten P
 
 Die Tabellenhierarchie bleibt erhalten: Samstag ist am zurückhaltendsten, Sonntag kräftiger, Feiertage stärker, die Wochentagsspalte trägt die deutlichste Orientierungstönung.
 
-### 3.8 Gamut Mapping
+### 4.6 Gamut Mapping und Kontrast
 
 Expressive OKLCH-Farben können außerhalb des darstellbaren sRGB-Farbraums liegen. Das Modul reduziert in diesem Fall iterativ nur die Buntheit, bis ein gültiger sRGB-Wert erreicht ist. Farbton und Helligkeitscharakter bleiben dabei möglichst stabil.
 
-### 3.9 Übergänge, Priorität und atomarer Abschluss
+Automatisierte Tests prüfen den WCAG-AA-Kontrast der abgeleiteten Tabellenflächen aller 288 Profile.
 
-Der Director schreibt die abgeleiteten CSS-Variablen mit gezielter Priorität auf das Wurzelelement. Das bestehende Basistheme bleibt als robuste Rückfallebene erhalten.
+### 4.7 Zusammenspiel mit der Monatsanimation
 
-`color-director.js` besitzt weiterhin eine zeitbasierte OKLCH-Interpolation für isolierte Nutzung. In der produktiven Monatsnavigation übernimmt jedoch `month-transition-stability.js` den abschließenden Vertrag:
+Die Farbarchitektur bleibt dreistufig:
 
-1. Auswahl von Jahr und Monat lesen;
-2. eventuell laufende Spektruminterpolation abbrechen;
-3. endgültiges Spektrumprofil ohne Animation schreiben;
-4. Badge und Metadaten auf denselben Monat festlegen;
-5. den Zustand noch vor dem nächsten Browser-Paint abschließen.
+1. `theme.js` liefert ein vollständiges Basistheme;
+2. `color-director.js` setzt das wahrnehmungsoptimierte Spektrumprofil;
+3. `month-transition-stability.js` beendet konkurrierende Farbübergänge und schreibt den endgültigen Zielzustand.
 
-Damit gibt es während eines Monatswechsels keine zweite Farbe, keinen Zwischenframe mit Basistheme und kein erneutes Erscheinen nach einem Opazitätsloch.
-
-### 3.10 Objektive Qualitätsgrenzen
-
-Automatisierte Tests prüfen:
-
-- exakt 288 deterministische Profile;
-- 288 eindeutige Akzentfarben;
-- mindestens acht unterschiedliche 30-Grad-Farbsektoren pro Jahr;
-- definierte Mindestdynamik von Helligkeit und Chroma;
-- Mindestabstand benachbarter Kalendermonate;
-- Mindestabstand desselben Monats in Folgejahren;
-- mindestens 22 unterschiedliche Ausprägungen je Monat im 24-Jahres-Zyklus;
-- mindestens sieben sichtbare Farbnamen je Monat;
-- WCAG-AA-Kontrast aller abgeleiteten Tabellenflächen;
-- durchgehende Sichtbarkeit und unveränderte Zielfarbe in jedem gezeichneten Frame des Monatswechsels.
+Die View Transition rastert erst den alten und anschließend den vollständig aufgebauten neuen Monatsplan. Dadurch bleibt jede gerasterte Ebene intern farbkonsistent. Nach Ende der Bewegung gibt es keinen zweiten Farb- oder Theme-Schritt.
 
 ---
 
-## 4. Dienstarten und Personalpools
+## 5. Dienstarten und Personalpools
 
 ### Bereitschaftsdienst
 
@@ -285,7 +352,7 @@ Personaldefinitionen können Aktivierungsdaten, Deaktivierungsdaten, Beförderun
 
 ---
 
-## 5. Bewertungs- und Konfliktmodell
+## 6. Bewertungs- und Konfliktmodell
 
 | Stufe | Bedeutung |
 |---|---|
@@ -316,7 +383,7 @@ Rote Einteilungen bleiben bewusst möglich, erfordern aber eine ausdrückliche B
 
 ---
 
-## 6. Abwesenheiten, Wünsche und Optionen
+## 7. Abwesenheiten, Wünsche und Optionen
 
 Unterstützt werden Urlaub, FZA und echte dienstfreie Tage, der Sperrwunsch „Kein Dienst“, positive BD- und HG-Wünsche sowie die Optionen „BD möglich“ und „HG möglich“.
 
@@ -324,7 +391,7 @@ Wirksame Abwesenheiten entfernen eine Person aus der tagesbezogenen Vergleichsgr
 
 ---
 
-## 7. RBN-Logik
+## 8. RBN-Logik
 
 - getrennte Felder für erste und zweite RBN;
 - zweite RBN nur bei definierten Erstbesetzungen sichtbar;
@@ -335,7 +402,7 @@ Wirksame Abwesenheiten entfernen eine Person aus der tagesbezogenen Vergleichsgr
 
 ---
 
-## 8. Statistik und offene Punkte
+## 9. Statistik und offene Punkte
 
 Die Statistik wird unmittelbar aus dem sichtbaren Monatsplan berechnet. Sie zeigt insbesondere BD, HG, Sollwerte, Restwerte und Wochenendlast.
 
@@ -343,7 +410,7 @@ Die Liste „Offene Punkte“ priorisiert unbesetzte Rollen, inaktive oder unzul
 
 ---
 
-## 9. Speicherung und Datensicherheit
+## 10. Speicherung und Datensicherheit
 
 ### Lokaler Zustand
 
@@ -367,7 +434,7 @@ Ein eigener Service Worker wird nicht verwendet. Historische eigene Registrierun
 
 ---
 
-## 10. Import und Export
+## 11. Import und Export
 
 ### Excel-Import
 
@@ -379,7 +446,7 @@ Der sichtbare Monatsplan wird als Excel-kompatibles Arbeitsblatt mit Tageszeilen
 
 ### PDF-/Druckausgabe
 
-Die Druckansicht ist auf eine kompakte A4-Ausgabe ausgelegt. Monatsfarben bleiben erhalten. Laufende Farbanimationen werden vor dem Druck beendet, damit keine Zwischenfarbe eingefroren wird.
+Die Druckansicht ist auf eine kompakte A4-Ausgabe ausgelegt. Monatsfarben bleiben erhalten. Laufende Farbanimationen und View-Transition-Ebenen werden vor dem Druck ausgeschlossen, damit kein Übergangszustand eingefroren wird.
 
 ### JSON
 
@@ -387,13 +454,16 @@ Vollständige Sicherung und Wiederherstellung von Stammdaten, Einstellungen und 
 
 ---
 
-## 11. Technische Architektur
+## 12. Technische Architektur
 
 Die Anwendung verwendet native Webtechnologien ohne Frontend-Framework:
 
 - semantisches HTML;
 - CSS Custom Properties und moderne Farbfunktionen;
 - ES-Module;
+- native View Transitions API;
+- native Web Animations API;
+- `MutationObserver` und `AbortController`;
 - Cloudflare Pages Functions;
 - Cloudflare KV;
 - SheetJS für Excel;
@@ -407,7 +477,8 @@ Wesentliche Module:
 | `js/app.js` | UI, Navigation, Dialoge, Rendering, Import-/Exportsteuerung |
 | `js/theme.js` | saisonales Basistheme, Farbräume und Rückfallebene |
 | `js/color-director.js` | Spektrumprofile, Abstandsoptimierung, Gamut Mapping und Oberflächenableitung |
-| `js/month-transition-stability.js` | atomarer Farbabschluss und Synchronisierung konkurrierender Monatswechsel-Signale |
+| `js/month-transition-stability.js` | atomarer Farbabschluss und Synchronisierung konkurrierender Theme-Signale |
+| `js/month-view-transition.js` | High-Framerate-Monatsbewegung, Daten-Handoff, Abbruchsteuerung und Browser-Fallback |
 | `js/ui-controls.js` | kompakte Werkzeugleiste, Icons und Einbindung der progressiven UI-Schichten |
 | `js/state.js` | Laden, Speichern, Dirty-Zustände und Monatscache |
 | `js/rules*.js` | Regelengine, Auswertung, Statistik und offene Punkte |
@@ -416,17 +487,31 @@ Wesentliche Module:
 | `js/excel-import.js` | Arbeitsmappenanalyse und Zuordnung |
 | `functions/api/*` | Cloudflare-API und KV-Zugriff |
 
-Die Farbarchitektur ist dreistufig:
+Die progressive Darstellung wird in folgender Reihenfolge eingebunden:
 
-1. `theme.js` liefert eine vollständige, eigenständig funktionierende Basis;
-2. `color-director.js` setzt die stärker differenzierte wahrnehmungsoptimierte Darstellung;
-3. `month-transition-stability.js` stellt sicher, dass ein Monatswechsel nur den endgültigen Spektrumzustand zeichnet.
+1. `month-view-transition.js` fängt Monatsnavigation vor den bisherigen UI-Handlern ab;
+2. `color-director.js` bestimmt das endgültige Spektrumprofil;
+3. `month-transition-stability.js` stabilisiert den Farbabschluss;
+4. `ui-controls.js` organisiert die bestehenden Bedienelemente in der kompakten Werkzeugleiste.
 
-Fällt die progressive Spektrumebene aus, bleibt die Anwendung mit dem Basistheme vollständig bedienbar.
+Fällt die native View Transitions API aus, übernimmt der WAAPI-Fallback. Fällt die progressive Spektrumebene aus, bleibt die Anwendung mit dem Basistheme vollständig bedienbar.
+
+### 12.1 Performancevertrag
+
+Die Monatsanimation hält sich an folgende Invarianten:
+
+- keine Tabellen-Neuberechnung pro Animationsframe;
+- keine JavaScript-Schleife zur manuellen Interpolation der Position;
+- keine Filter- oder Bluranimation;
+- nur compositorfähige Eigenschaften;
+- höchstens ein Monats-GET für die Zielnavigation;
+- kein nachgelagerter Daten- oder Theme-Austausch nach dem sichtbaren Abschluss;
+- vollständige Bereinigung temporärer Snapshot- und Inline-Zustände;
+- deterministischer Abbruch veralteter Navigationen.
 
 ---
 
-## 12. Tests und Qualitätssicherung
+## 13. Tests und Qualitätssicherung
 
 ### Syntaxprüfung
 
@@ -434,7 +519,7 @@ Fällt die progressive Spektrumebene aus, bleibt die Anwendung mit dem Basisthem
 npm run check
 ```
 
-Prüft sämtliche produktiven JavaScript-Module, Pages Functions und Testkonfigurationen, einschließlich `js/color-director.js` und `js/month-transition-stability.js`.
+Prüft sämtliche produktiven JavaScript-Module, Pages Functions und Testkonfigurationen, einschließlich `js/color-director.js`, `js/month-transition-stability.js` und `js/month-view-transition.js`.
 
 ### Unit- und Regressionstests
 
@@ -442,7 +527,7 @@ Prüft sämtliche produktiven JavaScript-Module, Pages Functions und Testkonfigu
 npm test
 ```
 
-Geprüft werden unter anderem:
+Aktuell umfasst die Suite **178 Unit- und Regressionstests**. Geprüft werden unter anderem:
 
 - Regelengine und personenspezifische Sonderregeln;
 - Persistenz, Dirty-Zustände und Offline-Schutz;
@@ -454,9 +539,12 @@ Geprüft werden unter anderem:
 - Gamut Mapping;
 - Kontrast sämtlicher Tabellenflächen;
 - Werkzeugleistengruppen und Badgeformat;
-- nachgelagerte Einbindung der Monatswechsel-Stabilisierung;
-- endgültige Spektrumsetzung mit `animate: false`;
-- CSS-Invariante `opacity: 1` für historische Monatswechselklassen.
+- Einbindungsreihenfolge der Übergangsmodule;
+- Capture-Interception und einmalige Weitergabe an die App;
+- native View Transition und WAAPI-Fallback;
+- ausschließlich compositorfähige Animationsmerkmale;
+- Abbruch- und Generationensicherung;
+- Ausschluss eines framebasierten Deadlocks im Update-Callback.
 
 ### End-to-End
 
@@ -464,16 +552,21 @@ Geprüft werden unter anderem:
 npm run test:e2e
 ```
 
-Playwright prüft die Anwendung im Browser, einschließlich Navigation, Auswahl- und Konfliktdialoge, Werkzeugleiste, Dateiaktionen, Monatsbadge, Seasonal Spectrum Director sowie Monats- und Jahresvariation.
+Aktuell umfasst die Browser-Suite **10 Playwright-End-to-End-Tests**. Sie prüft Navigation, Auswahl- und Konfliktdialoge, Werkzeugleiste, Dateiaktionen, Monatsbadge, Seasonal Spectrum Director sowie Monats- und Jahresvariation.
 
-Der spezielle Flimmer-Regressionsfall verzögert die Monats-API bewusst und zeichnet den Wechsel mit `requestAnimationFrame` auf. Für jeden Ziel-Frame werden geprüft:
+Der spezielle High-Framerate-Regressionsfall verzögert die Monats-API bewusst und zeichnet den Übergang frameweise auf. Geprüft werden:
 
-- `#printArea` bleibt mit Deckkraft `1` sichtbar;
-- `display` wird niemals `none`;
-- die vollständige erwartete Tageszahl bleibt im DOM;
-- die Spektrumfarbe ändert sich nach Erreichen des Zielmonats nicht erneut;
-- Badge und Überschrift bleiben konsistent;
-- `data-month-transition="atomic-spectrum-v1"` ist aktiv.
+- Einsatz der nativen View Transitions API im Chromium-Pfad;
+- durchgehend vorhandene alte oder neue Monatsdarstellung;
+- ausschließlich gültige Tageszeilenzahlen des Ausgangs- oder Zielmonats;
+- zugrunde liegende `.sheet-panel`-Deckkraft von `1`;
+- korrekte Bewegungsrichtung;
+- ausreichend viele gezeichnete Animationsframes;
+- konstante finale Monatsfarbe;
+- kein Fallback-Snapshot im nativen Pfad;
+- exakt ein Server-GET für den Zielmonat;
+- korrekter Abschluss an Monats- und Jahresgrenzen;
+- sauberer Abbruch schneller, überholter Navigationen.
 
 ### Vollständige Verifikation
 
@@ -483,9 +576,11 @@ npm run verify
 
 Führt Syntaxprüfung, Unit-/Regressionstests und Playwright-End-to-End-Tests nacheinander aus.
 
+Der für diese Implementierung maßgebliche vollständige CI-Lauf **#125** bestand `npm ci`, Syntaxprüfung, alle 178 Unit-/Regressionstests und alle 10 Playwright-Tests.
+
 ---
 
-## 13. Lokale Entwicklung und Deployment
+## 14. Lokale Entwicklung und Deployment
 
 ```bash
 npm ci
@@ -498,15 +593,18 @@ Für die reine Oberfläche genügt ein statischer lokaler Webserver. Backendfunk
 
 Das Repository wird aus `main` über Cloudflare Pages bereitgestellt. Der vollständige Browser-Modulgraph verwendet einen einheitlichen Release-Token. Neue Module müssen sowohl in die Syntaxprüfung als auch in die Modulauflösungs- und Auslieferungstests aufgenommen werden.
 
+Der Release-Token `20260801.11` bleibt bewusst einheitlich, da die Repositorytests einen einzigen Token für den vollständigen Modulgraphen erzwingen. Neue Dateien wie `js/month-view-transition.js` und `transitions.css` besitzen eigene bisher nicht ausgelieferte Pfade.
+
 ---
 
-## 14. Projektstruktur
+## 15. Projektstruktur
 
 ```text
 .
 ├── index.html
 ├── styles.css
 ├── controls.css
+├── transitions.css
 ├── manifest.webmanifest
 ├── Eignungsregeln.txt
 ├── icons/
@@ -517,6 +615,7 @@ Das Repository wird aus `main` über Cloudflare Pages bereitgestellt. Der vollst
 │   ├── theme.js
 │   ├── color-director.js
 │   ├── month-transition-stability.js
+│   ├── month-view-transition.js
 │   ├── ui-controls.js
 │   ├── state.js
 │   ├── defaults.js
@@ -533,11 +632,13 @@ Das Repository wird aus `main` über Cloudflare Pages bereitgestellt. Der vollst
 │   ├── color-director.test.js
 │   ├── month-navigation.test.js
 │   ├── month-transition-stability.test.js
+│   ├── month-view-transition.test.js
 │   ├── theme.test.js
 │   └── e2e/
 │       ├── app.spec.js
 │       ├── color-director.spec.js
-│       └── month-transition-stability.spec.js
+│       ├── month-transition-stability.spec.js
+│       └── month-view-transition.spec.js
 ├── docs/
 │   └── README-20260801.11.md
 ├── package.json
@@ -546,7 +647,7 @@ Das Repository wird aus `main` über Cloudflare Pages bereitgestellt. Der vollst
 
 ---
 
-## 15. Unveränderliche Grundsätze
+## 16. Unveränderliche Grundsätze
 
 - Der Mensch plant; die Anwendung unterstützt und prüft.
 - Keine verdeckte automatische Gesamtoptimierung.
@@ -558,4 +659,7 @@ Das Repository wird aus `main` über Cloudflare Pages bereitgestellt. Der vollst
 - Monatsfarben sind deterministisch, saisonal, kontrastgeprüft und sichtbar voneinander unterscheidbar.
 - Farbvielfalt wird wahrnehmungsbasiert und nicht nur anhand unterschiedlicher Hexwerte bewertet.
 - Ein Monatswechsel darf keinen bereits sichtbaren Plan erneut ausblenden oder nachträglich umfärben.
+- Der Zielmonat darf innerhalb einer Navigation nicht mehrfach identisch vom Server geladen werden.
+- Animationsframes dürfen kein Tabellenlayout und keine Farbinterpolation auf dem Main Thread erzwingen.
+- Überholte Navigationen dürfen keinen späteren Zustand mehr festlegen.
 - Regelwerk, Tests und Dokumentation werden gemeinsam geändert.
