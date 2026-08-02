@@ -7,18 +7,41 @@ import {
 } from './rules-core.js?v=20260801.11';
 import { evaluateCandidate } from './rules-evaluation.js?v=20260801.11';
 
+function matchingOverride(monthData, { dateIso, role, staffId, evaluation }) {
+  const entries = Array.isArray(monthData?.overrideLog) ? monthData.overrideLog : [];
+  const redReasons = (evaluation.reasonDetails || [])
+    .filter(reason => reason.level === 'red' && reason.kind === 'conflict')
+    .map(reason => reason.text);
+
+  return [...entries].reverse().find(entry => {
+    if (entry?.dateIso !== dateIso || entry?.role !== role || entry?.staffId !== staffId) return false;
+    if (!Array.isArray(entry.reasons) || entry.reasons.length === 0 || redReasons.length === 0) return true;
+    return redReasons.some(reason => entry.reasons.includes(reason));
+  }) || null;
+}
+
+function confirmedIssueDetails(evaluation, override) {
+  const timestamp = override?.timestamp ? new Date(override.timestamp) : null;
+  const validTimestamp = timestamp && !Number.isNaN(timestamp.getTime());
+  const confirmation = evaluation.meta?.confirmationType === 'special'
+    ? 'Besondere Bestätigung dokumentiert'
+    : 'Rote Planabweichung bestätigt';
+  const dateText = validTimestamp
+    ? ` am ${timestamp.toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' })}`
+    : '';
+  const comment = String(override?.comment || '').trim();
+  return `${confirmation}${dateText}${comment ? ` · Kommentar: ${comment}` : ''} · ${evaluation.reasons.join(' · ')}`;
+}
+
 /**
  * Sammelbefund des Monats.
  *
  * Jeder Eintrag trägt neben Stufe und Text ein `kind`: `open` für eine noch
- * fehlende Besetzung, `finding` für eine fachliche Auffälligkeit. Die Oberfläche
- * zählte beides zuvor über eine Textsuche nach „offen“ im Titel – das brach
- * still, sobald eine Meldung anders formuliert wurde.
+ * fehlende Besetzung, `finding` für eine fachliche Auffälligkeit. Bestätigte
+ * rote Ausnahmen bleiben sichtbar, werden jedoch als eigener Status markiert,
+ * damit sie nicht mit einer noch ungeprüften Regelverletzung verwechselt werden.
  */
 export function collectIssues(state, monthData, { evaluate = null } = {}) {
-  // Die Oberfläche bewertet dieselben belegten Zellen bereits beim Aufbau der
-  // Tabelle. Über `evaluate` teilen sich beide Wege einen Zwischenspeicher,
-  // statt jede Zelle ein zweites Mal durch das Regelwerk zu schicken.
   const evaluateCandidateCached = evaluate || (parameters => evaluateCandidate(parameters));
   const issues = [];
   for (const [iso, day] of Object.entries(monthData.days || {})) {
@@ -29,8 +52,6 @@ export function collectIssues(state, monthData, { evaluate = null } = {}) {
       const staffId = day[role];
       if (!staffId) continue;
       if (isExternalAssignment(staffId)) {
-        // Name aus einem Altimport: bewusst erhalten, aber ohne Personenbezug
-        // nicht bewertbar. Ein roter Datenfehler wäre hier irreführend.
         issues.push({
           level: 'yellow',
           title: `${fmtGermanDate(iso)} · ${role.toUpperCase()} · ${externalAssignmentLabel(staffId)}`,
@@ -46,6 +67,7 @@ export function collectIssues(state, monthData, { evaluate = null } = {}) {
         });
         continue;
       }
+
       const evaluation = evaluateCandidateCached({ state, monthData, dateIso: iso, role, staffId });
       if (evaluation.level === 'gray') {
         issues.push({
@@ -54,10 +76,17 @@ export function collectIssues(state, monthData, { evaluate = null } = {}) {
           details: evaluation.reasons.join(' · ')
         });
       } else if (['orange', 'red'].includes(evaluation.level)) {
+        const override = evaluation.level === 'red'
+          ? matchingOverride(monthData, { dateIso: iso, role, staffId, evaluation })
+          : null;
+        const confirmed = Boolean(override);
         issues.push({
           level: evaluation.level,
-          title: `${fmtGermanDate(iso)} · ${role.toUpperCase()} · ${getStaffById(state.staff, staffId)?.name || staffId}`,
-          details: evaluation.reasons.join(' · ')
+          confirmed,
+          title: confirmed
+            ? `${fmtGermanDate(iso)} · ${role.toUpperCase()} · bestätigte rote Ausnahme · ${getStaffById(state.staff, staffId)?.name || staffId}`
+            : `${fmtGermanDate(iso)} · ${role.toUpperCase()} · ${getStaffById(state.staff, staffId)?.name || staffId}`,
+          details: confirmed ? confirmedIssueDetails(evaluation, override) : evaluation.reasons.join(' · ')
         });
       }
     }
@@ -83,9 +112,15 @@ export function collectIssues(state, monthData, { evaluate = null } = {}) {
     if (!ABSENCE_FOR_CT_LEADERSHIP.has(becker) || !ABSENCE_FOR_CT_LEADERSHIP.has(martin)) continue;
     issues.push({ level: 'red', title: `${fmtGermanDate(iso)} · Becker/Martin gleichzeitig abwesend`, details: 'CT-Leitungsbesetzung prüfen.' });
   }
+
   return issues
     .map(issue => ({ kind: 'finding', ...issue }))
-    .sort((a, b) => severityRank[b.level] - severityRank[a.level]);
+    .sort((a, b) => {
+      const severityDifference = severityRank[b.level] - severityRank[a.level];
+      if (severityDifference) return severityDifference;
+      if (a.confirmed !== b.confirmed) return Number(a.confirmed) - Number(b.confirmed);
+      return a.title.localeCompare(b.title, 'de');
+    });
 }
 
 export function buildStats(state, monthData) {
