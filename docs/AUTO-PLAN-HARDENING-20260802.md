@@ -13,7 +13,7 @@ Dieser Änderungsstand härtet den bestehenden Auto-Plan fachlich, technisch und
 - erweiterter Planungsfingerprint für Markierungen, Personal und geladene Monatsstände;
 - zeitabhängige Aktivitäts-, Qualifikations- und Beförderungsbewertung;
 - vollständig scrollbar prüfbare Ergebnisansicht bei kleinen und großen Viewports;
-- neuer Build-Stempel `20260802.1` gegen veraltete Browser-Assets.
+- Beibehaltung des einheitlichen Release-Tokens für den gesamten Modulgraphen; Cloudflare revalidiert die Anwendungsassets bei jedem Aufruf.
 
 ## Sicherheitsgrenze
 
