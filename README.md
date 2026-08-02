@@ -361,7 +361,7 @@ Automatisierte Tests prüfen den WCAG-AA-Kontrast der abgeleiteten Tabellenfläc
 
 Die Farbarchitektur bleibt dreistufig:
 
-1. `theme.js` liefert ein vollständiges Basistheme;
+1. `theme.js` liefert ein vollständiges Basistheme und ist die Rückfallebene ohne geladenen Director;
 2. `color-director.js` besitzt die sichtbare Farbe und fährt sie als Verlauf an;
 3. `month-transition-stability.js` beendet konkurrierende Farbsignale und übergibt den Wechsel an genau einen Verlauf.
 
@@ -374,6 +374,8 @@ Ablauf eines Monatswechsels:
 - die Interpolation nimmt den kürzeren Farbtonbogen, deshalb läuft der Wechsel nie über ausgegraute Zwischentöne;
 - die Zeitkurve ist ein Smootherstep und damit in erster und zweiter Ableitung stetig – auf 120-Hz-Displays gibt es keinen sichtbaren Einsatz- oder Abrisspunkt;
 - begleitend läuft eine kurze Lichtwelle (`.month-spectrum-sweep`), die ausschließlich `opacity` und `transform` bewegt und damit vollständig auf dem Compositor bleibt.
+
+**Eindeutige Farbhoheit.** Sobald `data-color-director` gesetzt ist, schreibt `theme.js` die neun Monatsvariablen nicht mehr und startet keine eigene Interpolation. Das ist keine Kosmetik, sondern notwendig: `setProperty` ohne Priorität ersetzt nicht nur den Wert, sondern entfernt auch das `important` des Directors. Jeder Aufruf des Basisthemes – bei jedem `render()`, jeder Statusaktualisierung und vor dem Drucken – hätte den kräftigen Monatskontrast sonst gegen den gedämpften Basiston getauscht.
 
 Die View Transition rastert erst den alten und anschließend den neu aufgebauten Monatsplan; der Farbverlauf läuft live weiter und endet exakt auf dem Zielprofil. Bei `prefers-reduced-motion: reduce` entfällt der Verlauf samt Lichtwelle und die Zielfarbe wird sofort gesetzt.
 
@@ -493,7 +495,9 @@ Der sichtbare Monatsplan wird als Excel-kompatibles Arbeitsblatt mit Tageszeilen
 
 ### PDF-/Druckausgabe
 
-Die Druckansicht ist auf eine kompakte A4-Ausgabe ausgelegt. Monatsfarben bleiben erhalten. Laufende Farbanimationen und View-Transition-Ebenen werden vor dem Druck ausgeschlossen, damit kein Übergangszustand eingefroren wird.
+Die Druckansicht ist auf eine kompakte A4-Ausgabe ausgelegt. **Der Monatskontrast wird unverändert und in voller Intensität gedruckt.** View-Transition-Ebenen und die Lichtwelle sind vom Druck ausgeschlossen.
+
+Vor dem Druck wird ein eventuell laufender Farbverlauf des Directors synchron auf seinem Zielprofil abgeschlossen (`applySpectrumProfile(..., { animate: false })`). Dadurch friert der Ausdruck keinen Zwischenton ein, und die gedruckte Fläche passt exakt zum Monatskontrast-Abzeichen. Das Basistheme wird dabei nicht mehr als Farbquelle herangezogen – es besitzt die Farbhoheit nur noch ohne geladenen Director.
 
 ### JSON
 
