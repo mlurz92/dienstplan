@@ -10,7 +10,7 @@
 > **Farbarchitektur:** Seasonal Spectrum Director mit **288 deterministischen Spektrumprofilen**  
 > **Monatsfarben:** deutlich getrennte Nachbarmonate, Farbnamen aus dem tatsächlichen OKLCH-Wert abgeleitet  
 > **Monatswechsel:** flüssige, richtungsabhängige High-Framerate-Transition mit durchgehendem OKLCH-Farbverlauf  
-> **Bedienung:** kompakte, semantisch gruppierte Icon-Werkzeugleiste  
+> **Bedienung:** kompakte Icon-Werkzeugleiste · tastaturgeführter, nach Eignung sortierter Dienst-Picker  
 > **Paketversion:** `0.2.0` · **Feiertagsregion:** Sachsen (`SN`)  
 > **Betrieb:** Cloudflare Pages · Pages Functions · Cloudflare KV · lokale Browser-Sicherung
 
@@ -104,7 +104,37 @@ Dateiaktionen bleiben per Maus, Tastatur, Enter und Leertaste bedienbar. „Aktu
 - vollständiges Leeren des sichtbaren Monats nach Bestätigung;
 - automatische lokale Sicherung und Server-Synchronisierung.
 
-### 2.4 Gestaltungsprinzip
+### 2.4 Dienst-Picker
+
+Der Picker beantwortet mitten in der Planung genau **eine** Frage: Wer übernimmt diesen Dienst? Er ist deshalb schmal (max. 560 px), dicht gesetzt und nach Entscheidungsnähe sortiert – nicht als vollständiger Prüfbericht angelegt.
+
+**Rangfolge statt Namensliste.** Alle bewerteten Personen werden in Entscheidungsgruppen einsortiert und innerhalb der Gruppe gereiht:
+
+| Gruppe | Bedeutung |
+|---|---|
+| **Empfohlen** | Wunsch, Ausgleich oder Verlauf sprechen ausdrücklich dafür |
+| **Möglich** | keine relevanten Konflikte |
+| **Mit Hinweis** | wählbar, aber mit Anmerkung |
+| **Nachrangig** | nur, wenn keine bessere Besetzung möglich ist |
+| **Bestätigung nötig** | roter Konflikt, ausdrückliche Bestätigung erforderlich |
+| **Nicht verfügbar** | nicht im Dienstpool oder zum Termin nicht aktiv |
+
+Innerhalb einer Gruppe entscheidet die Empfehlungsstärke, danach die geringere Monatslast, danach der geringere Jahresverlauf, zuletzt der Name. Leere Gruppen erscheinen nicht.
+
+**Eine Zeile je Person.** Jede Zeile trägt Name, Funktion, Monatslast (`BD 2/4`, ohne den geöffneten Tag), die wichtigste Begründung und die Bewertung. Weitere Begründungen erscheinen als Zähler (`+2`); die **vollständige** Begründung steht im Detailbereich unter der Liste und wechselt mit der aktiven Zeile, ohne das Layout zu verschieben. Damit bleibt die fachliche Transparenz erhalten, ohne dass acht Textblöcke gleichzeitig um Aufmerksamkeit konkurrieren.
+
+**Tastaturgeführt.** Der Fokus liegt beim Öffnen im Suchfeld, die erste wählbare Person ist vorausgewählt:
+
+- tippen filtert über Name, Kurzname und Funktion, unabhängig von Groß- und Kleinschreibung, Punkten und Umlauten (`fr dal` findet `Fr. Dalitz`);
+- <kbd>↑</kbd> / <kbd>↓</kbd> wechseln die aktive Person und überspringen gesperrte Einträge;
+- <kbd>⏎</kbd> übernimmt, <kbd>Esc</kbd> schließt;
+- die häufigste Entscheidung braucht damit zwei Tastenanschläge.
+
+Semantisch ist die Auswahl eine `combobox` mit `listbox`, gruppierten `option`-Elementen und `aria-activedescendant`; der Detailbereich ist eine `aria-live`-Region.
+
+**Kontext statt Rätselraten.** Der Kopf nennt Dienstart, Wochentag und Datum sowie die aktuelle Besetzung. „Eintrag löschen“ erscheint nur, wenn der Tag tatsächlich besetzt ist; die eingeteilte Person trägt in der Liste die Markierung `aktuell`.
+
+### 2.5 Gestaltungsprinzip
 
 Die Oberfläche kombiniert eine Excel-nahe Tabellenlogik mit kontrollierter Glasoptik:
 
@@ -533,6 +563,7 @@ Wesentliche Module:
 | `js/ui-controls.js` | kompakte Werkzeugleiste, Icons und Einbindung der progressiven UI-Schichten |
 | `js/state.js` | Laden, Speichern, Dirty-Zustände und Monatscache |
 | `js/rules*.js` | Regelengine, Auswertung, Statistik und offene Punkte |
+| `js/picker-view.js` | Gruppierung, Rangfolge und Tippfilter des Dienst-Pickers |
 | `js/rbn.js` | RBN-Pools und zweite RBN |
 | `js/holidays.js` | sächsische Feiertage und Werktage |
 | `js/excel-import.js` | Arbeitsmappenanalyse und Zuordnung |
@@ -603,7 +634,9 @@ Aktuell umfasst die Suite **178 Unit- und Regressionstests**. Geprüft werden un
 npm run test:e2e
 ```
 
-Aktuell umfasst die Browser-Suite **10 Playwright-End-to-End-Tests**. Sie prüft Navigation, Auswahl- und Konfliktdialoge, Werkzeugleiste, Dateiaktionen, Monatsbadge, Seasonal Spectrum Director sowie Monats- und Jahresvariation.
+Aktuell umfasst die Browser-Suite **15 Playwright-End-to-End-Tests**. Sie prüft Navigation, Auswahl- und Konfliktdialoge, Werkzeugleiste, Dateiaktionen, Monatsbadge, Seasonal Spectrum Director, PDF-Export sowie Monats- und Jahresvariation.
+
+Der Dienst-Picker wird dabei vollständig durchgespielt: kompakte Breite, Gruppenreihenfolge, vorausgewählte Empfehlung, Tippfilter, Pfeiltasten, Übernahme per <kbd>⏎</kbd>, Anzeige der aktuellen Besetzung und Löschen des Eintrags.
 
 Der spezielle High-Framerate-Regressionsfall verzögert die Monats-API bewusst und zeichnet den Übergang frameweise auf. Geprüft werden:
 
@@ -674,6 +707,7 @@ Der Release-Token `20260801.11` bleibt bewusst einheitlich, da die Repositorytes
 │   ├── rules-core.js
 │   ├── rules-evaluation.js
 │   ├── rules-reporting.js
+│   ├── picker-view.js
 │   ├── rbn.js
 │   ├── holidays.js
 │   └── excel-import.js

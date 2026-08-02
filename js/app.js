@@ -6,6 +6,7 @@ import { applySpectrumProfile } from './color-director.js?v=20260801.11';
 import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260801.11';
 import { assignmentLabel, buildStats, clearedMonthData, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getEffectiveAbsence, getPlanningStaff, getOptions, getPreference, getStaffById, isExternalAssignment, labelForAbsence, labelForOption, labelForPreference, monthContentSummary, setAbsence, setAssignment, setOptions, setPreference, toggleOption, weekdayLabel } from './rules.js?v=20260801.11';
 import { getRbnOptions, isRbnValueAllowed, isSecondRbnAvailable, rbnDisplayName } from './rbn.js?v=20260801.11';
+import { additionalReasons, buildPickerModel, filterPickerModel, flattenPickerModel, loadSummary, nextSelectableIndex, primaryReason } from './picker-view.js?v=20260801.11';
 import { analyzeWorkbook } from './excel-import.js?v=20260801.11';
 
 const $ = selector => document.querySelector(selector);
@@ -100,7 +101,7 @@ async function init() {
 }
 
 function cacheElements() {
-  ['monthSelect','yearSelect','prevMonthBtn','nextMonthBtn','saveStatus','statusDot','planTableBody','statsGrid','monthTitle','pickerDialog','pickerList','pickerTitle','pickerEyebrow','pickerSubtitle','clearAssignmentBtn','dayMetaDialog','dayMetaTitle','dayMetaList','batchDialog','batchTitle','batchEyebrow','batchSubtitle','batchStaffSelect','batchTypeSelect','batchDayGrid','batchApplyBtn','batchClearSelectionBtn','conflictDialog','conflictDialogText','conflictReasons','conflictComment','confirmConflictBtn'].forEach(id => els[id] = document.getElementById(id));
+  ['monthSelect','yearSelect','prevMonthBtn','nextMonthBtn','saveStatus','statusDot','planTableBody','statsGrid','monthTitle','pickerDialog','pickerList','pickerTitle','pickerEyebrow','pickerSubtitle','pickerSearch','pickerCurrent','pickerDetail','clearAssignmentBtn','dayMetaDialog','dayMetaTitle','dayMetaList','batchDialog','batchTitle','batchEyebrow','batchSubtitle','batchStaffSelect','batchTypeSelect','batchDayGrid','batchApplyBtn','batchClearSelectionBtn','conflictDialog','conflictDialogText','conflictReasons','conflictComment','confirmConflictBtn'].forEach(id => els[id] = document.getElementById(id));
 }
 
 function bindEvents() {
@@ -124,6 +125,8 @@ function bindEvents() {
     document.querySelectorAll('.batch-day.selected').forEach(el => el.classList.remove('selected'));
   });
   $('#confirmConflictBtn').addEventListener('click', onConfirmConflict);
+  $('#pickerSearch').addEventListener('input', renderPickerList);
+  $('#pickerSearch').addEventListener('keydown', onPickerSearchKeydown);
   $('#excelImportInput').addEventListener('change', onExcelImport);
   $('#exportExcelBtn').addEventListener('click', exportCurrentMonthToExcel);
   // Safari kennt kein `beforeprint`; deshalb wird beim Export zusätzlich
@@ -622,30 +625,181 @@ function renderIssues(monthData) {
   }
 }
 
-function openPicker(dateIso, role) {
+const ROLE_LABELS = { bd: 'Bereitschaftsdienst', hg: 'Hintergrunddienst' };
+
+/**
+ * Zustand der geöffneten Auswahl.
+ *
+ * `entries` ist die aktuell sichtbare, bereits gefilterte Reihenfolge. Die
+ * Tastatursteuerung arbeitet ausschließlich auf diesem Array, damit sichtbare
+ * Reihenfolge und Tastaturweg nie auseinanderlaufen.
+ */
+const picker = { candidates: [], model: [], entries: [], activeId: null };
+
+function optionId(staffId) {
+  return `picker-option-${staffId}`;
+}
+
+function pickerCandidates(dateIso, role) {
   const monthData = getMonthData(state.currentYear, state.currentMonth);
-  state.currentPicker = { dateIso, role };
-  $('#pickerEyebrow').textContent = role === 'bd' ? 'Bereitschaftsdienst' : 'Hintergrunddienst';
-  $('#pickerTitle').textContent = `${fmtGermanDate(dateIso)} · ${role.toUpperCase()}`;
-  $('#pickerSubtitle').textContent = 'Harte und strukturelle Regeln greifen sofort; relative Ausgleichshinweise erst nach der ersten Verteilungsrunde. Rote Konflikte erfordern eine explizite Bestätigung.';
-  $('#pickerList').innerHTML = '';
-  const staffList = getPlanningStaff(state.staff, dateIso);
-  staffList.forEach(person => {
-    const evaluation = evaluateCandidate({ state, monthData, dateIso, role, staffId: person.id });
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = `picker-item ${evaluation.level}`;
-    button.title = evaluation.reasons.join('\n');
-    button.innerHTML = `<div class="topline"><span class="name">${esc(person.name)}</span><span class="small-chip ${evaluation.level}">${labelByLevel(evaluation.level)}</span></div><div class="reasons">${evaluation.reasons.map(reason => `<span>${esc(reason)}</span>`).join('')}</div>`;
-    if (evaluation.canSelect === false) {
-      button.disabled = true;
-      button.setAttribute('aria-disabled', 'true');
-    } else {
-      button.addEventListener('click', () => onPickStaff(person.id, evaluation));
-    }
-    $('#pickerList').appendChild(button);
+  return getPlanningStaff(state.staff, dateIso).map(person => ({
+    person,
+    role,
+    evaluation: evaluateCandidate({ state, monthData, dateIso, role, staffId: person.id })
+  }));
+}
+
+function renderPickerDetail(candidate) {
+  const detail = $('#pickerDetail');
+  if (!candidate) {
+    detail.textContent = '';
+    detail.hidden = true;
+    return;
+  }
+  const reasons = candidate.evaluation.reasons || [];
+  detail.hidden = reasons.length === 0;
+  detail.innerHTML = reasons.length
+    ? `<span class="picker-detail-name">${esc(candidate.person.name)}</span>${reasons
+        .map(reason => `<span class="picker-detail-reason">${esc(reason)}</span>`).join('')}`
+    : '';
+}
+
+function setActiveCandidate(staffId, { scroll = true } = {}) {
+  const candidate = picker.entries.find(entry => entry.person.id === staffId) || null;
+  picker.activeId = candidate ? staffId : null;
+  const list = $('#pickerList');
+  list.querySelectorAll('.picker-item').forEach(item => {
+    const active = item.dataset.staffId === picker.activeId;
+    item.classList.toggle('is-active', active);
+    item.setAttribute('aria-selected', String(active));
+    if (active && scroll) item.scrollIntoView({ block: 'nearest' });
   });
+  $('#pickerSearch').setAttribute('aria-activedescendant', picker.activeId ? optionId(picker.activeId) : '');
+  renderPickerDetail(candidate);
+}
+
+function moveActiveCandidate(delta) {
+  const currentIndex = picker.entries.findIndex(entry => entry.person.id === picker.activeId);
+  const nextIndex = nextSelectableIndex(picker.entries, currentIndex, delta);
+  if (nextIndex >= 0) setActiveCandidate(picker.entries[nextIndex].person.id);
+}
+
+function pickerItemMarkup(candidate) {
+  const { person, evaluation } = candidate;
+  const load = loadSummary(candidate);
+  const lead = primaryReason(candidate);
+  const rest = additionalReasons(candidate);
+  const restChip = rest.length ? `<span class="reason-more">+${rest.length}</span>` : '';
+  const assigned = candidate.isAssigned ? '<span class="picker-assigned" title="Aktuell eingeteilt">aktuell</span>' : '';
+  return `<span class="picker-identity">
+      <span class="picker-name">${esc(person.name)}</span>
+      ${person.roleLabel ? `<span class="picker-function">${esc(person.roleLabel)}</span>` : ''}
+      ${assigned}
+    </span>
+    <span class="picker-load${load.exceeded ? ' is-exceeded' : ''}" title="${esc(load.title)}">
+      <span class="picker-load-role">${load.role.toUpperCase()}</span>${esc(load.text)}
+    </span>
+    <span class="reasons"><span class="reason-lead">${esc(lead)}</span>${restChip}</span>
+    <span class="small-chip ${evaluation.level}">${labelByLevel(evaluation.level)}</span>`;
+}
+
+function renderPickerList() {
+  const list = $('#pickerList');
+  const query = $('#pickerSearch').value;
+  const filtered = filterPickerModel(picker.model, query);
+  picker.entries = flattenPickerModel(filtered);
+  list.replaceChildren();
+
+  if (!picker.entries.length) {
+    list.append(Object.assign(document.createElement('p'), {
+      className: 'picker-empty',
+      textContent: 'Keine Person passt zu dieser Eingabe.'
+    }));
+    setActiveCandidate(null);
+    return;
+  }
+
+  for (const group of filtered) {
+    const section = document.createElement('div');
+    section.className = `picker-group picker-group--${group.id}`;
+    section.setAttribute('role', 'group');
+    section.setAttribute('aria-label', group.label);
+    const heading = document.createElement('p');
+    heading.className = 'picker-group-label';
+    heading.innerHTML = `<span>${esc(group.label)}</span><span class="picker-group-count">${group.entries.length}</span>`;
+    heading.title = group.hint;
+    section.append(heading);
+
+    for (const candidate of group.entries) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.id = optionId(candidate.person.id);
+      button.dataset.staffId = candidate.person.id;
+      button.className = `picker-item ${candidate.evaluation.level}`;
+      button.setAttribute('role', 'option');
+      button.setAttribute('aria-selected', 'false');
+      button.title = candidate.evaluation.reasons.join('\n');
+      button.innerHTML = pickerItemMarkup(candidate);
+      if (candidate.evaluation.canSelect === false) {
+        button.disabled = true;
+        button.setAttribute('aria-disabled', 'true');
+      } else {
+        button.addEventListener('click', () => onPickStaff(candidate.person.id, candidate.evaluation));
+      }
+      button.addEventListener('pointerenter', () => setActiveCandidate(candidate.person.id, { scroll: false }));
+      button.addEventListener('focus', () => setActiveCandidate(candidate.person.id, { scroll: false }));
+      section.append(button);
+    }
+    list.append(section);
+  }
+
+  const stillVisible = picker.entries.some(entry => entry.person.id === picker.activeId
+    && entry.evaluation.canSelect !== false);
+  if (stillVisible) setActiveCandidate(picker.activeId, { scroll: false });
+  else moveActiveCandidate(1);
+}
+
+function onPickerSearchKeydown(event) {
+  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    event.preventDefault();
+    moveActiveCandidate(event.key === 'ArrowDown' ? 1 : -1);
+    return;
+  }
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    const candidate = picker.entries.find(entry => entry.person.id === picker.activeId);
+    if (candidate && candidate.evaluation.canSelect !== false) onPickStaff(candidate.person.id, candidate.evaluation);
+  }
+}
+
+function openPicker(dateIso, role) {
+  state.currentPicker = { dateIso, role };
+  const assignedId = getAssignment(state, dateIso, role);
+  const assignedName = assignedId ? getStaffById(state.staff, assignedId)?.name : '';
+
+  picker.candidates = pickerCandidates(dateIso, role)
+    .map(candidate => ({ ...candidate, isAssigned: candidate.person.id === assignedId }));
+  picker.model = buildPickerModel(picker.candidates);
+  picker.activeId = null;
+
+  $('#pickerEyebrow').textContent = ROLE_LABELS[role] || role.toUpperCase();
+  $('#pickerTitle').textContent = `${weekdayLabel(dateIso)}, ${fmtGermanDate(dateIso)}`;
+  $('#pickerCurrent').innerHTML = assignedName
+    ? `Aktuell eingeteilt: <strong>${esc(assignedName)}</strong>`
+    : 'Noch nicht besetzt';
+  $('#pickerCurrent').classList.toggle('is-open', !assignedName);
+  const note = $('#pickerSubtitle');
+  note.textContent = 'Rote Konflikte erfordern eine ausdrückliche Bestätigung.';
+  note.title = 'Harte und strukturelle Regeln greifen sofort; relative Ausgleichshinweise erst nach der ersten Verteilungsrunde.';
+  $('#clearAssignmentBtn').hidden = !assignedId;
+  const search = $('#pickerSearch');
+  search.value = '';
+
+  // renderPickerList wählt bereits die erste wählbare Person vor: Enter genügt
+  // damit für die häufigste Entscheidung, ohne dass etwas ungewollt entsteht.
+  renderPickerList();
   $('#pickerDialog').showModal();
+  search.focus();
 }
 
 async function onPickStaff(staffId, evaluation) {
