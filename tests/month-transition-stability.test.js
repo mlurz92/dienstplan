@@ -41,6 +41,13 @@ test('every synchronization cancels the base animation before writing the final 
   assert.match(stability, /data.*monthTransition|dataset\.monthTransition/);
 });
 
+test('metadata observer ignores the month key that it has just settled itself', () => {
+  assert.match(stability, /let lastSettledKey = null;/);
+  assert.match(stability, /lastSettledKey = monthKey\(date\);/);
+  assert.match(stability, /if \(requestedKey === lastSettledKey \|\| synchronizationQueued\) return;/);
+  assert.match(stability, /if \(monthKey\(selectedDate\(\)\) === lastSettledKey\) return;/);
+});
+
 test('a short paint guard reinforces the final colour after competing callbacks', () => {
   assert.match(stability, /const PAINT_GUARD_FRAMES = [3-9];/);
   assert.match(stability, /paintGuardHandle = requestAnimationFrame\(reinforce\)/);
