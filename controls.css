@@ -225,3 +225,25 @@
     transform: none;
   }
 }
+
+/* --------------------------------------------------------------------------
+   Stabiler Monatswechsel
+   --------------------------------------------------------------------------
+
+   app.js setzt die neue Tabelle bereits vollständig, bevor die historische
+   Richtungsanimation startet. Deren Startframe hatte opacity: 0 und ließ den
+   eben sichtbaren Plan deshalb noch einmal verschwinden. Die Spektrumebene
+   beendet parallel jeden Farbverlauf atomar; diese Regeln entfernen den zweiten
+   visuellen Zwischenzustand auch aus Überschrift, Tabelle und Statistik. */
+.month-enter-next,
+.month-enter-prev {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+  will-change: auto !important;
+}
+
+body.month-content-transition .month-palette-label {
+  animation: none !important;
+  filter: none !important;
+}
