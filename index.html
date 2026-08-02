@@ -18,7 +18,7 @@
     Zweig als main auslieferte. Von außen war das nicht zu erkennen, weil die
     Anwendung im Übrigen normal funktionierte.
   -->
-  <meta name="dienstplanrad-build" content="20260801.11" />
+  <meta name="dienstplanrad-build" content="20260802.1" />
   <script>
     (() => {
       const cachePrefix = 'dienstplanrad';
@@ -62,13 +62,22 @@
   <link rel="icon" href="/icons/icon.svg?icon=calendar-spectrum-1" type="image/svg+xml" sizes="any" />
   <link rel="shortcut icon" href="/icons/icon.svg?icon=calendar-spectrum-1" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="/icons/icon.svg?icon=calendar-spectrum-1" />
-  <link rel="manifest" href="/manifest.webmanifest?v=20260801.11" />
-  <link rel="stylesheet" href="/styles.css?v=20260801.11" />
-  <link rel="stylesheet" href="/controls.css?v=20260801.11" />
+  <link rel="manifest" href="/manifest.webmanifest?v=20260802.1" />
+  <link rel="stylesheet" href="/styles.css?v=20260802.1" />
+  <link rel="stylesheet" href="/controls.css?v=20260802.1" />
+  <script type="importmap">
+    {
+      "imports": {
+        "/js/auto-planner.js?v=20260801.11": "/js/auto-planner.js?v=20260802.1",
+        "/js/rules.js?v=20260801.11": "/js/rules.js?v=20260802.1",
+        "/js/rules-reporting.js?v=20260801.11": "/js/rules-reporting.js?v=20260802.1"
+      }
+    }
+  </script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" defer></script>
-  <script type="module" src="/js/app.js?v=20260801.11"></script>
-  <script type="module" src="/js/ui-controls.js?v=20260801.11"></script>
-  <script type="module" src="/js/auto-plan-ui.js?v=20260801.11"></script>
+  <script type="module" src="/js/app.js?v=20260802.1"></script>
+  <script type="module" src="/js/ui-controls.js?v=20260802.1"></script>
+  <script type="module" src="/js/auto-plan-ui.js?v=20260802.1"></script>
   <script type="module">
     document.addEventListener('DOMContentLoaded', () => {
       const reasons = document.getElementById('conflictReasons');
