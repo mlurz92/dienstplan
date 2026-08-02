@@ -44,13 +44,17 @@ test('weekend equivalent counts BD weekends once and HG-only weekends as half', 
   assert.equal(computeWeekendEquivalent(month, 'lurz'), 1.5);
 });
 
-test('statistics honor activation dates and calculate remaining targets', () => {
+test('statistics honor activation dates, role transitions and remaining targets', () => {
   const { state, data } = planningState(2026, 9);
   setAssignment(data, '2026-09-01', 'bd', 'lurz');
   const september = buildStats(state, data);
   assert.equal(september.some(item => item.id === 'hellmann'), false);
   assert.equal(september.find(item => item.id === 'lurz').bdRemaining, 3);
+  assert.equal(september.find(item => item.id === 'elhouba').roleLabel, 'AA → FA');
+
   const october = createEmptyMonth(2026, 10);
   state.months.set('2026-10', october);
-  assert.equal(buildStats(state, october).some(item => item.id === 'hellmann'), true);
+  const octoberStats = buildStats(state, october);
+  assert.equal(octoberStats.some(item => item.id === 'hellmann'), true);
+  assert.equal(octoberStats.find(item => item.id === 'elhouba').roleLabel, 'FA');
 });
