@@ -1,28 +1,33 @@
 /*
  * Hochfrequenter Monatswechsel
  *
- * Der Browser bewegt ausschließlich zwei bereits gerasterte View-Transition-
- * Ebenen. Tabellenlayout, Formularfelder und Farbvariablen werden nicht pro
- * Animationsframe neu berechnet. Der Fallback verwendet dieselben ausschließlich
- * compositorfähigen Eigenschaften über die Web Animations API.
+ * Nur die große Monatskarte wird gerastert und auf dem Compositor bewegt.
+ * Toolbar, Navigation und Status bleiben live und reagieren auch während des
+ * Vorladens unmittelbar. Tabellenlayout und Farben werden nicht pro Frame neu
+ * berechnet. Der Fallback verwendet dieselben GPU-freundlichen Eigenschaften.
  */
 
 :root {
   --month-motion-duration: 430ms;
   --month-motion-ease: cubic-bezier(.22, 1, .36, 1);
+  view-transition-name: none;
 }
 
-::view-transition-group(root) {
+.sheet-panel {
+  view-transition-name: month-sheet;
+}
+
+::view-transition-group(month-sheet) {
   animation-duration: var(--month-motion-duration);
   animation-timing-function: var(--month-motion-ease);
 }
 
-::view-transition-image-pair(root) {
+::view-transition-image-pair(month-sheet) {
   isolation: isolate;
 }
 
-::view-transition-old(root),
-::view-transition-new(root) {
+::view-transition-old(month-sheet),
+::view-transition-new(month-sheet) {
   animation-duration: var(--month-motion-duration);
   animation-timing-function: var(--month-motion-ease);
   animation-fill-mode: both;
@@ -31,19 +36,19 @@
   transform-origin: 50% 18%;
 }
 
-html[data-month-motion-direction="forward"]::view-transition-old(root) {
+html[data-month-motion-direction="forward"]::view-transition-old(month-sheet) {
   animation-name: month-motion-old-forward;
 }
 
-html[data-month-motion-direction="forward"]::view-transition-new(root) {
+html[data-month-motion-direction="forward"]::view-transition-new(month-sheet) {
   animation-name: month-motion-new-forward;
 }
 
-html[data-month-motion-direction="backward"]::view-transition-old(root) {
+html[data-month-motion-direction="backward"]::view-transition-old(month-sheet) {
   animation-name: month-motion-old-backward;
 }
 
-html[data-month-motion-direction="backward"]::view-transition-new(root) {
+html[data-month-motion-direction="backward"]::view-transition-new(month-sheet) {
   animation-name: month-motion-new-backward;
 }
 
@@ -89,16 +94,16 @@ html[data-month-motion-state="preloading"] .month-selector {
 @media (prefers-reduced-motion: reduce) {
   :root { --month-motion-duration: 1ms; }
 
-  ::view-transition-old(root),
-  ::view-transition-new(root) {
+  ::view-transition-old(month-sheet),
+  ::view-transition-new(month-sheet) {
     animation-name: none !important;
   }
 }
 
 @media print {
-  ::view-transition-group(root),
-  ::view-transition-old(root),
-  ::view-transition-new(root),
+  ::view-transition-group(month-sheet),
+  ::view-transition-old(month-sheet),
+  ::view-transition-new(month-sheet),
   .month-motion-fallback-snapshot {
     display: none !important;
   }
