@@ -1,0 +1,110 @@
+/*
+ * Hochfrequenter Monatswechsel
+ *
+ * Nur die große Monatskarte wird gerastert und auf dem Compositor bewegt.
+ * Toolbar, Navigation und Status bleiben live und reagieren auch während des
+ * Vorladens unmittelbar. Tabellenlayout und Farben werden nicht pro Frame neu
+ * berechnet. Der Fallback verwendet dieselben GPU-freundlichen Eigenschaften.
+ */
+
+:root {
+  --month-motion-duration: 430ms;
+  --month-motion-ease: cubic-bezier(.22, 1, .36, 1);
+  view-transition-name: none;
+}
+
+.sheet-panel {
+  view-transition-name: month-sheet;
+}
+
+::view-transition-group(month-sheet) {
+  animation-duration: var(--month-motion-duration);
+  animation-timing-function: var(--month-motion-ease);
+}
+
+::view-transition-image-pair(month-sheet) {
+  isolation: isolate;
+}
+
+::view-transition-old(month-sheet),
+::view-transition-new(month-sheet) {
+  animation-duration: var(--month-motion-duration);
+  animation-timing-function: var(--month-motion-ease);
+  animation-fill-mode: both;
+  backface-visibility: hidden;
+  mix-blend-mode: normal;
+  transform-origin: 50% 18%;
+}
+
+html[data-month-motion-direction="forward"]::view-transition-old(month-sheet) {
+  animation-name: month-motion-old-forward;
+}
+
+html[data-month-motion-direction="forward"]::view-transition-new(month-sheet) {
+  animation-name: month-motion-new-forward;
+}
+
+html[data-month-motion-direction="backward"]::view-transition-old(month-sheet) {
+  animation-name: month-motion-old-backward;
+}
+
+html[data-month-motion-direction="backward"]::view-transition-new(month-sheet) {
+  animation-name: month-motion-new-backward;
+}
+
+@keyframes month-motion-old-forward {
+  0% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+  44% { opacity: .72; }
+  100% { opacity: 0; transform: translate3d(-24px, 0, 0) scale(.996); }
+}
+
+@keyframes month-motion-new-forward {
+  0% { opacity: 0; transform: translate3d(30px, 0, 0) scale(.996); }
+  30% { opacity: .36; }
+  100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@keyframes month-motion-old-backward {
+  0% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+  44% { opacity: .72; }
+  100% { opacity: 0; transform: translate3d(24px, 0, 0) scale(.996); }
+}
+
+@keyframes month-motion-new-backward {
+  0% { opacity: 0; transform: translate3d(-30px, 0, 0) scale(.996); }
+  30% { opacity: .36; }
+  100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+.month-motion-fallback-snapshot,
+.month-motion-fallback-live {
+  transform-origin: 50% 18%;
+  backface-visibility: hidden;
+}
+
+.month-motion-fallback-snapshot {
+  contain: layout paint style;
+  box-sizing: border-box;
+}
+
+html[data-month-motion-state="preloading"] .month-selector {
+  cursor: progress;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --month-motion-duration: 1ms; }
+
+  ::view-transition-old(month-sheet),
+  ::view-transition-new(month-sheet) {
+    animation-name: none !important;
+  }
+}
+
+@media print {
+  ::view-transition-group(month-sheet),
+  ::view-transition-old(month-sheet),
+  ::view-transition-new(month-sheet),
+  .month-motion-fallback-snapshot {
+    display: none !important;
+  }
+}
