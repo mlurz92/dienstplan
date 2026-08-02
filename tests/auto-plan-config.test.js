@@ -77,8 +77,8 @@ test('harte BD-Obergrenzen werden in jeder Suchstufe eingehalten', async () => {
   const monthData = miniMonth(['2026-07-06', '2026-07-07', '2026-07-08']);
   const plannerState = stateWith(monthData);
   const config = createDefaultAutoPlanConfig(plannerState, monthData);
-  for (const person of DEFAULT_STAFF.filter(entry => entry.includeInPlanning)) {
-    config.staffLimits[person.id].maxBd = person.id === 'lurz' ? 0 : 1;
+  for (const [staffId, limits] of Object.entries(config.staffLimits)) {
+    limits.maxBd = staffId === 'lurz' ? 0 : 1;
   }
 
   const result = await run(monthData, plannerState, config);
