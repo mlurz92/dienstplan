@@ -116,22 +116,63 @@ export function getMonthData(year, month) {
   return state.months.get(key);
 }
 
+/**
+ * Lokale Sicherung eines Monats.
+ *
+ * Eigene Änderungen gehen sofort auf die Platte – sie sind das Ausfallnetz
+ * gegen einen Serverfehler und dürfen keine Sekunde ungesichert bleiben.
+ *
+ * Serverstände dagegen werden gebündelt geschrieben. Ein Monatswechsel lädt bis
+ * zu dreizehn Monate vor; jeder davon kostete zuvor ein vollständiges
+ * `JSON.stringify` samt Speicherzugriff mitten in der laufenden Übergangs-
+ * animation. Vor jedem Auslesen, jedem Serverschreibvorgang und beim Verlassen
+ * der Seite wird die Sammlung ausdrücklich geleert.
+ */
+const pendingLocalWrites = new Map();
+let localWriteHandle = null;
+
+export function flushLocalMonthWrites() {
+  if (localWriteHandle !== null) {
+    if (typeof cancelIdleCallback === 'function') cancelIdleCallback(localWriteHandle);
+    else clearTimeout(localWriteHandle);
+    localWriteHandle = null;
+  }
+  for (const [key, value] of pendingLocalWrites) storageSet(`${LOCAL_KEY_PREFIX}month:${key}`, JSON.stringify(value));
+  pendingLocalWrites.clear();
+}
+
+function scheduleLocalMonthWrite(key, value) {
+  pendingLocalWrites.set(key, value);
+  if (localWriteHandle !== null) return;
+  const run = () => { localWriteHandle = null; flushLocalMonthWrites(); };
+  localWriteHandle = typeof requestIdleCallback === 'function'
+    ? requestIdleCallback(run, { timeout: 500 })
+    : setTimeout(run, 120);
+}
+
 export function setMonthData(year, month, payload, source = null) {
   const normalized = normalizeMonthData(year, month, payload);
   const key = monthKey(year, month);
   state.months.set(key, normalized);
   if (source) state.monthSources.set(key, source);
-  storageSet(`${LOCAL_KEY_PREFIX}month:${key}`, JSON.stringify(normalized));
+  if (source === 'local' || state.dirtyMonths.has(key)) {
+    pendingLocalWrites.delete(key);
+    storageSet(`${LOCAL_KEY_PREFIX}month:${key}`, JSON.stringify(normalized));
+  } else {
+    scheduleLocalMonthWrite(key, normalized);
+  }
   return normalized;
 }
 
 export function readLocalMonth(year, month) {
+  flushLocalMonthWrites();
   const raw = storageGet(`${LOCAL_KEY_PREFIX}month:${monthKey(year, month)}`);
   if (!raw) return null;
   try { return JSON.parse(raw); } catch { return null; }
 }
 
 export function readAllLocalMonths() {
+  flushLocalMonthWrites();
   const months = new Map();
   try {
     if (typeof localStorage === 'undefined' || typeof localStorage.key !== 'function') return months;
@@ -281,6 +322,27 @@ export async function loadMonth(year, month, { forceServer = false } = {}) {
   }
 }
 
+/**
+ * Gibt den Hauptthread frei, bevor der nächste Monat übernommen wird.
+ *
+ * `scheduler.yield()` reiht den Rest hinter anstehende Eingaben und Frames ein;
+ * ohne diese Schnittstelle genügt ein Leerlauf- bzw. Makrotask-Sprung.
+ */
+function yieldToBrowser() {
+  if (typeof scheduler === 'object' && typeof scheduler?.yield === 'function') return scheduler.yield();
+  if (typeof requestIdleCallback === 'function') return new Promise(resolve => requestIdleCallback(() => resolve(), { timeout: 120 }));
+  return new Promise(resolve => setTimeout(resolve, 0));
+}
+
+/**
+ * Lädt die Nachbarmonate und den bisherigen Jahresverlauf vor.
+ *
+ * Abgerufen wird parallel, **übernommen aber einzeln**: Jede Übernahme
+ * normalisiert einen vollständigen Monat. Dreizehn Monate in einem Zug
+ * blockierten den Hauptthread gemessen mehrere hundert Millisekunden – genau
+ * während der laufenden Wechselanimation. Zwischen zwei Übernahmen wird deshalb
+ * abgegeben, sodass Bewegung und Eingaben durchlaufen können.
+ */
 export async function warmAdjacentMonths(year, month) {
   restoreSyncState();
   const previousReady = state.serverReady;
@@ -292,19 +354,25 @@ export async function warmAdjacentMonths(year, month) {
   addRequest(next.getFullYear(), next.getMonth() + 1);
   for (let historicalMonth = 1; historicalMonth < month; historicalMonth += 1) addRequest(year, historicalMonth);
 
-  const tasks = [...requestedMonths.values()].map(async ([requestedYear, requestedMonth]) => {
-    const key = monthKey(requestedYear, requestedMonth);
-    if (state.dirtyMonths.has(key)) return;
-    try {
-      const data = await api.getMonth(requestedYear, requestedMonth);
-      setMonthData(requestedYear, requestedMonth, data.month || createEmptyMonth(requestedYear, requestedMonth), 'server');
-    } catch {
-      const local = readLocalMonth(requestedYear, requestedMonth);
-      if (local) setMonthData(requestedYear, requestedMonth, local, 'local');
-      else setMonthData(requestedYear, requestedMonth, createEmptyMonth(requestedYear, requestedMonth), 'fallback');
+  const pending = [...requestedMonths.values()]
+    .filter(([requestedYear, requestedMonth]) => !state.dirtyMonths.has(monthKey(requestedYear, requestedMonth)))
+    .map(([requestedYear, requestedMonth]) => ({
+      requestedYear,
+      requestedMonth,
+      request: api.getMonth(requestedYear, requestedMonth).then(data => data?.month || null, () => null)
+    }));
+
+  for (const { requestedYear, requestedMonth, request } of pending) {
+    const payload = await request;
+    await yieldToBrowser();
+    if (payload) {
+      setMonthData(requestedYear, requestedMonth, payload, 'server');
+      continue;
     }
-  });
-  await Promise.allSettled(tasks);
+    const local = readLocalMonth(requestedYear, requestedMonth);
+    if (local) setMonthData(requestedYear, requestedMonth, local, 'local');
+    else setMonthData(requestedYear, requestedMonth, createEmptyMonth(requestedYear, requestedMonth), 'fallback');
+  }
   state.serverReady = previousReady;
 }
 
@@ -332,6 +400,7 @@ export async function persistMonth(year, monthNumber) {
   const duplicate = state.saveRequests.get(key);
   if (duplicate?.version === saveVersion) return duplicate.promise;
 
+  flushLocalMonthWrites();
   const month = getMonthData(year, monthNumber);
   month.updatedAt = new Date().toISOString();
   month.revision = (month.revision || 0) + 1;

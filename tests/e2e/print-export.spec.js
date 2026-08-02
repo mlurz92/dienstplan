@@ -40,8 +40,18 @@ test('PDF-Export lässt den Monatskontrast unverändert und kräftig', async ({ 
   await page.evaluate(() => { window.print = () => {}; });
   await page.selectOption('#yearSelect', '2026');
   await page.selectOption('#monthSelect', '7');
-  await expect(page.locator('html')).toHaveAttribute('data-spectrum-motion', 'settled');
   await expect(page.locator('html')).toHaveAttribute('data-spectrum-key', '2026-07');
+
+  // Auf das Ende des Verlaufs warten, nicht auf das Attribut allein: `settled`
+  // steht auch noch vom vorherigen Monat, bevor der neue Verlauf überhaupt
+  // beginnt. Verlässlich ist erst die Zielfarbe selbst.
+  const target = await page.evaluate(async () => {
+    const module = await import('/js/color-director.js?v=20260801.11');
+    const [r, g, b] = module.colorProfileForDate(2026, 7).accent.slice(0, 3).map(value => Math.round(value));
+    return `rgb(${r}, ${g}, ${b})`;
+  });
+  await expect.poll(async () => (await readSurface(page)).accent).toBe(target);
+  await expect(page.locator('html')).toHaveAttribute('data-spectrum-motion', 'settled');
 
   const before = await readSurface(page);
   expect(before.priority).toBe('important');

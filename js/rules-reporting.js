@@ -15,7 +15,11 @@ import { evaluateCandidate } from './rules-evaluation.js?v=20260801.11';
  * zählte beides zuvor über eine Textsuche nach „offen“ im Titel – das brach
  * still, sobald eine Meldung anders formuliert wurde.
  */
-export function collectIssues(state, monthData) {
+export function collectIssues(state, monthData, { evaluate = null } = {}) {
+  // Die Oberfläche bewertet dieselben belegten Zellen bereits beim Aufbau der
+  // Tabelle. Über `evaluate` teilen sich beide Wege einen Zwischenspeicher,
+  // statt jede Zelle ein zweites Mal durch das Regelwerk zu schicken.
+  const evaluateCandidateCached = evaluate || (parameters => evaluateCandidate(parameters));
   const issues = [];
   for (const [iso, day] of Object.entries(monthData.days || {})) {
     if (!day.hg) issues.push({ kind: 'open', level: 'yellow', title: `${fmtGermanDate(iso)}: HG offen`, details: 'Kein HG eingetragen.' });
@@ -42,7 +46,7 @@ export function collectIssues(state, monthData) {
         });
         continue;
       }
-      const evaluation = evaluateCandidate({ state, monthData, dateIso: iso, role, staffId });
+      const evaluation = evaluateCandidateCached({ state, monthData, dateIso: iso, role, staffId });
       if (evaluation.level === 'gray') {
         issues.push({
           level: 'red',

@@ -1,5 +1,5 @@
 import { ABSENCE_TYPES, MONTH_NAMES, OPTION_TYPES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, normalizeBackupPayload, toIsoDate } from './defaults.js?v=20260801.11';
-import { state, bootstrapState, buildBackupPayload, getMonthData, getMonthLabel, isMonthDirty, isMonthMergeSafe, loadMonth, markBootstrapDirty, markBootstrapSynced, markMonthDirty, markMonthSynced, persistDirtyState, persistMonth, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260801.11';
+import { state, bootstrapState, buildBackupPayload, flushLocalMonthWrites, getMonthData, getMonthLabel, isMonthDirty, isMonthMergeSafe, loadMonth, markBootstrapDirty, markBootstrapSynced, markMonthDirty, markMonthSynced, persistDirtyState, persistMonth, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260801.11';
 import { api } from './api.js?v=20260801.11';
 import { applyMonthTheme, prefersReducedMotion, resolveThemeYear } from './theme.js?v=20260801.11';
 import { applySpectrumProfile } from './color-director.js?v=20260801.11';
@@ -65,7 +65,12 @@ function monthOrdinal(year, month) {
 }
 
 window.addEventListener('DOMContentLoaded', init);
-window.addEventListener('beforeunload', () => { if (state.dirty) persistDirtyState(); });
+window.addEventListener('beforeunload', () => {
+  // Die gebündelte lokale Sicherung muss vor dem Verlassen der Seite auf die
+  // Platte, sonst ginge die jüngste Änderung ohne Serververbindung verloren.
+  flushLocalMonthWrites();
+  if (state.dirty) persistDirtyState();
+});
 
 /**
  * Auslieferungsstempel aus dem Kopf der Seite in den DOM und die Konsole
@@ -278,19 +283,69 @@ async function onClearMonth() {
   render();
 }
 
+/**
+ * Bewertungen eines Renderlaufs.
+ *
+ * Tabelle und Sammelprüfung bewerten dieselben belegten Zellen. Gemessen kostete
+ * das doppelte Durchlaufen des Regelwerks rund 13 ms je Monat – genug, um beim
+ * Monatswechsel einen sichtbaren Ruckler zu erzeugen.
+ */
+let evaluationCache = new Map();
+
+function evaluateCached(parameters) {
+  const key = `${parameters.dateIso}|${parameters.role}|${parameters.staffId}`;
+  if (!evaluationCache.has(key)) evaluationCache.set(key, evaluateCandidate(parameters));
+  return evaluationCache.get(key);
+}
+
+let issueRenderHandle = null;
+let renderGeneration = 0;
+
+/**
+ * Zeichnet den Monat.
+ *
+ * Tabelle, Titel und Statistik entstehen sofort – sie tragen die Bewegung des
+ * Monatswechsels. Die Sammelprüfung ist die teuerste Einzelarbeit (rund 18 ms)
+ * und für den ersten sichtbaren Frame ohne Belang; sie läuft deshalb erst,
+ * wenn der Hauptthread wieder frei ist.
+ */
 function render() {
   // Sicherheitsnetz: Palette bleibt garantiert mit dem gerenderten Monat synchron.
   applyMonthTheme(state.currentMonth);
   const monthData = getMonthData(state.currentYear, state.currentMonth);
+  evaluationCache = new Map();
+  const generation = ++renderGeneration;
   $('#monthTitle').textContent = getMonthLabel();
   renderPlanTable(monthData);
   renderStats(monthData);
-  renderIssues(monthData);
+  scheduleIssueRender(monthData, generation);
 }
 
+function scheduleIssueRender(monthData, generation) {
+  if (issueRenderHandle !== null) {
+    if (typeof cancelIdleCallback === 'function') cancelIdleCallback(issueRenderHandle);
+    else clearTimeout(issueRenderHandle);
+  }
+  const run = () => {
+    issueRenderHandle = null;
+    if (generation !== renderGeneration) return;
+    renderIssues(monthData);
+  };
+  issueRenderHandle = typeof requestIdleCallback === 'function'
+    ? requestIdleCallback(run, { timeout: 400 })
+    : setTimeout(run, 0);
+}
+
+/**
+ * Baut die Tabelle in einem Fragment und hängt sie in einem Zug ein.
+ *
+ * Einzeln eingehängte Zeilen lassen den Browser den Tabellenfluss 31-mal neu
+ * bestimmen – mitten in der Wechselanimation. Ein Fragment kostet genau eine
+ * Einfügung.
+ */
 function renderPlanTable(monthData) {
   const tbody = $('#planTableBody');
-  tbody.innerHTML = '';
+  const fragment = document.createDocumentFragment();
   let rowIndex = 0;
   for (const [iso, day] of Object.entries(monthData.days)) {
     const tr = document.createElement('tr');
@@ -328,9 +383,10 @@ function renderPlanTable(monthData) {
     syncSecondRbnControl(iso, firstRbn.select, secondRbn);
     tr.children[6].appendChild(buildAbsenceSummary(iso, monthData));
     tr.children[7].appendChild(buildPreferenceSummary(iso, monthData));
-    tbody.appendChild(tr);
+    fragment.appendChild(tr);
     rowIndex += 1;
   }
+  tbody.replaceChildren(fragment);
 }
 
 function weekdayLabelLong(shortLabel) {
@@ -346,7 +402,7 @@ function buildAssignmentButton(dateIso, role, staffId, monthData) {
   // schmal, der volle Name steht weiterhin im Tooltip und in der Statistik.
   // Namen aus Altimporten ohne bekannte Person bleiben als Text erhalten.
   const name = staffId ? assignmentLabel(state.staff, staffId, { short: true }) : '—';
-  const evaluation = (staffId && person) ? evaluateCandidate({ state, monthData, dateIso, role, staffId }) : { level: 'green', reasons: [] };
+  const evaluation = (staffId && person) ? evaluateCached({ state, monthData, dateIso, role, staffId }) : { level: 'green', reasons: [] };
   const badgeMarkup = staffId
     ? ''
     : '<span class="assignment-badges"><span class="small-chip">offen</span></span>';
@@ -585,7 +641,7 @@ function renderIssues(monthData) {
   const summary = $('#issueSummary');
   if (!container) return;
 
-  const issues = collectIssues(state, monthData);
+  const issues = collectIssues(state, monthData, { evaluate: evaluateCached });
   const offen = issues.filter(issue => issue.kind === 'open').length;
   const auffaellig = issues.length - offen;
 
