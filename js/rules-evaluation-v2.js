@@ -3,57 +3,68 @@ import { addDays, getAssignment, parseIso, toLocalIso } from './rules-core.js?v=
 
 export * from './rules-evaluation.js?v=20260801.11';
 
-const WEEKDAY_HG_BEFORE_BD = 'HG am Werktag vor eigenem BD';
+const REASON = 'HG am Werktag vor eigenem BD';
+const LEGACY_REASONS = new Set([
+  'Eigener HG am Vortag vor BD',
+  'HG am Tag vor eigenem BD',
+  `${REASON}: nicht zulässige werktägliche Dienstfolge.`
+]);
 
 function weekdayHgBeforeBdConflict({ state, dateIso, role, staffId }) {
   const date = parseIso(dateIso);
   if (role === 'hg') {
     const weekday = date.getDay();
     if (weekday < 1 || weekday > 4) return false;
-    const nextIso = toLocalIso(addDays(date, 1));
-    return getAssignment(state, nextIso, 'bd') === staffId;
+    return getAssignment(state, toLocalIso(addDays(date, 1)), 'bd') === staffId;
   }
   if (role === 'bd') {
     const previous = addDays(date, -1);
     const previousWeekday = previous.getDay();
     if (previousWeekday < 1 || previousWeekday > 4) return false;
-    const previousIso = toLocalIso(previous);
-    return getAssignment(state, previousIso, 'hg') === staffId;
+    return getAssignment(state, toLocalIso(previous), 'hg') === staffId;
   }
   return false;
 }
 
 function withWeekdayHgBeforeBdConflict(evaluation) {
-  const reason = `${WEEKDAY_HG_BEFORE_BD}: nicht zulässige werktägliche Dienstfolge.`;
-  const existing = Array.isArray(evaluation?.reasonDetails) ? evaluation.reasonDetails : [];
-  const reasonDetails = existing.some(item => item?.text === reason)
-    ? existing
-    : [{ level: 'red', kind: 'conflict', text: reason }, ...existing];
-  const reasons = reasonDetails.map(item => item.text).filter(Boolean);
+  if (!evaluation || evaluation.level === 'gray' || evaluation.canSelect === false) return evaluation;
+  const reasonDetails = (Array.isArray(evaluation.reasonDetails) ? evaluation.reasonDetails : [])
+    .filter(item => !LEGACY_REASONS.has(item?.text));
+  reasonDetails.unshift({
+    text: `${REASON}: rote werktägliche Dienstfolge`,
+    kind: 'conflict',
+    level: 'red',
+    lane: null,
+    selection: 'standard'
+  });
+  const priorType = evaluation.meta?.confirmationType;
   return {
     ...evaluation,
     level: 'red',
     canSelect: true,
-    reasons,
+    reasons: reasonDetails.map(item => item.text).filter(Boolean),
     reasonDetails,
     meta: {
-      ...(evaluation?.meta || {}),
-      confirmationType: evaluation?.meta?.confirmationType || 'standard',
+      ...(evaluation.meta || {}),
+      confirmationType: priorType === 'special' ? 'special' : 'standard',
+      selectionPolicy: priorType === 'special' ? 'special' : 'standard',
       weekdayHgBeforeBd: true
     }
   };
 }
 
 /**
- * Zentrale Erweiterung der bestehenden Eignungsprüfung.
+ * Montag bis Donnerstag ist ein eigener HG unmittelbar vor einem eigenen BD
+ * am Folgetag rot. Die Prüfung erfolgt symmetrisch bei Auswahl des HG und des
+ * BD, damit die Farbe nicht von der Eingabereihenfolge abhängt.
  *
- * Montag bis Donnerstag ist ein eigener HG am unmittelbar vorangehenden Tag
- * eines eigenen BD rot. Die Bewertung ist symmetrisch und daher unabhängig von
- * der Eingabereihenfolge. Freitag-HG vor Samstags-BD bleibt von dieser Regel
- * ausgenommen, damit die definierte Wochenendkopplung erhalten bleibt.
+ * Freitag-HG vor Samstags-BD bleibt ausgenommen; hierfür gelten die definierten
+ * Wochenendkopplungen. Bereits nicht wählbare oder graue Bewertungen werden
+ * niemals durch diese Policy wieder freigeschaltet.
  */
 export function evaluateCandidate(parameters) {
   const evaluation = evaluateCandidateBase(parameters);
-  if (!weekdayHgBeforeBdConflict(parameters)) return evaluation;
-  return withWeekdayHgBeforeBdConflict(evaluation);
+  return weekdayHgBeforeBdConflict(parameters)
+    ? withWeekdayHgBeforeBdConflict(evaluation)
+    : evaluation;
 }
