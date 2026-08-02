@@ -7,8 +7,8 @@
 <p align="center"><strong>Regelgestützte Monatsplanung für Bereitschaftsdienst, Hintergrunddienst und neuroradiologische Rufbereitschaft</strong></p>
 
 > **Paketversion:** `0.3.0`  
-> **Regelwerk:** Eignungsregeln `v4.7` mit gestuftem Override-, Prioritäts- und Auto-Plan-Modell  
-> **Auto-Plan:** globale, deterministische BD/HG-Optimierung mit verpflichtender Vorschau und Bestätigung  
+> **Regelwerk:** Eignungsregeln `v4.8` mit gestuftem Override-, Prioritäts- und Auto-Plan-Modell  
+> **Auto-Plan:** deterministische BD/HG-Optimierung mit vertiefter Null-Rot-Suche, bestätigungspflichtigem Minimal-Rot-Fallback und vollständiger Vorschau  
 > **Farbarchitektur:** Trend Atlas v3 mit 288 deterministischen Monatsprofilen  
 > **Feiertagsregion:** Sachsen (`SN`)  
 > **Betrieb:** Cloudflare Pages · Pages Functions · Cloudflare KV · lokale Browser-Sicherung
@@ -30,7 +30,7 @@ DienstplanRAD unterstützt sowohl die bewusste manuelle Einzelplanung als auch e
 
 ### Auto-Plan
 
-Der Button **Auto-Plan** verteilt ausschließlich noch leere BD- und HG-Felder des sichtbaren Monats. Der Algorithmus schreibt während der Berechnung nichts in den Plan. Nach dem Lauf erscheint eine vollständige Vorschau; erst **Vorschläge übernehmen** führt die atomare Änderung aus.
+Der Button **Auto-Plan** verteilt ausschließlich noch leere BD- und HG-Felder des sichtbaren Monats. Der Algorithmus schreibt während der Berechnung nichts in den Plan. Nach dem Lauf erscheint eine vollständig scrollbar prüfbare Vorschau; erst **Vorschläge übernehmen** führt die atomare Änderung aus.
 
 Unverändert bleiben:
 
@@ -38,9 +38,9 @@ Unverändert bleiben:
 - RBN und zweite RBN;
 - Abwesenheiten, Wünsche und Optionen;
 - Notizen;
-- Override- und Importprotokolle.
+- bestehende Override- und Importprotokolle.
 
-Kann kein vollständiger Plan ohne rote Regelverletzung erzeugt werden, wird die Übernahme technisch nicht freigegeben.
+Der Auto-Plan versucht zuerst eine vollständige Variante ohne rote Regelverletzung. Ist diese auch nach einer vertieften Suche nicht erreichbar, kann eine vollständige **Minimal-Rot-Variante** vorgeschlagen werden. Sie bleibt gesperrt, bis sämtliche roten Zuteilungen und Gründe sichtbar geprüft und ausdrücklich bestätigt wurden. Graue beziehungsweise technisch nicht wählbare Sperren werden niemals verwendet.
 
 ---
 
@@ -50,49 +50,66 @@ Kann kein vollständiger Plan ohne rote Regelverletzung erzeugt werden, wird die
 
 Der Auto-Planer besitzt keine parallele oder vereinfachte Regelkopie. Für jede hypothetische Einteilung wird die bestehende Funktion `evaluateCandidate()` auf dem jeweiligen simulierten Monatszustand ausgeführt.
 
-Automatisch ausgeschlossen werden:
+**In allen Suchstufen absolut ausgeschlossen** sind:
 
-- sämtliche grauen, fachlich nicht wählbaren Kandidaten;
-- sämtliche roten Kandidaten, auch wenn eine manuelle Bestätigung grundsätzlich möglich wäre;
+- sämtliche grauen oder technisch nicht wählbaren Kandidaten;
 - fehlende Qualifikation;
 - nicht aktive oder nicht planbare Personen;
 - gleichzeitiger BD und HG derselben Person;
 - unmittelbar aufeinanderfolgende eigene BD;
-- Abwesenheiten und Polednia-Sperren;
-- harte BD-Maxima;
-- widersprüchliche Kopplungen;
-- sonstige rote Planabweichungen.
+- unbekannte oder strukturell ungültige Personalwerte.
 
-Der Auto-Planer erzeugt daher **keine automatischen Overrides** und keine stillen Ausnahmen.
+**Nur im gesonderten Minimal-Rot-Fallback zulässig** sind technisch wählbare rote Kandidaten, beispielsweise:
+
+- Abwesenheiten und Polednia-Sperren mit besonderer Bestätigung;
+- harte BD-Maxima mit besonderer Bestätigung;
+- organisatorisch bestätigbare Kopplungs- oder Verteilungsabweichungen;
+- sonstige rote, aber ausdrücklich überschreibbare Planabweichungen.
+
+Der Auto-Plan erzeugt keine stillen Ausnahmen. Bei bestätigter Minimal-Rot-Übernahme wird jede rote Zelle einzeln im Override-Protokoll mit Zeitstempel, Gründen, Bestätigungstyp, Quelle und optionalem Kommentar dokumentiert.
 
 ### 2.2 Globale Suche statt Tages-Greedy
 
 Die Planung erfolgt als deterministische mehrstufige **Beam Search**:
 
 1. Schutz und Analyse aller bestehenden Fixpunkte;
-2. globale Verteilung der offenen BD;
-3. globale Verteilung der offenen HG auf dem bereits simulierten BD-Plan;
-4. Fairness-Politur der überlebenden Gesamtvarianten;
-5. vollständiger Schlussaudit aller vorgeschlagenen Einteilungen.
+2. reguläre globale Null-Rot-Suche;
+3. bei Bedarf vertiefte Null-Rot-Suche mit verbreitertem Suchstrahl;
+4. nur bei erneutem Scheitern globale Minimal-Rot-Suche;
+5. je Suchlauf globale Verteilung der offenen BD;
+6. anschließende globale Verteilung der offenen HG auf dem simulierten BD-Plan;
+7. Fairness-Politur der überlebenden Gesamtvarianten;
+8. vollständiger Schlussaudit aller vorgeschlagenen Einteilungen.
 
-Je Dienstfeld werden mehrere regelkonforme Kandidaten weiterverfolgt. Dadurch kann eine lokal attraktive Auswahl verworfen werden, wenn sie spätere Kopplungen, Wochenenden oder den Monatsausgleich verschlechtert. Die Suche hält parallel mehrere globale Planvarianten offen und reduziert sie nach jedem Schritt auf die fachlich besten, voneinander verschiedenen Zustände.
+Dienstfelder mit kleiner Kandidatendomäne und kritischen Wochenendkopplungen werden zuerst bearbeitet. Je Dienstfeld werden mehrere Kandidatenvarianten weiterverfolgt. Dadurch kann eine lokal attraktive Auswahl verworfen werden, wenn sie spätere Kopplungen, Wochenenden oder den Monatsausgleich verschlechtert. Die Suche hält parallel mehrere globale Planvarianten offen und reduziert sie nach jedem Schritt auf die fachlich besten, voneinander verschiedenen Zustände.
 
 ### 2.3 Lexikografische Optimierung
 
-Die Zielordnung ist bewusst nicht als intransparente freie Punktsumme implementiert. Sie folgt einer festen lexikografischen Hierarchie:
+Die Zielordnung ist bewusst nicht als intransparente freie Punktsumme implementiert.
 
-1. keine roten oder grauen Vorschläge;
+**Null-Rot-Suche:**
+
+1. keine grauen Vorschläge;
 2. vollständige Besetzung aller offenen Felder;
-3. möglichst wenige orange, danach gelbe Konstellationen;
-4. deterministische Kopplungen;
-5. positive Dienstwünsche;
-6. Optionen `BD möglich` beziehungsweise `HG möglich`;
-7. BD-Sollausgleich;
-8. kombinierter BD/HG-Ausgleich;
-9. sekundärer AA-HG-Ausgleich;
-10. Wochenend- und Samstagsrotation;
-11. sonstige positive Empfehlungen;
-12. deterministische stabile Tie-Breaks.
+3. keine roten Vorschläge;
+4. möglichst wenige orange, danach gelbe Konstellationen;
+5. deterministische Kopplungen;
+6. positive Dienstwünsche;
+7. Optionen `BD möglich` beziehungsweise `HG möglich`;
+8. BD-Sollausgleich;
+9. kombinierter BD/HG-Ausgleich;
+10. sekundärer AA-HG-Ausgleich;
+11. Wochenend- und Samstagsrotation;
+12. sonstige positive Empfehlungen;
+13. deterministische stabile Tie-Breaks.
+
+**Minimal-Rot-Fallback:**
+
+1. keine grauen Vorschläge;
+2. vollständige Besetzung aller offenen Felder;
+3. minimale Zahl roter Zuteilungen;
+4. bei Gleichstand minimale Zahl besonders bestätigungspflichtiger roter Zuteilungen;
+5. anschließend dieselbe Qualitäts-, Wunsch- und Fairnesskaskade wie oben.
 
 Ein höherrangiges Signal kann nicht durch eine beliebige Summe niedrigerer Signale verdrängt werden.
 
@@ -103,7 +120,7 @@ Die globale Bewertung berücksichtigt:
 - individuellen BD-Richtwert und Überhänge;
 - definierte abweichende Sollwerte;
 - harte BD-Maxima;
-- kombinierte Monatslast `BD + HG` der Facharztgruppe;
+- kombinierte Monatslast `BD + HG` der HG-berechtigten Facharztgruppe;
 - Zahl belastender HG zu Assistenzarzt-BD;
 - Wochenendäquivalente;
 - Rotation der Samstags-BD;
@@ -111,6 +128,8 @@ Die globale Bewertung berücksichtigt:
 - positive Wünsche und Optionen;
 - Urlaubsverlängerer;
 - bestehende Einteilungen als vorgegebene Last.
+
+Aktivität, HG-Berechtigung, Samstagsberechtigung und Beförderungen werden am konkreten Diensttag ausgewertet. Damit wird etwa El Houba ab dem **22.09.2026** exakt ab diesem Datum als Facharzt mit HG- und Samstagsberechtigung berücksichtigt, nicht pauschal für den gesamten Monat.
 
 Der Jahresverlauf bleibt wie im manuellen Picker ein reiner Kontexthinweis und beeinflusst die automatische Rangfolge nicht.
 
@@ -122,25 +141,34 @@ Die Suchreihenfolge plant zunächst BD und anschließend HG. Dadurch können die
 - Facharzt-BD am Samstag: Sonntag-HG = Samstags-BD;
 - AA-BD am Feiertagsvortag: Vortags-HG = Feiertags-BD.
 
-Der Schlussaudit bewertet anschließend jede vorgeschlagene Zelle erneut im vollständigen Endzustand.
+Der Schlussaudit bewertet anschließend jede vorgeschlagene Zelle erneut im vollständigen Endzustand. Widersprüchliche, aber technisch bestätigbare Kopplungen können ausschließlich als deutlich ausgewiesene Minimal-Rot-Ausnahme erscheinen.
 
 ### 2.6 Atomare Übernahme und Schutz vor veralteten Vorschlägen
 
-Beim Start wird ein Fingerprint aus Monat, Revision, Zeitstempel und sämtlichen BD/HG-Fixpunkten gebildet. Vor der Übernahme wird dieser Fingerprint erneut geprüft.
+Beim Start wird ein deterministischer Planungsfingerprint gebildet. Er umfasst:
+
+- Monat, Schema, Revision und Zeitstempel;
+- sämtliche BD/HG-Fixpunkte;
+- Abwesenheiten, Wünsche und Optionen;
+- die aktuelle Personaldefinition einschließlich Aktivitäts- und Beförderungsdaten;
+- alle geladenen Monatsstände, soweit sie für monatsübergreifende Regeln relevant sein können.
+
+Unmittelbar vor der Übernahme werden Fingerprint, Feldbelegung und sämtliche vorgeschlagenen Zellen erneut vollständig geprüft.
 
 Die Übernahme wird verweigert, wenn:
 
-- der Monat zwischen Berechnung und Bestätigung verändert wurde;
+- Planungsdaten, Personal oder geladene Nachbarmonate zwischen Berechnung und Bestätigung verändert wurden;
 - ein vorgeschlagenes Feld zwischenzeitlich belegt wurde;
-- der Lauf nicht vollständig erfolgreich war;
-- der Schlussaudit rote oder graue Vorschläge enthält;
-- offene Felder verblieben sind.
+- ein Vorschlag doppelt, manipuliert oder strukturell ungültig ist;
+- der erneute Audit eine graue beziehungsweise nicht überschreibbare Besetzung erkennt;
+- offene Felder verblieben sind;
+- rote Zuteilungen vorliegen, ohne dass die Minimal-Rot-Bestätigung erteilt wurde.
 
 Erst danach werden alle Änderungen in einer einzigen lokalen Monatsmutation übernommen und synchronisiert.
 
 ---
 
-## 3. Animierter Optimierungslauf
+## 3. Animierter Optimierungslauf und Prüfoberfläche
 
 Der Auto-Plan-Lauf besitzt eine eigenständige, performante Visualisierung:
 
@@ -148,13 +176,23 @@ Der Auto-Plan-Lauf besitzt eine eigenständige, performante Visualisierung:
 - animierte Verbindungen zwischen bereits bewerteten Dienstfeldern;
 - pulsierender Fortschrittskern;
 - Phasenanzeige für Fixpunkte, BD, HG, Fairness und Audit;
+- sichtbare Suchstufen für reguläre, vertiefte und gegebenenfalls Minimal-Rot-Suche;
 - Live-Anzeige von Kandidatenzahl, Beam-Varianten, Fixpunkten und offenen Feldern;
 - progressive Dienstfeldmatrix;
 - abschließende Ergebnisinszenierung mit Audit-, Fairness-, Wunsch- und Hinweiskarten;
 - vollständige Vorschlagsliste;
-- Vorher-Nachher-Verteilungsbild je Person.
+- Vorher-Nachher-Verteilungsbild je Person;
+- bei Bedarf vollständige Liste jeder roten Zuteilung mit sämtlichen Gründen und Bestätigungstyp.
 
-Die Berechnung gibt zwischen den Dienstfeldern an den Browser zurück. Animation, Eingaben und Abbruch bleiben dadurch responsiv. `prefers-reduced-motion` reduziert bewegte Effekte, ohne Informationen oder Funktionen zu entfernen.
+Die Berechnung gibt zwischen den Dienstfeldern an den Browser zurück. Animation, Eingaben und Abbruch bleiben dadurch responsiv. Die Auto-Plan-Inszenierung läuft regulär mit der vollständigen Animation.
+
+Die Ergebnisansicht verwendet einen echten, höhengebundenen Haupt-Scrollbereich:
+
+- Kopfzeile und untere Aktionsleiste bleiben sichtbar;
+- sämtliche konkreten Zuteilungen sind vollständig erreichbar;
+- die vollständige BD/HG-/Wochenendstatistik bleibt einsehbar;
+- rote Gründe, Kommentarfeld und Bestätigung bleiben auch bei kleinen Fenstern erreichbar;
+- die inneren Listen schneiden keine Einträge mehr ab.
 
 ---
 
@@ -189,7 +227,7 @@ Der Auto-Plan-Button bleibt in der Planungsgruppe. Daten- und Ausgabeaktionen we
 | **Möglich** | keine relevanten Konflikte |
 | **Mit Hinweis** | gelb, weiterhin wählbar |
 | **Nachrangig** | orange, nur bei fehlender besserer Besetzung |
-| **Bestätigung nötig** | roter, manuell überschreibbarer Konflikt |
+| **Bestätigung nötig** | roter, überschreibbarer Konflikt |
 | **Nicht verfügbar** | fachlich oder strukturell nicht überschreibbar |
 
 Die kompakte Kandidatenzeile zeigt Gründe in der Reihenfolge rot, orange, gelb, positive Empfehlung, neutraler Hinweis.
@@ -205,19 +243,21 @@ Die kompakte Kandidatenzeile zeigt Gründe in der Reihenfolge rot, orange, gelb,
 - gleichzeitige Einteilung derselben Person in BD und HG;
 - eigener BD am unmittelbar vorhergehenden oder folgenden Kalendertag.
 
+Diese Fälle bleiben auch im Minimal-Rot-Fallback absolut ausgeschlossen.
+
 ### Besondere rote Bestätigung
 
 - eingetragene oder abgeleitete Abwesenheit;
 - Polednia-Sperre Dienstag oder Sonntag;
 - hartes BD-Monatsmaximum.
 
-Diese manuell möglichen Sonderfälle werden vom Auto-Planer trotzdem nie verwendet.
+Diese Sonderfälle werden in den Null-Rot-Suchen ausgeschlossen. Sie dürfen nur dann in einer vollständigen Minimal-Rot-Variante erscheinen, wenn keine saubere Komplettbelegung gefunden wurde, und benötigen vor der Übernahme eine ausdrückliche besondere Bestätigung.
 
 ### Normale rote Planabweichung
 
-Organisatorisch lösbare rote Konflikte können manuell bestätigt werden. Der Auto-Planer schließt sie vollständig aus.
+Organisatorisch lösbare rote Konflikte können manuell bestätigt werden. Im Auto-Plan bleiben sie in den Null-Rot-Suchen ausgeschlossen und können ausschließlich im deutlich ausgewiesenen Minimal-Rot-Fallback erscheinen.
 
-Bestätigte manuelle Ausnahmen bleiben unter **Offene Punkte** revisionssicher sichtbar.
+Bestätigte manuelle und automatische Ausnahmen bleiben unter **Offene Punkte** revisionssicher sichtbar.
 
 ---
 
@@ -317,9 +357,10 @@ Der vollständige Zustand kann als JSON exportiert und streng validiert importie
 | `js/rules-core.js` | Datum, Personal, Lasten und Zählfunktionen |
 | `js/rules-evaluation.js` | Konflikte, Empfehlungen, Fairness und Kopplungen |
 | `js/rules-reporting.js` | offene Punkte, Ausnahmen und Statistik |
-| `js/auto-planner.js` | globale Beam Search, Schlussaudit, Fingerprint und atomare Übernahme |
-| `js/auto-plan-ui.js` | Auto-Plan-Button, Canvas-Visualisierung, Vorschau und Bestätigung |
-| `auto-plan.css` | spektakuläre, responsive und bewegungsreduzierbare Auto-Plan-Darstellung |
+| `js/auto-planner.js` | Null-Rot-/Minimal-Rot-Beam-Search, Schlussaudit, Planungsfingerprint und atomare Übernahme |
+| `js/auto-plan-ui.js` | Auto-Plan-Button, Canvas-Visualisierung, scrollbare Vorschau und Bestätigung |
+| `auto-plan.css` | animierte Grunddarstellung des Auto-Plan Studios |
+| `auto-plan-review.css` | Minimal-Rot-Prüfung, feste Dialoggeometrie und vollständiger Ergebnis-Scrollbereich |
 | `js/picker-view.js` | Picker-Gruppen und lexikografische Sortierung |
 | `js/rbn.js` | RBN-Pools |
 | `js/holidays.js` | Feiertage Sachsen |
@@ -340,18 +381,25 @@ npm run verify
 Zusätzlich zur bestehenden Regel-, Import-, Speicher-, Farb- und Browserabdeckung prüfen Auto-Plan-Tests:
 
 - vollständige Besetzung aller offenen BD/HG;
-- Null rote beziehungsweise graue Vorschläge;
+- strikte Null-Rot-Priorität;
+- bestätigungspflichtigen Minimal-Rot-Fallback;
+- absolute Sperre grauer oder technisch nicht wählbarer Kandidaten;
 - Unveränderlichkeit des Eingangszustands;
 - Schutz vorhandener Fixpunkte;
 - deterministische Reproduzierbarkeit;
 - Priorisierung positiver Wünsche;
 - vollständige Wochenendkopplung;
+- zeitabhängige Beförderung und Qualifikation;
 - atomare Übernahme;
-- Fingerprint-Schutz gegen zwischenzeitliche Änderungen;
-- Blockierung unlösbarer Monate;
-- animierter Browserlauf;
+- vollständigen Planungsfingerprint einschließlich Personal, Markierungen und geladenen Nachbarmonaten;
+- erneuten vollständigen Audit unmittelbar vor der Übernahme;
+- Erkennung manipulierter Vorschläge;
+- Override-Protokollierung jeder bestätigten roten Zelle;
+- Blockierung selbst im Fallback unlösbarer Monate;
+- animierten Browserlauf;
 - keine Servermutation vor Bestätigung;
-- Speicherung erst nach Klick auf **Vorschläge übernehmen**.
+- Speicherung erst nach Klick auf **Vorschläge übernehmen**;
+- vollständige Scrollbarkeit von Zuteilungen und Statistik bei geringer Fensterhöhe.
 
 ---
 
@@ -376,6 +424,7 @@ Das Repository wird aus `main` über Cloudflare Pages bereitgestellt.
 ├── styles.css
 ├── controls.css
 ├── auto-plan.css
+├── auto-plan-review.css
 ├── manifest.webmanifest
 ├── Eignungsregeln.txt
 ├── icons/
@@ -408,12 +457,16 @@ Das Repository wird aus `main` über Cloudflare Pages bereitgestellt.
 - Auto-Plan verändert ausschließlich leere BD/HG-Felder des sichtbaren Monats.
 - RBN wird niemals automatisch geplant.
 - Kein Vorschlag wird vor ausdrücklicher Bestätigung geschrieben.
-- Auto-Plan verwendet keine roten oder grauen Kandidaten und erzeugt keine Overrides.
-- Ein unvollständiger oder nicht regelkonformer Lauf kann nicht übernommen werden.
+- Eine vollständige Null-Rot-Variante besitzt immer Vorrang.
+- Rote Kandidaten dürfen nur im gesonderten Minimal-Rot-Fallback verwendet werden und benötigen eine ausdrückliche Bestätigung.
+- Graue oder technisch nicht wählbare Kandidaten bleiben in jeder Suchstufe ausgeschlossen.
+- Jede bestätigte rote Auto-Plan-Zelle wird revisionsfest protokolliert.
+- Ein unvollständiger oder technisch nicht wählbarer Lauf kann nicht übernommen werden.
 - Die Regelengine bleibt die einzige fachliche Wahrheitsquelle.
 - Positive Hinweise heben Konflikte nicht auf.
 - Empfehlungen folgen der dokumentierten Kaskade.
 - Relative Fairness wird nicht durch rote Personen verzerrt.
+- Zeitabhängige Aktivität und Qualifikation werden am konkreten Datum ausgewertet.
 - Der Jahresverlauf bleibt reine Information.
 - Sachsen bleibt die fest definierte Feiertagsregion.
 - Monatsfarben bleiben deterministisch und kontrastgeprüft.
