@@ -1,182 +1,218 @@
-Regeln und Kriterien für manuelle Kandidatenempfehlungen und Auto-Plan in DienstplanRAD (v4.8)
+Regeln und Kriterien für manuelle Kandidatenempfehlungen und Auto-Plan in DienstplanRAD (v4.9)
 
 GRUNDPRINZIPIEN & DATENBASIS:
-- DienstplanRAD enthält keinen automatischen Dienstplaner, der ohne ausdrückliche Nutzerbestätigung unmittelbar in den Monatsplan schreibt.
-- Es erfolgt keine automatische Eintragung vor der abschließenden Vorschau und bewussten Bestätigung durch den Benutzer.
-- DienstplanRAD unterstützt manuelle Einzelplanung sowie eine bestätigungspflichtige automatische Komplettierung noch leerer BD- und HG-Felder des aktuell angezeigten Monats.
-- Bereits eingetragene BD und HG bleiben in beiden Modi unveränderliche Fixpunkte.
-- RBN, zweite RBN, Abwesenheiten, Wünsche, Optionen, Notizen sowie bestehende Override- und Importprotokolle werden vom Auto-Planer nicht verändert.
-- Die Feiertagsregion ist fachlich fest auf Sachsen (SN) gesetzt.
+- DienstplanRAD unterstützt manuelle Einzelplanung sowie eine bestätigungspflichtige automatische Komplettierung der noch leeren BD- und HG-Felder des aktuell sichtbaren Monats.
+- Kein automatischer Vorschlag wird vor ausdrücklicher Nutzerentscheidung in den Monatsplan geschrieben.
+- Bereits eingetragene BD und HG sind unveränderliche Fixpunkte. Der Auto-Plan darf sie weder löschen, tauschen noch umbuchen.
+- RBN, zweite RBN, Abwesenheiten, Wünsche, Optionen, Notizen sowie bestehende Override- und Importprotokolle werden nicht verändert.
+- Feiertagsregion ist verbindlich Sachsen (SN).
 - Die Anwendung ist als Einzelbearbeiter-System ausgelegt.
-- Die bestehende Eignungsprüfung ist die einzige fachliche Wahrheitsquelle für manuelle und automatische Planung.
-- Bewertungen verändern den Zustand nicht. Der Auto-Plan arbeitet bis zur ausdrücklichen Bestätigung ausschließlich auf geklonten Simulationsständen.
+- Die zentrale Funktion evaluateCandidate ist die fachliche Wahrheitsquelle für manuellen Picker, Auto-Plan, Schlussaudit und offene Punkte.
+- Sämtliche Such-, Tausch- und Reparaturschritte arbeiten bis zur bestätigten Übernahme ausschließlich auf geklonten Simulationsständen.
+- Aktivität, Qualifikation, Beförderung und Samstagsberechtigung werden am konkreten Diensttag bewertet.
 
-BESETZUNG, PERSONALDATEN & QUALIFIKATION:
+BESETZUNG, PERSONAL UND QUALIFIKATION:
 - Pro Kalendertag existiert genau ein BD- und genau ein HG-Feld.
-- Samstags-BD dürfen nur von am Diensttag qualifizierten Fachärzten geleistet werden.
-- HG dürfen nur von am Diensttag qualifizierten Fachärzten geleistet werden.
-- Assistenzärzte dürfen BD montags bis freitags sowie sonntags übernehmen, jedoch keinen Samstags-BD und keinen HG.
+- Samstags-BD dürfen nur von am konkreten Tag qualifizierten Fachärzten übernommen werden.
+- HG dürfen nur von am konkreten Tag qualifizierten Fachärzten übernommen werden.
+- Assistenzärzte dürfen BD montags bis freitags sowie sonntags übernehmen, keinen Samstags-BD, keinen HG.
 - Dieselbe Person darf am selben Tag nicht gleichzeitig BD und HG übernehmen.
-- Personal-IDs müssen eindeutig und strukturell gültig sein.
-- Unbekannte Altwerte bleiben als externe Einteilungen lesbar, werden jedoch nie automatisch als Personal interpretiert.
-- Die historische Kernreihenfolge bleibt stabil; zusätzliche valide Personen werden danach einsortiert.
-- Aktivität, Qualifikation, Beförderungen und Samstagsberechtigung werden am konkreten Diensttag bewertet, nicht pauschal an einem Monatsstichtag.
+- Nicht aktive, nicht planbare oder unbekannte Personen werden nicht automatisch zugeteilt.
+- Unbekannte Importwerte bleiben als externe Fixpunkte lesbar, werden jedoch nicht als Personal-ID interpretiert.
+- Die historische Personalreihenfolge bleibt stabil; zusätzliche valide Personen werden danach einsortiert.
 
 KONFLIKT- UND BESTÄTIGUNGSMODELL:
 - Nicht überschreibbar sind fehlende Qualifikation, nicht aktive oder nicht planbare Person, gleichzeitiger BD/HG derselben Person sowie unmittelbar aufeinanderfolgende eigene BD.
-- Nicht überschreibbare Bewertungen bleiben grau beziehungsweise technisch nicht wählbar und werden in keinem Auto-Plan-Suchlauf zugelassen.
-- Mit besonderer Bestätigung überschreibbar sind Abwesenheit, Polednia-Sperre und ausdrücklich hinterlegtes hartes BD-Monatsmaximum.
+- Nicht überschreibbare Bewertungen bleiben grau beziehungsweise technisch nicht wählbar und werden in keiner Such- oder Reparaturphase zugelassen.
+- Mit besonderer Bestätigung überschreibbar sind Abwesenheit, Polednia-Sperre und ein hinterlegtes hartes BD-Monatsmaximum.
 - Organisatorisch lösbare rote Planabweichungen bleiben nach gewöhnlicher Bestätigung wählbar.
-- Die reguläre Null-Rot-Suche des Auto-Planers schließt sämtliche roten und grauen Kandidaten aus.
-- Nur wenn auch eine vertiefte Null-Rot-Suche keine vollständige Belegung findet, startet ein gesonderter Minimal-Rot-Fallback.
-- Der Minimal-Rot-Fallback darf ausschließlich technisch wählbare rote Kandidaten verwenden; graue oder nicht wählbare Kandidaten bleiben absolut ausgeschlossen.
-- Eine Minimal-Rot-Variante wird niemals still übernommen. Sämtliche roten Zuteilungen, Bestätigungstypen und Gründe werden vollständig angezeigt und müssen gemeinsam ausdrücklich bestätigt werden.
-- Bei bestätigter Übernahme erzeugt der Auto-Plan für jede rote Zelle einen eigenen revisionsfesten Override-Eintrag einschließlich Zeitstempel, Gründen, Bestätigungstyp, Quelle und optionalem Kommentar.
-- Fr. Hellmann besitzt ein BD-Soll und BD-Maximum von zwei; ein dritter BD ist nur mit besonderer Bestätigung möglich.
-- Bestätigte manuelle und automatische Ausnahmen bleiben in den offenen Punkten eindeutig dokumentiert.
+- Die Null-Rot-Suche schließt alle roten und grauen Kandidaten aus.
+- Erst wenn reguläre und vertiefte Null-Rot-Suche keine vollständige Belegung finden, darf ein gesonderter Minimal-Rot-Fallback starten.
+- Der Minimal-Rot-Fallback darf ausschließlich technisch wählbare rote Kandidaten verwenden. Graue Sperren bleiben absolut.
+- Eine Minimal-Rot-Variante wird nie still übernommen. Jede rote Zelle wird mit Datum, Rolle, Person, Bestätigungstyp und vollständigen Gründen angezeigt.
+- Jede rote Zelle muss einzeln als geprüft markiert werden. Besondere rote Ausnahmen benötigen zusätzlich einen begründenden Kommentar.
+- Bei bestätigter Übernahme erhält jede rote Zelle einen eigenen Override-Eintrag mit Zeitstempel, Gründen, Quelle, Bestätigungstyp und Kommentar.
+- Bestätigte manuelle und automatische rote Ausnahmen bleiben unter „Offene Punkte“ sichtbar.
 
 BEGRÜNDUNGSREIHENFOLGE:
-- Rote Konflikte stehen vor orangefarbenen, orangefarbene vor gelben, Konflikte vor positiven Empfehlungen, Empfehlungen vor neutralen Hinweisen.
-- Positive Wünsche oder Optionen können Konflikte weder verdecken noch abwerten.
-- Alle Gründe bleiben vollständig sichtbar.
+- Rote Konflikte stehen vor orangefarbenen, orangefarbene vor gelben.
+- Konflikte stehen vor positiven Empfehlungen, Empfehlungen vor neutralen Hinweisen.
+- Wünsche und Optionen können Konflikte weder verdecken noch abwerten.
+- Alle ausgelösten Gründe bleiben vollständig sichtbar.
 
 FACHLICHE EMPFEHLUNGSPRIORITÄT:
-- Empfehlungen werden nicht als frei addierte Gesamtsumme gegeneinander aufgerechnet.
-- Die lexikografische Reihenfolge lautet: deterministische Kopplung, positiver Dienstwunsch, Option BD/HG möglich, Monats- und Lastenausgleich, Wochenendausgleich, sonstige Empfehlung.
+- Empfehlungen werden lexikografisch, nicht als frei gewichtete Gesamtsumme bewertet.
+- Grundreihenfolge: deterministische Kopplung, positiver Dienstwunsch, Option BD/HG möglich, Monats- und Lastenausgleich, Wochenendausgleich, sonstige Empfehlung.
 - Ein höherrangiges Signal bleibt vor beliebig vielen niedrigeren Signalen.
 - Erst innerhalb derselben Kategorie entscheidet die Signalstärke.
 
+AUTO-PLAN-STUDIO – PARAMETER VOR DEM START:
+- Das Auto-Plan Studio startet nicht unmittelbar nach dem Öffnen. Zuerst erscheint eine Parameter- und Grenzprüfung.
+- Pro aktivem Mitarbeitenden können harte Obergrenzen für BD, HG und Gesamtzahl BD+HG festgelegt werden.
+- Eine leere HG- oder Gesamtgrenze bedeutet keine zusätzliche Laufgrenze; bestehende fachliche Regeln bleiben unberührt.
+- Hinterlegte Personalmaxima, insbesondere das BD-Maximum von Fr. Hellmann, bleiben unabhängig von der Studioeingabe wirksam.
+- Eine Nutzervorgabe darf nicht unter bereits vorhandenen Fixpunkten liegen. In diesem Fall bleibt der Start gesperrt und die betroffene Person wird konkret benannt.
+- Eine individuelle BD- oder HG-Grenze darf eine zusätzlich gesetzte Gesamtgrenze nicht überschreiten.
+- Der Benutzer kann die Suchintensität Standard, Tief oder Maximum wählen.
+- Der Benutzer kann den Schwerpunkt Ausgewogen, Wünsche, Lastenausgleich oder Wochenenden wählen.
+- Der Benutzer kann die Zahl iterativer Reparaturrunden und das Budget der lokalen Teil-Neuplanung festlegen.
+- Der Benutzer kann den Minimal-Rot-Fallback deaktivieren oder eine maximale Zahl roter Vorschläge vorgeben.
+- Harte Obergrenzen und die maximale Rotzahl werden vor weichen Qualitätszielen behandelt.
+- Laufparameter werden normalisiert, validiert, in der Vorschau ausgewiesen und durch Fingerprints gegen nachträgliche Manipulation geschützt.
+
 AUTO-PLAN – SCOPE UND SCHREIBSCHUTZ:
 - Auto-Plan berücksichtigt ausschließlich leere BD- und HG-Felder des aktuell sichtbaren Monats.
-- Vorhandene Einteilungen werden niemals umgebucht, getauscht oder gelöscht.
-- Die Berechnung verändert weder den sichtbaren Plan noch den lokalen oder zentralen Speicher.
-- Nach dem Lauf erscheint eine vollständige Vorschau mit allen Zuteilungen, Belastungsverteilung, Auditkennzahlen und gegebenenfalls sämtlichen roten Regelgründen.
-- Der Ergebnisbereich ist unabhängig von Fensterhöhe und Bildschirmgröße scrollbar; Kopf und Bestätigungsleiste bleiben erreichbar.
-- Erst der Klick auf „Vorschläge übernehmen“ schreibt alle Änderungen atomar in den Monatsplan.
-- Bei einer Minimal-Rot-Variante bleibt der Übernahmebutton gesperrt, bis die ausdrückliche Bestätigung erfolgt ist.
-- Ein deterministischer Planungsfingerprint umfasst alle planungsrelevanten Felder des Monats, Abwesenheiten, Wünsche, Optionen, Personaldefinitionen sowie geladene Nachbarmonate.
-- Bei veränderten Planungsdaten, verändertem Personal, verändertem geladenem Verlauf, zwischenzeitlich belegtem Feld oder unvollständigem Ergebnis wird die Übernahme verweigert.
+- Vorhandene Einteilungen bleiben Fixpunkte, auch während Tausch- und Reparaturrunden.
+- Die Berechnung verändert weder sichtbaren Monatsplan noch lokalen oder zentralen Speicher.
+- Nach dem Lauf erscheint die vollständige Monatstabelle mit einer Zeile pro Kalendertag, BD und HG nebeneinander.
+- Jede Tageszeile unterscheidet Fixpunkt, Auto-Plan-Vorschlag, Bewertungsstufe und Regelgründe.
+- Die Vorschau enthält zusätzlich Vorher-Nachher-Statistik, Sollausgleich, Wochenendlast, Suchtelemetrie und Tauschdiagnostik.
+- Ergebnis, Tageszeilen, Statistik und rote Prüfobjekte bleiben bei jeder unterstützten Fensterhöhe scrollbar erreichbar.
+- Erst „Vorschläge übernehmen“ schreibt alle Änderungen atomar.
+- Fingerprints umfassen Monatsdaten, Fixpunkte, Abwesenheiten, Wünsche, Optionen, Personaldefinitionen, geladene Nachbarmonate, Laufparameter, iterative Parameter und den konkreten Änderungssatz.
+- Veränderte Daten, Parameter, Personalstände, belegte Felder, manipulierte Vorschläge oder unvollständige Ergebnisse blockieren die Übernahme.
+- Unmittelbar vor dem Schreiben werden sämtliche Zellen, Obergrenzen und roten Bestätigungen erneut geprüft.
 
-AUTO-PLAN – SUCHVERFAHREN:
-- Die automatische Planung erfolgt als deterministische mehrstufige Beam Search, nicht als rein gierige Tagesauswahl.
-- Zunächst werden Fixpunkte analysiert, anschließend sämtliche offenen BD global verteilt, danach sämtliche offenen HG auf dem simulierten BD-Endstand.
-- Je Rolle werden Dienstfelder mit kleiner Kandidatendomäne und kritischen Wochenendkopplungen zuerst bearbeitet.
-- Je Dienstfeld werden mehrere Kandidatenvarianten parallel weitergeführt.
-- Nach jedem Schritt bleiben nur die lexikografisch besten voneinander verschiedenen Gesamtzustände erhalten.
-- Eine lokal attraktive Einteilung kann verworfen werden, wenn sie spätere Kopplungen, Wochenenden, Sollausgleich oder HG-Fairness verschlechtert.
+AUTO-PLAN – DYNAMISCHE CONSTRAINT-SUCHE:
+- Die automatische Planung verwendet eine deterministische mehrstufige Constraint- und Beam-Search, keine rein gierige Tagesauswahl.
+- Offene BD werden vor offenen HG geplant, damit HG auf dem simulierten BD-Endstand bewertet werden kann.
+- Innerhalb einer Rolle wird das jeweils schwierigste Restfeld dynamisch gewählt: kleinste aktuelle Kandidatendomäne zuerst, anschließend kritische Wochenend- und Datumsmerkmale.
+- Die Kandidatendomäne wird nach jeder hypothetischen Zuteilung neu bestimmt.
+- Forward-Checking verwirft Varianten früh, wenn verbleibende Felder keine technisch zulässigen Kandidaten mehr besitzen.
+- Mehrere unterschiedliche Gesamtzustände werden parallel weitergeführt und nach lexikografischer Qualität begrenzt.
+- Eine lokal günstige Auswahl darf verworfen werden, wenn sie spätere Kopplungen, Obergrenzen, Wochenenden oder Lastenausgleich verschlechtert.
+- Bei wenigen verbleibenden Feldern erfolgt eine begrenzte exakte Tiefensuche.
 - Suchstufe 1 ist eine reguläre Null-Rot-Suche.
-- Scheitert diese, folgt eine vertiefte Null-Rot-Suche mit verbreitertem Suchstrahl.
-- Erst danach folgt gegebenenfalls eine verbreiterte Minimal-Rot-Suche mit technisch bestätigbaren roten Kandidaten.
-- Die Berechnung gibt zwischen Dienstfeldern an den Browser zurück, damit Animation und Abbruch responsiv bleiben.
-- Die Ausgabe ist deterministisch: identische Eingaben erzeugen identische Vorschläge.
+- Suchstufe 2 verbreitert Suchstrahl, Kandidatenzahl, Lookahead und exakte Restknotensuche.
+- Suchstufe 3 ist optional der Minimal-Rot-Fallback.
+- Identische Eingaben und Parameter erzeugen determinische Vorschläge.
+
+AUTO-PLAN – ITERATIVE TAUSCH- UND REPARATURPHASE:
+- Nach der ersten vollständigen Belegung wird der Plan iterativ weiter verbessert.
+- Nur vom Algorithmus gesetzte Zellen sind veränderbar. Manuelle Fixpunkte bleiben unverändert.
+- Einzelumbesetzung prüft alternative Personen für eine algorithmisch gesetzte Zelle.
+- Rollengleicher Paar-Tausch vertauscht zwei algorithmisch gesetzte BD beziehungsweise zwei HG.
+- Dreierrotation verschiebt drei rollengleiche Zuteilungen zyklisch und kann lokale Minima überwinden.
+- Tagesbündel-Tausch vertauscht BD und HG zweier vollständig algorithmisch gesetzter Tage gemeinsam.
+- Lokale Ruin-and-Recreate-Reparatur leert einen kleinen konfliktbelasteten Teilbereich und plant ihn mit dynamischer Engpasswahl neu.
+- Jede Nachbarschaft wird im vollständigen Monatszustand durch die zentrale Regelengine auditiert.
+- Eine Änderung wird nur akzeptiert, wenn sie die lexikografische Gesamtqualität strikt verbessert.
+- Die beste bisher gefundene Lösung bleibt jederzeit erhalten; eine Suchbewegung darf das Endergebnis nicht verschlechtern.
+- Eine saubere Null-Rot-Lösung darf in der Reparaturphase keine rote oder graue Zelle neu erzeugen.
+- Eine Minimal-Rot-Lösung darf nur innerhalb des bestätigbaren Modus verbessert werden und muss rote Zahl beziehungsweise nachgelagerte Qualitätsziele verbessern.
+- Die Phase stoppt bei erreichter Rundenzahl oder nach wiederholt stabilen Runden ohne Verbesserung.
+- Angezeigt werden geprüfte Nachbarschaften, Verbesserungen, Paar-/Kettentausche, lokale Neuplanungen und besuchte Teilknoten.
 
 AUTO-PLAN – ZIELORDNUNG:
-- Oberste Priorität bleibt eine vollständige Variante ohne rote oder graue Vorschläge.
-- Innerhalb der Null-Rot-Suche gilt: keine grauen Vorschläge, vollständige Besetzung, möglichst wenige orangefarbene, danach gelbe Konstellationen.
-- Nur im gesonderten Fallback gilt: keine grauen Vorschläge, vollständige Besetzung, minimale Zahl roter Zuteilungen, bei Gleichstand minimale Zahl besonders bestätigungspflichtiger roter Zuteilungen.
-- Danach folgen möglichst wenige orangefarbene und gelbe Konstellationen.
-- Danach folgen Kopplungen, positive Wünsche, Optionen, BD-Sollausgleich, kombinierter BD/HG-Ausgleich, AA-HG-Ausgleich, Wochenend- und Samstagsrotation sowie sonstige Empfehlungen.
-- Der Jahresverlauf bleibt ein neutraler Kontext und wird nicht zur automatischen Entscheidung verwendet.
-- Eine Variante mit grauen oder offenen vorgeschlagenen Feldern wird niemals zur Übernahme freigegeben.
-- Eine vollständige Variante mit roten, aber technisch wählbaren Zuteilungen wird ausschließlich als bestätigungspflichtiger Minimal-Rot-Fallback freigegeben.
+- Oberste Priorität: keine Laufobergrenzenverletzung, keine graue Zelle, vollständige Belegung.
+- Null-Rot-Suche: null rote Zellen vor allen weichen Zielen.
+- Minimal-Rot-Fallback: minimale Zahl roter Zellen, danach minimale Zahl besonders bestätigungspflichtiger roter Zellen.
+- Danach möglichst wenige orangefarbene, anschließend gelbe Konstellationen.
+- Danach folgen entsprechend gewähltem Profil Kopplungen, Wünsche, Optionen, BD-Soll, kombinierte Last, AA-HG-Last, Wochenenden, Samstagsrotation und sonstige Empfehlungen.
+- Jahresverlauf bleibt reine Information und wird nicht als Optimierungsdimension verwendet.
+- Graue, obergrenzenwidrige oder unvollständige Varianten werden nie freigegeben.
 
 AUTO-PLAN – SCHLUSSAUDIT UND ÜBERNAHMEAUDIT:
-- Nach der Suche wird jede vorgeschlagene Zelle erneut im vollständigen Endzustand durch evaluateCandidate geprüft.
-- Eine saubere Variante muss null rote, null graue und null unbesetzte Vorschläge ergeben.
-- Eine Minimal-Rot-Variante muss null graue und null unbesetzte Vorschläge ergeben; jede rote vorgeschlagene Zelle wird als Bestätigungsobjekt ausgegeben.
-- Bestehende manuelle rote Fixpunkte werden nicht verändert; der Audit der Automatik bezieht sich auf die neu vorgeschlagenen Zellen.
-- Unmittelbar vor der Übernahme werden Fingerprint, Feldbelegung und sämtliche vorgeschlagenen Zellen erneut vollständig geprüft.
-- Manipulierte, veraltete, doppelte, fachlich nicht mehr wählbare oder unvollständige Vorschläge werden verworfen.
-- Fehlt selbst unter bestätigbaren roten Ausnahmen eine vollständige technisch wählbare Belegung, bleibt der Plan unverändert und die Oberfläche benennt den Blocker.
+- Jede vorgeschlagene Zelle wird nach Suche und nach iterativer Reparatur erneut im vollständigen Endzustand bewertet.
+- Eine saubere Variante muss null rote, null graue, null unbesetzte und null obergrenzenwidrige Vorschläge besitzen.
+- Eine Minimal-Rot-Variante muss null graue, null unbesetzte und null obergrenzenwidrige Vorschläge besitzen.
+- Bestehende rote Fixpunkte werden nicht verändert; der Auto-Plan-Audit bezieht sich auf neu gesetzte Zellen.
+- Vor der Übernahme werden Fingerprints, eindeutige Zielzellen, Personal-IDs, freie Felder, Laufgrenzen und Regelbewertungen erneut geprüft.
+- Besondere rote Ausnahmen ohne Kommentar werden nicht übernommen.
+- Fehlt selbst mit erlaubtem Minimal-Rot-Fallback eine vollständige technisch wählbare Belegung, bleibt der Monat unverändert.
 
 RUHEZEITEN, FREIZEITAUSGLEICH & DIENSTFOLGEN:
 - Nach gewöhnlichem BD wird kein FZA automatisch eingetragen.
 - Ausschließlich nach Becker-Samstags-BD wird am nächsten regulären Werktag ein wirksames FZA abgeleitet.
-- Das Becker-FZA sperrt BD und HG, entfernt Becker aus Fairnessvergleichen und zählt bei der CT-Leitungsregel als Abwesenheit.
-- Ein eigener BD am unmittelbar vorhergehenden oder folgenden Kalendertag ist nicht überschreibbar rot und bleibt auch im Minimal-Rot-Fallback ausgeschlossen.
-- Abstand von zwei oder drei Kalendertagen erzeugt einen gelben Hinweis.
+- Becker-FZA sperrt BD und HG, entfernt Becker aus Fairnessvergleichen und zählt bei der CT-Leitungsregel als Abwesenheit.
+- Eigene BD an unmittelbar aufeinanderfolgenden Kalendertagen sind nicht überschreibbar und bleiben auch im Minimal-Rot-Fallback ausgeschlossen.
+- BD mit zwei oder drei Kalendertagen Abstand erzeugt einen gelben Hinweis.
 - Werktägliches BD–FZA–BD wird gesondert gelb markiert.
-- HG am Tag vor eigenem BD ist grundsätzlich orange, außer definierter Freitag-/Samstag- beziehungsweise Facharzt-Ausnahme.
-- Erneuter HG innerhalb drei Tagen ist gelb; dritter HG in einer Dreierkette orange.
+- Eigener HG am Montag, Dienstag, Mittwoch oder Donnerstag unmittelbar vor eigenem BD am Folgetag ist rot.
+- Die rote HG-vor-BD-Regel wird symmetrisch geprüft, unabhängig davon, welche der beiden Zellen zuerst eingegeben wird.
+- Freitag-HG vor Samstags-BD bleibt von dieser Werktagsregel ausgenommen; hierfür gelten die definierten Wochenendkopplungen.
+- Eine bereits graue oder nicht wählbare Person wird durch die Zusatzregel niemals wieder freigeschaltet.
+- Erneuter HG innerhalb drei Kalendertagen ist gelb; dritter HG in einer Dreierkette orange.
 
 WOCHENEND- & FEIERTAGSLOGIK:
 - Ein Wochenende umfasst Freitag, Samstag und Sonntag.
 - Mindestens ein BD ergibt 1,0 Wochenendäquivalent; ausschließlich HG ergibt 0,5.
-- Das regelkonforme Standardwochenende Freitag-HG, Samstags-BD und Sonntag-HG derselben Person bleibt insgesamt 1,0.
+- Regelkonformes Standardwochenende Freitag-HG, Samstags-BD und Sonntag-HG derselben Person bleibt insgesamt 1,0.
 - Zusätzliche nicht gekoppelte Mehrfachbelastung wird gesondert gelb markiert.
 - Kandidaten mit geringerer Wochenendlast werden bevorzugt.
 - Überschreitung von 1,0 wird unabhängig von der Verteilungsrunde gelb.
 - Zwei benachbarte BD-Wochenenden sind rot; sonstige benachbarte Dienstwochenenden orange.
-- Die Null-Rot-Suche verwendet keine roten benachbarten BD-Wochenenden; der Minimal-Rot-Fallback darf sie nur als ausgewiesene und ausdrücklich bestätigte Ausnahme verwenden, sofern sie technisch wählbar bleiben.
+- Null-Rot-Suche verwendet keine roten benachbarten BD-Wochenenden. Minimal-Rot darf sie nur als ausgewiesene bestätigbare Ausnahme nutzen.
 - Zweiter Samstags-BD derselben Person im Monat ist orange.
 - Oster- und Pfingstblock alternieren; Dienst in beiden Blöcken ist orange.
 
 MONATSFAIRNESS & VERGLEICHSGRUPPE:
-- Der relative BD-Monatsausgleich beginnt, sobald mindestens eine aktive planbare Person ihr Soll erreicht hat.
+- Relativer BD-Monatsausgleich beginnt, sobald mindestens eine aktive planbare Person ihr Soll erreicht hat.
 - Vorher erzeugt unterschiedlicher Sollrückstand keine relative Nachrangigkeit.
-- Sollrückstand, HG-Last, AA-HG-Last und Wochenendlast werden nur zwischen am konkreten Tag nicht roten Personen verglichen.
-- Orange und gelbe Personen bleiben Bestandteil des Vergleichs.
-- Der bewertete Tag wird aus allen Zählungen ausgeschlossen.
+- Sollrückstand, HG-Last, AA-HG-Last und Wochenendlast werden zwischen am konkreten Tag nicht roten Personen verglichen.
+- Orange und gelbe Personen bleiben Teil der Vergleichsgruppe.
+- Der bewertete Tag wird aus den Vergleichszählungen ausgeschlossen.
 - Größter BD-Rückstand wird bevorzugt; kleinerer Rückstand wird nach Aktivierung gelb.
 - Erreichtes BD-Soll erzeugt einen gelben Richtwerthinweis.
-- Ein hartes Maximum erzeugt einen roten Konflikt mit besonderer Bestätigung. Es bleibt in beiden Null-Rot-Suchen ausgeschlossen und darf nur im ausgewiesenen Minimal-Rot-Fallback nach Bestätigung verwendet werden.
-- Die globale Fairnessgruppe berücksichtigt jede Person an den konkreten Tagen, an denen sie aktiv und für die jeweilige Rolle qualifiziert ist.
+- Hartes Personalmaximum erzeugt einen roten Konflikt mit besonderer Bestätigung. Zusätzlich festgelegte Studio-Obergrenzen sind nicht bestätigbar, sondern harte Laufgrenzen.
+- Die globale Fairnessgruppe berücksichtigt jede Person nur an Tagen, an denen sie aktiv und für die Rolle qualifiziert ist.
 
 HG-AUSGLEICH:
-- Bei HG wird primär die kombinierte Monatslast BD + HG verglichen.
-- Die geringste kombinierte Last wird von Beginn an positiv erklärt.
-- Höhere Last wird erst nach vollständiger erster Verteilungsrunde gelb; zuvor neutral informativ.
+- Bei HG wird primär die kombinierte Monatslast BD+HG verglichen.
+- Geringste kombinierte Last wird von Beginn an positiv erklärt.
+- Höhere Last wird erst nach vollständiger erster Verteilungsrunde gelb, zuvor neutral informativ.
 - Bei HG zu Assistenzarzt-BD wird sekundär die Zahl bisheriger AA-HG ausgeglichen.
-- Im manuellen Picker wird HG-Zahl und kombinierte Last angezeigt.
-- Bei Gleichstand gilt nach Empfehlung: kombinierte Last, AA-HG-Zahl, reine HG-Zahl, stabiler Name.
+- Im manuellen Picker werden HG-Zahl und kombinierte Last angezeigt.
+- Bei Gleichstand gilt nach Empfehlung: kombinierte Last, AA-HG-Zahl, reine HG-Zahl, stabile Personalreihenfolge.
 
 JAHRESVERLAUF:
-- Der Jahresverlauf wird nur bei vollständig geladenen Vormonaten angezeigt.
+- Jahresverlauf wird nur bei vollständig geladenen Vormonaten angezeigt.
 - Er bleibt reine Information ohne Farb-, Empfehlungs- oder Sortierwirkung.
-- Auto-Plan verwendet ihn nicht als Optimierungsdimension.
-- Geladene Nachbarmonate fließen ausschließlich dort ein, wo konkrete Dienstfolgen oder abgeleitete Regeln über Monatsgrenzen hinweg ausgewertet werden, und werden deshalb vom Fingerprint geschützt.
+- Geladene Nachbarmonate fließen nur in konkrete monatsübergreifende Dienstfolgen und abgeleitete Regeln ein.
+- Geladene Nachbarmonate werden deshalb vom Planungsfingerprint geschützt.
 
 ÜBERHANG-PRÄFERENZ:
-- Der erste notwendige BD-Überhang wird nur unter nicht roten, grundsätzlich wählbaren Personen beurteilt.
+- Erster notwendiger BD-Überhang wird nur unter nicht roten, grundsätzlich wählbaren Personen beurteilt.
 - Er greift erst, wenn alle maßgeblichen Personen ihr Soll erreicht haben und niemand bereits darüber liegt.
 - Dr. Lurz wird für den ersten Schritt von Soll auf Soll+1 bevorzugt, solange er nicht bereits über Soll liegt.
-- Positive BD-Wünsche anderer Personen setzen diese Präferenz außer Kraft.
+- Positiver BD-Wunsch einer anderen Person setzt diese Präferenz außer Kraft.
 
 DETERMINISTISCHE KOPPLUNGEN:
 - AA-BD am Freitag: Freitag-HG und Samstags-BD personengleich.
 - Facharzt-BD am Samstag: Sonntag-HG durch dieselbe Person.
 - AA-BD am Feiertagsvortag: Vortags-HG und Feiertags-BD personengleich.
-- Offene Gegenposten erzeugen neutralen Strukturhinweis; widersprüchliche belegte Gegenposten einen roten Konflikt.
-- Manuelle Planung trägt Gegenposten niemals selbst ein.
-- Auto-Plan plant zunächst BD, anschließend HG und kann dadurch alle offenen Gegenposten konsistent vervollständigen.
-- Widersprüchliche, aber technisch bestätigbare Kopplungen bleiben in der Null-Rot-Suche ausgeschlossen und können nur als explizit bestätigte Minimal-Rot-Ausnahme erscheinen.
+- Offene Gegenposten erzeugen neutralen Strukturhinweis; widersprüchliche belegte Gegenposten roten Konflikt.
+- Manuelle Planung trägt Gegenposten nicht automatisch ein.
+- Auto-Plan berücksichtigt Kopplungen im globalen Monatszustand und kann offene Gegenposten konsistent vervollständigen.
 
 PERSONELLE SONDEREINSCHRÄNKUNGEN:
 - Prof. Schäfer ist nicht Bestandteil des aktiven Dienstpools.
-- Dr. Polednia darf dienstags und sonntags weder BD noch HG übernehmen; dies ist eine rote besondere Sperre. Sie bleibt in der Null-Rot-Suche ausgeschlossen und darf nur im Minimal-Rot-Fallback nach ausdrücklicher besonderer Bestätigung verwendet werden.
-- Dr. Becker ist für Samstags-BD orange und nur nachrangig.
+- Dr. Polednia darf dienstags und sonntags weder BD noch HG übernehmen; besondere rote Bestätigung beziehungsweise Minimal-Rot-Prüfung.
+- Dr. Becker ist für Samstags-BD orange nachrangig.
 - Dalitz-HG an Sonntag oder Montag bei Sebastian-BD ist orange.
 - Dr. Becker und Dr. Martin dürfen an regulären Werktagen nicht gleichzeitig mit Urlaub oder FZA abwesend sein.
+- Fr. Hellmann ist ab Oktober 2026 aktiv, maximal zwei BD im Monat.
+- Hr. El Houba wird ab 22.09.2026 am konkreten Diensttag als Facharzt mit HG- und Samstagsberechtigung bewertet.
 
 URLAUBSNÄHE:
-- Donnerstags-BD wird als Urlaubsverlängerer empfohlen, wenn der Montag der folgenden Woche Bestandteil eines zusammenhängenden Urlaubsblocks ist.
+- Donnerstags-BD wird als Urlaubsverlängerer empfohlen, wenn Montag der folgenden Woche zu einem zusammenhängenden Urlaubsblock gehört.
 - Freitags-BD vor diesem Block ist orange.
 - BD unmittelbar vor eingetragenem Urlaub ist orange.
 - Bei Abwesenheit am bewerteten Tag werden keine zusätzlichen Urlaubsnähe-Empfehlungen erzeugt.
-- Eine Einteilung trotz Abwesenheit bleibt rot und besondere bestätigungspflichtig; sie ist ausschließlich im Minimal-Rot-Fallback zulässig.
 
-IMPORT, SICHERUNG & DATENINTEGRITÄT:
-- Einstellungen, Personal, Altwerte und Monatsdaten werden vor Verwendung normalisiert.
+IMPORT, SPEICHERUNG & DATENINTEGRITÄT:
+- Einstellungen, Personal, Monatsdaten und Altwerte werden vor Verwendung normalisiert.
 - Strikte Importe lehnen falsche Typen, ungültige Pflichtfelder, doppelte IDs, ungültige ISO-Daten, negative Kontingente und doppelte Monate ab.
 - Änderungen werden unmittelbar lokal gesichert; ältere Serverantworten dürfen neuere lokale Zustände nicht überschreiben.
-- Auto-Plan übernimmt den Ergebniszustand über denselben lokalen und zentralen Speicherpfad wie manuelle Änderungen.
-- Bestätigte rote Auto-Plan-Ausnahmen werden im bestehenden Override-Protokollformat gespeichert und von der Monatsprüfung als bestätigte rote Ausnahme erkannt.
+- Auto-Plan übernimmt den final auditierten Ergebniszustand über denselben lokalen und zentralen Speicherpfad wie manuelle Änderungen.
+- Rote Auto-Plan-Ausnahmen werden revisionsfest protokolliert.
 
-ERKLÄRBARKEIT, ANIMATION, PRÜFBARKEIT & TESTS:
+ERKLÄRBARKEIT, ANIMATION & TESTS:
 - Jede ausgelöste Regel erscheint als konkreter Klartextgrund.
-- Die Auto-Plan-Animation zeigt Fixpunktanalyse, Null-Rot-Suche, gegebenenfalls vertiefte Suche und Minimal-Rot-Fallback, BD-Suche, HG-Suche, Fairness-Politur und Schlussaudit.
-- Canvas-Visualisierung, Dienstfeldmatrix und Live-Metriken verändern die fachliche Berechnung nicht.
-- Die Auto-Plan-Inszenierung läuft regulär mit der vollständigen Animation.
-- Die Ergebnisansicht besitzt einen echten Haupt-Scrollbereich. Sämtliche Zuteilungen, Laststatistiken, roten Gründe, Kommentarfeld und Bestätigung bleiben auch bei kleinen Viewports erreichbar.
+- Das Studio zeigt vor dem Start die Parameterprüfung, danach Fixpunktanalyse, dynamische Constraint-Suche, Tiefenreparatur, iterative Tausche und Schlussaudit.
+- Canvas-Visualisierung trennt BD- und HG-Knoten, zeigt Phasenwechsel, aktive Dienstfelder, Suchsignale und Fortschritt.
+- Live-Metriken zeigen Varianten, Kandidaten, geprüfte Zustände, verworfene Sackgassen und iterative Verbesserungen.
+- Animation und Telemetrie verändern die fachliche Berechnung nicht.
+- Die Tagesvorschau verwendet eine semantische Tabelle mit sticky Kopfzeile, einer Zeile je Kalendertag, gemeinsamem BD/HG und vollständigen Regelgründen.
 - Permanente CI prüft Syntax, Unit-/Regressionstests und reale Chromium-End-to-End-Tests.
-- Auto-Plan-Tests sichern Vollständigkeit, Null-Rot-Priorität, Minimal-Rot-Fallback, absolute graue Sperren, Fixpunktschutz, Determinismus, Wunschpriorität, Kopplungen, zeitabhängige Beförderung, vollständigen Fingerprint, erneuten Übernahmeaudit, Override-Protokollierung, atomare Bestätigung und Scrollbarkeit der Prüfoberfläche.
+- Auto-Plan-Tests sichern Parametergrenzen, Fixpunktschutz, dynamische Engpasswahl, Forward-Checking, exakte Restknoten, Minimal-Rot-Bestätigung, iterative Tauschreparatur, Manipulationsschutz, Tagesvorschau, Scrollbarkeit und atomare Speicherung.
