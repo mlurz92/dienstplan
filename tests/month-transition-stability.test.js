@@ -22,6 +22,13 @@ test('every synchronization writes the final spectrum without another animation'
   assert.match(stability, /data.*monthTransition|dataset\.monthTransition/);
 });
 
+test('a short paint guard reinforces the final colour after competing callbacks', () => {
+  assert.match(stability, /const PAINT_GUARD_FRAMES = [3-9];/);
+  assert.match(stability, /paintGuardHandle = requestAnimationFrame\(reinforce\)/);
+  assert.match(stability, /writeFinalSpectrum\(\);\s*remaining -= 1;/s);
+  assert.match(stability, /cancelAnimationFrame\(paintGuardHandle\)/);
+});
+
 test('legacy month-enter classes can no longer hide the freshly rendered table', () => {
   const blockStart = controls.indexOf('.month-enter-next');
   const blockEnd = controls.indexOf('body.month-content-transition .month-palette-label', blockStart);
