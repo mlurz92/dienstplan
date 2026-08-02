@@ -9,4 +9,4 @@
 - Vollständiger Planungsfingerprint.
 - Scrollbare Vorschau und Statistik.
 - Beförderungsstichtage in Optimierung und Statistik.
-- Build-Stempel 20260802.1.
+- Einheitlicher Release-Token im vollständigen Modulgraphen beibehalten.
