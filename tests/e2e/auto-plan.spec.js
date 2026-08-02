@@ -163,3 +163,33 @@ test('Minimal-Rot-Fallback bleibt gesperrt, bis alle roten Ausnahmen ausdrückli
   expect(api.getMonth().overrideLog.every(entry => entry.source === 'auto-plan')).toBe(true);
   expect(api.getMonth().overrideLog.every(entry => entry.comment === 'Betrieblich notwendige Komplettbelegung')).toBe(true);
 });
+
+test('Ergebnis, Zuteilungen und Statistik bleiben bei geringer Fensterhöhe vollständig scrollbar', async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 920, height: 520 });
+  await mockApi(page);
+  await openJuly(page);
+
+  await page.locator('#autoPlanBtn').click();
+  const result = page.locator('#autoPlanResult');
+  await expect(result).toBeVisible({ timeout: 60_000 });
+  await expect(page.locator('#autoPlanChangeList .auto-plan-change')).toHaveCount(2);
+  await expect(page.locator('#autoPlanLoadTable .auto-plan-load-row')).toHaveCount(staff.length);
+
+  const scrollState = await result.evaluate(element => ({
+    clientHeight: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+    overflowY: getComputedStyle(element).overflowY
+  }));
+  expect(scrollState.overflowY).toBe('auto');
+  expect(scrollState.scrollHeight).toBeGreaterThan(scrollState.clientHeight);
+
+  await result.evaluate(element => { element.scrollTop = element.scrollHeight; });
+  await expect.poll(() => result.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+  await expect.poll(() => result.evaluate(element =>
+    Math.ceil(element.scrollTop + element.clientHeight) >= element.scrollHeight - 2)).toBe(true);
+
+  await expect(page.locator('#autoPlanConfirmNote')).toBeInViewport();
+  await expect(page.locator('#autoPlanApplyBtn')).toBeVisible();
+  await expect(page.locator('#autoPlanApplyBtn')).toBeEnabled();
+});
