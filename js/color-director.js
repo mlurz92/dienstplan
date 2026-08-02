@@ -9,6 +9,41 @@ export * from './color-atlas-engine.js';
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 
+const SEASON_LABELS = Object.freeze({
+  Winter: 'Winter',
+  'Late winter': 'Spätwinter',
+  'Early spring': 'Vorfrühling',
+  Spring: 'Frühling',
+  'Early summer': 'Frühsommer',
+  'High summer': 'Hochsommer',
+  'Late summer': 'Spätsommer',
+  'Early autumn': 'Frühherbst',
+  Autumn: 'Herbst',
+  'Late autumn': 'Spätherbst'
+});
+
+const FAMILY_LABELS = Object.freeze({
+  'Ice · Polar light': 'Eis · Polarlicht',
+  'Berry · Lacquer': 'Beere · Lack',
+  'Bud green · Botanical': 'Knospe · Botanik',
+  'Bloom · Iris': 'Blüte · Iris',
+  'Leaf green · Citrus': 'Blattgrün · Zitrus',
+  'Water · Coast': 'Wasser · Küste',
+  'Fruit · Solar heat': 'Frucht · Sonnenhitze',
+  'Gold · Harvest': 'Gold · Ernte',
+  'Wine · Plum': 'Wein · Pflaume',
+  'Copper · Earth': 'Kupfer · Erde',
+  'Mineral · Storm': 'Mineral · Sturm',
+  'Evergreen · Festive light': 'Immergrün · Festlicht'
+});
+
+function localizedMetadata(palette) {
+  return {
+    season: SEASON_LABELS[palette.season] || palette.season,
+    family: FAMILY_LABELS[palette.family] || palette.family
+  };
+}
+
 function parseCssColor(value) {
   const match = String(value ?? '').match(/^rgba?\(([^)]+)\)$/i);
   if (!match) return null;
@@ -84,8 +119,9 @@ export function applySpectrumProfile(year, month, { animate = true } = {}) {
 
   const label = document.getElementById('monthPaletteLabel');
   if (label) {
+    const metadata = localizedMetadata(palette);
     const text = `Monatskontrast · ${palette.name}`;
-    const title = `${palette.season} · ${palette.family} · ${palette.tone} · ${palette.mood} · ${palette.year}`;
+    const title = `${metadata.season} · ${metadata.family} · ${palette.tone} · ${palette.mood} · ${palette.year}`;
     if (label.textContent !== text) label.textContent = text;
     if (label.title !== title) label.title = title;
   }
