@@ -16,8 +16,8 @@ import { applySpectrumProfile } from './color-director.js?v=20260801.11';
  * synchronen Schritten kann der Browser keinen Frame zeichnen.
  *
  * Eine kurze Paint-Barriere wiederholt denselben Abschluss über wenige Frames.
- * Damit gewinnt der identische Endzustand auch dann zuverlässig, wenn ein bereits
- * registrierter Observer oder rAF-Callback später im selben Zyklus erneut schreibt.
+ * Die idempotente Monatsschlüssel-Sperre verhindert dabei, dass die vom Modul
+ * selbst gesetzten data-month-/data-year-Attribute den Observer erneut auslösen.
  */
 
 const PAINT_GUARD_FRAMES = 4;
@@ -33,8 +33,15 @@ function selectedDate() {
   return { year, month };
 }
 
+function monthKey({ year, month }) {
+  return `${year}-${String(month).padStart(2, '0')}`;
+}
+
+let lastSettledKey = null;
+
 function writeFinalSpectrum() {
-  const { year, month } = selectedDate();
+  const date = selectedDate();
+  const { year, month } = date;
 
   // Wichtig: Reihenfolge beibehalten. Der atomare Basistheme-Aufruf beendet
   // dessen eventuell laufende rAF-Interpolation; anschließend besitzt das
@@ -42,6 +49,7 @@ function writeFinalSpectrum() {
   applyMonthTheme(month, { animate: false, year });
   const palette = applySpectrumProfile(year, month, { animate: false });
 
+  lastSettledKey = monthKey(date);
   document.documentElement.dataset.monthTransition = 'atomic-spectrum-v1';
   return palette;
 }
@@ -82,10 +90,17 @@ export function settleMonthSpectrum() {
 let synchronizationQueued = false;
 
 function queueSettlement() {
-  if (synchronizationQueued) return;
+  const requestedKey = monthKey(selectedDate());
+
+  // applyMonthTheme schreibt seine Metadaten auch bei identischem Ziel erneut.
+  // Der Observer darf diese selbst verursachte Mutation nicht als neuen Wechsel
+  // interpretieren, sonst entstünde eine endlose Microtask-/rAF-Schleife.
+  if (requestedKey === lastSettledKey || synchronizationQueued) return;
+
   synchronizationQueued = true;
   queueMicrotask(() => {
     synchronizationQueued = false;
+    if (monthKey(selectedDate()) === lastSettledKey) return;
     settleMonthSpectrum();
   });
 }
@@ -101,7 +116,8 @@ function initializeMonthTransitionStability() {
 
   // applyMonthTheme aktualisiert data-month/data-year. MutationObserver laufen
   // noch vor dem nächsten Paint und beenden dadurch auch später gestartete
-  // Basistheme- oder Spektrumverläufe ohne sichtbaren Zwischenframe.
+  // Basistheme- oder Spektrumverläufe ohne sichtbaren Zwischenframe. Die
+  // Monatsschlüssel-Sperre filtert anschließend die eigenen Metadatenmutationen.
   if (typeof MutationObserver === 'function') {
     const observer = new MutationObserver(queueSettlement);
     observer.observe(document.documentElement, {
