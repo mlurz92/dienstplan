@@ -14,31 +14,12 @@ function preparedMonth(year, month) {
   const count = new Date(year, month, 0).getDate();
   for (let day = 1; day <= count; day += 1) {
     const iso = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    days[iso] = {
-      bd: 'extern:Bestand BD',
-      hg: 'extern:Bestand HG',
-      rbn1: '',
-      rbn2: '',
-      notes: ''
-    };
+    days[iso] = { bd: 'extern:Bestand BD', hg: 'extern:Bestand HG', rbn1: '', rbn2: '', notes: '' };
   }
   const target = `${year}-${String(month).padStart(2, '0')}-15`;
   days[target].bd = '';
   days[target].hg = '';
-  return {
-    schemaVersion: 1,
-    year,
-    month,
-    revision: 0,
-    updatedAt: null,
-    days,
-    absences: {},
-    absenceSources: {},
-    preferences: {},
-    options: {},
-    overrideLog: [],
-    importLog: []
-  };
+  return { schemaVersion: 1, year, month, revision: 0, updatedAt: null, days, absences: {}, absenceSources: {}, preferences: {}, options: {}, overrideLog: [], importLog: [] };
 }
 
 function emptyMonth(year, month) {
@@ -48,37 +29,16 @@ function emptyMonth(year, month) {
     const iso = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     days[iso] = { bd: '', hg: '', rbn1: '', rbn2: '', notes: '' };
   }
-  return {
-    schemaVersion: 1,
-    year,
-    month,
-    revision: 0,
-    updatedAt: null,
-    days,
-    absences: {},
-    absenceSources: {},
-    preferences: {},
-    options: {},
-    overrideLog: [],
-    importLog: []
-  };
+  return { schemaVersion: 1, year, month, revision: 0, updatedAt: null, days, absences: {}, absenceSources: {}, preferences: {}, options: {}, overrideLog: [], importLog: [] };
 }
 
 async function mockApi(page) {
   let currentMonth = preparedMonth(2026, 7);
   let putCount = 0;
-
-  await page.route('https://cdn.sheetjs.com/**', route => route.fulfill({
-    status: 200,
-    contentType: 'application/javascript',
-    body: 'window.XLSX = undefined;'
-  }));
-  await page.route('**/api/bootstrap', route => route.fulfill({
-    json: { ok: true, settings: { schemaVersion: 2 }, staff, rbnNames: [] }
-  }));
+  await page.route('https://cdn.sheetjs.com/**', route => route.fulfill({ status: 200, contentType: 'application/javascript', body: 'window.XLSX = undefined;' }));
+  await page.route('**/api/bootstrap', route => route.fulfill({ json: { ok: true, settings: { schemaVersion: 2 }, staff, rbnNames: [] } }));
   await page.route('**/api/month/**', async route => {
-    const url = new URL(route.request().url());
-    const parts = url.pathname.split('/');
+    const parts = new URL(route.request().url()).pathname.split('/');
     const year = Number(parts.at(-2));
     const month = Number(parts.at(-1));
     if (route.request().method() === 'PUT') {
@@ -86,18 +46,9 @@ async function mockApi(page) {
       putCount += 1;
       return route.fulfill({ json: { ok: true } });
     }
-    return route.fulfill({
-      json: {
-        ok: true,
-        month: year === 2026 && month === 7 ? currentMonth : emptyMonth(year, month)
-      }
-    });
+    return route.fulfill({ json: { ok: true, month: year === 2026 && month === 7 ? currentMonth : emptyMonth(year, month) } });
   });
-
-  return {
-    getPutCount: () => putCount,
-    getMonth: () => currentMonth
-  };
+  return { getPutCount: () => putCount, getMonth: () => currentMonth };
 }
 
 async function openJuly(page) {
@@ -115,7 +66,9 @@ test('Auto-Plan präsentiert BD und HG jedes Tages gemeinsam wie die Diensttabel
 
   await page.locator('#autoPlanBtn').click();
   await expect(page.locator('#autoPlanConfig')).toBeVisible();
-  await expect(page.locator('#autoPlanStartBtn')).toBeEnabled();
+  await expect(page.locator('#autoPlanLimitBody tr')).toHaveCount(staff.length);
+  await page.locator('#autoPlanSearchIntensity').selectOption('standard');
+  await page.locator('#autoPlanRepairIterations').fill('3');
   await page.locator('#autoPlanStartBtn').click();
   await expect(page.locator('#autoPlanResult')).toBeVisible({ timeout: 120_000 });
   await expect(page.locator('#autoPlanResultTitle')).toHaveText('Regelkonformer Vorschlag bereit');
@@ -136,15 +89,12 @@ test('Auto-Plan präsentiert BD und HG jedes Tages gemeinsam wie die Diensttabel
 
   await expect(page.locator('#autoPlanSearchMetrics')).toContainText('Varianten geprüft');
   await expect(page.locator('#autoPlanSearchMetrics')).toContainText('Sackgassen');
-  await expect(page.locator('#autoPlanSearchMetrics')).toContainText('Grenzfilter');
-  await expect(page.locator('#autoPlanRunConfigChips')).toContainText('Minimal-Rot');
+  await expect(page.locator('#autoPlanSearchMetrics')).toContainText('Nachbarschaften');
+  await expect(page.locator('#autoPlanRunConfig')).toContainText('Reparaturrunden: 3');
   await expect(page.locator('#autoPlanLoadTable .auto-plan-distribution-table')).toBeVisible();
 
   const scroll = page.locator('#autoPlanChangeList');
-  const dimensions = await scroll.evaluate(element => ({
-    scrollHeight: element.scrollHeight,
-    clientHeight: element.clientHeight
-  }));
+  const dimensions = await scroll.evaluate(element => ({ scrollHeight: element.scrollHeight, clientHeight: element.clientHeight }));
   expect(dimensions.scrollHeight).toBeGreaterThan(dimensions.clientHeight);
   await scroll.evaluate(element => { element.scrollTop = element.scrollHeight; });
   await expect.poll(() => scroll.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
