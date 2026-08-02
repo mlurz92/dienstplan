@@ -10,26 +10,152 @@
  * mit dem größten OKLab-Abstand zum vorherigen Kalendermonat und zum gleichen
  * Monat des Vorjahres. So bleibt die Jahreszeit erkennbar, ohne dass die
  * Oberfläche in einer Folge ähnlich gedämpfter Mitteltöne stecken bleibt.
+ *
+ * Der sichtbare Farbname wird nicht aus einer Reihenfolge gezogen, sondern aus
+ * dem tatsächlich gewählten OKLCH-Wert bestimmt: Jeder Monat besitzt ein
+ * Lexikon aus Farbankern mit Farbton, Helligkeits- und Buntheitscharakter. Der
+ * nächstgelegene Anker benennt die Farbe. Dadurch beschreibt das Badge immer
+ * genau den Ton, der tatsächlich auf der Fläche liegt.
+ *
+ * Der Monatswechsel wird als durchgehender High-Framerate-Verlauf in OKLCH
+ * interpoliert. Ein laufender Verlauf auf dasselbe Ziel wird nie neu gestartet,
+ * dadurch bleibt die Bewegung auch bei mehrfachen Synchronisationssignalen
+ * flüssig und frei von Sprüngen.
  */
 
 export const SPECTRUM_REFERENCE_YEAR = 2026;
 export const SPECTRUM_CYCLE_YEARS = 24;
-export const SPECTRUM_DURATION_MS = 620;
+export const SPECTRUM_DURATION_MS = 760;
 
-const MONTH_PROFILES = Object.freeze([
-  { month: 1, season: 'Winter', family: 'Eis · Polarlicht', hue: 225, hueSpan: 72, lightness: .655, lightnessSpan: .12, chroma: .145, chromaSpan: .10, names: ['Gletscherblau', 'Polarviolett', 'Fjordtürkis', 'Eiscyan', 'Nordlicht', 'Stahlblau', 'Frostindigo', 'Arktisgrün'] },
-  { month: 2, season: 'Spätwinter', family: 'Beere · Lack', hue: 352, hueSpan: 62, lightness: .635, lightnessSpan: .13, chroma: .165, chromaSpan: .11, names: ['Himbeerlack', 'Cassis', 'Rubin', 'Rosenquarz', 'Magentawein', 'Granatapfel', 'Orchidee', 'Kirschrot'] },
-  { month: 3, season: 'Vorfrühling', family: 'Keimgrün · Botanik', hue: 137, hueSpan: 78, lightness: .65, lightnessSpan: .12, chroma: .155, chromaSpan: .12, names: ['Keimgrün', 'Eukalyptus', 'Jade', 'Junge Olive', 'Klee', 'Celadon', 'Mooslicht', 'Frühlingspetrol'] },
-  { month: 4, season: 'Frühling', family: 'Blüte · Himmel', hue: 293, hueSpan: 82, lightness: .67, lightnessSpan: .13, chroma: .15, chromaSpan: .12, names: ['Iris', 'Wisteria', 'Fliederblitz', 'Veilchenblau', 'Blütenrosa', 'Krokus', 'Hyazinthe', 'Frühlingshimmel'] },
-  { month: 5, season: 'Frühling', family: 'Blattgrün · Zitrus', hue: 108, hueSpan: 82, lightness: .665, lightnessSpan: .13, chroma: .17, chromaSpan: .14, names: ['Maigrün', 'Minzblatt', 'Chartreuse', 'Lindenblatt', 'Apfelgrün', 'Salbei', 'Bambus', 'Zitrusblatt'] },
-  { month: 6, season: 'Frühsommer', family: 'Wasser · Küste', hue: 195, hueSpan: 76, lightness: .65, lightnessSpan: .12, chroma: .16, chromaSpan: .12, names: ['Lagune', 'Aqua', 'Meeresglas', 'Küstenblau', 'Türkisstrom', 'Mineralwasser', 'Poolblau', 'Seegrün'] },
-  { month: 7, season: 'Hochsommer', family: 'Frucht · Sonnenuntergang', hue: 24, hueSpan: 64, lightness: .65, lightnessSpan: .13, chroma: .18, chromaSpan: .12, names: ['Koralle', 'Persimone', 'Wassermelone', 'Papaya', 'Hibiskus', 'Sonnenuntergang', 'Tomatenrot', 'Pfirsichglut'] },
-  { month: 8, season: 'Spätsommer', family: 'Gold · Ernte', hue: 69, hueSpan: 72, lightness: .69, lightnessSpan: .12, chroma: .17, chromaSpan: .13, names: ['Safran', 'Bernstein', 'Ringelblume', 'Aprikosengold', 'Erntegelb', 'Honig', 'Sonnenblume', 'Goldolive'] },
-  { month: 9, season: 'Frühherbst', family: 'Wein · Pflaume', hue: 326, hueSpan: 70, lightness: .61, lightnessSpan: .14, chroma: .145, chromaSpan: .12, names: ['Weinlese', 'Pflaume', 'Feige', 'Aubergine', 'Brombeere', 'Dahlie', 'Traubenrot', 'Cassisnebel'] },
-  { month: 10, season: 'Herbst', family: 'Kupfer · Erde', hue: 43, hueSpan: 66, lightness: .62, lightnessSpan: .14, chroma: .155, chromaSpan: .12, names: ['Kupfer', 'Terrakotta', 'Zimt', 'Bronze', 'Rostrot', 'Kürbis', 'Ocker', 'Ahorn'] },
-  { month: 11, season: 'Spätherbst', family: 'Mineral · Sturm', hue: 226, hueSpan: 92, lightness: .595, lightnessSpan: .15, chroma: .105, chromaSpan: .11, names: ['Sturmblau', 'Schiefer', 'Petrolgrau', 'Indigonebel', 'Graphitblau', 'Nebelgrün', 'Basaltviolett', 'Regentief'] },
-  { month: 12, season: 'Winter', family: 'Immergrün · Festlicht', hue: 164, hueSpan: 76, lightness: .59, lightnessSpan: .13, chroma: .13, chromaSpan: .11, names: ['Tannengrün', 'Smaragdnacht', 'Wacholder', 'Winterwald', 'Pfauengrün', 'Mistel', 'Nordmanntanne', 'Festpetrol'] }
-]);
+/**
+ * Farbanker: [Name, absoluter OKLCH-Farbton in Grad, Helligkeitscharakter,
+ * Buntheitscharakter]. Die Charakterwerte sind -1 (tief/zart), 0 (ausgewogen)
+ * und 1 (hell/leuchtend) relativ zur Mitte des jeweiligen Monatskorridors.
+ */
+export const SPECTRUM_MONTH_PROFILES = Object.freeze([
+  {
+    month: 1, season: 'Winter', family: 'Eis · Polarlicht',
+    hue: 245, hueSpan: 76, lightness: .655, lightnessSpan: .13, chroma: .145, chromaSpan: .11,
+    names: [
+      ['Eiscyan', 210, 1, 1], ['Petrolblau', 210, -1, 0], ['Aquamarin', 210, 1, -1],
+      ['Gletscherblau', 232, 1, 1], ['Azurblau', 232, 0, 1], ['Stahlblau', 232, -1, -1],
+      ['Nordlichtblau', 254, 1, 1], ['Wintergrau', 254, 0, -1], ['Frostindigo', 254, -1, 0],
+      ['Polarviolett', 280, 0, 1], ['Eisflieder', 280, 1, -1], ['Nachtindigo', 280, -1, 1]
+    ]
+  },
+  {
+    month: 2, season: 'Spätwinter', family: 'Beere · Lack',
+    hue: 5, hueSpan: 54, lightness: .635, lightnessSpan: .14, chroma: .165, chromaSpan: .12,
+    names: [
+      ['Magentawein', 335, -1, 1], ['Orchidee', 335, 1, -1], ['Fuchsia', 335, 0, 1],
+      ['Himbeerlack', 352, 0, 1], ['Rosenquarz', 352, 1, -1], ['Beerenrot', 352, -1, 1],
+      ['Karminrot', 8, 0, 1], ['Altrosa', 8, 1, -1], ['Rubinrot', 8, -1, 1],
+      ['Granatapfel', 28, 0, 1], ['Kirschrot', 28, -1, 0], ['Korallrosa', 28, 1, -1]
+    ]
+  },
+  {
+    month: 3, season: 'Vorfrühling', family: 'Keimgrün · Botanik',
+    hue: 150, hueSpan: 78, lightness: .655, lightnessSpan: .13, chroma: .155, chromaSpan: .12,
+    names: [
+      ['Chartreusegrün', 118, 1, 1], ['Wiesengrün', 118, 0, 0], ['Olivgrün', 118, -1, -1],
+      ['Keimgrün', 142, 1, 1], ['Kleegrün', 142, 0, 1], ['Moosgrün', 142, -1, -1],
+      ['Celadon', 165, 1, -1], ['Jadegrün', 165, 0, 1], ['Waldjade', 165, -1, 0],
+      ['Eukalyptus', 188, 1, -1], ['Frühlingspetrol', 188, 0, 1], ['Tiefpetrol', 188, -1, 1]
+    ]
+  },
+  {
+    month: 4, season: 'Frühling', family: 'Blüte · Iris',
+    hue: 305, hueSpan: 80, lightness: .67, lightnessSpan: .14, chroma: .15, chromaSpan: .12,
+    names: [
+      ['Veilchenblau', 275, 0, 1], ['Glockenblau', 275, 1, -1], ['Nachtviolett', 275, -1, 0],
+      ['Iris', 295, 0, 1], ['Hyazinthe', 295, 1, 0], ['Purpurnacht', 295, -1, 1],
+      ['Krokusviolett', 315, 0, 0], ['Fliederblitz', 315, 1, 1], ['Amethyst', 315, -1, 1],
+      ['Malve', 335, 0, -1], ['Blütenrosa', 335, 1, -1], ['Beerenmagenta', 335, -1, 1]
+    ]
+  },
+  {
+    month: 5, season: 'Frühling', family: 'Blattgrün · Zitrus',
+    hue: 136, hueSpan: 62, lightness: .675, lightnessSpan: .13, chroma: .17, chromaSpan: .13,
+    names: [
+      ['Zitrusgelb', 95, 1, 1], ['Limonengrün', 95, 0, 1], ['Senfoliv', 95, -1, -1],
+      ['Chartreuse', 118, 1, 1], ['Apfelgrün', 118, 0, 1], ['Lindenblatt', 118, 1, -1],
+      ['Maigrün', 140, 0, 1], ['Salbei', 140, 1, -1], ['Farngrün', 140, -1, 0],
+      ['Minzblatt', 162, 1, -1], ['Smaragdgrün', 162, 0, 1], ['Bambusgrün', 162, -1, 0]
+    ]
+  },
+  {
+    month: 6, season: 'Frühsommer', family: 'Wasser · Küste',
+    hue: 208, hueSpan: 80, lightness: .655, lightnessSpan: .13, chroma: .16, chromaSpan: .12,
+    names: [
+      ['Seegrün', 178, 0, 1], ['Meeresglas', 178, 1, -1], ['Tiefseegrün', 178, -1, 1],
+      ['Türkisstrom', 198, 0, 1], ['Aqua', 198, 1, 1], ['Petroltürkis', 198, -1, 0],
+      ['Lagune', 218, 0, 1], ['Poolblau', 218, 1, 0], ['Mineralblau', 218, 0, -1],
+      ['Küstenblau', 242, -1, 0], ['Sommerhimmel', 242, 1, -1], ['Tiefenblau', 242, -1, 1]
+    ]
+  },
+  {
+    month: 7, season: 'Hochsommer', family: 'Frucht · Sonnenglut',
+    hue: 34, hueSpan: 42, lightness: .645, lightnessSpan: .14, chroma: .18, chromaSpan: .12,
+    names: [
+      ['Hibiskusrot', 12, 0, 1], ['Wassermelone', 12, 1, 0], ['Kirschglut', 12, -1, 1],
+      ['Koralle', 30, 1, 1], ['Tomatenrot', 30, -1, 1], ['Terrakottarot', 30, 0, 0],
+      ['Persimone', 46, 0, 1], ['Pfirsichglut', 46, 1, -1], ['Rostorange', 46, -1, 0],
+      ['Mandarine', 62, 0, 1], ['Papaya', 62, 1, 1], ['Karamell', 62, -1, -1]
+    ]
+  },
+  {
+    month: 8, season: 'Spätsommer', family: 'Gold · Ernte',
+    hue: 82, hueSpan: 52, lightness: .72, lightnessSpan: .13, chroma: .17, chromaSpan: .13,
+    names: [
+      ['Bernstein', 58, 0, 1], ['Aprikosengold', 58, 1, 1], ['Karamellbraun', 58, -1, -1],
+      ['Safran', 76, 0, 1], ['Honiggold', 76, 1, 0], ['Bronzegold', 76, -1, 0],
+      ['Sonnenblume', 94, 1, 1], ['Currygelb', 94, 0, 1], ['Erntegelb', 94, 1, 0],
+      ['Goldolive', 112, -1, -1], ['Senfgrün', 112, -1, 0], ['Limonengold', 112, 1, -1]
+    ]
+  },
+  {
+    month: 9, season: 'Frühherbst', family: 'Wein · Pflaume',
+    hue: 340, hueSpan: 68, lightness: .615, lightnessSpan: .15, chroma: .145, chromaSpan: .12,
+    names: [
+      ['Aubergine', 312, -1, -1], ['Traubenviolett', 312, -1, 1], ['Mauve', 312, 1, -1],
+      ['Brombeere', 330, -1, 0], ['Pflaume', 330, 0, 0], ['Fuchsienrosa', 330, 1, 1],
+      ['Dahlienrot', 348, 0, 1], ['Weinlese', 348, -1, 1], ['Feige', 348, 1, -1],
+      ['Altrosé', 6, 1, -1], ['Rosenholz', 6, 0, -1], ['Burgunder', 6, -1, 1]
+    ]
+  },
+  {
+    month: 10, season: 'Herbst', family: 'Kupfer · Erde',
+    hue: 60, hueSpan: 62, lightness: .625, lightnessSpan: .15, chroma: .155, chromaSpan: .12,
+    names: [
+      ['Rostrot', 32, -1, 1], ['Terrakotta', 32, 0, 1], ['Lachsrot', 32, 1, -1],
+      ['Kupfer', 50, 0, 1], ['Kürbis', 50, 1, 1], ['Zimtbraun', 50, -1, -1],
+      ['Ahornorange', 68, 1, 1], ['Bronze', 68, -1, 0], ['Karamellgold', 68, 0, 0],
+      ['Ocker', 88, 0, 0], ['Senfocker', 88, -1, -1], ['Strohgold', 88, 1, -1]
+    ]
+  },
+  {
+    month: 11, season: 'Spätherbst', family: 'Mineral · Sturm',
+    hue: 260, hueSpan: 80, lightness: .60, lightnessSpan: .15, chroma: .105, chromaSpan: .11,
+    names: [
+      ['Petrolgrau', 212, -1, -1], ['Stahlpetrol', 212, 0, -1], ['Nebelblau', 212, 1, -1],
+      ['Graphitblau', 240, -1, -1], ['Sturmblau', 240, -1, 0], ['Rauchblau', 240, 1, -1],
+      ['Schiefer', 268, 0, -1], ['Indigonebel', 268, 0, 0], ['Nachtblau', 268, -1, 1],
+      ['Basaltviolett', 298, -1, -1], ['Nebelviolett', 298, 1, -1], ['Amethystnebel', 298, 0, 1]
+    ]
+  },
+  {
+    month: 12, season: 'Winter', family: 'Immergrün · Festlicht',
+    hue: 182, hueSpan: 52, lightness: .595, lightnessSpan: .14, chroma: .13, chromaSpan: .11,
+    names: [
+      ['Winterwald', 145, -1, -1], ['Tannengrün', 145, -1, 0], ['Mistelgrün', 145, 1, -1],
+      ['Smaragdnacht', 168, -1, 1], ['Wacholder', 168, 0, -1], ['Jadenacht', 168, 0, 1],
+      ['Pfauengrün', 188, 0, 1], ['Festpetrol', 188, 1, -1], ['Nachtpetrol', 188, -1, 1],
+      ['Polartürkis', 208, 1, 0], ['Eisblaugrün', 208, 1, -1], ['Winterblau', 208, -1, 0]
+    ]
+  }
+].map(profile => Object.freeze({ ...profile, names: Object.freeze(profile.names.map(entry => Object.freeze(entry))) })));
+
+const MONTH_PROFILES = SPECTRUM_MONTH_PROFILES;
 
 const YEAR_MOODS = Object.freeze([
   ['Kristall', -10, .030, -.010], ['Juwel', 8, -.030, .035], ['Botanisch', -14, .005, .020],
@@ -54,11 +180,16 @@ const VARIABLE_NAMES = Object.freeze([
   ...Object.keys(SURFACE_MIX)
 ]);
 
-const MIN_NEIGHBOUR_DISTANCE = .075;
-const MIN_ANNUAL_DISTANCE = .055;
+const MIN_NEIGHBOUR_DISTANCE = .12;
+const MIN_ANNUAL_DISTANCE = .09;
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const positiveMod = (value, divisor) => ((value % divisor) + divisor) % divisor;
 const radians = degrees => degrees * Math.PI / 180;
+const degrees = radiansValue => positiveMod(radiansValue * 180 / Math.PI, 360);
+const angularDistance = (first, second) => {
+  const delta = Math.abs(positiveMod(first - second, 360));
+  return delta > 180 ? 360 - delta : delta;
+};
 const radicalInverse = (value, base) => {
   let n = value;
   let fraction = 1 / base;
@@ -144,40 +275,151 @@ export function perceptualDistance(first, second) {
 
 function hueSector(color) {
   const [, a, b] = rgbToOklab(color);
-  const degrees = (Math.atan2(b, a) * 180 / Math.PI + 360) % 360;
-  return Math.floor(degrees / 30);
+  return Math.floor(degrees(Math.atan2(b, a)) / 30);
 }
 
+/**
+ * Globales Farblexikon.
+ *
+ * Jeder Anker kennt seinen Farbton sowie den Helligkeits- und Buntheitswert,
+ * den er beschreibt. Die Anker des eigenen Monats werden bevorzugt; verlässt
+ * ein Ton seinen saisonalen Korridor, benennt ihn der treffendere Anker eines
+ * anderen Monats. Dadurch kann der angezeigte Name nie vom sichtbaren Ton
+ * abweichen.
+ */
+export const SPECTRUM_COLOR_ANCHORS = Object.freeze(MONTH_PROFILES.flatMap(profile =>
+  profile.names.map(([name, anchorHue, lightnessBias, chromaBias]) => Object.freeze({
+    name,
+    month: profile.month,
+    hue: anchorHue,
+    lightness: profile.lightness + lightnessBias * profile.lightnessSpan * .42,
+    chroma: profile.chroma + chromaBias * profile.chromaSpan * .42
+  }))
+));
+
+const FOREIGN_ANCHOR_PENALTY = 1.15;
+
+function anchorScore(anchor, lightness, chroma, hueDegrees) {
+  return (angularDistance(hueDegrees, anchor.hue) / 26) ** 2
+    + ((lightness - anchor.lightness) / .085) ** 2
+    + ((chroma - anchor.chroma) / .06) ** 2;
+}
+
+/**
+ * Benennt eine Farbe anhand ihres tatsächlichen OKLCH-Werts.
+ */
+export function describeColor(profile, lightness, chroma, hueRadians) {
+  const hueDegrees = degrees(hueRadians);
+  let best = null;
+  for (const anchor of SPECTRUM_COLOR_ANCHORS) {
+    const penalty = anchor.month === profile.month ? 0 : FOREIGN_ANCHOR_PENALTY;
+    const score = anchorScore(anchor, lightness, chroma, hueDegrees) + penalty;
+    if (!best || score < best.score) best = { name: anchor.name, score };
+  }
+  return best.name;
+}
+
+const LIGHTNESS_WORDS = Object.freeze(['tief', 'satt', 'mittelhell', 'hell', 'licht']);
+const CHROMA_WORDS = Object.freeze(['zart', 'gedämpft', 'ausgewogen', 'kräftig', 'leuchtend']);
+
+function toneWords(lightness, chroma) {
+  const lightnessIndex = clamp(Math.floor((lightness - .53) / .06), 0, LIGHTNESS_WORDS.length - 1);
+  const chromaIndex = clamp(Math.floor((chroma - .07) / .042), 0, CHROMA_WORDS.length - 1);
+  return `${LIGHTNESS_WORDS[lightnessIndex]} · ${CHROMA_WORDS[chromaIndex]}`;
+}
+
+const HUE_LANES = Object.freeze([-.5, -.3, -.12, .12, .3, .5]);
+const TONE_LANES = Object.freeze([
+  [1, 1], [-1, 1], [1, -1], [-1, -1], [0, 1], [0, -1], [1, 0], [-1, 0]
+]);
+export const SPECTRUM_CANDIDATES_PER_MONTH = HUE_LANES.length * TONE_LANES.length;
+
+/**
+ * Erzeugt einen Kandidaten aus dem Korridor eines Monats.
+ *
+ * Farbton, Helligkeit und Buntheit werden unabhängig voneinander aufgespannt.
+ * Dadurch stehen pro Monat alle Ecken des Korridors zur Auswahl – ein helles
+ * leuchtendes und ein tiefes ruhiges Maigrün sind beide erreichbar, ohne die
+ * Jahreszeit zu verlassen.
+ */
 function candidateFor(profile, cycleIndex, phase) {
   const mood = YEAR_MOODS[cycleIndex];
   const sequence = cycleIndex * 17 + profile.month * 11 + phase * 7 + 1;
-  const hueNoise = (radicalInverse(sequence, 2) - .5) * profile.hueSpan;
-  const lightnessNoise = (radicalInverse(sequence, 3) - .5) * profile.lightnessSpan;
-  const chromaNoise = (radicalInverse(sequence, 5) - .5) * profile.chromaSpan;
-  const lanes = [-.52, .52, -.36, .36, -.20, .20, -.08, .08];
-  const lane = lanes[phase % lanes.length];
-  const hue = radians(profile.hue + hueNoise + mood.hue + lane * profile.hueSpan);
-  const lightness = clamp(profile.lightness + lightnessNoise + mood.lightness + lane * .03, .525, .765);
-  const chroma = clamp(profile.chroma + chromaNoise + mood.chroma + Math.abs(lane) * .022, .075, .25);
+  const hueNoise = (radicalInverse(sequence, 2) - .5) * profile.hueSpan * .5;
+  const lightnessNoise = (radicalInverse(sequence, 3) - .5) * profile.lightnessSpan * .45;
+  const chromaNoise = (radicalInverse(sequence, 5) - .5) * profile.chromaSpan * .45;
+  const hueLane = HUE_LANES[phase % HUE_LANES.length];
+  const [lightnessLane, chromaLane] = TONE_LANES[Math.floor(phase / HUE_LANES.length) % TONE_LANES.length];
+
+  // Der Farbton bleibt bewusst im saisonalen Korridor. Vielfalt entsteht über
+  // die volle Korridorbreite sowie über Helligkeit und Buntheit, nicht durch
+  // ein Abwandern in eine fremde Jahreszeit.
+  const hueDegrees = profile.hue + clamp(
+    hueNoise + mood.hue + hueLane * profile.hueSpan,
+    -profile.hueSpan / 2,
+    profile.hueSpan / 2
+  );
+  const hue = radians(hueDegrees);
+  const lightness = clamp(
+    clamp(profile.lightness + lightnessNoise + mood.lightness + lightnessLane * .062,
+      profile.lightness - .085, profile.lightness + .085),
+    .525, .78
+  );
+  const chroma = clamp(
+    clamp(profile.chroma + chromaNoise + mood.chroma + chromaLane * .055,
+      profile.chroma - .07, profile.chroma + .075),
+    .075, .25
+  );
   const accent = oklchToRgb(lightness, chroma, hue);
-  return { accent, mood: mood.name, hue, lightness, chroma, phase, sector: hueSector(accent) };
+  const [actualLightness, actualChromaRaw, actualHue] = labToLch(rgbToOklab(accent));
+  return {
+    accent,
+    mood: mood.name,
+    hue: actualHue,
+    lightness: actualLightness,
+    chroma: actualChromaRaw,
+    phase,
+    sector: hueSector(accent),
+    name: describeColor(profile, actualLightness, actualChromaRaw, actualHue)
+  };
 }
 
-function selectCandidate(profile, cycleIndex, previous, sameMonthPreviousYear, usedSectors) {
-  const ranked = Array.from({ length: 24 }, (_, phase) => candidateFor(profile, cycleIndex, phase))
+function selectCandidate(profile, cycleIndex, previous, sameMonthPreviousYear, usedSectors, usedHexes) {
+  const previousHue = previous ? degrees(previous.hue) : null;
+  const ranked = Array.from({ length: SPECTRUM_CANDIDATES_PER_MONTH }, (_, phase) => candidateFor(profile, cycleIndex, phase))
     .map(candidate => {
       const previousDistance = previous ? perceptualDistance(candidate.accent, previous.accent) : .4;
       const annualDistance = sameMonthPreviousYear ? perceptualDistance(candidate.accent, sameMonthPreviousYear.accent) : .4;
-      const sectorBonus = usedSectors.has(candidate.sector) ? 0 : .075;
-      const score = Math.min(previousDistance * 1.1, annualDistance) + Math.max(previousDistance, annualDistance) * .18 + candidate.chroma * .08 + sectorBonus;
+      const sectorBonus = usedSectors.has(candidate.sector) ? 0 : .085;
+      const hueSeparation = previousHue === null ? 90 : angularDistance(degrees(candidate.hue), previousHue);
+      const score = Math.min(previousDistance * 1.15, annualDistance)
+        + Math.max(previousDistance, annualDistance) * .2
+        + Math.min(hueSeparation, 90) / 90 * .09
+        + candidate.chroma * .08
+        + sectorBonus;
       return { candidate, score, previousDistance, annualDistance };
     })
     .sort((left, right) => right.score - left.score);
 
-  const neighbourSafe = ranked.filter(entry => entry.previousDistance >= MIN_NEIGHBOUR_DISTANCE);
-  const neighbourPool = neighbourSafe.length ? neighbourSafe : ranked;
-  const fullySafe = neighbourPool.filter(entry => entry.annualDistance >= MIN_ANNUAL_DISTANCE);
-  return (fullySafe.length ? fullySafe : neighbourPool)[0];
+  // Ein Farbwert darf im gesamten 24-Jahres-Zyklus nur einmal vorkommen. Nach
+  // der Gamut-Begrenzung können zwei Kandidaten sonst auf denselben sRGB-Wert
+  // fallen und der Zyklus verlöre sichtbar an Vielfalt.
+  const unique = ranked.filter(entry => !usedHexes.has(toHex(entry.candidate.accent)));
+  const pool = unique.length ? unique : ranked;
+  const fullySafe = pool.filter(entry =>
+    entry.previousDistance >= MIN_NEIGHBOUR_DISTANCE && entry.annualDistance >= MIN_ANNUAL_DISTANCE);
+  if (fullySafe.length) return fullySafe[0];
+
+  // Kein Kandidat erfüllt beide Mindestabstände. Dann gewinnt der Kandidat mit
+  // der besten schwächsten Achse, damit weder der Vormonat noch das Vorjahr in
+  // einen kaum unterscheidbaren Ton fällt.
+  return pool.reduce((best, entry) => {
+    const rank = candidate => Math.min(
+      candidate.previousDistance / MIN_NEIGHBOUR_DISTANCE,
+      candidate.annualDistance / MIN_ANNUAL_DISTANCE
+    );
+    return rank(entry) > rank(best) ? entry : best;
+  });
 }
 
 function toHex(color) {
@@ -187,33 +429,36 @@ function toHex(color) {
 function buildCanonicalPalettes() {
   const result = [];
   const sameMonth = new Map();
+  const usedHexes = new Set();
   let previous = null;
   for (let cycleIndex = 0; cycleIndex < SPECTRUM_CYCLE_YEARS; cycleIndex += 1) {
     const usedSectors = new Set();
     for (const profile of MONTH_PROFILES) {
-      const selected = selectCandidate(profile, cycleIndex, previous, sameMonth.get(profile.month), usedSectors);
+      const selected = selectCandidate(profile, cycleIndex, previous, sameMonth.get(profile.month), usedSectors, usedHexes);
       const year = SPECTRUM_REFERENCE_YEAR + cycleIndex;
-      const name = profile.names[positiveMod(cycleIndex * 5 + profile.month * 3, profile.names.length)];
+      const candidate = selected.candidate;
       const palette = Object.freeze({
         key: `${year}-${String(profile.month).padStart(2, '0')}`,
         year,
         month: profile.month,
         season: profile.season,
         family: profile.family,
-        name,
-        mood: selected.candidate.mood,
-        accent: selected.candidate.accent,
-        accentHex: toHex(selected.candidate.accent),
-        lightness: selected.candidate.lightness,
-        chroma: selected.candidate.chroma,
-        hue: selected.candidate.hue,
+        name: candidate.name,
+        tone: toneWords(candidate.lightness, candidate.chroma),
+        mood: candidate.mood,
+        accent: candidate.accent,
+        accentHex: toHex(candidate.accent),
+        lightness: candidate.lightness,
+        chroma: candidate.chroma,
+        hue: candidate.hue,
         previousDistance: selected.previousDistance,
         annualDistance: selected.annualDistance
       });
       result.push(palette);
       previous = palette;
       sameMonth.set(profile.month, palette);
-      usedSectors.add(selected.candidate.sector);
+      usedSectors.add(candidate.sector);
+      usedHexes.add(palette.accentHex);
     }
   }
   return Object.freeze(result);
@@ -271,12 +516,63 @@ function readCurrentVariables(root, fallback) {
   return Object.fromEntries(VARIABLE_NAMES.map(name => [name, parseCssColor(computed.getPropertyValue(name)) || fallback[name]]));
 }
 
+/**
+ * Schreibt nur tatsächlich veränderte Variablen.
+ *
+ * Jede geschriebene Custom Property auf `:root` invalidiert den Stil des
+ * gesamten Dokuments. Während eines Verlaufs runden die zarten Flächentöne über
+ * mehrere Frames auf denselben sRGB-Wert; diese Frames dürfen keine zusätzliche
+ * Style-Recalculation auslösen.
+ */
+const lastWritten = new Map();
+
 function writeVariables(root, values) {
-  for (const [name, value] of Object.entries(values)) root.style.setProperty(name, toCss(value), 'important');
+  for (const [name, value] of Object.entries(values)) {
+    const css = toCss(value);
+    if (lastWritten.get(name) === css && root.style.getPropertyValue(name) === css) continue;
+    root.style.setProperty(name, css, 'important');
+    lastWritten.set(name, css);
+  }
 }
+
+/**
+ * Smootherstep. Beginn und Ende sind in der ersten und zweiten Ableitung
+ * stetig; dadurch wirkt der Farbverlauf auf 120-Hz-Displays vollkommen
+ * ruckfrei und ohne sichtbaren Einsatz- oder Abrisspunkt.
+ */
+const easeSpectrum = t => t * t * t * (t * (t * 6 - 15) + 10);
 
 let animationHandle = null;
 let activeKey = null;
+let animatingKey = null;
+
+/**
+ * Blendet eine kurze, GPU-getragene Lichtwelle über die Fläche.
+ *
+ * Bewegt werden ausschließlich `opacity` und `transform`, dadurch entsteht
+ * keine zusätzliche Layout- oder Style-Last auf dem Main Thread.
+ */
+function playSpectrumSweep(root, accent) {
+  if (typeof document === 'undefined' || typeof document.createElement !== 'function') return;
+  if (typeof Element === 'undefined' || typeof Element.prototype.animate !== 'function') return;
+  const existing = document.querySelector('.month-spectrum-sweep');
+  if (existing) existing.remove();
+  const sweep = document.createElement('div');
+  sweep.className = 'month-spectrum-sweep';
+  sweep.setAttribute('aria-hidden', 'true');
+  sweep.style.setProperty('--sweep-color', toCss([...accent.slice(0, 3), .42]));
+  document.body?.appendChild(sweep);
+  const animation = sweep.animate([
+    { opacity: 0, transform: 'translate3d(-12%, 0, 0) scale(1.04)' },
+    { opacity: 1, offset: .32 },
+    { opacity: 0, transform: 'translate3d(12%, 0, 0) scale(1.04)' }
+  ], { duration: SPECTRUM_DURATION_MS, easing: 'cubic-bezier(.33, 0, .18, 1)', fill: 'none' });
+  const remove = () => sweep.remove();
+  animation.addEventListener?.('finish', remove);
+  animation.addEventListener?.('cancel', remove);
+  animation.finished?.then?.(remove, remove);
+  void root;
+}
 
 export function applySpectrumProfile(year, month, { animate = true } = {}) {
   if (typeof document === 'undefined') return null;
@@ -284,13 +580,9 @@ export function applySpectrumProfile(year, month, { animate = true } = {}) {
   const palette = colorProfileForDate(year, month);
   const target = spectrumVariables(palette);
   const changed = activeKey !== palette.key;
+  const first = activeKey === null;
 
-  if (animationHandle !== null && typeof cancelAnimationFrame === 'function') {
-    cancelAnimationFrame(animationHandle);
-    animationHandle = null;
-  }
-
-  root.dataset.colorDirector = 'seasonal-spectrum-v1';
+  root.dataset.colorDirector = 'seasonal-spectrum-v2';
   root.dataset.spectrumPalette = palette.name;
   root.dataset.spectrumMood = palette.mood;
   root.dataset.spectrumKey = palette.key;
@@ -298,31 +590,55 @@ export function applySpectrumProfile(year, month, { animate = true } = {}) {
 
   const label = document.getElementById('monthPaletteLabel');
   if (label) {
-    label.textContent = `Monatskontrast · ${palette.name}`;
-    label.title = `${palette.season} · ${palette.family} · ${palette.year} · ${palette.mood}`;
+    const text = `Monatskontrast · ${palette.name}`;
+    const title = `${palette.season} · ${palette.family} · ${palette.tone} · ${palette.mood} · ${palette.year}`;
+    if (label.textContent !== text) label.textContent = text;
+    if (label.title !== title) label.title = title;
   }
 
-  if (!animate || !changed || prefersReducedMotion() || typeof requestAnimationFrame !== 'function') {
+  // Ein bereits laufender Verlauf auf dasselbe Ziel wird niemals neu gestartet
+  // oder hart überschrieben. Wiederholte Synchronisationssignale bleiben damit
+  // wirkungslos und die Bewegung bleibt in jedem Frame stetig.
+  if (animate && animatingKey === palette.key && animationHandle !== null) return palette;
+
+  if (animationHandle !== null && typeof cancelAnimationFrame === 'function') {
+    cancelAnimationFrame(animationHandle);
+    animationHandle = null;
+  }
+
+  if (!animate || !changed || first || prefersReducedMotion() || typeof requestAnimationFrame !== 'function') {
+    animatingKey = null;
     writeVariables(root, target);
     return palette;
   }
 
   const from = readCurrentVariables(root, target);
   const started = performance.now();
-  const ease = t => 1 - (1 - t) ** 3;
+  animatingKey = palette.key;
+  playSpectrumSweep(root, target['--month-accent']);
+  root.dataset.spectrumMotion = 'running';
+
   const step = now => {
     const progress = Math.min(1, (now - started) / SPECTRUM_DURATION_MS);
+    const eased = easeSpectrum(progress);
     const frame = {};
-    for (const name of VARIABLE_NAMES) frame[name] = mixOklch(from[name], target[name], ease(progress));
+    for (const name of VARIABLE_NAMES) frame[name] = mixOklch(from[name], target[name], eased);
     writeVariables(root, frame);
-    if (progress < 1) animationHandle = requestAnimationFrame(step);
-    else {
+    if (progress < 1) {
+      animationHandle = requestAnimationFrame(step);
+    } else {
       animationHandle = null;
+      animatingKey = null;
       writeVariables(root, target);
+      root.dataset.spectrumMotion = 'settled';
     }
   };
   animationHandle = requestAnimationFrame(step);
   return palette;
+}
+
+export function spectrumMotionIsRunning() {
+  return animationHandle !== null;
 }
 
 function selectedDate() {
@@ -333,13 +649,12 @@ function selectedDate() {
 }
 
 function initializeColorDirector() {
-  // Automatische Monats- und Jahreswechsel sind Teil eines vollständigen
-  // Tabellen-Renderings. Sie werden daher atomar abgeschlossen und starten
-  // niemals einen eigenen rAF-Farbverlauf. Die exportierte API behält die
-  // optionale Animation für ausdrücklich isolierte Aufrufe bei.
+  // Monats- und Jahreswechsel werden als durchgehender Farbverlauf gefahren.
+  // Ein laufender Verlauf auf dasselbe Ziel wird von applySpectrumProfile
+  // erkannt und nicht neu gestartet; dadurch bleibt die Bewegung flüssig.
   const update = () => {
     const { year, month } = selectedDate();
-    applySpectrumProfile(year, month, { animate: false });
+    applySpectrumProfile(year, month, { animate: true });
   };
 
   update();
@@ -353,7 +668,7 @@ function initializeColorDirector() {
       const labelObserver = new MutationObserver(() => {
         const { year, month } = selectedDate();
         const expected = colorProfileForDate(year, month);
-        if (label.textContent !== `Monatskontrast · ${expected.name}`) applySpectrumProfile(year, month, { animate: false });
+        if (label.textContent !== `Monatskontrast · ${expected.name}`) applySpectrumProfile(year, month, { animate: true });
       });
       labelObserver.observe(label, { childList: true, characterData: true, subtree: true, attributes: true, attributeFilter: ['title'] });
     }

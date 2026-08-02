@@ -108,3 +108,29 @@ html[data-month-motion-state="preloading"] .month-selector {
     display: none !important;
   }
 }
+
+/*
+ * Spektrum-Lichtwelle
+ *
+ * Begleitet den Farbverlauf des Monatswechsels. Bewegt werden ausschließlich
+ * `opacity` und `transform`; die Ebene liegt auf einem eigenen Compositor-Layer
+ * und erzeugt dadurch keine zusätzliche Layout- oder Style-Last.
+ */
+.month-spectrum-sweep {
+  position: fixed;
+  inset: -10vh -12vw;
+  z-index: 2147482000;
+  pointer-events: none;
+  opacity: 0;
+  will-change: opacity, transform;
+  contain: strict;
+  background: radial-gradient(58% 44% at 30% 34%, var(--sweep-color, transparent) 0%, transparent 70%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .month-spectrum-sweep { display: none !important; }
+}
+
+@media print {
+  .month-spectrum-sweep { display: none !important; }
+}

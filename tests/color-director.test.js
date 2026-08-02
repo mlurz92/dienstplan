@@ -3,9 +3,12 @@ import assert from 'node:assert/strict';
 
 import {
   SPECTRUM_CYCLE_YEARS,
+  SPECTRUM_COLOR_ANCHORS,
+  SPECTRUM_MONTH_PROFILES,
   SPECTRUM_PALETTES,
   SPECTRUM_REFERENCE_YEAR,
   colorProfileForDate,
+  describeColor,
   perceptualDistance,
   rgbToOklab,
   spectrumVariables
@@ -20,10 +23,14 @@ const contrast = (first, second) => {
   const values = [luminance(first), luminance(second)];
   return (Math.max(...values) + .05) / (Math.min(...values) + .05);
 };
-const hueSector = color => {
+const hueDegrees = color => {
   const [, a, b] = rgbToOklab(color);
-  const degrees = (Math.atan2(b, a) * 180 / Math.PI + 360) % 360;
-  return Math.floor(degrees / 30);
+  return (Math.atan2(b, a) * 180 / Math.PI + 360) % 360;
+};
+const hueSector = color => Math.floor(hueDegrees(color) / 30);
+const angularDistance = (first, second) => {
+  const delta = Math.abs(((first - second) % 360 + 360) % 360);
+  return delta > 180 ? 360 - delta : delta;
 };
 
 test('Seasonal Spectrum Director builds a deterministic 24-year calendar', () => {
@@ -63,15 +70,15 @@ test('calendar neighbours and annual repeats remain perceptually separated', () 
       minimumAnnual = Math.min(minimumAnnual, perceptualDistance(accents[index - 1], accents[index]));
     }
   }
-  assert.ok(minimumNeighbour >= .075, `minimaler Abstand benachbarter Monate nur ${minimumNeighbour.toFixed(3)}`);
-  assert.ok(minimumAnnual >= .055, `minimaler Abstand desselben Monats in Folgejahren nur ${minimumAnnual.toFixed(3)}`);
+  assert.ok(minimumNeighbour >= .11, `minimaler Abstand benachbarter Monate nur ${minimumNeighbour.toFixed(3)}`);
+  assert.ok(minimumAnnual >= .08, `minimaler Abstand desselben Monats in Folgejahren nur ${minimumAnnual.toFixed(3)}`);
 });
 
 test('the same calendar month explores many distinct looks across the cycle', () => {
   for (let month = 1; month <= 12; month += 1) {
     const palettes = Array.from({ length: 24 }, (_, offset) => colorProfileForDate(2026 + offset, month));
     assert.ok(new Set(palettes.map(palette => palette.accentHex)).size >= 22, `Monat ${month}: zu viele Wiederholungen`);
-    assert.ok(new Set(palettes.map(palette => palette.name)).size >= 7, `Monat ${month}: zu wenig sichtbare Farbnamen`);
+    assert.ok(new Set(palettes.map(palette => palette.name)).size >= 6, `Monat ${month}: zu wenig sichtbare Farbnamen`);
   }
 });
 
@@ -85,5 +92,23 @@ test('all derived table surfaces keep WCAG AA contrast', () => {
     }
     assert.equal(variables['--month-glow'].length, 4);
     assert.ok(variables['--month-glow'][3] < .5, `${palette.key}: Glow muss transparent bleiben`);
+  }
+});
+
+test('the visible colour name always describes the colour that is actually shown', () => {
+  for (const palette of SPECTRUM_PALETTES) {
+    const profile = SPECTRUM_MONTH_PROFILES.find(entry => entry.month === palette.month);
+    const anchor = SPECTRUM_COLOR_ANCHORS.find(entry => entry.name === palette.name);
+    assert.ok(anchor, `${palette.key}: ${palette.name} gehört nicht zum Farblexikon`);
+
+    // Der Name muss aus dem tatsächlich gerenderten Ton abgeleitet sein.
+    assert.equal(describeColor(profile, palette.lightness, palette.chroma, palette.hue), palette.name);
+
+    const distance = angularDistance(hueDegrees(palette.accent), anchor.hue);
+    assert.ok(distance <= 42, `${palette.key} ${palette.name}: Farbton weicht ${distance.toFixed(0)}° vom Namensanker ab`);
+
+    assert.ok(Math.abs(palette.lightness - anchor.lightness) <= .16,
+      `${palette.key} ${palette.name}: Helligkeitscharakter passt nicht zum Namen`);
+    assert.match(palette.tone, /^(tief|satt|mittelhell|hell|licht) · (zart|gedämpft|ausgewogen|kräftig|leuchtend)$/);
   }
 });
