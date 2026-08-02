@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 const stability = await readFile(new URL('../js/month-transition-stability.js', import.meta.url), 'utf8');
+const colorDirector = await readFile(new URL('../js/color-director.js', import.meta.url), 'utf8');
 const controls = await readFile(new URL('../controls.css', import.meta.url), 'utf8');
 const uiControls = await readFile(new URL('../js/ui-controls.js', import.meta.url), 'utf8');
 const packageJson = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
@@ -12,6 +13,17 @@ test('month transition stability is loaded after the spectrum director', () => {
   const stabilityImport = uiControls.indexOf("import './month-transition-stability.js?v=20260801.11';");
   assert.ok(spectrumImport >= 0, 'der Spectrum Director muss eingebunden bleiben');
   assert.ok(stabilityImport > spectrumImport, 'die Stabilisierung muss den Director nachgelagert abschließen');
+});
+
+test('automatic director updates are atomic while explicit API calls may still animate', () => {
+  const initializer = colorDirector.slice(colorDirector.indexOf('function initializeColorDirector()'));
+  assert.match(initializer, /const update = \(\) => \{/);
+  assert.match(initializer, /applySpectrumProfile\(year, month, \{ animate: false \}\)/);
+  assert.match(initializer, /new MutationObserver\(update\)/);
+  assert.match(initializer, /monthSelect'\)\?\.addEventListener\('change', update\)/);
+  assert.match(initializer, /yearSelect'\)\?\.addEventListener\('change', update\)/);
+  assert.doesNotMatch(initializer, /update\(\{ animate: true \}\)/);
+  assert.match(colorDirector, /export function applySpectrumProfile\(year, month, \{ animate = true \} = \{\}\)/);
 });
 
 test('every synchronization writes the final spectrum without another animation', () => {
