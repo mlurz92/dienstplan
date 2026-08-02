@@ -8,6 +8,7 @@ const controls = await readFile(new URL('../controls.css', import.meta.url), 'ut
 const uiControls = await readFile(new URL('../js/ui-controls.js', import.meta.url), 'utf8');
 const theme = await readFile(new URL('../js/theme.js', import.meta.url), 'utf8');
 const transitions = await readFile(new URL('../transitions.css', import.meta.url), 'utf8');
+const app = await readFile(new URL('../js/app.js', import.meta.url), 'utf8');
 const packageJson = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
 
 test('month transition stability is loaded after the spectrum director', () => {
@@ -85,4 +86,19 @@ test('the spectrum sweep only animates compositor properties', () => {
   assert.match(colorDirector, /sweep\.animate\(\[/);
   assert.match(transitions, /\.month-spectrum-sweep \{[^}]*will-change: opacity, transform;/s);
   assert.match(transitions, /prefers-reduced-motion: reduce\)[^}]*\{[\s\S]*?\.month-spectrum-sweep \{ display: none !important; \}/);
+});
+
+test('the base theme never overwrites the colours owned by the director', () => {
+  // setProperty ohne Priorität würde das `important` des Directors entfernen und
+  // den kräftigen Monatskontrast gegen den gedämpften Basiston tauschen.
+  assert.match(theme, /export function colorDirectorOwnsSurface\(\)/);
+  const writer = theme.slice(theme.indexOf('function writeVariables(root, values)'));
+  assert.match(writer.slice(0, 200), /if \(colorDirectorOwnsSurface\(\)\) return;/);
+  assert.match(theme, /\|\| colorDirectorOwnsSurface\(\)/);
+});
+
+test('printing settles the director transition instead of the base theme', () => {
+  const prepare = app.slice(app.indexOf('function prepareForPrint()'), app.indexOf('function restoreAfterPrint()'));
+  assert.match(prepare, /applySpectrumProfile\(resolveThemeYear\(state\.currentYear\), state\.currentMonth, \{ animate: false \}\)/);
+  assert.match(app, /import \{ applySpectrumProfile \} from '\.\/color-director\.js\?v=20260801\.11';/);
 });

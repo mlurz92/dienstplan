@@ -609,6 +609,9 @@ export function applySpectrumProfile(year, month, { animate = true } = {}) {
   if (!animate || !changed || first || prefersReducedMotion() || typeof requestAnimationFrame !== 'function') {
     animatingKey = null;
     writeVariables(root, target);
+    // Auch der sofortige Weg endet auf dem Zielprofil – etwa wenn der Druck
+    // einen laufenden Verlauf abschließt. Das Attribut muss das abbilden.
+    root.dataset.spectrumMotion = 'settled';
     return palette;
   }
 

@@ -326,7 +326,22 @@ export function easeOut(t) {
   return bezier(y1, y2, guess);
 }
 
+/**
+ * Sobald der Seasonal Spectrum Director geladen ist, gehört ihm die sichtbare
+ * Farbe. Das Basistheme bleibt die Rückfallebene für Umgebungen ohne diese
+ * Schicht und schreibt dann unverändert weiter.
+ *
+ * Der Director schreibt mit `important`. `setProperty` ohne Priorität würde
+ * diese Kennzeichnung entfernen und den Wert ersetzen – der Ausdruck, jedes
+ * erneute `render()` und jede Statusaktualisierung hätten den kräftigen
+ * Monatskontrast dadurch gegen den gedämpften Basiston getauscht.
+ */
+export function colorDirectorOwnsSurface() {
+  return typeof document !== 'undefined' && Boolean(document.documentElement?.dataset?.colorDirector);
+}
+
 function writeVariables(root, values) {
+  if (colorDirectorOwnsSurface()) return;
   for (const [name, color] of Object.entries(values)) {
     const css = toCss(color);
     if (css) root.style.setProperty(name, css);
@@ -404,7 +419,10 @@ export function applyMonthTheme(month, { animate = true, year } = {}) {
     updateMetadata();
   };
 
-  if (!animate || !changed || activeThemeKey === null || prefersReducedMotion() || typeof requestAnimationFrame !== 'function') {
+  // Ohne eigene Farbhoheit gibt es auch keinen Grund für eine eigene
+  // rAF-Interpolation: Sie liefe unsichtbar gegen den Verlauf des Directors.
+  if (!animate || !changed || activeThemeKey === null || colorDirectorOwnsSurface()
+    || prefersReducedMotion() || typeof requestAnimationFrame !== 'function') {
     finish();
     return { palette, changed };
   }
