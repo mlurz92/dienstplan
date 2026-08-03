@@ -10,9 +10,9 @@ import {
   parseIso,
   setAssignment,
   setPeerGroupCacheToken
-} from './rules.js?v=20260803.3';
-import { createPacer, yieldToBrowser } from './cooperative-scheduling.js?v=20260803.3';
-import { AUTO_PLAN_BD_LIMITS } from './defaults.js?v=20260803.3';
+} from './rules.js?v=20260803.4';
+import { createPacer, yieldToBrowser } from './cooperative-scheduling.js?v=20260803.4';
+import { AUTO_PLAN_BD_LIMITS } from './defaults.js?v=20260803.4';
 
 const LEVEL_RANK = Object.freeze({ green: 0, yellow: 1, orange: 2, red: 3, gray: 4 });
 const ROLE_ORDER = Object.freeze(['bd', 'hg']);
@@ -254,6 +254,12 @@ function normalizeCap(value) {
   return Number.isInteger(number) && number >= 0 ? number : null;
 }
 
+function invalidCap(value) {
+  if (value === null || value === undefined || value === '') return false;
+  const number = Number(value);
+  return !Number.isFinite(number) || !Number.isInteger(number) || number < 0;
+}
+
 /**
  * Vorgeschlagene BD-Obergrenze einer Person.
  *
@@ -307,8 +313,8 @@ export function normalizeAutoPlanConfig(state, monthData, input = null) {
     const supplied = source.staffLimits?.[person.id] || {};
     staffLimits[person.id] = {
       maxBd: supplied.maxBd === undefined ? defaults.staffLimits[person.id]?.maxBd ?? null : normalizeCap(supplied.maxBd),
-      maxHg: normalizeCap(supplied.maxHg),
-      maxTotal: normalizeCap(supplied.maxTotal)
+      maxHg: supplied.maxHg === undefined ? defaults.staffLimits[person.id]?.maxHg ?? null : normalizeCap(supplied.maxHg),
+      maxTotal: supplied.maxTotal === undefined ? defaults.staffLimits[person.id]?.maxTotal ?? null : normalizeCap(supplied.maxTotal)
     };
   }
   return {
@@ -327,8 +333,17 @@ export function autoPlanConfigFingerprint(config) {
 export function validateAutoPlanConfig(state, monthData, input = null) {
   const config = normalizeAutoPlanConfig(state, monthData, input);
   const errors = [];
+  if (invalidCap(input?.maxRedViolations)) {
+    errors.push('Maximal rote Vorschläge müssen eine nichtnegative ganze Zahl oder leer sein.');
+  }
   for (const person of monthPlanningStaff(state, monthData)) {
     const limits = config.staffLimits[person.id] || {};
+    const supplied = input?.staffLimits?.[person.id] || {};
+    for (const [field, label] of [['maxBd', 'BD-Obergrenze'], ['maxHg', 'HG-Obergrenze'], ['maxTotal', 'Gesamtobergrenze']]) {
+      if (invalidCap(supplied[field])) {
+        errors.push(`${person.short || person.name}: ${label} muss eine nichtnegative ganze Zahl oder leer sein.`);
+      }
+    }
     const bd = countRoleInMonth(monthData, person.id, 'bd');
     const hg = countRoleInMonth(monthData, person.id, 'hg');
     const total = bd + hg;

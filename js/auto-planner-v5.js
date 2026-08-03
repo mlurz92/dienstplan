@@ -21,16 +21,16 @@
 import {
   applyAutoPlanProposal as applyV4Proposal,
   buildAutoPlan as buildV4Plan
-} from './auto-planner-v4.js?v=20260803.3';
+} from './auto-planner-v4.js?v=20260803.4';
 import {
   assertFixedAssignmentsUntouched,
   emptyOptimizerStats,
   perfect,
   proposedChanges
-} from './auto-planner-optimizer.js?v=20260803.3';
-import { evaluatePlanObjective } from './auto-planner-engine.js?v=20260803.3';
+} from './auto-planner-optimizer.js?v=20260803.4';
+import { evaluatePlanObjective } from './auto-planner-engine.js?v=20260803.4';
 
-export * from './auto-planner-v4.js?v=20260803.3';
+export * from './auto-planner-v4.js?v=20260803.4';
 
 const OPTIMIZER_REVISION = 5;
 const clone = value => typeof structuredClone === 'function'

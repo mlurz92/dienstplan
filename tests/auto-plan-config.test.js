@@ -163,6 +163,51 @@ test('Obergrenze unterhalb bestehender Fixpunkte wird vor der Suche abgewiesen',
   await assert.rejects(() => run(monthData, plannerState, config), /Konfiguration ungültig/);
 });
 
+test('negative Obergrenze wird vor der Suche abgewiesen', () => {
+  const monthData = miniMonth(['2026-10-05']);
+  const plannerState = stateWith(monthData);
+  const validation = validateAutoPlanConfig(plannerState, monthData, {
+    staffLimits: { lurz: { maxBd: -1 } }
+  });
+
+  assert.equal(validation.valid, false);
+  assert.match(validation.errors.join(' '), /nichtnegative ganze Zahl/);
+});
+
+test('gebrochene Obergrenze wird vor der Suche abgewiesen', () => {
+  const monthData = miniMonth(['2026-10-05']);
+  const plannerState = stateWith(monthData);
+  const validation = validateAutoPlanConfig(plannerState, monthData, {
+    staffLimits: { lurz: { maxBd: 1.5 } }
+  });
+
+  assert.equal(validation.valid, false);
+  assert.match(validation.errors.join(' '), /nichtnegative ganze Zahl/);
+});
+
+test('nichtnumerische Obergrenze wird vor der Suche abgewiesen', () => {
+  const monthData = miniMonth(['2026-10-05']);
+  const plannerState = stateWith(monthData);
+  const validation = validateAutoPlanConfig(plannerState, monthData, {
+    staffLimits: { lurz: { maxBd: 'unbegrenzt' } }
+  });
+
+  assert.equal(validation.valid, false);
+  assert.match(validation.errors.join(' '), /nichtnegative ganze Zahl/);
+});
+
+test('partielle Engine-Konfiguration behält die HG-Standardgrenze', async () => {
+  const { normalizeAutoPlanConfig: normalizeEngineConfig } = await import('../js/auto-planner-engine.js');
+  const monthData = miniMonth(['2026-09-01', '2026-09-15']);
+  const plannerState = stateWith(monthData);
+  const config = normalizeEngineConfig(plannerState, monthData, {
+    staffLimits: { lurz: { maxBd: 4 } }
+  });
+
+  assert.equal(config.staffLimits.licenji.maxHg, 0);
+  assert.equal(config.staffLimits.sebastian.maxHg, 0);
+});
+
 test('deaktivierter Minimal-Rot-Fallback liefert bei ausschließlich roten Möglichkeiten keinen Vorschlag', async () => {
   const monthData = miniMonth(['2026-07-08']);
   for (const person of DEFAULT_STAFF.filter(entry => entry.includeInPlanning)) {

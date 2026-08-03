@@ -1,0 +1,48 @@
+test_strategy:
+  artifact: "Auto-Plan Engine und Auto-Plan Studio v7.5"
+  rationale: "Die Funktion verändert einen vollständigen Monatsdienstplan, führt parallele Worker aus und zeigt einen lang laufenden, sicher abbrechbaren Hauptworkflow; Fehler können fachlich unzulässige Einteilungen, Datenverlust oder eine blockierte Oberfläche verursachen."
+  criticality: "HIGH"
+
+  selected_types:
+    - rationale: "Fortschrittsaggregation, Konfigurationsnormalisierung, Kommentardeduplizierung und Renderbudget enthalten verzweigte, deterministisch isolierbare Logik."
+      type: "unit"
+      size: "small"
+      framework: "Node.js node:test"
+      dependencies: []
+      gate: "Gate 1"
+    - rationale: "Planner, Runner, Workerprotokoll, Regelengine und Studio-Lebenszyklus überschreiten mehrere Modul- und Nebenläufigkeitsgrenzen."
+      type: "integration"
+      size: "medium"
+      framework: "Node.js node:test mit kontrollierten Worker- und Zeitgeber-Doubles"
+      dependencies: ["Planner-Fixtures", "kontrollierte Worker-Doubles"]
+      gate: "Gate 2"
+    - rationale: "Start, Fortschrittsanzeige, Abbruch, Ergebnisprüfung und Übernahme bilden den zentralen nutzerseitigen Workflow der Anwendung."
+      type: "e2e"
+      size: "large"
+      framework: "Playwright"
+      dependencies: ["lokaler statischer HTTP-Server", "gemockte HTTP-Endpunkte", "Chromium"]
+      gate: "Gate 3"
+    - rationale: "Der statisch ausgelieferte Browser-Modulgraph benötigt einen kurzen Go/No-Go-Nachweis für Start, Studioöffnung und Modulauflösung."
+      type: "smoke"
+      size: "large"
+      framework: "bestehender npm-verify-Workflow mit Playwright-Smoke-Pfad"
+      dependencies: ["auflösbarer Modul-Worker und Browser-Modulgraph", "lokaler statischer HTTP-Server"]
+      gate: "Gate 5"
+    - rationale: "Beliebig lange, ungeordnet eintreffende Worker-Ereignisfolgen besitzen stabile Invarianten: Werte bleiben endlich und begrenzt, Fortschritt fällt nie zurück und ein nichtterminaler Zustand erreicht nie 100 Prozent."
+      type: "property-based"
+      size: "small"
+      framework: "Node.js node:test mit deterministisch generierten Ereignisfolgen"
+      dependencies: []
+      gate: "Gate 6"
+
+  rejected_types:
+    - reason: "Das Studio wird als vollständiger nativer Dialog in der realen Anwendung geladen; ein zusätzliches DOM-Komponenten-Harness würde denselben Zustand schwächer als die ausgewählten Browserpfade prüfen."
+      type: "component"
+    - reason: "Worker, UI und Planner werden gemeinsam aus demselben Repository und Release ausgeliefert; es existiert kein unabhängig versionierter externer Consumer."
+      type: "contract"
+
+  deliberately_skipped:
+    - why: "WebGL und WebGPU werden von v7.5 bewusst nicht verwendet; deren Browser- und Treibermatrix hätte keinen Bezug zur Canvas-2D-Zielarchitektur."
+      what: "GPU-spezifische Kompatibilitäts- und Lasttests"
+    - why: "Instabile Wandzeitgrenzen erzeugen auf geteilter CI falsche Fehlschläge; deterministische Arbeitsmengen, Framebudgets und Lebenszykluszähler liefern die belastbarere Regressionserkennung."
+      what: "starre Millisekunden-Grenzen für vollständige Monatsläufe in CI"

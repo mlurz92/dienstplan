@@ -1,7 +1,7 @@
 /** Auto-Plan Studio v7 – adaptive portfolio controls and execution telemetry. */
-import './auto-plan-studio-v6.js?v=20260803.3';
+import './auto-plan-studio-v6.js?v=20260803.4';
 
-const RELEASE = '20260803.3';
+const RELEASE = '20260803.4';
 
 function addStylesheet() {
   if (document.querySelector('link[data-auto-plan-v7-style]')) return;
@@ -38,12 +38,13 @@ function enhance(dialog) {
 
 function initialize() {
   addStylesheet();
-  const attempt = () => {
-    const dialog = document.getElementById('autoPlanDialog');
-    if (!dialog) return requestAnimationFrame(attempt);
+  const install = event => {
+    const dialog = event?.detail?.dialog || document.getElementById('autoPlanDialog');
+    if (!dialog) return false;
     enhance(dialog);
+    return true;
   };
-  attempt();
+  if (!install()) window.addEventListener('autoplanstudioready', install, { once: true });
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initialize, { once: true });

@@ -70,8 +70,8 @@ async function openJuly(page) {
 async function openStudio(page) {
   await page.locator('#autoPlanBtn').click();
   await expect(page.locator('#autoPlanDialog')).toBeVisible();
-  await expect(page.locator('#autoPlanDialog')).toHaveAttribute('data-algorithm-revision', '7');
-  await expect(page.locator('#autoPlanV7Ribbon')).toContainText('Adaptive Constraint Portfolio');
+  await expect(page.locator('#autoPlanDialog')).toHaveAttribute('data-algorithm-revision', '7.5');
+  await expect(page.locator('#autoPlanV75Ribbon')).toContainText('Truthful Constraint Observatory');
   await expect(page.locator('#autoPlanPerformanceProfile')).toHaveValue('adaptive');
   await expect(page.locator('#autoPlanConfig')).toBeVisible();
   await expect(page.locator('#autoPlanStage')).toBeHidden();
@@ -105,6 +105,7 @@ test('Auto-Plan startet erst nach Parameterfreigabe und schreibt erst nach Ergeb
   await expect(page.locator('#autoPlanLog')).toContainText('Lauf gestartet');
 
   await expect(page.locator('#autoPlanResult')).toBeVisible({ timeout: 120_000 });
+  await expect(page.locator('#autoPlanCanvas')).toHaveAttribute('data-render-mode', 'stopped');
   await expect(page.locator('#autoPlanResultTitle')).toHaveText('Regelkonformer Vorschlag bereit');
   await expect(page.locator('#autoPlanChangeCount')).toContainText('2 neue Einträge');
   await expect(page.locator('#autoPlanScorecards')).toContainText('0 rot');
@@ -203,4 +204,88 @@ test('ungültige Obergrenze unterhalb eines personengebundenen Fixpunkts blockie
   await expect(page.locator('#autoPlanValidation')).toHaveClass(/invalid/);
   await expect(page.locator('#autoPlanValidation')).toContainText('unter 1 bestehenden BD');
   await expect(page.locator('#autoPlanStartBtn')).toBeDisabled();
+});
+
+test('negative Rohgrenze blockiert den Start', async ({ page }) => {
+  await mockApi(page);
+  await openJuly(page);
+  await openStudio(page);
+
+  const input = page.locator('#autoPlanLimitBody tr[data-staff-id="lurz"] input[data-limit="maxBd"]');
+  await input.fill('-1');
+  await expect(page.locator('#autoPlanValidation')).toHaveClass(/invalid/);
+  await expect(page.locator('#autoPlanValidation')).toContainText('nichtnegative ganze Zahl');
+  await expect(page.locator('#autoPlanStartBtn')).toBeDisabled();
+});
+
+test('Fortschrittsanzeige besitzt einen zugänglichen Prozentwert', async ({ page }) => {
+  test.setTimeout(150_000);
+  await mockApi(page);
+  await openJuly(page);
+  await startStudio(page);
+
+  const meter = page.locator('#autoPlanProgressMeter');
+  await expect(meter).toHaveAttribute('role', 'progressbar');
+  await expect(meter).toHaveAttribute('aria-valuemin', '0');
+  await expect(meter).toHaveAttribute('aria-valuemax', '100');
+  await expect.poll(async () => Number(await meter.getAttribute('aria-valuenow'))).toBeGreaterThan(0);
+  await expect(page.locator('#autoPlanTruthWorkload')).toContainText(/Felder|Fixpunkte/);
+  await expect(page.locator('#autoPlanTruthPortfolio')).toContainText(/Läufe|Inline/);
+});
+
+test('Abbruch während der Ergebnisüberleitung hält das Studio geschlossen', async ({ page }) => {
+  test.setTimeout(150_000);
+  await mockApi(page);
+  await openJuly(page);
+  await openStudio(page);
+  await page.locator('#autoPlanTimeBudget').fill('10');
+  await page.locator('#autoPlanStartBtn').click();
+  await expect(page.locator('#autoPlanStage')).toBeVisible();
+
+  await expect(page.locator('#autoPlanProgressMeter')).toHaveAttribute('aria-valuenow', '100', { timeout: 120_000 });
+  await expect(page.locator('#autoPlanStage')).toBeVisible();
+  await page.locator('#autoPlanCancelBtn').click();
+  await expect(page.locator('#autoPlanDialog')).toBeHidden();
+  await page.waitForTimeout(900);
+  await expect(page.locator('#autoPlanDialog')).toBeHidden();
+  await expect(page.locator('#autoPlanResult')).toBeHidden();
+});
+
+test('Reduced Motion schaltet die Canvas auf Ereigniszeichnung', async ({ page }) => {
+  await mockApi(page);
+  await openJuly(page);
+  await page.evaluate(() => {
+    document.documentElement.dataset.motion = 'reduced';
+    document.documentElement.classList.add('reduce-motion');
+  });
+  await startStudio(page);
+
+  await expect(page.locator('#autoPlanCanvas')).toHaveAttribute('data-render-mode', 'reduced');
+});
+
+test('Deaktivierte Rich Tooltips schließen einen sichtbaren Hinweis', async ({ page }) => {
+  await mockApi(page);
+  await openJuly(page);
+  await openStudio(page);
+
+  await page.locator('#autoPlanSearchIntensity').hover();
+  await expect(page.locator('#autoPlanRichTooltip')).toBeVisible();
+  await page.evaluate(() => {
+    document.documentElement.dataset.richTooltips = 'false';
+    window.dispatchEvent(new CustomEvent('appsettingschange', {
+      detail: { appearance: { richTooltips: false } }
+    }));
+  });
+  await expect(page.locator('#autoPlanRichTooltip')).toBeHidden();
+});
+
+test('Escape schließt das Studio und gibt den Fokus an den Auslöser zurück', async ({ page }) => {
+  await mockApi(page);
+  await openJuly(page);
+  await openStudio(page);
+
+  await page.keyboard.press('Escape');
+
+  await expect(page.locator('#autoPlanDialog')).toBeHidden();
+  await expect(page.locator('#autoPlanBtn')).toBeFocused();
 });

@@ -33,6 +33,14 @@ const NEIGHBOURHOOD_TEXT = Object.freeze({
   zertifizierung: 'Vollprüfung'
 });
 
+const EXECUTION_REASON_TEXT = Object.freeze({
+  'memory-constrained': 'speicherschonend',
+  'small-problem': 'auf den kleinen Suchraum begrenzt',
+  'responsive-ui': 'mit Vorrang für eine reaktionsschnelle Oberfläche',
+  'maximum-throughput': 'auf maximalen Durchsatz gestellt',
+  'balanced-throughput': 'zwischen Durchsatz und Bedienbarkeit ausbalanciert'
+});
+
 /**
  * Meilensteine des Laufs, in ihrer sachlichen Reihenfolge.
  *
@@ -86,6 +94,26 @@ function describeCells(cells) {
   if (!days.length) return '';
   if (days.length <= 3) return days.join(', ');
   return `${days.slice(0, 3).join(', ')} und ${days.length - 3} weitere`;
+}
+
+const germanNumber = value => Number(value).toLocaleString('de-DE');
+
+function secondsLabel(milliseconds) {
+  const seconds = Math.max(0, Number(milliseconds) || 0) / 1000;
+  return `${seconds < 10 ? seconds.toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : Math.round(seconds).toLocaleString('de-DE')} s`;
+}
+
+/**
+ * Zerlegt ausschließlich die eine von uns erzeugte Hervorhebung. Beide Teile
+ * werden von der Oberfläche über `textContent` eingesetzt; fremde Markierung
+ * bleibt dadurch sichtbar harmloser Text.
+ */
+export function commentaryParts(value) {
+  const text = String(value ?? '');
+  const match = /^<b>(.*?)<\/b>([\s\S]*)$/.exec(text);
+  return match
+    ? { emphasis: match[1], detail: match[2] }
+    : { emphasis: '', detail: text };
 }
 
 export class AlgorithmCommentary {
@@ -170,7 +198,35 @@ export class AlgorithmCommentary {
       return;
     }
     if (phase === 'blocked') {
+      if (this.finished) return;
+      this.finished = true;
       this.emit('blocked', `<b>Blockiert</b> · ${update.message || ''}`, { force: true });
+      return;
+    }
+
+    if (update.portfolioEvent && Number.isFinite(Number(update.portfolioTotal))) {
+      const total = Number(update.portfolioTotal) || 1;
+      const completed = Math.min(total, Number(update.portfolioCompleted) || 0);
+      const normalizedStage = String(update.stage || '').toLowerCase();
+      const stage = normalizedStage.includes('perfekt') || normalizedStage === 'perfection'
+        ? 'Perfektionsläufe'
+        : 'Aufbauläufe';
+      const cancelled = Number(update.portfolioCancelled) || 0;
+      const failed = Number(update.portfolioFailed) || 0;
+      const settled = Math.min(total, completed + cancelled + failed);
+      this.emit('work', `${settled}/${total} ${stage} abgeschlossen${failed ? ` · ${failed} fehlgeschlagen` : ''}${cancelled ? ` · ${cancelled} nach Regelkurzschluss beendet` : ''}`, { force: true });
+      return;
+    }
+
+    if (phase === 'analysis' && update.executionPlan) {
+      const plan = update.executionPlan;
+      const reserve = Number(plan.reserveCores) || 0;
+      const reason = EXECUTION_REASON_TEXT[plan.reason] || 'adaptiv verteilt';
+      this.once('work', [
+        `${Number(plan.constructionWorkers) || 1} Aufbau- und ${Number(plan.perfectionWorkers) || 1} Perfektionsstränge eingeplant`,
+        reserve ? `${reserve} Kern${reserve === 1 ? '' : 'e'} für die Oberfläche reserviert` : 'Berechnung läuft ohne zusätzliche Kernreserve',
+        reason
+      ].join(' · '));
       return;
     }
 
@@ -182,8 +238,12 @@ export class AlgorithmCommentary {
       this.improvements = update.improvements;
       const where = describeCells(update.changedCells);
       const how = NEIGHBOURHOOD_TEXT[update.neighbourhood] || OPERATOR_TEXT[update.neighbourhood];
-      const detail = [how, where && `am ${where}`].filter(Boolean).join(' ');
-      this.emit('gain', `<b>Verbesserung übernommen</b>${detail ? ` · ${detail}` : ''}`, { force: first });
+      const detail = [
+        how,
+        where && `am ${where}`,
+        Number.isFinite(Number(update.evaluations)) && `${germanNumber(update.evaluations)} Bewertungen bis zu diesem Zugewinn`
+      ].filter(Boolean).join(' · ');
+      this.emit('gain', `<b>Verbesserung ${this.improvements} übernommen</b>${detail ? ` · ${detail}` : ''}`, { force: first });
       return;
     }
 
@@ -195,7 +255,15 @@ export class AlgorithmCommentary {
     // Lebenszeichen einer laufenden Absuche: sie sagen, woran gerade gerechnet
     // wird, ohne ein Ergebnis zu behaupten.
     if (phase === 'perfect' && update.scanning) {
-      this.emit('work', `Nachbarschaft wird abgesucht: ${NEIGHBOURHOOD_TEXT[update.scanning] || update.scanning}`);
+      const facts = [
+        Number.isFinite(Number(update.optimizerRound)) && `Runde ${germanNumber(update.optimizerRound)}`,
+        NEIGHBOURHOOD_TEXT[update.scanning] || update.scanning,
+        Number.isFinite(Number(update.evaluations)) && `${germanNumber(update.evaluations)} Bewertungen`,
+        Number.isFinite(Number(update.moves)) && `${germanNumber(update.moves)} Züge`,
+        Number.isFinite(Number(update.accepted)) && `${germanNumber(update.accepted)} übernommen`,
+        Number.isFinite(Number(update.remainingMs)) && `${secondsLabel(update.remainingMs)} Restbudget`
+      ].filter(Boolean);
+      this.emit('work', `Nachbarschaft wird abgesucht: ${facts.join(' · ')}`);
       return;
     }
 
@@ -210,9 +278,15 @@ export class AlgorithmCommentary {
 
     if ((phase === 'search' || phase === 'propagate') && update.dateIso && Number.isFinite(update.candidateCount)) {
       const role = String(update.role || '').toUpperCase();
-      this.emit('work', update.candidateCount <= 2
+      const facts = [
+        Number.isFinite(Number(update.beamSize)) && `${Number(update.beamSize).toLocaleString('de-DE')} Varianten`,
+        Number.isFinite(Number(update.exploredNodes)) && `${Number(update.exploredNodes).toLocaleString('de-DE')} Zustände geprüft`,
+        Number.isFinite(Number(update.processed)) && Number.isFinite(Number(update.total)) && `${Number(update.processed).toLocaleString('de-DE')}/${Number(update.total).toLocaleString('de-DE')} Felder bearbeitet`
+      ].filter(Boolean);
+      const lead = update.candidateCount <= 2
         ? `Engpass: ${role} am ${germanDay(update.dateIso)} lässt nur noch ${update.candidateCount} Person${update.candidateCount === 1 ? '' : 'en'} zu`
-        : `${role} am ${germanDay(update.dateIso)} belegt · ${update.candidateCount} Personen wären möglich gewesen`);
+        : `${role} am ${germanDay(update.dateIso)} belegt · ${update.candidateCount} Personen wären möglich gewesen`;
+      this.emit('work', [lead, ...facts].join(' · '));
       return;
     }
 
@@ -233,9 +307,17 @@ export class AlgorithmCommentary {
     const parts = [
       `${result.changes?.length || 0} Felder belegt`,
       `${metrics.red || 0} rot`,
+      `${metrics.orange || 0} orange`,
       `${metrics.yellow || 0} gelb`,
       `Fairness ${metrics.fairnessIndex ?? '—'} %`
     ];
+    if (Number(metrics.wishesPossible) > 0 && Number.isFinite(Number(metrics.wishesFulfilled))) {
+      const wishPercent = Math.round((Number(metrics.wishesFulfilled) / Number(metrics.wishesPossible)) * 100);
+      parts.push(`Wünsche ${germanNumber(wishPercent)} %`);
+    }
+    if (Number.isFinite(Number(metrics.exploredNodes))) parts.push(`${germanNumber(metrics.exploredNodes)} Suchzustände`);
+    if (Number.isFinite(Number(metrics.optimizer?.evaluations))) parts.push(`${germanNumber(metrics.optimizer.evaluations)} Bewertungen`);
+    if (Number.isFinite(Number(result.elapsedMs))) parts.push(`${secondsLabel(result.elapsedMs)} Laufzeit`);
     if (result.certified) parts.push('als nicht weiter verbesserbar zertifiziert');
     this.emit('final', `<b>Ergebnis steht</b> · ${parts.join(' · ')}`, { force: true });
   }

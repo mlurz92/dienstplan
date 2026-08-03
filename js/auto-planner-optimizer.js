@@ -57,8 +57,8 @@ import {
   planRespectsLimits,
   planningContextFor,
   syncPeerCache as syncPlanPeerCache
-} from './auto-planner-engine.js?v=20260803.3';
-import { createPacer, createTicker, now } from './cooperative-scheduling.js?v=20260803.3';
+} from './auto-planner-engine.js?v=20260803.4';
+import { createPacer, createTicker, now } from './cooperative-scheduling.js?v=20260803.4';
 import {
   basicallyEligiblePeers,
   countRoleInMonth,
@@ -68,7 +68,7 @@ import {
   setAssignment,
   setPeerGroupCacheToken,
   toLocalIso
-} from './rules.js?v=20260803.3';
+} from './rules.js?v=20260803.4';
 
 const ROLE_ORDER = Object.freeze(['bd', 'hg']);
 const LEVEL_RANK = Object.freeze({ green: 0, yellow: 1, orange: 2, red: 3, gray: 4 });

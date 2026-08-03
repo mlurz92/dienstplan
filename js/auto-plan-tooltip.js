@@ -114,6 +114,11 @@ export function installAutoPlanTooltips(dialog) {
   });
   window.addEventListener('resize', position, { passive: true });
   dialog.querySelector('#autoPlanBody')?.addEventListener('scroll', position, { passive: true });
+  window.addEventListener('appsettingschange', event => {
+    if (event?.detail?.appearance?.richTooltips === false
+      || document.documentElement.dataset.richTooltips === 'false') hide();
+  });
+  dialog.addEventListener('close', hide);
 
   new MutationObserver(records => {
     for (const record of records) {

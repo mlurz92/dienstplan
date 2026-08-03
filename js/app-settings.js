@@ -1,7 +1,7 @@
-import { DEFAULT_SETTINGS, normalizeSettings } from './defaults.js?v=20260803.3';
-import { markBootstrapDirty, persistBootstrap, state } from './state.js?v=20260803.3';
+import { DEFAULT_SETTINGS, normalizeSettings } from './defaults.js?v=20260803.4';
+import { markBootstrapDirty, persistBootstrap, state } from './state.js?v=20260803.4';
 
-const RELEASE = '20260803.3';
+const RELEASE = '20260803.4';
 const byId = id => document.getElementById(id);
 
 function addStylesheet() {
@@ -42,7 +42,7 @@ function dialogMarkup() {
         </section>
         <section class="settings-section settings-section--accent" aria-labelledby="settingsAutoPlanTitle">
           <div class="settings-section-heading">
-            <span class="settings-section-icon" aria-hidden="true">v7</span>
+            <span class="settings-section-icon" aria-hidden="true">v7.5</span>
             <div><h3 id="settingsAutoPlanTitle">Auto-Plan Engine</h3><p>Sichere Voreinstellungen für neue Läufe; im Studio bleibt jeder Wert pro Lauf änderbar.</p></div>
           </div>
           <div class="settings-grid settings-grid--three">
