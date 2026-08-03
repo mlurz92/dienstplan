@@ -88,10 +88,15 @@ export function isHoliday(dateIso) {
 /**
  * Regulärer Werktag: Montag bis Freitag und kein gesetzlicher Feiertag.
  */
+const regularWorkdayCache = new Map();
 export function isRegularWorkdayIso(dateIso) {
+  const cached = regularWorkdayCache.get(dateIso);
+  if (cached !== undefined) return cached;
   const weekday = parseIsoDate(dateIso).getDay();
-  if (weekday === 0 || weekday === 6) return false;
-  return !isHoliday(dateIso);
+  const result = weekday !== 0 && weekday !== 6 && !isHoliday(dateIso);
+  if (regularWorkdayCache.size > 20000) regularWorkdayCache.clear();
+  regularWorkdayCache.set(dateIso, result);
+  return result;
 }
 
 export function isRegularWorkday(date) {
@@ -120,7 +125,16 @@ export function isFirstRegularWorkdayAfter(dateIso, matches, lookbackDays = 7) {
 /**
  * Die beiden alternierenden Feiertagsblöcke eines Jahres, als ISO-Daten.
  */
+const holidayBlockCache = new Map();
 export function holidayBlocks(year) {
+  const cached = holidayBlockCache.get(year);
+  if (cached) return cached;
+  const blocks = computeHolidayBlocks(year);
+  holidayBlockCache.set(year, blocks);
+  return blocks;
+}
+
+function computeHolidayBlocks(year) {
   const easter = easterSunday(year);
   const goodFriday = addDays(easter, -2);
   return {

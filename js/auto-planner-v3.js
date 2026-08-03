@@ -18,6 +18,7 @@ import {
   isPositivePreference,
   setAssignment
 } from './rules.js?v=20260801.11';
+import { createPacer } from './cooperative-scheduling.js?v=20260801.11';
 
 export {
   autoPlanConfigFingerprint,
@@ -260,7 +261,7 @@ function tryMonth(state, trial, baseline, config, current, stats, kind) {
   return { monthData: trial, objective: next };
 }
 
-function singleReassignments(state, current, baseline, config, allowRed, stats, budget) {
+async function singleReassignments(state, current, baseline, config, allowRed, stats, budget, pace) {
   let best = current;
   const severity = new Map(best.objective.audit.entries.map(entry => [`${entry.dateIso}|${entry.role}`, LEVEL_RANK[entry.evaluation.level] || 0]));
   const changes = mutableChanges(best.monthData, baseline).sort((left, right) =>
@@ -268,6 +269,7 @@ function singleReassignments(state, current, baseline, config, allowRed, stats, 
     || left.dateIso.localeCompare(right.dateIso));
   for (const change of changes) {
     if (stats.neighbors >= budget) break;
+    await pace();
     const cleared = clone(best.monthData);
     cleared.days[change.dateIso][change.role] = '';
     for (const candidate of eligibleCandidates(state, cleared, change.dateIso, change.role, config, allowRed).slice(0, 6)) {
@@ -280,11 +282,12 @@ function singleReassignments(state, current, baseline, config, allowRed, stats, 
   return best;
 }
 
-function pairAndChainMoves(state, current, baseline, config, stats, budget) {
+async function pairAndChainMoves(state, current, baseline, config, stats, budget, pace) {
   let best = current;
   const changes = mutableChanges(best.monthData, baseline);
   for (let left = 0; left < changes.length && stats.neighbors < budget; left += 1) {
     for (let right = left + 1; right < changes.length && stats.neighbors < budget; right += 1) {
+      await pace();
       const first = changes[left];
       const second = changes[right];
       if (first.role !== second.role || first.staffId === second.staffId) continue;
@@ -299,6 +302,7 @@ function pairAndChainMoves(state, current, baseline, config, stats, budget) {
   for (let a = 0; a < refreshed.length && stats.neighbors < budget; a += 1) {
     for (let b = a + 1; b < refreshed.length && stats.neighbors < budget; b += 1) {
       for (let c = b + 1; c < refreshed.length && stats.neighbors < budget; c += 1) {
+        await pace();
         const first = refreshed[a];
         const second = refreshed[b];
         const third = refreshed[c];
@@ -315,13 +319,14 @@ function pairAndChainMoves(state, current, baseline, config, stats, budget) {
   return best;
 }
 
-function dayBundleMoves(state, current, baseline, config, stats, budget) {
+async function dayBundleMoves(state, current, baseline, config, stats, budget, pace) {
   let best = current;
   const dates = monthDates(best.monthData).filter(dateIso =>
     !baseline.days?.[dateIso]?.bd && !baseline.days?.[dateIso]?.hg
     && best.monthData.days?.[dateIso]?.bd && best.monthData.days?.[dateIso]?.hg);
   for (let left = 0; left < dates.length && stats.neighbors < budget; left += 1) {
     for (let right = left + 1; right < dates.length && stats.neighbors < budget; right += 1) {
+      await pace();
       const firstDate = dates[left];
       const secondDate = dates[right];
       const trial = clone(best.monthData);
@@ -405,6 +410,7 @@ async function iterativeImprove({ state, result, runConfig, onProgress, signal }
     localRebuilds: 0,
     localNodes: 0
   };
+  const pace = createPacer();
   let stableRounds = 0;
   const perRoundBudget = runConfig?.searchIntensity === 'maximum' ? 420 : runConfig?.searchIntensity === 'standard' ? 120 : 260;
 
@@ -417,9 +423,9 @@ async function iterativeImprove({ state, result, runConfig, onProgress, signal }
     stats.rounds = round;
     const before = [...current.objective.key];
     const budget = stats.neighbors + perRoundBudget;
-    current = singleReassignments(state, current, result.baseline, config, allowRed, stats, budget);
-    current = pairAndChainMoves(state, current, result.baseline, config, stats, budget);
-    current = dayBundleMoves(state, current, result.baseline, config, stats, budget);
+    current = await singleReassignments(state, current, result.baseline, config, allowRed, stats, budget, pace);
+    current = await pairAndChainMoves(state, current, result.baseline, config, stats, budget, pace);
+    current = await dayBundleMoves(state, current, result.baseline, config, stats, budget, pace);
     current = localRebuild(state, current, result.baseline, config, allowRed, iterative, stats, signal);
     const improved = compareVectors(current.objective.key, before) < 0;
     stableRounds = improved ? 0 : stableRounds + 1;
@@ -433,8 +439,6 @@ async function iterativeImprove({ state, result, runConfig, onProgress, signal }
       iterativeRounds: iterative.repairIterations,
       localNodes: stats.localNodes
     });
-    if (typeof scheduler === 'object' && typeof scheduler.yield === 'function') await scheduler.yield();
-    else await Promise.resolve();
     if (stableRounds >= 2) break;
   }
   return { current, iterative, stats };

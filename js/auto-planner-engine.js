@@ -10,6 +10,7 @@ import {
   parseIso,
   setAssignment
 } from './rules.js?v=20260801.11';
+import { createPacer, yieldToBrowser } from './cooperative-scheduling.js?v=20260801.11';
 
 const LEVEL_RANK = Object.freeze({ green: 0, yellow: 1, orange: 2, red: 3, gray: 4 });
 const ROLE_ORDER = Object.freeze(['bd', 'hg']);
@@ -18,10 +19,20 @@ const FOCUS_VALUES = new Set(['balanced', 'wishes', 'workload', 'weekends']);
 const INTENSITY_VALUES = new Set(['standard', 'deep', 'maximum']);
 const EPSILON = 1e-9;
 const MAX_EXACT_REMAINING = 7;
+/**
+ * Suchstrahlbreiten der Konstruktionsphase.
+ *
+ * Die Konstruktion liefert den Ausgangspunkt, nicht das Ergebnis: Die eigentliche
+ * Qualität entsteht in der nachgelagerten iterativen Optimierung, die den
+ * gesamten Zeitrahmen bekommt. Sehr breite Suchstrahlen kosten hier
+ * überproportional viel Zeit – jede zusätzliche Variante braucht eigene
+ * Regelbewertungen für Kandidaten und Vorwärts-Checking – und verbessern den
+ * Startpunkt nur noch marginal. Die Breiten bleiben deshalb bewusst moderat.
+ */
 const PRESETS = Object.freeze({
-  standard: { beam: 48, branch: 10, deepBeam: 96, deepBranch: 15, fallbackBeam: 128, fallbackBranch: 18, exact: 3200, lookahead: 6, polish: 1 },
-  deep: { beam: 72, branch: 14, deepBeam: 144, deepBranch: 20, fallbackBeam: 192, fallbackBranch: 24, exact: 9000, lookahead: 10, polish: 2 },
-  maximum: { beam: 112, branch: 20, deepBeam: 224, deepBranch: 28, fallbackBeam: 320, fallbackBranch: 32, exact: 22000, lookahead: 14, polish: 3 }
+  standard: { beam: 10, branch: 5, deepBeam: 18, deepBranch: 7, fallbackBeam: 24, fallbackBranch: 9, exact: 3200, lookahead: 3, polish: 1 },
+  deep: { beam: 16, branch: 6, deepBeam: 28, deepBranch: 9, fallbackBeam: 36, fallbackBranch: 11, exact: 9000, lookahead: 4, polish: 2 },
+  maximum: { beam: 24, branch: 8, deepBeam: 44, deepBranch: 12, fallbackBeam: 56, fallbackBranch: 14, exact: 22000, lookahead: 5, polish: 3 }
 });
 
 const clone = value => typeof structuredClone === 'function'
@@ -54,12 +65,6 @@ function abortIfRequested(signal) {
   const error = new Error('Auto-Plan wurde abgebrochen.');
   error.name = 'AbortError';
   throw error;
-}
-
-function yieldToBrowser() {
-  if (typeof scheduler === 'object' && typeof scheduler?.yield === 'function') return scheduler.yield();
-  if (typeof requestAnimationFrame === 'function') return new Promise(resolve => requestAnimationFrame(resolve));
-  return Promise.resolve();
 }
 
 async function report(onProgress, payload) {
@@ -106,6 +111,46 @@ function relevantMonthSnapshot(monthData) {
     preferences: monthData?.preferences || {},
     options: monthData?.options || {}
   });
+}
+
+/**
+ * Zugänge für die nachgelagerte Perfektionsphase.
+ *
+ * Zielfunktion, Vergleich und Zulässigkeitsprüfung existieren bewusst nur an
+ * einer Stelle: Konstruktion und iterative Optimierung müssen dieselbe Ordnung
+ * verwenden, sonst verbessert die eine Phase, was die andere für schlechter
+ * hält.
+ */
+export function evaluatePlanObjective(state, monthData, baseline, config) {
+  return finalObjective(state, monthData, baseline, config);
+}
+
+export function compareObjectiveKeys(left, right) {
+  return compareVectors(left, right);
+}
+
+export function isObjectiveAdmissible(objective, allowRed) {
+  return admissible(objective, allowRed ? SEARCH_MODE.CONFIRMABLE : SEARCH_MODE.STRICT);
+}
+
+export function listOpenSlots(monthData) {
+  return openSlots(monthData);
+}
+
+export function listProposedAssignments(monthData, baseline) {
+  return proposedAssignments(monthData, baseline);
+}
+
+export function planRespectsLimits(monthData, staffId, role, config) {
+  return respectsLimits(monthData, staffId, role, config);
+}
+
+export function planningContextFor(state, baseline) {
+  return planningContext(state, baseline);
+}
+
+export function candidateEvaluationVector(evaluation) {
+  return vectorOf(evaluation);
 }
 
 export function fingerprintMonth(monthData) {
@@ -210,6 +255,50 @@ function vectorOf(evaluation) {
   return Array.isArray(vector) ? vector.map(value => Number(value) || 0) : [0, 0, 0, 0, 0, 0];
 }
 
+/**
+ * Unveränderlicher Planungskontext eines Laufs.
+ *
+ * Alles, was ausschließlich vom Ausgangsmonat abhängt, wird genau einmal
+ * bestimmt: die Tagesliste, die offenen Felder, der Kreis der Fachärzte, die
+ * Samstage und vor allem der Katalog erfüllbarer Wünsche. Letzterer erforderte
+ * zuvor je Zwischenbewertung einen vollständigen Regeldurchlauf über alle
+ * Wunschzellen des Monats und dominierte damit die Laufzeit.
+ */
+const planningContextCache = new WeakMap();
+
+function planningContext(state, baseline) {
+  let cached = planningContextCache.get(baseline);
+  if (cached && cached.state === state) return cached;
+  const dates = monthDates(baseline);
+  const staff = monthPlanningStaff(state, baseline);
+  const baselineState = simulatedState(state, baseline);
+  const possibleWishes = [];
+  for (const dateIso of dates) {
+    for (const role of ROLE_ORDER) {
+      if (baseline.days?.[dateIso]?.[role]) continue;
+      for (const person of getPlanningStaff(state.staff, dateIso)) {
+        if (!isPositivePreference(getPreference(baseline, person.id, dateIso), role)) continue;
+        const evaluation = evaluateCandidate({ state: baselineState, monthData: baseline, dateIso, role, staffId: person.id });
+        if (evaluation.level === 'gray' || evaluation.canSelect === false) continue;
+        possibleWishes.push({ dateIso, role, staffId: person.id });
+      }
+    }
+  }
+  cached = {
+    state,
+    dates,
+    staff,
+    openSlots: openSlots(baseline),
+    specialists: staff.filter(person => dates.some(dateIso => getRoleProperties(person, dateIso).canHg)),
+    saturdays: dates.filter(dateIso => parseIso(dateIso).getDay() === 6),
+    possibleWishes
+  };
+  cached.saturdayStaff = cached.staff.filter(person =>
+    cached.saturdays.some(dateIso => getRoleProperties(person, dateIso).canSaturdayBd));
+  planningContextCache.set(baseline, cached);
+  return cached;
+}
+
 function respectsLimits(monthData, staffId, role, config) {
   const limits = config.staffLimits?.[staffId];
   if (!limits) return true;
@@ -312,14 +401,14 @@ function variance(values) {
   return values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / values.length;
 }
 
-function fairnessSnapshot(state, monthData) {
-  const staff = monthPlanningStaff(state, monthData);
-  const dates = monthDates(monthData);
+function fairnessSnapshot(state, monthData, context) {
+  const staff = context?.staff || monthPlanningStaff(state, monthData);
+  const specialists = context?.specialists
+    || staff.filter(person => monthDates(monthData).some(dateIso => getRoleProperties(person, dateIso).canHg));
   const bdPenalty = staff.reduce((sum, person) => {
     const deviation = countRoleInMonth(monthData, person.id, 'bd') - Number(person.bdTarget || 0);
     return sum + (deviation < 0 ? deviation ** 2 : 1.3 * deviation ** 2);
   }, 0);
-  const specialists = staff.filter(person => dates.some(dateIso => getRoleProperties(person, dateIso).canHg));
   const sandbox = simulatedState(state, monthData);
   return {
     bdPenalty,
@@ -329,30 +418,18 @@ function fairnessSnapshot(state, monthData) {
   };
 }
 
-function saturdayVariance(state, monthData) {
-  const saturdays = monthDates(monthData).filter(dateIso => parseIso(dateIso).getDay() === 6);
-  const eligible = monthPlanningStaff(state, monthData).filter(person =>
+function saturdayVariance(state, monthData, context) {
+  const saturdays = context?.saturdays || monthDates(monthData).filter(dateIso => parseIso(dateIso).getDay() === 6);
+  const eligible = context?.saturdayStaff || monthPlanningStaff(state, monthData).filter(person =>
     saturdays.some(dateIso => getRoleProperties(person, dateIso).canSaturdayBd));
   return variance(eligible.map(person => saturdays.filter(dateIso => monthData.days?.[dateIso]?.bd === person.id).length));
 }
 
 function wishSnapshot(state, monthData, baseline) {
-  let possible = 0;
-  let fulfilled = 0;
-  const baselineState = simulatedState(state, baseline);
-  for (const dateIso of monthDates(monthData)) {
-    for (const role of ROLE_ORDER) {
-      if (baseline.days?.[dateIso]?.[role]) continue;
-      const assigned = monthData.days?.[dateIso]?.[role] || '';
-      for (const person of getPlanningStaff(state.staff, dateIso)) {
-        if (!isPositivePreference(getPreference(monthData, person.id, dateIso), role)) continue;
-        const evaluation = evaluateCandidate({ state: baselineState, monthData: baseline, dateIso, role, staffId: person.id });
-        if (evaluation.level === 'gray' || evaluation.canSelect === false) continue;
-        possible += 1;
-        if (assigned === person.id) fulfilled += 1;
-      }
-    }
-  }
+  const context = planningContext(state, baseline);
+  const possible = context.possibleWishes.length;
+  const fulfilled = context.possibleWishes.filter(wish =>
+    monthData.days?.[wish.dateIso]?.[wish.role] === wish.staffId).length;
   return { possible, fulfilled, missed: Math.max(0, possible - fulfilled) };
 }
 
@@ -371,8 +448,9 @@ function softObjectiveKey(config, audit, wishes, fairness, weekendSpread) {
 }
 
 function finalObjective(state, monthData, baseline, config) {
+  const context = planningContext(state, baseline);
   const audit = auditProposal(state, monthData, baseline);
-  const fairness = fairnessSnapshot(state, monthData);
+  const fairness = fairnessSnapshot(state, monthData, context);
   const wishes = wishSnapshot(state, monthData, baseline);
   const unfilled = openSlots(monthData).length;
   const limitViolations = limitsAudit(monthData, config).length;
@@ -388,7 +466,7 @@ function finalObjective(state, monthData, baseline, config) {
       audit.specialRed,
       audit.orange,
       audit.yellow,
-      ...softObjectiveKey(config, audit, wishes, fairness, saturdayVariance(state, monthData)),
+      ...softObjectiveKey(config, audit, wishes, fairness, saturdayVariance(state, monthData, context)),
       -audit.recommendation[3],
       -audit.recommendation[4],
       -audit.recommendation[5]
@@ -396,22 +474,67 @@ function finalObjective(state, monthData, baseline, config) {
   };
 }
 
+/**
+ * Zusammenfassung der Bewertungen, die beim Setzen entstanden sind.
+ *
+ * Jede Kandidatenbewertung wird bei der Auswahl ohnehin berechnet und im
+ * Suchpfad des Knotens mitgeführt. Für das Ranking eines Zwischenzustands genügt
+ * diese Mitschrift: Sie ist ohne einen einzigen weiteren Regeldurchlauf
+ * verfügbar. Verbindlich ist sie nicht – spätere Belegungen können frühere
+ * Bewertungen verschieben –, deshalb wird jede Endlösung anschließend mit
+ * `finalObjective` vollständig neu geprüft.
+ */
+function traceAudit(node) {
+  const recommendation = [0, 0, 0, 0, 0, 0];
+  let red = 0;
+  let specialRed = 0;
+  let orange = 0;
+  let yellow = 0;
+  let gray = 0;
+  for (const step of node.trace) {
+    if (step.level === 'red') red += 1;
+    if (step.level === 'red' && step.confirmationType === 'special') specialRed += 1;
+    if (step.level === 'orange') orange += 1;
+    if (step.level === 'yellow') yellow += 1;
+    if (step.level === 'gray') gray += 1;
+    const vector = step.vector;
+    if (vector) for (let index = 0; index < recommendation.length; index += 1) recommendation[index] += vector[index] || 0;
+  }
+  return { red, specialRed, orange, yellow, gray, recommendation, entries: node.trace };
+}
+
+/**
+ * Rangfolge eines Zwischenzustands ohne vollständiges Monats-Audit.
+ *
+ * Zuvor bewertete diese Stelle jeden erzeugten Nachfolger mit einem kompletten
+ * Regeldurchlauf über alle bereits gesetzten Felder. Bei einigen hundert
+ * Nachfolgern je Dienstfeld und rund sechzig Dienstfeldern ergab das
+ * Millionen von Regelauswertungen und Laufzeiten jenseits jeder Nutzbarkeit.
+ * Gezählt wird jetzt ausschließlich, was bereits vorliegt oder sich in
+ * Zählschritten ergibt.
+ */
 function partialObjective(state, node, baseline, config, flexibility = null) {
-  const objective = finalObjective(state, node.monthData, baseline, config);
+  const context = planningContext(state, baseline);
+  const audit = traceAudit(node);
+  const fairness = fairnessSnapshot(state, node.monthData, context);
+  const wishes = wishSnapshot(state, node.monthData, baseline);
+  const limitViolations = limitsAudit(node.monthData, config).length;
+  const redLimitExceeded = config.maxRedViolations !== null && audit.red > config.maxRedViolations;
   return {
-    ...objective,
+    audit, fairness, wishes, limitViolations, redLimitExceeded,
+    unfilled: 0,
     key: [
-      objective.limitViolations,
-      objective.audit.gray,
-      objective.redLimitExceeded ? 1 : 0,
-      objective.audit.red,
-      objective.audit.specialRed,
-      objective.audit.orange,
-      objective.audit.yellow,
+      limitViolations,
+      audit.gray,
+      redLimitExceeded ? 1 : 0,
+      audit.red,
+      audit.specialRed,
+      audit.orange,
+      audit.yellow,
       flexibility?.blocked ? 1 : 0,
       -(flexibility?.minimumDomain || 0),
       -(flexibility?.domainProduct || 0),
-      ...softObjectiveKey(config, objective.audit, objective.wishes, objective.fairness, saturdayVariance(state, node.monthData))
+      ...softObjectiveKey(config, audit, wishes, fairness, saturdayVariance(state, node.monthData, context))
     ]
   };
 }
@@ -425,7 +548,14 @@ function assignNode(node, slot, candidate) {
   setAssignment(monthData, slot.dateIso, slot.role, candidate.person.id);
   return {
     monthData,
-    trace: [...node.trace, { ...slot, staffId: candidate.person.id, level: candidate.evaluation.level, reasons: candidate.evaluation.reasons || [] }],
+    trace: [...node.trace, {
+      ...slot,
+      staffId: candidate.person.id,
+      level: candidate.evaluation.level,
+      confirmationType: candidate.evaluation.meta?.confirmationType || null,
+      vector: vectorOf(candidate.evaluation),
+      reasons: candidate.evaluation.reasons || []
+    }],
     depth: node.depth + 1
   };
 }
@@ -434,8 +564,26 @@ function signature(monthData, baseline) {
   return openSlots(baseline).map(slot => `${slot.dateIso}:${slot.role}:${monthData.days?.[slot.dateIso]?.[slot.role] || ''}`).join('|');
 }
 
+/**
+ * Der beste Endzustand einer Suchwelle.
+ *
+ * Vorgefiltert wird mit der inkrementellen Mitschrift, entschieden ausschließlich
+ * mit dem vollständigen Regel-Audit: Nur die aussichtsreichsten Varianten
+ * durchlaufen die teure Endbewertung, das Ergebnis bleibt aber eine exakt
+ * geprüfte Belegung.
+ */
+const EXACT_FINALISTS = 24;
+
 function selectBest(state, nodes, baseline, config) {
-  const ranked = nodes.map(node => ({ node, objective: finalObjective(state, node.monthData, baseline, config) }));
+  const shortlist = nodes.length <= EXACT_FINALISTS
+    ? nodes
+    : nodes
+      .map(node => ({ node, objective: partialObjective(state, node, baseline, config) }))
+      .sort((left, right) => compareVectors(left.objective.key, right.objective.key)
+        || signature(left.node.monthData, baseline).localeCompare(signature(right.node.monthData, baseline)))
+      .slice(0, EXACT_FINALISTS)
+      .map(entry => entry.node);
+  const ranked = shortlist.map(node => ({ node, objective: finalObjective(state, node.monthData, baseline, config) }));
   ranked.sort((left, right) => compareVectors(left.objective.key, right.objective.key)
     || signature(left.node.monthData, baseline).localeCompare(signature(right.node.monthData, baseline)));
   return ranked[0] || null;
@@ -474,30 +622,53 @@ function admissible(objective, mode) {
   return mode === SEARCH_MODE.CONFIRMABLE || objective.audit.red === 0;
 }
 
+/**
+ * Auswahl der Nachfolger einer Suchwelle.
+ *
+ * Das Vorwärts-Checking ist der teuerste Schritt der Konstruktion: Es besetzt
+ * probeweise künftige Dienstfelder und braucht dafür echte Regelbewertungen.
+ * Es läuft deshalb erst, nachdem billig gerankt und entdoppelt wurde, und nur
+ * für so viele Varianten, wie tatsächlich in den Suchstrahl passen. Fällt eine
+ * Variante als Sackgasse aus, rückt begrenzt aus der Warteliste nach.
+ */
 function pruneBeam({ state, nodes, baseline, config, mode, futureSlots, candidatesFor, width, lookahead, stats }) {
-  const pre = nodes.map(node => ({ node, objective: partialObjective(state, node, baseline, config) }))
+  const ordered = nodes.map(node => ({
+    node,
+    objective: partialObjective(state, node, baseline, config),
+    signature: signature(node.monthData, baseline)
+  }))
     .filter(entry => admissible(entry.objective, mode))
     .sort((left, right) => compareVectors(left.objective.key, right.objective.key)
-      || signature(left.node.monthData, baseline).localeCompare(signature(right.node.monthData, baseline)))
-    .slice(0, Math.max(width, Math.ceil(width * 1.8)));
+      || left.signature.localeCompare(right.signature));
+
+  const seen = new Set();
+  const shortlist = [];
+  for (const entry of ordered) {
+    if (seen.has(entry.signature)) continue;
+    seen.add(entry.signature);
+    shortlist.push(entry);
+  }
+
+  const checkLimit = width + Math.min(width, 24);
   const ranked = [];
-  for (const entry of pre) {
+  for (const entry of shortlist) {
+    if (ranked.length >= width || stats.forwardChecks - stats.forwardChecksAtSlot >= checkLimit) break;
+    stats.forwardChecks += 1;
     const forward = flexibility(entry.node, futureSlots, candidatesFor, lookahead);
     if (forward.blocked) {
       stats.deadEnds += 1;
       continue;
     }
-    ranked.push({ node: entry.node, objective: partialObjective(state, entry.node, baseline, config, forward), signature: signature(entry.node.monthData, baseline) });
+    ranked.push({
+      node: entry.node,
+      objective: partialObjective(state, entry.node, baseline, config, forward),
+      signature: entry.signature
+    });
   }
+  stats.forwardChecksAtSlot = stats.forwardChecks;
+
   ranked.sort((left, right) => compareVectors(left.objective.key, right.objective.key) || left.signature.localeCompare(right.signature));
-  const seen = new Set();
-  const result = [];
-  for (const entry of ranked) {
-    if (seen.has(entry.signature)) continue;
-    seen.add(entry.signature);
-    result.push(entry.node);
-    if (result.length >= width) break;
-  }
+  const result = ranked.slice(0, width).map(entry => entry.node);
   stats.maxBeam = Math.max(stats.maxBeam, result.length);
   return result;
 }
@@ -543,7 +714,7 @@ function exactComplete({ state, seeds, baseline, config, mode, candidatesFor, bu
 }
 
 async function runPass({ state, baseline, config, mode, strategy, width, branch, exactBudget, lookahead, label, progressStart, progressSpan, passIndex, onProgress, signal }) {
-  const stats = { id: `${mode}-${strategy}-${passIndex}`, mode, strategy, beamWidth: width, branchLimit: branch, exploredNodes: 0, generatedNodes: 0, candidateEvaluations: 0, limitRejects: 0, deadEnds: 0, exactNodes: 0, maxBeam: 1, complete: false };
+  const stats = { id: `${mode}-${strategy}-${passIndex}`, mode, strategy, beamWidth: width, branchLimit: branch, exploredNodes: 0, generatedNodes: 0, candidateEvaluations: 0, limitRejects: 0, deadEnds: 0, exactNodes: 0, forwardChecks: 0, forwardChecksAtSlot: 0, maxBeam: 1, complete: false };
   const candidatesFor = createCandidateResolver(state, mode, strategy, config, stats);
   let beam = [emptyNode(clone(baseline))];
   const allSlots = openSlots(baseline);
@@ -602,6 +773,7 @@ function clearAssignment(monthData, dateIso, role) {
 
 async function polish({ state, baseline, best, config, mode, passes, onProgress, signal, stats }) {
   if (!best || best.objective.unfilled || !admissible(best.objective, mode)) return best;
+  const pace = createPacer();
   let monthData = clone(best.node.monthData);
   let objective = finalObjective(state, monthData, baseline, config);
   let improvements = 0;
@@ -617,6 +789,7 @@ async function polish({ state, baseline, best, config, mode, passes, onProgress,
       const candidatesFor = createCandidateResolver(state, mode, 'balanced', config, localStats);
       for (const candidate of candidatesFor(cleared, change.dateIso, change.role)) {
         if (candidate.person.id === current) continue;
+        await pace();
         const trial = clone(cleared);
         setAssignment(trial, change.dateIso, change.role, candidate.person.id);
         const trialObjective = finalObjective(state, trial, baseline, config);
@@ -635,6 +808,7 @@ async function polish({ state, baseline, best, config, mode, passes, onProgress,
     outer: for (let left = 0; left < changes.length; left += 1) {
       for (let right = left + 1; right < changes.length; right += 1) {
         if (swapChecks >= 220) break outer;
+        await pace();
         const first = changes[left];
         const second = changes[right];
         if (first.role !== second.role || first.staffId === second.staffId) continue;
@@ -668,7 +842,7 @@ function profiles(config, overrides) {
   const baseExact = Number.isInteger(overrides.exactBudget) ? overrides.exactBudget : preset.exact;
   const result = [
     { id: 'strict-balanced', mode: SEARCH_MODE.STRICT, strategy: 'balanced', width: Math.max(8, baseBeam), branch: Math.max(4, baseBranch), exact: Math.max(800, Math.floor(baseExact * .35)), lookahead: preset.lookahead, start: .06, span: .30, label: 'Null-Rot-Suche' },
-    { id: 'strict-coverage', mode: SEARCH_MODE.STRICT, strategy: 'coverage', width: Math.max(preset.deepBeam, baseBeam * 2), branch: Math.max(preset.deepBranch, baseBranch + 5), exact: Math.max(3000, Math.floor(baseExact * .8)), lookahead: preset.lookahead + 3, start: .37, span: .29, label: 'Vertiefte Null-Rot-Suche' }
+    { id: 'strict-coverage', mode: SEARCH_MODE.STRICT, strategy: 'coverage', width: Math.max(preset.deepBeam, baseBeam * 2), branch: Math.max(preset.deepBranch, baseBranch + 5), exact: Math.max(3000, Math.floor(baseExact * .8)), lookahead: preset.lookahead + 1, start: .37, span: .29, label: 'Vertiefte Null-Rot-Suche' }
   ];
   if (config.allowRedFallback) result.push({ id: 'confirmable-balanced', mode: SEARCH_MODE.CONFIRMABLE, strategy: 'balanced', width: Math.max(preset.fallbackBeam, baseBeam * 3), branch: Math.max(preset.fallbackBranch, baseBranch + 8), exact: Math.max(6000, baseExact), lookahead: preset.lookahead + 1, start: .69, span: .20, label: 'Minimal-Rot-Suche' });
   return result;

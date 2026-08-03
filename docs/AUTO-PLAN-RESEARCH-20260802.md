@@ -105,6 +105,19 @@ Eine rote Lösung ist nur zulässig, wenn:
 - besondere Ausnahmen zusätzlich begründet wurden;
 - der vollständige Übernahmeaudit keine graue, unbesetzte oder obergrenzenwidrige Zelle erkennt.
 
+### 8. Perfektionsphase und Optimalitätsnachweis
+
+Ergänzt am 03.08.2026 nach erneuter Auswertung der oben genannten Quellen.
+
+Die Konstruktion bestimmt die Ergebnisqualität nur zu einem kleinen Teil. Maßgeblich ist die anschließende Verbesserung. Umgesetzt wird deshalb der in der Literatur übliche Aufbau:
+
+- **Adaptive Large Neighborhood Search.** Zerstören eines fachlich zusammenhängenden Ausschnitts und Neuaufbau mit Vorwärts-Checking. Acht Operatoren decken Zufall, Bewertungsqualität, Kalenderlage, Person, Verwandtschaft, Rolle und Sollabweichung ab. Die Auswahlgewichte folgen dem Erfolg der jeweils letzten Runden.
+- **Late-Acceptance-Hill-Climbing.** Angenommen wird, was den aktuellen Zustand verbessert oder mindestens so gut ist wie der Zustand einer festen Zahl von Runden zuvor. Der Vorteil gegenüber simuliertem Ausglühen liegt in der fehlenden Abstimmung: Es gibt nur einen Parameter, und er ist gegenüber der Problemgröße unempfindlich.
+- **Variable Nachbarschaftsabstiege** zwischen den Runden über sechs Zugarten wachsender Reichweite.
+- **Zertifizierung.** Ein abschließender, nicht abkürzender Durchgang über alle Einzelumsetzungen und alle Paartausche. Ohne Verbesserung ist die Belegung bezüglich dieser Nachbarschaften nachweisbar optimal.
+
+Der Zufallsgenerator wird aus Ausgangsmonat und Laufparametern abgeleitet. Der Lauf bleibt damit reproduzierbar, was für eine fachliche Überprüfung des Vorschlags Voraussetzung ist.
+
 ## Abgrenzung
 
-Die Anwendung implementiert keinen mathematischen Optimalitätsbeweis wie ein vollständiger externer MIP-/CP-SAT-Lauf. Sie kombiniert einen deterministischen, browsergeeigneten Constraint-Suchstrahl mit exakter Restsuche und mehreren lokalen Reparaturnachbarschaften. Die Oberfläche benennt dies als Optimierungsvorschlag und stellt Suchtelemetrie bereit, ohne eine nicht belegte globale Optimalitätsgarantie zu behaupten.
+Die Anwendung implementiert keinen mathematischen Beweis **globaler** Optimalität wie ein vollständiger externer MIP-/CP-SAT-Lauf. Nachgewiesen wird die lokale Optimalität bezüglich aller Einzelumsetzungen und aller Paartausche; weiter reichende Nachbarschaften – Dreierketten, Tages- und Wochenendpakete – werden zusätzlich abgesucht, aber nicht erschöpfend bewiesen. Die Oberfläche unterscheidet genau zwischen `zertifiziert` und `zeitbegrenzt` und behauptet nie mehr, als geprüft wurde.
