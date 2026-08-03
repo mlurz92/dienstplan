@@ -1,5 +1,12 @@
 import { defineConfig } from '@playwright/test';
 
+/**
+ * In abgeschotteten Umgebungen liegt bereits ein Chromium bereit, das nicht der
+ * von Playwright erwarteten Revision entspricht. `PLAYWRIGHT_CHROMIUM_EXECUTABLE`
+ * erlaubt es, genau dieses zu verwenden, statt einen Download zu erzwingen.
+ */
+const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE || undefined;
+
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: false,
@@ -9,6 +16,7 @@ export default defineConfig({
   use: {
     baseURL: 'http://127.0.0.1:4173',
     browserName: 'chromium',
+    launchOptions: executablePath ? { executablePath } : {},
     trace: 'retain-on-failure'
   },
   webServer: {

@@ -93,16 +93,18 @@ test('Auto-Plan präsentiert BD und HG jedes Tages gemeinsam wie die Diensttabel
   await expect(page.locator('#autoPlanRunConfig')).toContainText('Reparaturrunden: 3');
   await expect(page.locator('#autoPlanLoadTable .auto-plan-distribution-table')).toBeVisible();
 
-  const result = page.locator('#autoPlanResult');
-  const scrollState = await result.evaluate(element => ({
+  // Der Dialog hat genau einen Scrollbereich zwischen Kopf- und Fußleiste;
+  // die Abschnitte darin wachsen frei und scrollen nicht für sich.
+  const body = page.locator('#autoPlanBody');
+  const scrollState = await body.evaluate(element => ({
     scrollHeight: element.scrollHeight,
     clientHeight: element.clientHeight,
     overflowY: getComputedStyle(element).overflowY
   }));
   expect(scrollState.overflowY).toBe('auto');
   expect(scrollState.scrollHeight).toBeGreaterThan(scrollState.clientHeight);
-  await result.evaluate(element => { element.scrollTop = element.scrollHeight; });
-  await expect.poll(() => result.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+  await body.evaluate(element => { element.scrollTop = element.scrollHeight; });
+  await expect.poll(() => body.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
   await expect(page.locator('#autoPlanConfirmNote')).toBeInViewport();
 
   const sticky = await table.locator('thead th').first().evaluate(element => getComputedStyle(element).position);

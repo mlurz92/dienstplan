@@ -96,7 +96,7 @@ test('Auto-Plan startet erst nach Parameterfreigabe und schreibt erst nach Ergeb
   await page.locator('#autoPlanSearchIntensity').selectOption('standard');
   await page.locator('#autoPlanStartBtn').click();
   await expect(page.locator('#autoPlanCanvas')).toBeVisible();
-  await expect(page.locator('#autoPlanPhaseList .auto-plan-phase')).toHaveCount(5);
+  await expect(page.locator('#autoPlanPhaseList .auto-plan-phase')).toHaveCount(6);
   await expect(page.locator('#autoPlanGrid > span')).toHaveCount(62);
 
   await expect(page.locator('#autoPlanResult')).toBeVisible({ timeout: 120_000 });
@@ -144,16 +144,47 @@ test('Tageszeilen, Statistik und Bestätigung bleiben bei geringer Fensterhöhe 
   await openJuly(page);
   await startStudio(page);
 
-  const result = page.locator('#autoPlanResult');
-  await expect(result).toBeVisible({ timeout: 120_000 });
+  // Gescrollt wird im gemeinsamen Arbeitsbereich zwischen Kopf und Fußleiste,
+  // nicht in den einzelnen Abschnitten.
+  const body = page.locator('#autoPlanBody');
+  await expect(page.locator('#autoPlanResult')).toBeVisible({ timeout: 120_000 });
   await expect(page.locator('#autoPlanProposalBody tr')).toHaveCount(31);
   await expect(page.locator('#autoPlanLoadTable .auto-plan-distribution-table')).toBeVisible();
-  const state = await result.evaluate(element => ({ clientHeight: element.clientHeight, scrollHeight: element.scrollHeight, overflowY: getComputedStyle(element).overflowY }));
+  const state = await body.evaluate(element => ({ clientHeight: element.clientHeight, scrollHeight: element.scrollHeight, overflowY: getComputedStyle(element).overflowY }));
   expect(state.overflowY).toBe('auto');
   expect(state.scrollHeight).toBeGreaterThan(state.clientHeight);
-  await result.evaluate(element => { element.scrollTop = element.scrollHeight; });
-  await expect.poll(() => result.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+  await body.evaluate(element => { element.scrollTop = element.scrollHeight; });
+  await expect.poll(() => body.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
   await expect(page.locator('#autoPlanApplyBtn')).toBeVisible();
+});
+
+/**
+ * Regression: Die Obergrenzen ließen sich für die unteren Personen nicht mehr
+ * setzen. Ursache war ein Parameterbereich ohne eigenen Scrollbereich in einer
+ * Grid-Zeile fester Höhe – die letzten Zeilen lagen außerhalb des sichtbaren
+ * Bereichs und waren weder erreichbar noch bedienbar.
+ */
+test('jede Person ist im Parameterbereich erreichbar und ihre Obergrenzen sind setzbar', async ({ page }) => {
+  await page.setViewportSize({ width: 900, height: 500 });
+  await mockApi(page);
+  await openJuly(page);
+  await openStudio(page);
+
+  const rows = page.locator('#autoPlanLimitBody tr[data-staff-id]');
+  await expect(rows).toHaveCount(staff.length);
+
+  for (let index = 0; index < staff.length; index += 1) {
+    const input = rows.nth(index).locator('input[data-limit="maxHg"]');
+    await input.scrollIntoViewIfNeeded();
+    await input.fill(String(index + 1));
+    await expect(input).toHaveValue(String(index + 1));
+  }
+
+  // Auch die Freigabemeldung unterhalb der Tabelle bleibt erreichbar.
+  const validation = page.locator('#autoPlanValidation');
+  await validation.scrollIntoViewIfNeeded();
+  await expect(validation).toBeInViewport();
+  await expect(page.locator('#autoPlanStartBtn')).toBeVisible();
 });
 
 test('ungültige Obergrenze unterhalb eines personengebundenen Fixpunkts blockiert den Start', async ({ page }) => {

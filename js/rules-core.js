@@ -1,7 +1,28 @@
 import { MONTH_NAMES, OPTION_TYPES, PREFERENCE_TYPES, STAFF_ORDER, createEmptyMonth, toIsoDate, WEEKDAYS } from './defaults.js?v=20260801.11';
 import { isFirstRegularWorkdayAfter } from './holidays.js?v=20260801.11';
 
-export function parseIso(date) { return new Date(`${date}T00:00:00`); }
+/**
+ * Kalenderhilfen mit Zwischenspeicher.
+ *
+ * `parseIso` liegt auf dem heißesten Pfad der Regelbewertung: Der Auto-Plan
+ * bewertet je Lauf Hunderttausende Kandidaten, und jede Bewertung liest
+ * Nachbartage, Wochenendfenster und Feiertagsblöcke. Das Zerlegen der
+ * Zeichenkette durch den Date-Parser dominierte dabei die Laufzeit. Gespeichert
+ * wird deshalb nur der Zeitstempel; jeder Aufruf liefert weiterhin ein frisches,
+ * gefahrlos veränderbares Date-Objekt.
+ */
+const isoTimestampCache = new Map();
+export function parseIso(date) {
+  const cached = isoTimestampCache.get(date);
+  if (cached !== undefined) return new Date(cached);
+  const parsed = new Date(`${date}T00:00:00`);
+  const time = parsed.getTime();
+  if (Number.isFinite(time)) {
+    if (isoTimestampCache.size > 20000) isoTimestampCache.clear();
+    isoTimestampCache.set(date, time);
+  }
+  return parsed;
+}
 export function addDays(date, days) { const d = new Date(date); d.setDate(d.getDate() + days); return d; }
 export function fmtShort(date) { return `${String(date.getDate()).padStart(2, '0')}.${String(date.getMonth() + 1).padStart(2, '0')}.${date.getFullYear()}`; }
 export function toLocalIso(date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; }
@@ -9,7 +30,27 @@ export function toLocalIso(date) { return `${date.getFullYear()}-${String(date.g
 export const severityRank = { green: 0, yellow: 1, orange: 2, red: 3, gray: -1 };
 export const ABSENCE_FOR_CT_LEADERSHIP = new Set(['urlaub', 'fza']);
 
-export function getStaffById(staff, id) { return staff.find(item => item.id === id); }
+/**
+ * Personenzugriff über einen Index je Personalliste.
+ *
+ * Die Personalliste wird beim Laden, Speichern und Bearbeiten stets als neues
+ * Array gesetzt, nie in sich verändert. Der Index darf deshalb an der Identität
+ * des Arrays hängen und wird mit ihm zusammen verworfen.
+ */
+const staffIndexCache = new WeakMap();
+function staffIndex(staff) {
+  let index = staffIndexCache.get(staff);
+  if (!index) {
+    index = new Map();
+    for (const person of staff) if (person?.id && !index.has(person.id)) index.set(person.id, person);
+    staffIndexCache.set(staff, index);
+  }
+  return index;
+}
+export function getStaffById(staff, id) {
+  if (!Array.isArray(staff)) return undefined;
+  return staffIndex(staff).get(id);
+}
 
 /**
  * Dienstfelder können neben einer Personal-ID auch einen reinen Namenstext aus
@@ -46,17 +87,37 @@ export function assignmentLabel(staff, value, { short = false } = {}) {
   if (!person) return value;
   return short ? (person.short || person.name) : person.name;
 }
+const FIXED_STAFF_ORDER = new Map(STAFF_ORDER.map((id, index) => [id, index]));
+const planningStaffCache = new WeakMap();
+
+/**
+ * Der planbare Personalpool eines Kalendertags in fester Reihenfolge.
+ *
+ * Das Ergebnis hängt nur an der Personalliste und am Datum und wird je
+ * Listenidentität zwischengespeichert. Die zurückgegebene Liste ist eingefroren:
+ * Sie wird an vielen Stellen weitergereicht und darf von keinem Aufrufer
+ * verändert werden, ohne den Zwischenspeicher zu verfälschen.
+ */
 export function getPlanningStaff(staff, dateIso) {
-  const fixedOrder = new Map(STAFF_ORDER.map((id, index) => [id, index]));
-  return staff
+  if (!Array.isArray(staff)) return Object.freeze([]);
+  let byDate = planningStaffCache.get(staff);
+  if (!byDate) {
+    byDate = new Map();
+    planningStaffCache.set(staff, byDate);
+  }
+  const cached = byDate.get(dateIso);
+  if (cached) return cached;
+  const result = Object.freeze(staff
     .map((person, index) => ({ person, index }))
     .filter(({ person }) => person?.includeInPlanning && isStaffActiveOn(person, dateIso))
     .sort((left, right) => {
-      const leftOrder = fixedOrder.has(left.person.id) ? fixedOrder.get(left.person.id) : STAFF_ORDER.length + left.index;
-      const rightOrder = fixedOrder.has(right.person.id) ? fixedOrder.get(right.person.id) : STAFF_ORDER.length + right.index;
+      const leftOrder = FIXED_STAFF_ORDER.has(left.person.id) ? FIXED_STAFF_ORDER.get(left.person.id) : STAFF_ORDER.length + left.index;
+      const rightOrder = FIXED_STAFF_ORDER.has(right.person.id) ? FIXED_STAFF_ORDER.get(right.person.id) : STAFF_ORDER.length + right.index;
       return leftOrder - rightOrder;
     })
-    .map(({ person }) => person);
+    .map(({ person }) => person));
+  byDate.set(dateIso, result);
+  return result;
 }
 
 export function isStaffActiveOn(person, dateIso) {
@@ -66,7 +127,22 @@ export function isStaffActiveOn(person, dateIso) {
   return true;
 }
 
+const rolePropertiesCache = new WeakMap();
+
+/**
+ * Datumsabhängige Qualifikation einer Person. Das Ergebnis ist für ein
+ * Personenobjekt und einen Kalendertag unveränderlich und wird deshalb je
+ * Person zwischengespeichert; Personenobjekte werden beim Bearbeiten immer neu
+ * erzeugt, nie in sich verändert.
+ */
 export function getRoleProperties(person, dateIso) {
+  let byDate = rolePropertiesCache.get(person);
+  if (!byDate) {
+    byDate = new Map();
+    rolePropertiesCache.set(person, byDate);
+  }
+  const cached = byDate.get(dateIso);
+  if (cached) return cached;
   const date = parseIso(dateIso);
   const base = { roleLabel: person.roleLabel, canHg: !!person.canHg, canSaturdayBd: !!person.canSaturdayBd };
   if (person.promotionDate && date >= parseIso(person.promotionDate)) {
@@ -74,7 +150,9 @@ export function getRoleProperties(person, dateIso) {
     base.canHg = person.promotedCanHg ?? base.canHg;
     base.canSaturdayBd = person.promotedCanSaturdayBd ?? base.canSaturdayBd;
   }
-  return base;
+  const frozen = Object.freeze(base);
+  byDate.set(dateIso, frozen);
+  return frozen;
 }
 
 export function dayIso(year, month, day) { return toIsoDate(year, month, day); }
@@ -183,12 +261,28 @@ export function monthContentSummary(monthData) {
   return { filledDays, markedStaff, empty: !filledDays && !markedStaff };
 }
 
+/**
+ * Die Zählfunktionen dieses Abschnitts liegen im innersten Ring der
+ * Regelbewertung: Eine einzige Kandidatenbewertung ruft sie dutzendfach auf, ein
+ * Auto-Plan-Lauf millionenfach. `Object.entries` legte dabei je Aufruf zwei
+ * Wegwerf-Arrays an und machte die Speicherbereinigung zum größten einzelnen
+ * Laufzeitposten. Gezählt wird deshalb direkt über die Schlüssel, ohne
+ * Zwischenobjekte.
+ */
 export function countRoleInMonth(monthData, staffId, role) {
-  return Object.values(monthData.days || {}).filter(day => day?.[role] === staffId).length;
+  const days = monthData?.days;
+  if (!days) return 0;
+  let count = 0;
+  for (const iso in days) if (days[iso]?.[role] === staffId) count += 1;
+  return count;
 }
 
 export function countRoleInMonthExcept(monthData, staffId, role, exceptIso) {
-  return Object.entries(monthData.days || {}).filter(([iso, day]) => iso !== exceptIso && day?.[role] === staffId).length;
+  const days = monthData?.days;
+  if (!days) return 0;
+  let count = 0;
+  for (const iso in days) if (iso !== exceptIso && days[iso]?.[role] === staffId) count += 1;
+  return count;
 }
 
 export function weekendKey(date) {
@@ -199,10 +293,15 @@ export function weekendKey(date) {
 
 export function weekendMap(monthData, staffId, exceptIso = '') {
   const weekends = {};
-  for (const [iso, day] of Object.entries(monthData.days || {})) {
+  const days = monthData?.days;
+  if (!days) return weekends;
+  for (const iso in days) {
     if (iso === exceptIso) continue;
+    const day = days[iso];
+    if (day?.bd !== staffId && day?.hg !== staffId) continue;
     const date = parseIso(iso);
-    if (![5, 6, 0].includes(date.getDay())) continue;
+    const weekday = date.getDay();
+    if (weekday !== 5 && weekday !== 6 && weekday !== 0) continue;
     const key = weekendKey(date);
     weekends[key] ||= { bd: false, hg: false };
     if (day.bd === staffId) weekends[key].bd = true;
@@ -233,7 +332,9 @@ export function projectedWeekendEquivalent(monthData, staffId, dateIso, role) {
 export function listOwnRoleDates(state, staffId, role) {
   const dates = [];
   for (const month of state.months.values()) {
-    for (const [iso, day] of Object.entries(month.days || {})) if (day?.[role] === staffId) dates.push(iso);
+    const days = month?.days;
+    if (!days) continue;
+    for (const iso in days) if (days[iso]?.[role] === staffId) dates.push(iso);
   }
   return dates.sort();
 }
@@ -273,23 +374,39 @@ export function basicallyEligiblePeers(state, monthData, dateIso, role) {
 }
 
 export function countSaturdayBdExcept(monthData, staffId, exceptIso) {
-  return Object.entries(monthData.days || {}).filter(([iso, day]) => iso !== exceptIso && day?.bd === staffId && parseIso(iso).getDay() === 6).length;
+  const days = monthData?.days;
+  if (!days) return 0;
+  let count = 0;
+  for (const iso in days) {
+    if (iso === exceptIso || days[iso]?.bd !== staffId) continue;
+    if (parseIso(iso).getDay() === 6) count += 1;
+  }
+  return count;
 }
 
 export function countHgForAaBdExcept(state, monthData, staffId, exceptIso) {
-  return Object.entries(monthData.days || {}).filter(([iso, day]) => {
-    if (iso === exceptIso || day?.hg !== staffId || !day.bd) return false;
-    return isAaOn(state, day.bd, iso);
-  }).length;
+  const days = monthData?.days;
+  if (!days) return 0;
+  let count = 0;
+  for (const iso in days) {
+    const day = days[iso];
+    if (iso === exceptIso || day?.hg !== staffId || !day.bd) continue;
+    if (isAaOn(state, day.bd, iso)) count += 1;
+  }
+  return count;
 }
 
 export function countServicesInLoadedYearExcept(state, staffId, year, exceptIso, throughMonth = 12) {
+  const prefix = `${year}-`;
   let count = 0;
   for (const [key, month] of state.months.entries()) {
-    if (!key.startsWith(`${year}-`)) continue;
+    if (!key.startsWith(prefix)) continue;
     if (Number(key.slice(5, 7)) > throughMonth) continue;
-    for (const [iso, day] of Object.entries(month.days || {})) {
+    const days = month?.days;
+    if (!days) continue;
+    for (const iso in days) {
       if (iso === exceptIso) continue;
+      const day = days[iso];
       if (day.bd === staffId) count += 1;
       if (day.hg === staffId) count += 1;
     }
