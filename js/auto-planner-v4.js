@@ -1,16 +1,16 @@
 import {
   applyAutoPlanProposal as applyV3Proposal,
   buildAutoPlan as buildV3Plan
-} from './auto-planner-v3.js?v=20260803.6';
+} from './auto-planner-v3.js?v=20260803.4';
 import {
   computeWeekendEquivalent,
   countHgForAaBdExcept,
   countRoleInMonth,
   getPlanningStaff,
   getRoleProperties
-} from './rules.js?v=20260803.6';
+} from './rules.js?v=20260803.4';
 
-export * from './auto-planner-v3.js?v=20260803.6';
+export * from './auto-planner-v3.js?v=20260803.4';
 
 function variance(values) {
   if (!values.length) return 0;

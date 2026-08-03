@@ -1,32 +1,4 @@
-# DienstplanRAD Changelog
-
-## 2026-08-03 – Release 0.7.1 / Excel 365 Aero Workspace
-
-- Die Anwendung besitzt eine aktuelle Office-Fensterhierarchie aus grüner Titelleiste, Befehlssuche, sechs Registern, Menüband, Formelzeile, deckendem Arbeitsblatt, Blattreitern und Statusleiste.
-- Jeder Produktbefehl ist genau einem Register zugeordnet; Import, Export, Planung, Auto-Plan, Aktualisierung und Einstellungen bleiben anhand ihrer Aufgabe auffindbar.
-- Das semantische Registermuster unterstützt Pfeiltasten, `Pos1`, `Ende`, automatische Aktivierung und `Strg+F1` zum Ein- und Ausklappen der Befehlsfläche.
-- `Alt+Q` fokussiert die Befehlssuche und blendet bei einem Treffer ein zuvor eingeklapptes Menüband wieder ein; Formelzeile und Blattreiter verbinden Office-Chrome mit dem aktuellen Monats- beziehungsweise Arbeitsbereichskontext.
-- Aero-Transparenz ist auf App-Chrome und Dialograhmen begrenzt. Dienstplan, Statistik, offene Punkte und Auto-Plan-Inhalte bleiben in Hell, Dunkel und Systemeinstellung vollständig deckend.
-- Windows Forced Colors erhält einen expliziten sichtbaren Fokus; Reduced Motion, Reduced Transparency, Druck und schmale Viewports besitzen eigene Darstellungen.
-- Auto-Plan v7.5, Regelengine, Persistenzverträge und fachliche Monatsfarben bleiben unverändert; bestehende Button-IDs und Ereignisbindungen werden vom neuen Menüband weiterverwendet.
-- Die Statusleiste spiegelt den echten Speicher-, Offline- und Fehlerzustand auch auf schmalen Ansichten als zugängliche Live-Region.
-- Neue Unit- und Chromium-Regressionen prüfen Befehlszuordnung, Registersemantik, Tastatursteuerung, kombinierte Ribbon-/Suchzustände, responsiven Speicherstatus, Theme-Oberflächen, Transparenzgrenzen, Geometrie und Druck.
-- Paketversion `0.7.1`; Browser-Modulgraph, Styles und Manifest verwenden Release-Token `20260803.6`.
-
-## 2026-08-03 – Release 0.7.0 / Clinical Fluent Workspace
-
-- Die vollständige Anwendung verwendet ein gemeinsames semantisches Designsystem für Hauptplan, Action Bar, Dialoge, Einstellungen und Auto-Plan Studio.
-- Systemeinstellung, Hell und Dunkel sind als persistente, normalisierte Darstellung im Settings-Schema v4 verfügbar.
-- Sehr helle Monatsakzente werden im Dark Mode auf kontraststabile Bildschirmflächen abgebildet, ohne Druckfarben oder Monatsidentität zu verändern.
-- Die Diensttabelle behält auf schmalen Ansichten Tag und Wochentag als sticky Orientierung; die Statistik fließt in zugänglich beschriftete Karten um.
-- Zentrale Topbar-/Action-Bar-Bedienungen sind mindestens 36 Pixel, auf groben Zeigegeräten 44 Pixel groß.
-- Reduced Motion, Reduced Transparency, erhöhter Kontrast und Windows Forced Colors besitzen explizite, getestete Darstellungen.
-- Mobile Einstellungen bleiben vollständig innerhalb der dynamischen Viewport-Höhe und scrollen nur ihren Inhaltsbereich.
-- Dekoratives Chrom ist statisch; die Auto-Plan-Bewegung bleibt fortschritts- und zustandsbezogen sowie adaptiv budgetiert.
-- `color-scheme` und synchronisiertes Browser-`theme-color` folgen dem gewählten Theme; Manifest und bewusst neutrale helle PWA-Startfläche sind versioniert.
-- Die lokale Theme-Präferenz wird vor dem ersten Paint defensiv angewendet; ein verzögerter Bootstrap erzeugt keinen Hell-/Dunkelblitz.
-- Neue E2E-Gates messen Theme-Auswahl und Session-Erhalt, Action-Bar-Zielgrößen, ausgewählte dunkle Textkontraste, Forced-Colors-Grundzustand, Motion, Responsive-Tabelle, Statistikkarten und mobile Dialoggrenzen.
-- Paketversion `0.7.0`; Browser-Modulgraph und Styles verwendeten Release-Token `20260803.5`.
+# Auto-Plan Changelog
 
 ## 2026-08-03 – Release 0.6.5 / Auto-Plan v7.5
 

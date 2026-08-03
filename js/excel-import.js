@@ -20,9 +20,9 @@
  * `externalAssignmentValue`). Abwesenheiten sind an eine Personal-ID gebunden
  * und können für Unbekannte nicht abgelegt werden; sie werden gemeldet.
  */
-import { MONTH_NAMES, SHEET_NAMES, createEmptyMonth, toIsoDate } from './defaults.js?v=20260803.6';
-import { externalAssignmentValue, setAbsence, setAssignment } from './rules-core.js?v=20260803.6';
-import { getRbnOptions, rbnDisplayName } from './rbn.js?v=20260803.6';
+import { MONTH_NAMES, SHEET_NAMES, createEmptyMonth, toIsoDate } from './defaults.js?v=20260803.4';
+import { externalAssignmentValue, setAbsence, setAssignment } from './rules-core.js?v=20260803.4';
+import { getRbnOptions, rbnDisplayName } from './rbn.js?v=20260803.4';
 
 const SHEET_NAME_ALIASES = { mrz: 3, mär: 3, maerz: 3, sept: 9, dez: 12 };
 const ABSENCE_CODES = {

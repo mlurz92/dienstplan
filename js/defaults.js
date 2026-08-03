@@ -3,9 +3,8 @@ export const SHEET_NAMES = ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Au
 export const WEEKDAYS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 
 export const DEFAULT_SETTINGS = Object.freeze({
-  schemaVersion: 4,
+  schemaVersion: 3,
   appearance: Object.freeze({
-    theme: 'system',
     density: 'comfortable',
     motion: 'system',
     richTooltips: true
@@ -157,7 +156,6 @@ export function normalizeSettings(value, { strict = false } = {}) {
   return {
     schemaVersion: DEFAULT_SETTINGS.schemaVersion,
     appearance: {
-      theme: normalizedEnum(appearance.theme, new Set(['system', 'light', 'dark']), DEFAULT_SETTINGS.appearance.theme, 'settings.appearance.theme', strict),
       density: normalizedEnum(appearance.density, new Set(['comfortable', 'compact']), DEFAULT_SETTINGS.appearance.density, 'settings.appearance.density', strict),
       motion: normalizedEnum(appearance.motion, new Set(['system', 'reduced']), DEFAULT_SETTINGS.appearance.motion, 'settings.appearance.motion', strict),
       richTooltips: normalizedBoolean(appearance.richTooltips, DEFAULT_SETTINGS.appearance.richTooltips, 'settings.appearance.richTooltips', strict)
