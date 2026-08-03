@@ -427,16 +427,40 @@ async function iterativeImprove({ state, result, runConfig, onProgress, signal }
     stats.rounds = round;
     const before = [...current.objective.key];
     const budget = stats.neighbors + perRoundBudget;
+
+    // Eine Runde dauert mehrere Sekunden. Ohne Zwischenmeldungen stünde der
+    // Balken solange still und die Kommentierung schwiege – beides liest sich
+    // wie ein Hänger. Deshalb meldet jeder der vier Schritte seinen Beginn,
+    // aufgeteilt auf den Fortschrittsabschnitt dieser Runde.
+    const roundSpan = .065 / Math.max(1, iterative.repairIterations);
+    const roundBase = .91 + (round - 1) * roundSpan;
+    const step = async (index, label) => {
+      await onProgress?.({
+        phase: 'polish',
+        progress: roundBase + roundSpan * (index / 5),
+        message: `Tauschrunde ${round}/${iterative.repairIterations} · ${label}`,
+        improvements: stats.improvements,
+        swapChecks: stats.swaps + stats.chains + stats.dayBundles,
+        iterativeRound: round,
+        iterativeRounds: iterative.repairIterations,
+        localNodes: stats.localNodes
+      });
+    };
+
+    await step(0, 'Einzelumsetzungen werden geprüft');
     current = await singleReassignments(state, current, result.baseline, config, allowRed, stats, budget, pace);
+    await step(1, 'Paartausche und Dreierketten werden geprüft');
     current = await pairAndChainMoves(state, current, result.baseline, config, stats, budget, pace);
+    await step(2, 'Tagespakete werden geprüft');
     current = await dayBundleMoves(state, current, result.baseline, config, stats, budget, pace);
+    await step(3, 'Auffällige Tage werden lokal neu geplant');
     current = localRebuild(state, current, result.baseline, config, allowRed, iterative, stats, signal);
     const improved = compareVectors(current.objective.key, before) < 0;
     stableRounds = improved ? 0 : stableRounds + 1;
     await onProgress?.({
       phase: 'polish',
-      progress: .91 + round / Math.max(1, iterative.repairIterations) * .065,
-      message: `Iterative Tauschoptimierung ${round}/${iterative.repairIterations} · ${stats.neighbors.toLocaleString('de-DE')} Nachbarschaften · ${stats.improvements} Verbesserungen`,
+      progress: roundBase + roundSpan,
+      message: `Tauschrunde ${round}/${iterative.repairIterations} abgeschlossen · ${stats.neighbors.toLocaleString('de-DE')} Nachbarschaften · ${stats.improvements} Verbesserungen`,
       improvements: stats.improvements,
       swapChecks: stats.swaps + stats.chains + stats.dayBundles,
       iterativeRound: round,

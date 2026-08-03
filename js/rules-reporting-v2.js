@@ -1,10 +1,11 @@
 import {
   buildStats,
-  collectIssues as collectIssuesBase
+  collectIssues as collectIssuesBase,
+  roleLabelForMonth
 } from './rules-reporting.js?v=20260801.11';
 import { evaluateCandidate } from './rules-evaluation-v2.js?v=20260801.11';
 
-export { buildStats };
+export { buildStats, roleLabelForMonth };
 
 export function collectIssues(state, monthData, options = {}) {
   return collectIssuesBase(state, monthData, {

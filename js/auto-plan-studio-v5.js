@@ -36,9 +36,11 @@ import {
   getPlanningStaff,
   getStaffById,
   parseIso,
+  roleLabelForMonth,
   weekdayLabel
 } from './rules.js?v=20260801.11';
 import { holidayName } from './holidays.js?v=20260801.11';
+import { AlgorithmCommentary } from './auto-plan-commentary.js?v=20260801.11';
 import { AutoPlanVisualizer } from './auto-plan-visualizer.js?v=20260801.11';
 
 const RELEASE = '20260801.11';
@@ -53,9 +55,15 @@ const PHASES = Object.freeze([
   ['certify', 'Zertifizierung']
 ]);
 
+/**
+ * `audit` ist der Schlussaudit des *Aufbaus*, nicht der Optimalitätsnachweis.
+ * Er fällt mit der Fairness-Politur zusammen und gehört deshalb auf „Tausche".
+ * Auf „Zertifizierung" abgebildet spränge das Band schon nach wenigen Sekunden
+ * auf die letzte Stufe und stünde dort minutenlang still.
+ */
 const PHASE_ALIASES = Object.freeze({
   search: 'propagate',
-  audit: 'certify',
+  audit: 'polish',
   complete: null,
   blocked: null
 });
@@ -304,11 +312,14 @@ function template() {
             <div class="auto-plan-phase-list" id="autoPlanPhaseList">${PHASES
               .map(([id, label]) => `<div class="auto-plan-phase" data-phase="${id}"><i></i><span>${label}</span><b>offen</b></div>`)
               .join('')}</div>
-            <div class="auto-plan-message" aria-live="polite">
-              <span class="auto-plan-message-dot"></span>
-              <span id="autoPlanMessage">Monatszustand wird vorbereitet …</span>
-            </div>
-            <div class="auto-plan-grid" id="autoPlanGrid" aria-label="Fortschritt je Dienstfeld"></div>
+            <section class="auto-plan-log" aria-labelledby="autoPlanLogTitle">
+              <div class="auto-plan-log-head">
+                <span id="autoPlanLogTitle">Algorithmus-Kommentar</span>
+                <b id="autoPlanLogCount">—</b>
+              </div>
+              <div class="auto-plan-log-stream" id="autoPlanLog" role="log" aria-live="polite" aria-relevant="additions"></div>
+            </section>
+            <p class="visually-hidden" id="autoPlanMessage">Monatszustand wird vorbereitet …</p>
             <div class="auto-plan-live-metrics">
               <div title="Zahl der Belegungsvarianten, die der Suchstrahl gerade parallel weiterverfolgt."><span>Varianten</span><strong id="autoPlanBeam">—</strong></div>
               <div title="Zahl der Personen, die für das zuletzt bearbeitete Dienstfeld regelkonform wählbar waren."><span>Kandidaten</span><strong id="autoPlanCandidates">—</strong></div>
@@ -426,7 +437,7 @@ function renderLimitRows(monthData, { reset = false } = {}) {
     const name = esc(person.short || person.name);
     const blocked = !reset && limits.maxHg === 0;
     return `<tr data-staff-id="${esc(person.id)}"${blocked ? ' class="is-hg-blocked"' : ''}>
-      <th scope="row"><strong>${name}</strong><small>${esc(person.roleLabel || '')}</small></th>
+      <th scope="row"><strong>${name}</strong><small>${esc(roleLabelForMonth(person, monthData.year, monthData.month))}</small></th>
       <td class="auto-plan-fixed-count">${bd}</td>
       <td><input data-limit="maxBd" type="number" min="${bd}" max="31" step="1" value="${maxBd}" aria-label="BD-Obergrenze ${name}" placeholder="∞"></td>
       <td class="auto-plan-fixed-count">${hg}</td>
@@ -550,18 +561,32 @@ function syncConfigValidation() {
   return errors.length === 0;
 }
 
-function buildGrid(monthData) {
-  const grid = byId('autoPlanGrid');
-  grid.replaceChildren();
-  for (const dateIso of Object.keys(monthData.days || {}).sort()) {
-    for (const role of ['bd', 'hg']) {
-      const cell = document.createElement('span');
-      cell.dataset.slot = `${dateIso}|${role}`;
-      cell.className = monthData.days[dateIso]?.[role] ? 'fixed' : 'open';
-      cell.innerHTML = `<i>${dateIso.slice(-2)}</i><b>${role.toUpperCase()}</b>`;
-      grid.append(cell);
-    }
-  }
+/**
+ * Die laufende Klartextkommentierung des Algorithmus.
+ *
+ * Sie ersetzt das frühere Feldraster. Das Raster zeigte, *dass* etwas passiert;
+ * die Kommentierung zeigt, *was* – welcher Ausschnitt neu aufgebaut wurde,
+ * welcher Tausch etwas gebracht hat, wie weit der Optimalitätsnachweis ist.
+ */
+const MAX_LOG_ENTRIES = 220;
+let commentary;
+
+function appendLogEntry({ kind, text, time }) {
+  const stream = byId('autoPlanLog');
+  if (!stream) return;
+  const entry = document.createElement('p');
+  entry.className = `auto-plan-log-entry is-${kind}`;
+  entry.innerHTML = `<time>${esc(time)}</time><i></i><span>${text}</span>`;
+  stream.append(entry);
+  while (stream.childElementCount > MAX_LOG_ENTRIES) stream.firstElementChild.remove();
+  byId('autoPlanLogCount').textContent = `${stream.childElementCount} Meldungen`;
+  stream.scrollTop = stream.scrollHeight;
+}
+
+function resetLog() {
+  byId('autoPlanLog')?.replaceChildren();
+  const count = byId('autoPlanLogCount');
+  if (count) count.textContent = '—';
 }
 
 function phasePosition(phase) {
@@ -571,8 +596,16 @@ function phasePosition(phase) {
   return index < 0 ? 1 : index;
 }
 
+let highestPhase = 0;
+
+/**
+ * Das Phasenband läuft nur vorwärts. Mehrere parallele Läufe melden
+ * unterschiedliche Stufen; ohne Sperre spränge die Anzeige zwischen ihnen.
+ */
 function renderPhases(phase) {
-  const active = phasePosition(phase);
+  const position = phasePosition(phase);
+  highestPhase = Math.max(highestPhase, position);
+  const active = highestPhase;
   document.querySelectorAll('#autoPlanPhaseList .auto-plan-phase').forEach((element, index) => {
     const status = index < active ? 'done' : index === active ? 'active' : 'pending';
     element.dataset.state = status;
@@ -588,8 +621,15 @@ function renderPhases(phase) {
  * eintreffenden Ereignis zwischen den Läufen hin und her.
  */
 const searchProgress = new Map();
+let searchStage = '';
 
 function mergeSearchProgress(update) {
+  // Beim Wechsel von Aufbau auf Perfektion beginnen neue Läufe mit eigenen
+  // Zählwerten. Ohne Zurücksetzen summierten sich die Stände beider Phasen.
+  if (update.stage && update.stage !== searchStage) {
+    searchStage = update.stage;
+    searchProgress.clear();
+  }
   const index = Number.isInteger(update.searchIndex) ? update.searchIndex : 0;
   searchProgress.set(index, update);
   if (searchProgress.size <= 1) return update;
@@ -632,17 +672,7 @@ function updateProgress(rawUpdate) {
   document.querySelector('.auto-plan-shell')?.style.setProperty('--auto-progress', `${percent}%`);
   renderPhases(update.phase);
 
-  const touched = update.changedCells?.length
-    ? update.changedCells
-    : update.dateIso ? [{ dateIso: update.dateIso, role: update.role }] : [];
-  for (const cell of touched) {
-    const element = document.querySelector(`#autoPlanGrid [data-slot="${cell.dateIso}|${cell.role}"]`);
-    if (!element) continue;
-    element.classList.remove('open');
-    element.classList.add('done', 'active');
-    setTimeout(() => element.classList.remove('active'), 460);
-  }
-
+  commentary?.observe(update);
   visualizer?.update(update);
 }
 
@@ -758,7 +788,9 @@ function renderSearch(result) {
   const iterative = metrics.iterative || {};
   const optimizer = metrics.optimizer || {};
   const entries = [
-    ['Suchläufe', String(metrics.attempts?.length || 0), ''],
+    // Nicht mit den parallelen Suchläufen verwechseln: gezählt werden die
+    // Aufbauversuche des Gewinnerlaufs bis zu seiner ersten gültigen Belegung.
+    ['Aufbauversuche', String(metrics.attempts?.length || 0), ''],
     ['Varianten geprüft', formatNumber(metrics.exploredNodes), ''],
     ['Nachfolger', formatNumber(metrics.generatedNodes), ''],
     ['Sackgassen', formatNumber(metrics.deadEnds), ''],
@@ -940,8 +972,10 @@ function resetProgress(monthData) {
   byId('autoPlanBody').scrollTop = 0;
   stopClock();
   searchProgress.clear();
+  searchStage = '';
+  highestPhase = 0;
   renderPhases('analysis');
-  buildGrid(monthData);
+  resetLog();
   visualizer?.stop();
   visualizer = null;
   renderConfig(monthData);
@@ -976,6 +1010,12 @@ async function startPlanner() {
   visualizer = new AutoPlanVisualizer(byId('autoPlanCanvas'), activeMonth);
   startClock();
 
+  resetLog();
+  commentary = new AlgorithmCommentary({ onEntry: appendLogEntry });
+  const open = Object.values(activeMonth.days || {}).reduce((sum, day) => sum + Number(!day.bd) + Number(!day.hg), 0);
+  const fixed = Object.values(activeMonth.days || {}).reduce((sum, day) => sum + Number(Boolean(day.bd)) + Number(Boolean(day.hg)), 0);
+  commentary.begin({ open, fixed, searches: workersAvailable() ? parallelSearchCount() : 1 });
+
   try {
     proposal = await runAutoPlan({
       state,
@@ -988,6 +1028,7 @@ async function startPlanner() {
     });
     // Kurz stehen lassen: Der Balken erreicht sichtbar hundert Prozent, bevor
     // die Ansicht auf das Ergebnis wechselt.
+    commentary?.finish(proposal);
     await new Promise(resolve => setTimeout(resolve, 620));
     renderResult(proposal);
   } catch (error) {

@@ -59,6 +59,10 @@ self.addEventListener('message', async event => {
       self.postMessage({ type: 'done', runId, result });
       return;
     }
+    // Ein unbekannter Auftrag darf nicht stillschweigend verschluckt werden:
+    // der Anzeigestrang wartet sonst bis zum Zeitlimit auf eine Antwort, die
+    // nie kommt. Lieber sofort und benennbar scheitern.
+    throw new Error(`Unbekannter Auftrag "${String(type)}"`);
   } catch (error) {
     self.postMessage({
       type: 'error',

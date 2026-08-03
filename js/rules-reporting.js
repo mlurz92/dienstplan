@@ -37,7 +37,16 @@ function confirmedIssueDetails(evaluation, override) {
   return `${confirmation}${dateText}${comment ? ` · Kommentar: ${comment}` : ''} · ${evaluation.reasons.join(' · ')}`;
 }
 
-function roleLabelForMonth(person, year, month) {
+/**
+ * Funktionsbezeichnung einer Person für einen ganzen Monat.
+ *
+ * Maßgeblich ist die datumsabhängige Qualifikation, nicht der statische
+ * Stammwert: Wer im Monat befördert wird, trägt vorher die alte und nachher die
+ * neue Bezeichnung, und für den Übergangsmonat wird beides genannt. Jede
+ * monatsbezogene Liste muss diese Fassung verwenden – der Stammwert bliebe
+ * sonst dauerhaft auf dem Stand vor der Beförderung stehen.
+ */
+export function roleLabelForMonth(person, year, month) {
   const firstIso = dayIso(year, month, 1);
   const lastIso = dayIso(year, month, new Date(year, month, 0).getDate());
   const first = getRoleProperties(person, firstIso).roleLabel || '';
