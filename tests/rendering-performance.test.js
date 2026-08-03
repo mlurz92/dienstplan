@@ -86,6 +86,6 @@ test('eigene Änderungen werden sofort lokal gesichert, Serverstände gebündelt
   assert.match(source, /export function flushLocalMonthWrites\(\)/);
 
   // Vor jedem Auslesen und vor jedem Serverschreibvorgang muss die Sammlung leer sein.
-  assert.match(source, /export function readLocalMonth\(year, month\) \{\n  flushLocalMonthWrites\(\);/);
-  assert.match(source, /export function readAllLocalMonths\(\) \{\n  flushLocalMonthWrites\(\);/);
+  assert.match(source, /export function readLocalMonth\(year, month\) \{\r?\n  flushLocalMonthWrites\(\);/);
+  assert.match(source, /export function readAllLocalMonths\(\) \{\r?\n  flushLocalMonthWrites\(\);/);
 });

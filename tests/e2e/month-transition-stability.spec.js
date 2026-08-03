@@ -73,10 +73,25 @@ test('Monatswechsel bleibt sichtbar und läuft als flüssiger Farbverlauf', asyn
     requestAnimationFrame(capture);
   });
 
+  // Der erste Quellframe muss tatsächlich aufgezeichnet sein, bevor die
+  // Auswahl den Zielmonat setzt. Unter Last kann selectOption sonst noch vor
+  // dem ersten requestAnimationFrame laufen und die Ausgangsfarbe fehlt.
+  await page.waitForFunction(
+    () => window.__monthTransitionFrames?.some(frame => frame.key === '2026-01'),
+    null,
+    { polling: 'raf' }
+  );
+
   await page.selectOption('#monthSelect', '2');
   await expect(page.locator('html')).toHaveAttribute('data-spectrum-key', '2026-02');
   await expect(page.locator('#monthTitle')).toContainText('Februar 2026');
-  await page.waitForTimeout(1800);
+  await page.waitForFunction(() => {
+    const root = document.documentElement;
+    return root.dataset.spectrumMotion === 'settled'
+      && root.dataset.monthMotionState === 'idle';
+  }, null, { polling: 'raf' });
+  await page.evaluate(() => new Promise(resolve =>
+    requestAnimationFrame(() => requestAnimationFrame(resolve))));
 
   const frames = await page.evaluate(() => {
     window.__monthTransitionCapture = false;

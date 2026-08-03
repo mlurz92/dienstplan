@@ -18,8 +18,8 @@ import {
   applyAutoPlanProposal,
   createDefaultAutoPlanConfig,
   validateAutoPlanConfig
-} from './auto-planner.js?v=20260801.11';
-import { parallelSearchCount, runAutoPlan, workersAvailable } from './auto-plan-runner.js?v=20260801.11';
+} from './auto-planner.js?v=20260803.2';
+import { parallelSearchCount, runAutoPlan, workersAvailable } from './auto-plan-runner.js?v=20260803.2';
 import {
   getMonthData,
   getMonthLabel,
@@ -27,7 +27,7 @@ import {
   persistMonth,
   setMonthData,
   state
-} from './state.js?v=20260801.11';
+} from './state.js?v=20260803.2';
 import {
   assignmentLabel,
   computeWeekendEquivalent,
@@ -38,12 +38,12 @@ import {
   parseIso,
   roleLabelForMonth,
   weekdayLabel
-} from './rules.js?v=20260801.11';
-import { holidayName } from './holidays.js?v=20260801.11';
-import { AlgorithmCommentary } from './auto-plan-commentary.js?v=20260801.11';
-import { AutoPlanVisualizer } from './auto-plan-visualizer.js?v=20260801.11';
+} from './rules.js?v=20260803.2';
+import { holidayName } from './holidays.js?v=20260803.2';
+import { AlgorithmCommentary } from './auto-plan-commentary.js?v=20260803.2';
+import { AutoPlanVisualizer } from './auto-plan-visualizer.js?v=20260803.2';
 
-const RELEASE = '20260801.11';
+const RELEASE = '20260803.2';
 const STYLESHEETS = ['/auto-plan-studio.css'];
 
 const PHASES = Object.freeze([

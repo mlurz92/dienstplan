@@ -1,12 +1,12 @@
 # DienstplanRAD
 
 <p align="center">
-  <img src="icons/icon.svg" alt="DienstplanRAD – Kalendertabelle mit wechselnden Monatsfarben" width="144">
+  <img src="icons/icon.svg" alt="DienstplanRAD – farbiges Auto-Plan-Constraint-Netz in einer Kalenderfläche" width="144">
 </p>
 
 <p align="center"><strong>Regelgestützte Monatsplanung für Bereitschaftsdienst, Hintergrunddienst und neuroradiologische Rufbereitschaft</strong></p>
 
-> **Paketversion:** `0.5.0`  
+> **Paketversion:** `0.5.1`<br>
 > **Regelwerk:** Eignungsregeln `v4.9`  
 > **Auto-Plan:** Algorithmus `v6` mit Null-Rot-Guardrail, adaptiver Strict-Rescue, iterativer Tauschreparatur, ALNS-Perfektion und Zertifizierung  
 > **Feiertagsregion:** Sachsen (`SN`)  
@@ -249,6 +249,19 @@ Die Canvas-Visualisierung bildet den tatsächlichen Lauf ab:
 
 Der v6-Guardrail macht zusätzlich sichtbar, dass der Minimal-Rot-Fallback erst nach der verbreiterten Strict-Rescue erreicht werden kann.
 
+### App-Icon
+
+Das App-Icon verbindet die Kalenderfläche der Monatsplanung mit dem konzentrischen Constraint-Netz der Auto-Plan-Animation. Zwölf farbige Außenknoten greifen das Monatsspektrum auf; Ringe, Kopplungslinien und der leuchtende Kern stehen für Suche, Propagation und Optimierung.
+
+- `icons/icon.svg`: statisches Vektormaster für Markenbild und skalierbares Favicon;
+- `icons/icon-animated.svg`: separate animierte Designvariante mit `prefers-reduced-motion`;
+- `icons/icon-32.png`: Raster-Fallback für kleine Browserkontexte;
+- `icons/icon-180.png`: Apple-Touch-Icon;
+- `icons/icon-192.png` und `icons/icon-512.png`: installierbare PWA-Icons;
+- `icons/icon-maskable-512.png`: vollflächige Maskable-Variante mit allen wesentlichen Formen innerhalb der sicheren Mittelzone.
+
+Das Icon enthält keine Schrift. Die zentrale Metapher bleibt auch bei 32 Pixeln erkennbar; für Maskable-Kontexte wird nicht dieselbe transparente Datei wiederverwendet.
+
 ---
 
 ## 7. Accessibility
@@ -302,6 +315,15 @@ controls.css
 transitions.css
 auto-plan-studio.css
 auto-plan-studio-v6.css
+
+icons/
+  icon.svg
+  icon-animated.svg
+  icon-32.png
+  icon-180.png
+  icon-192.png
+  icon-512.png
+  icon-maskable-512.png
 
 js/
   app.js
@@ -428,6 +450,8 @@ Neue v6-Regressionstests prüfen insbesondere:
 - bewusste Aufhebung durch explizites `null`;
 - ausschließlich strikte Profile in der Rescue;
 - protokollierte Rescue vor einem Minimal-Rot-Fallback.
+- plattformneutrale Syntax-Gate-Pfade unter Windows und POSIX;
+- identische Quelltextprüfungen bei LF- und CRLF-Zeilenenden.
 
 Ein Merge nach `main` ist nur nach erfolgreicher CI vorgesehen.
 
@@ -453,7 +477,7 @@ Die fachliche und technische Begründung der v6-Architektur einschließlich Cons
 
 ---
 
-## 15. Release 0.5.0
+## 15. Release 0.5.1
 
 - Auto-Plan-Algorithmus v6;
 - adaptive Null-Rot-Rescue vor jedem bestätigbaren Fallback;
@@ -464,3 +488,8 @@ Die fachliche und technische Begründung der v6-Architektur einschließlich Cons
 - WCAG-orientierte Rich Tooltips;
 - zusätzliche v6-Regressionsabdeckung;
 - aktualisierte Architektur-, Betriebs- und Testdokumentation.
+- neues Algorithmus-Spektrum-App-Icon als statische und bewegte SVG-Variante;
+- vollständige 32/180/192/512-Pixel-Ableitungen und separates Maskable-PWA-Icon;
+- plattformneutrale Qualitätsgates für Windows-, macOS- und Linux-Arbeitskopien;
+- deterministische E2E-Synchronisation des Monatsfarbverlaufs über echte Start- und Abschlusszustände statt fester Wartezeit;
+- einheitlicher Release-Token `20260803.2` im vollständigen Browser-Modulgraphen und ein Gate gegen künftige Teilversionen.

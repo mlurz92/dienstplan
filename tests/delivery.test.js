@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile, access } from 'node:fs/promises';
 
 const read = path => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
+const readBinary = path => readFile(new URL(`../${path}`, import.meta.url));
 const exists = async path => {
   try {
     await access(new URL(`../${path}`, import.meta.url));
@@ -11,6 +12,42 @@ const exists = async path => {
     return false;
   }
 };
+
+const pngSize = async path => {
+  const data = await readBinary(path);
+  assert.equal(data.subarray(1, 4).toString('ascii'), 'PNG', `${path} ist keine PNG-Datei`);
+  return [data.readUInt32BE(16), data.readUInt32BE(20)];
+};
+
+test('algorithm spectrum app icons are complete, accessible and correctly wired', async () => {
+  const [html, manifestSource, icon, animated] = await Promise.all([
+    read('index.html'),
+    read('manifest.webmanifest'),
+    read('icons/icon.svg'),
+    read('icons/icon-animated.svg')
+  ]);
+  const manifest = JSON.parse(manifestSource);
+
+  assert.match(icon, /farbiges Constraint-Netz/i);
+  assert.match(icon, /Auto-Plan-Kern/i);
+  assert.match(animated, /prefers-reduced-motion:reduce/);
+  assert.match(html, /icon\.svg\?icon=algorithm-spectrum-2/);
+  assert.match(html, /icon-32\.png\?icon=algorithm-spectrum-2/);
+  assert.match(html, /icon-180\.png\?icon=algorithm-spectrum-2/);
+  assert.match(html, /manifest\.webmanifest\?manifest=algorithm-spectrum-2/);
+
+  assert.deepEqual(await pngSize('icons/icon-32.png'), [32, 32]);
+  assert.deepEqual(await pngSize('icons/icon-180.png'), [180, 180]);
+  assert.deepEqual(await pngSize('icons/icon-192.png'), [192, 192]);
+  assert.deepEqual(await pngSize('icons/icon-512.png'), [512, 512]);
+  assert.deepEqual(await pngSize('icons/icon-maskable-512.png'), [512, 512]);
+
+  const rasterIcons = manifest.icons.filter(item => item.type === 'image/png');
+  assert.deepEqual(rasterIcons.map(item => item.sizes), ['192x192', '512x512', '512x512']);
+  const maskable = manifest.icons.filter(item => item.purpose === 'maskable');
+  assert.equal(maskable.length, 1);
+  assert.match(maskable[0].src, /icon-maskable-512\.png/);
+});
 
 /**
  * Die Anwendung hat keinen Service Worker mehr – und darf auch keinen
@@ -98,11 +135,17 @@ test('legacy service workers are neutralized before versioned application assets
 });
 
 test('all release-critical shell and module assets share one cache-busting token', async () => {
+  const { readdir } = await import('node:fs/promises');
   const files = ['index.html', 'js/app.js', 'js/state.js', 'js/rules.js'];
   const sources = await Promise.all(files.map(read));
-  const tokens = sources.flatMap(source => [...source.matchAll(/\?v=([a-z0-9.-]+)/gi)].map(match => match[1]));
+  const moduleFiles = (await readdir(new URL('../js/', import.meta.url), { withFileTypes: true }))
+    .filter(entry => entry.isFile() && entry.name.endsWith('.js'))
+    .map(entry => `js/${entry.name}`);
+  const releaseSources = [sources[0], ...await Promise.all(moduleFiles.map(read))];
+  const tokens = releaseSources.flatMap(source =>
+    [...source.matchAll(/\?v=([a-z0-9.-]+)/gi)].map(match => match[1]));
 
-  assert.ok(tokens.length >= 10, 'entry assets and the full module graph need version tokens');
+  assert.ok(tokens.length >= 50, 'entry assets and the full module graph need version tokens');
   assert.equal(new Set(tokens).size, 1, 'one release must use one asset version everywhere');
 
   for (let index = 1; index < files.length; index += 1) {
@@ -184,7 +227,7 @@ test('the deployed build stamp matches the module graph release token', async ()
  */
 test('the syntax check covers every shipped module under js/ and functions/', async () => {
   const { readdir } = await import('node:fs/promises');
-  const { resolve, relative, dirname } = await import('node:path');
+  const { resolve, relative, dirname, sep } = await import('node:path');
   const { fileURLToPath } = await import('node:url');
   const wurzel = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -194,7 +237,7 @@ test('the syntax check covers every shipped module under js/ and functions/', as
     for (const eintrag of einträge) {
       const pfad = resolve(verzeichnis, eintrag.name);
       if (eintrag.isDirectory()) treffer.push(...await module_(pfad));
-      else if (eintrag.name.endsWith('.js')) treffer.push(relative(wurzel, pfad));
+      else if (eintrag.name.endsWith('.js')) treffer.push(relative(wurzel, pfad).split(sep).join('/'));
     }
     return treffer;
   }

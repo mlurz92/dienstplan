@@ -19,7 +19,7 @@
  * Abbruchsignal lässt sich nicht über die Strangs hinweg reichen.
  */
 
-import { constructAutoPlan, perfectAutoPlan } from './auto-planner.js?v=20260801.11';
+import { constructAutoPlan, perfectAutoPlan } from './auto-planner.js?v=20260803.2';
 
 /**
  * Fortschrittsmeldungen tragen am Ende das vollständige Ergebnis. Über die

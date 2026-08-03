@@ -10,9 +10,9 @@ import {
   parseIso,
   setAssignment,
   setPeerGroupCacheToken
-} from './rules.js?v=20260801.11';
-import { createPacer, yieldToBrowser } from './cooperative-scheduling.js?v=20260801.11';
-import { AUTO_PLAN_BD_LIMITS } from './defaults.js?v=20260801.11';
+} from './rules.js?v=20260803.2';
+import { createPacer, yieldToBrowser } from './cooperative-scheduling.js?v=20260803.2';
+import { AUTO_PLAN_BD_LIMITS } from './defaults.js?v=20260803.2';
 
 const LEVEL_RANK = Object.freeze({ green: 0, yellow: 1, orange: 2, red: 3, gray: 4 });
 const ROLE_ORDER = Object.freeze(['bd', 'hg']);

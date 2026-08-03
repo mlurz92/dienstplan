@@ -12,8 +12,8 @@ const app = await readFile(new URL('../js/app.js', import.meta.url), 'utf8');
 const packageJson = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
 
 test('month transition stability is loaded after the spectrum director', () => {
-  const spectrumImport = uiControls.indexOf("import './color-director.js?v=20260801.11';");
-  const stabilityImport = uiControls.indexOf("import './month-transition-stability.js?v=20260801.11';");
+  const spectrumImport = uiControls.indexOf("import './color-director.js?v=20260803.2';");
+  const stabilityImport = uiControls.indexOf("import './month-transition-stability.js?v=20260803.2';");
   assert.ok(spectrumImport >= 0, 'der Spectrum Director muss eingebunden bleiben');
   assert.ok(stabilityImport > spectrumImport, 'die Stabilisierung muss den Director nachgelagert abschließen');
 });
@@ -35,7 +35,7 @@ test('a running transition towards the same month is never restarted', () => {
 });
 
 test('every synchronization ends the base animation and hands the colour to the director', () => {
-  assert.match(stability, /import \{ applyMonthTheme \} from '.\/theme\.js\?v=20260801\.11';/);
+  assert.match(stability, /import \{ applyMonthTheme \} from '.\/theme\.js\?v=20260803\.2';/);
   assert.match(stability, /applyMonthTheme\(month, \{ animate: false, year \}\);/);
   assert.match(stability, /applySpectrumProfile\(year, month, \{ animate: true \}\)/);
 
@@ -100,5 +100,5 @@ test('the base theme never overwrites the colours owned by the director', () => 
 test('printing settles the director transition instead of the base theme', () => {
   const prepare = app.slice(app.indexOf('function prepareForPrint()'), app.indexOf('function restoreAfterPrint()'));
   assert.match(prepare, /applySpectrumProfile\(resolveThemeYear\(state\.currentYear\), state\.currentMonth, \{ animate: false \}\)/);
-  assert.match(app, /import \{ applySpectrumProfile \} from '\.\/color-director\.js\?v=20260801\.11';/);
+  assert.match(app, /import \{ applySpectrumProfile \} from '\.\/color-director\.js\?v=20260803\.2';/);
 });
