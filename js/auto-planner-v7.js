@@ -23,7 +23,9 @@ function settingsDefaults(state) {
     allowRedFallback: source.allowRedFallback,
     maxRedViolations: source.maxRedViolations,
     perfectionEnabled: source.perfectionEnabled,
-    parallelSearches: source.parallelSearches
+    parallelSearches: source.parallelSearches,
+    certificationRounds: source.certificationRounds,
+    portfolioDiversity: source.portfolioDiversity
   };
 }
 

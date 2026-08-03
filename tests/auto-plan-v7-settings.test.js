@@ -8,11 +8,19 @@ test('v7 settings defaults are complete and safe', () => {
   const settings = normalizeSettings(null);
 
   assert.deepEqual(settings, DEFAULT_SETTINGS);
-  assert.equal(settings.schemaVersion, 3);
+  assert.equal(settings.schemaVersion, 4);
   assert.deepEqual(settings.appearance, {
     density: 'comfortable',
     motion: 'system',
-    richTooltips: true
+    richTooltips: true,
+    monthColors: 'spectrum',
+    weekendEmphasis: true,
+    ambientBackdrop: true
+  });
+  assert.deepEqual(settings.workflow, {
+    autoSaveDelayMs: 1100,
+    algorithmCommentary: true,
+    studioVisualizer: true
   });
   assert.deepEqual(settings.autoPlan, {
     performanceProfile: 'adaptive',
@@ -22,7 +30,9 @@ test('v7 settings defaults are complete and safe', () => {
     allowRedFallback: true,
     maxRedViolations: null,
     perfectionEnabled: true,
-    parallelSearches: null
+    parallelSearches: null,
+    certificationRounds: 4,
+    portfolioDiversity: true
   });
 });
 
@@ -42,8 +52,13 @@ test('legacy settings migrate without losing explicit values', () => {
     }
   });
 
-  assert.equal(settings.schemaVersion, 3);
+  assert.equal(settings.schemaVersion, 4);
   assert.equal(settings.appearance.density, 'compact');
+  // Ein Stand ohne die v8-Gruppen erhält deren Vorschlagswerte, ohne dass
+  // ausdrücklich gesetzte Altwerte verlorengehen.
+  assert.equal(settings.appearance.monthColors, 'spectrum');
+  assert.equal(settings.workflow.autoSaveDelayMs, 1100);
+  assert.equal(settings.autoPlan.certificationRounds, 4);
   assert.equal(settings.appearance.motion, 'reduced');
   assert.equal(settings.appearance.richTooltips, false);
   assert.equal(settings.autoPlan.performanceProfile, 'responsive');

@@ -1185,3 +1185,38 @@ h3 { font-size: 1.05rem; }
 
   .issue-heading, .issue-list { display: none !important; }
 }
+
+/* ==========================================================================
+   Darstellungseinstellungen
+   ==========================================================================
+
+   Die Einstellungen wirken ausschließlich über Datenattribute an der Wurzel.
+   Damit bleibt das Stylesheet die einzige Stelle, die über das Aussehen
+   entscheidet, und die Einstellungslogik muss keine Farben kennen. */
+
+/* Atmosphärischer Hintergrund abschaltbar. Auf schwacher Grafik ist das der
+   wirksamste einzelne Hebel für eine flüssige Oberfläche. */
+:root[data-ambient-backdrop="false"] .ambient-layer { display: none; }
+
+/* Ohne Wochenendhervorhebung tragen Samstag, Sonntag und Feiertag denselben
+   Grund wie ein Werktag; unterschieden werden sie dann allein über die
+   Wochentagsspalte und die Feiertagsbeschriftung. */
+:root[data-weekend-emphasis="false"] {
+  --saturday-row-bg: transparent;
+  --sunday-row-bg: transparent;
+  --holiday-row-bg: transparent;
+}
+
+:root[data-weekend-emphasis="false"] .plan-table tr.saturday-row td.date-cell,
+:root[data-weekend-emphasis="false"] .plan-table tr.sunday-row td.date-cell,
+:root[data-weekend-emphasis="false"] .plan-table tr.holiday-row td.date-cell {
+  box-shadow: none;
+}
+
+/* Umgekehrt verstärkt die Hervorhebung den Kontrast spürbar, damit ein
+   Wochenende auch auf einem blassen Bildschirm sofort auffällt. */
+:root[data-weekend-emphasis="true"] {
+  --saturday-row-bg: color-mix(in srgb, var(--month-accent) 18%, white);
+  --sunday-row-bg: color-mix(in srgb, var(--month-accent) 27%, white);
+  --holiday-row-bg: color-mix(in srgb, var(--month-accent) 36%, white);
+}

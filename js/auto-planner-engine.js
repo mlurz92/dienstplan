@@ -13,6 +13,16 @@ import {
 } from './rules.js?v=20260803.4';
 import { createPacer, yieldToBrowser } from './cooperative-scheduling.js?v=20260803.4';
 import { AUTO_PLAN_BD_LIMITS } from './defaults.js?v=20260803.4';
+import {
+  baselineOpenSlots,
+  buildLedger,
+  cloneLedger as cloneLedgerCounts,
+  internStaffId,
+  monthDatesOf,
+  primeStaffIds,
+  planToken,
+  spread
+} from './auto-plan-index.js?v=20260803.4';
 
 const LEVEL_RANK = Object.freeze({ green: 0, yellow: 1, orange: 2, red: 3, gray: 4 });
 const ROLE_ORDER = Object.freeze(['bd', 'hg']);
@@ -54,20 +64,43 @@ const PRESETS = Object.freeze({
  */
 let evaluationEpoch = 0;
 
-export function beginEvaluationEpoch() {
+export function beginEvaluationEpoch(staff = null) {
   evaluationEpoch += 1;
+  primeStaffIds(staff);
   setPeerGroupCacheToken(null);
 }
 
+/**
+ * Meldet den Belegungszustand an den Vergleichsgruppen-Speicher.
+ *
+ * Die Marke war zuvor eine fortlaufend verkettete Zeichenkette über alle Tage
+ * des Monats – gebildet in jedem einzelnen Bewertungspfad. Sie entsteht jetzt
+ * verlustfrei aus internierten Personal-Kennungen über ein vorbelegtes Feld.
+ * Der Inhalt der Marke ist unverändert eindeutig; nur ihre Bildung kostet nicht
+ * mehr in jeder Bewertung einen vollständigen Satz Zwischenzeichenketten.
+ */
 export function syncPeerCache(monthData) {
-  const days = monthData?.days;
-  if (!days) {
+  if (!monthData?.days) {
     setPeerGroupCacheToken(null);
     return;
   }
-  let token = `${evaluationEpoch}|${monthData.year}-${monthData.month}`;
-  for (const iso in days) token += `|${days[iso].bd}>${days[iso].hg}`;
+  setPeerGroupCacheToken(planToken(monthData, evaluationEpoch));
+}
+
+/**
+ * Direktes Setzen einer bereits bekannten Marke.
+ *
+ * Wer genau einen Schreibtrichter in den Arbeitsmonat besitzt, kennt seinen
+ * Zustand exakt und muss ihn nicht aus den Daten ableiten. Der
+ * Perfektionsoptimierer nutzt das; für alle anderen bleibt `syncPeerCache` der
+ * einzige Weg.
+ */
+export function adoptPeerCacheToken(token) {
   setPeerGroupCacheToken(token);
+}
+
+export function currentEvaluationEpoch() {
+  return evaluationEpoch;
 }
 
 const clone = value => typeof structuredClone === 'function'
@@ -112,23 +145,20 @@ function simulatedState(state, monthData) {
   return { ...state, months, currentYear: monthData.year, currentMonth: monthData.month };
 }
 
+/**
+ * Die sortierten Kalendertage eines Monats.
+ *
+ * Zuvor sortierte jeder Aufruf neu. Da die Funktion aus `openSlots`,
+ * `proposedAssignments`, `auditProposal` und der Fairnessbewertung heraus
+ * aufgerufen wird, fiel das je Zielfunktionsauswertung mehrfach an. Das
+ * Ergebnis hängt allein am Monatsobjekt und wird deshalb dort gehalten.
+ */
 function monthDates(monthData) {
-  return Object.keys(monthData?.days || {}).sort();
+  return monthDatesOf(monthData);
 }
 
-function buildAssignmentLedger(monthData) {
-  const bd = Object.create(null);
-  const hg = Object.create(null);
-  for (const day of Object.values(monthData?.days || {})) {
-    if (day?.bd) bd[day.bd] = (bd[day.bd] || 0) + 1;
-    if (day?.hg) hg[day.hg] = (hg[day.hg] || 0) + 1;
-  }
-  return { bd, hg };
-}
-
-function cloneLedger(ledger) {
-  return { bd: { ...ledger.bd }, hg: { ...ledger.hg } };
-}
+const buildAssignmentLedger = buildLedger;
+const cloneLedger = cloneLedgerCounts;
 
 function ledgerFor(monthData, stats = null) {
   let ledger = assignmentLedgers.get(monthData);
@@ -405,7 +435,7 @@ function planningContext(state, baseline) {
     state,
     dates,
     staff,
-    openSlots: openSlots(baseline),
+    openSlots: baselineOpenSlots(baseline),
     specialists: staff.filter(person => dates.some(dateIso => getRoleProperties(person, dateIso).canHg)),
     saturdays: dates.filter(dateIso => parseIso(dateIso).getDay() === 6),
     possibleWishes
@@ -529,13 +559,31 @@ function fairnessSnapshot(state, monthData, context, ledger = null) {
     return sum + (deviation < 0 ? deviation ** 2 : 1.3 * deviation ** 2);
   }, 0);
   const sandbox = simulatedState(state, monthData);
+  const bdLoads = staff.map(person => ledger
+    ? Number(ledger.bd[person.id] || 0)
+    : countRoleInMonth(monthData, person.id, 'bd'));
+  const combinedLoads = specialists.map(person => ledger
+    ? Number(ledger.bd[person.id] || 0) + Number(ledger.hg[person.id] || 0)
+    : countRoleInMonth(monthData, person.id, 'bd') + countRoleInMonth(monthData, person.id, 'hg'));
+  const weekendLoads = staff.map(person => computeWeekendEquivalent(monthData, person.id));
   return {
     bdPenalty,
-    combinedVariance: variance(specialists.map(person => ledger
-      ? Number(ledger.bd[person.id] || 0) + Number(ledger.hg[person.id] || 0)
-      : countRoleInMonth(monthData, person.id, 'bd') + countRoleInMonth(monthData, person.id, 'hg'))),
+    combinedVariance: variance(combinedLoads),
     aaHgVariance: variance(specialists.map(person => countHgForAaBdExcept(sandbox, monthData, person.id, ''))),
-    weekendVariance: variance(staff.map(person => computeWeekendEquivalent(monthData, person.id)))
+    weekendVariance: variance(weekendLoads),
+    /**
+     * Spannweiten als nachrangige Gerechtigkeitsmaße.
+     *
+     * Varianz allein unterscheidet zwei Pläne nicht, bei denen dieselbe Streuung
+     * einmal auf viele kleine und einmal auf einen großen Abstand entfällt.
+     * Wahrgenommen wird aber genau der Abstand zwischen der am stärksten und der
+     * am schwächsten belasteten Person. Die Spannweiten stehen deshalb am Ende
+     * der Zielordnung: Sie ändern nichts an bestehenden Entscheidungen und
+     * entscheiden nur dort, wo bisher der Zufall der Reihenfolge entschied.
+     */
+    bdSpread: spread(bdLoads),
+    combinedSpread: spread(combinedLoads),
+    weekendSpread: Number(spread(weekendLoads).toFixed(4))
   };
 }
 
@@ -590,7 +638,10 @@ function finalObjective(state, monthData, baseline, config) {
       ...softObjectiveKey(config, audit, wishes, fairness, saturdayVariance(state, monthData, context)),
       -audit.recommendation[3],
       -audit.recommendation[4],
-      -audit.recommendation[5]
+      -audit.recommendation[5],
+      fairness.bdSpread,
+      fairness.combinedSpread,
+      fairness.weekendSpread
     ]
   };
 }
@@ -685,8 +736,26 @@ function assignNode(node, slot, candidate) {
   };
 }
 
+/**
+ * Verlustfreie Kennung einer Belegung, bezogen auf die offenen Felder.
+ *
+ * Sie entdoppelt den Suchstrahl und ordnet gleichwertige Varianten stabil. Der
+ * Aufbau erfolgt über ein vorbelegtes Feld aus internierten Personal-Kennungen:
+ * Die frühere Fassung setzte für jeden erzeugten Nachfolger eine Zeichenkette
+ * aus Datum, Rolle und Name zusammen – bei Suchstrahlbreite mal
+ * Verzweigungsgrad je Dienstfeld war das der teuerste Einzelposten der
+ * Konstruktion. Eindeutig bleibt sie unverändert: Die Felderfolge ist fest, und
+ * jede Kennung hat genau eine Zahl.
+ */
 function signature(monthData, baseline) {
-  return openSlots(baseline).map(slot => `${slot.dateIso}:${slot.role}:${monthData.days?.[slot.dateIso]?.[slot.role] || ''}`).join('|');
+  const slots = baselineOpenSlots(baseline);
+  const parts = new Array(slots.length);
+  const days = monthData.days;
+  for (let index = 0; index < slots.length; index += 1) {
+    const slot = slots[index];
+    parts[index] = internStaffId(days?.[slot.dateIso]?.[slot.role] || '');
+  }
+  return parts.join('.');
 }
 
 /**
@@ -842,7 +911,7 @@ async function runPass({ state, baseline, config, mode, strategy, width, branch,
   const stats = { id: `${mode}-${strategy}-${passIndex}`, mode, strategy, beamWidth: width, branchLimit: branch, exploredNodes: 0, generatedNodes: 0, candidateEvaluations: 0, limitRejects: 0, deadEnds: 0, exactNodes: 0, forwardChecks: 0, forwardChecksAtSlot: 0, maxBeam: 1, assignmentLedgerHits: 0, assignmentLedgerMisses: 0, complete: false };
   const candidatesFor = createCandidateResolver(state, mode, strategy, config, stats);
   let beam = [emptyNode(clone(baseline), stats)];
-  const allSlots = openSlots(baseline);
+  const allSlots = baselineOpenSlots(baseline);
   let processed = 0;
 
   let remaining = [...allSlots];
@@ -1000,9 +1069,9 @@ export async function buildAutoPlan({ state, monthData, year = monthData?.year, 
   const validation = validateAutoPlanConfig(state, monthData, runConfig);
   if (!validation.valid) throw new Error(`Auto-Plan-Konfiguration ungültig: ${validation.errors.join(' ')}`);
   const config = validation.config;
-  beginEvaluationEpoch();
+  beginEvaluationEpoch(state?.staff);
   const baseline = clone(monthData);
-  const slots = openSlots(baseline);
+  const slots = baselineOpenSlots(baseline);
   const fixed = fixedAssignmentCount(baseline);
   const startedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
   abortIfRequested(signal);
@@ -1031,7 +1100,15 @@ export async function buildAutoPlan({ state, monthData, year = monthData?.year, 
     }
     const attempt = await runPass({ state, baseline, config, mode: profile.mode, strategy: profile.strategy, width: profile.width, branch: profile.branch, exactBudget: profile.exact, lookahead: profile.lookahead, label: profile.label, progressStart: profile.start, progressSpan: profile.span, passIndex: index + 1, onProgress, signal });
     attempts.push(attempt.stats);
-    if (attempt.best && (compareVectors(attempt.best.objective.key, best.objective.key) < 0 || attempt.stats.complete)) {
+    /**
+     * Übernommen wird ausschließlich, was in der lexikografischen Zielordnung
+     * echt besser ist. Die frühere Fassung übernahm zusätzlich jeden als
+     * vollständig gemeldeten Lauf – auch einen schlechteren. Sobald das
+     * Worker-Portfolio einzelne Profile getrennt startet, ist genau dieser Fall
+     * erreichbar: Ein später gemeldeter Minimal-Rot-Lauf verdrängte dann eine
+     * bereits gefundene Null-Rot-Lösung.
+     */
+    if (attempt.best && compareVectors(attempt.best.objective.key, best.objective.key) < 0) {
       best = attempt.best;
       selectedProfile = profile.id;
       selectedMode = profile.mode;

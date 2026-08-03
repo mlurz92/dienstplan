@@ -2,12 +2,38 @@ export const MONTH_NAMES = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni'
 export const SHEET_NAMES = ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
 export const WEEKDAYS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 
+/**
+ * Anwendungseinstellungen.
+ *
+ * Jede Einstellung hier ist tatsächlich verdrahtet – es gibt bewusst keinen
+ * Schalter, der nur gespeichert und nirgends gelesen wird. Die drei Gruppen
+ * trennen, worauf sie wirken:
+ *
+ * - `appearance` wirkt auf die Oberfläche und wird über Datenattribute an der
+ *   Wurzel wirksam, damit das Stylesheet allein entscheidet.
+ * - `workflow` wirkt auf das Arbeitsverhalten der Anwendung, etwa auf den
+ *   Zeitpunkt des automatischen Speicherns.
+ * - `autoPlan` liefert die Voreinstellungen jedes Auto-Plan-Laufs; im Studio
+ *   bleibt jeder Wert pro Lauf änderbar.
+ */
 export const DEFAULT_SETTINGS = Object.freeze({
-  schemaVersion: 3,
+  schemaVersion: 4,
   appearance: Object.freeze({
     density: 'comfortable',
     motion: 'system',
-    richTooltips: true
+    richTooltips: true,
+    /**
+     * Monatsfarbsystem. `spectrum` ist der Trend-Atlas des Color Directors,
+     * `classic` die feste Monatspalette, `neutral` schaltet die Einfärbung ab.
+     */
+    monthColors: 'spectrum',
+    weekendEmphasis: true,
+    ambientBackdrop: true
+  }),
+  workflow: Object.freeze({
+    autoSaveDelayMs: 1100,
+    algorithmCommentary: true,
+    studioVisualizer: true
   }),
   autoPlan: Object.freeze({
     performanceProfile: 'adaptive',
@@ -17,7 +43,9 @@ export const DEFAULT_SETTINGS = Object.freeze({
     allowRedFallback: true,
     maxRedViolations: null,
     perfectionEnabled: true,
-    parallelSearches: null
+    parallelSearches: null,
+    certificationRounds: 4,
+    portfolioDiversity: true
   })
 });
 
@@ -145,9 +173,13 @@ export function normalizeSettings(value, { strict = false } = {}) {
     return structuredClone(DEFAULT_SETTINGS);
   }
   const appearance = isPlainRecord(value.appearance) ? value.appearance : {};
+  const workflow = isPlainRecord(value.workflow) ? value.workflow : {};
   const autoPlan = isPlainRecord(value.autoPlan) ? value.autoPlan : {};
   if (strict && value.appearance !== undefined && !isPlainRecord(value.appearance)) {
     throw new Error('„settings.appearance“ muss ein JSON-Objekt sein.');
+  }
+  if (strict && value.workflow !== undefined && !isPlainRecord(value.workflow)) {
+    throw new Error('„settings.workflow“ muss ein JSON-Objekt sein.');
   }
   if (strict && value.autoPlan !== undefined && !isPlainRecord(value.autoPlan)) {
     throw new Error('„settings.autoPlan“ muss ein JSON-Objekt sein.');
@@ -158,7 +190,15 @@ export function normalizeSettings(value, { strict = false } = {}) {
     appearance: {
       density: normalizedEnum(appearance.density, new Set(['comfortable', 'compact']), DEFAULT_SETTINGS.appearance.density, 'settings.appearance.density', strict),
       motion: normalizedEnum(appearance.motion, new Set(['system', 'reduced']), DEFAULT_SETTINGS.appearance.motion, 'settings.appearance.motion', strict),
-      richTooltips: normalizedBoolean(appearance.richTooltips, DEFAULT_SETTINGS.appearance.richTooltips, 'settings.appearance.richTooltips', strict)
+      richTooltips: normalizedBoolean(appearance.richTooltips, DEFAULT_SETTINGS.appearance.richTooltips, 'settings.appearance.richTooltips', strict),
+      monthColors: normalizedEnum(appearance.monthColors, new Set(['spectrum', 'classic', 'neutral']), DEFAULT_SETTINGS.appearance.monthColors, 'settings.appearance.monthColors', strict),
+      weekendEmphasis: normalizedBoolean(appearance.weekendEmphasis, DEFAULT_SETTINGS.appearance.weekendEmphasis, 'settings.appearance.weekendEmphasis', strict),
+      ambientBackdrop: normalizedBoolean(appearance.ambientBackdrop, DEFAULT_SETTINGS.appearance.ambientBackdrop, 'settings.appearance.ambientBackdrop', strict)
+    },
+    workflow: {
+      autoSaveDelayMs: normalizedBoundedInteger(workflow.autoSaveDelayMs, DEFAULT_SETTINGS.workflow.autoSaveDelayMs, 300, 5000, 'settings.workflow.autoSaveDelayMs', strict),
+      algorithmCommentary: normalizedBoolean(workflow.algorithmCommentary, DEFAULT_SETTINGS.workflow.algorithmCommentary, 'settings.workflow.algorithmCommentary', strict),
+      studioVisualizer: normalizedBoolean(workflow.studioVisualizer, DEFAULT_SETTINGS.workflow.studioVisualizer, 'settings.workflow.studioVisualizer', strict)
     },
     autoPlan: {
       performanceProfile: normalizedEnum(autoPlan.performanceProfile, new Set(['responsive', 'adaptive', 'power']), DEFAULT_SETTINGS.autoPlan.performanceProfile, 'settings.autoPlan.performanceProfile', strict),
@@ -168,7 +208,9 @@ export function normalizeSettings(value, { strict = false } = {}) {
       allowRedFallback: normalizedBoolean(autoPlan.allowRedFallback, DEFAULT_SETTINGS.autoPlan.allowRedFallback, 'settings.autoPlan.allowRedFallback', strict),
       maxRedViolations: normalizedBoundedInteger(autoPlan.maxRedViolations, DEFAULT_SETTINGS.autoPlan.maxRedViolations, 0, 62, 'settings.autoPlan.maxRedViolations', strict, true),
       perfectionEnabled: normalizedBoolean(autoPlan.perfectionEnabled, DEFAULT_SETTINGS.autoPlan.perfectionEnabled, 'settings.autoPlan.perfectionEnabled', strict),
-      parallelSearches: normalizedBoundedInteger(autoPlan.parallelSearches, DEFAULT_SETTINGS.autoPlan.parallelSearches, 1, 8, 'settings.autoPlan.parallelSearches', strict, true)
+      parallelSearches: normalizedBoundedInteger(autoPlan.parallelSearches, DEFAULT_SETTINGS.autoPlan.parallelSearches, 1, 8, 'settings.autoPlan.parallelSearches', strict, true),
+      certificationRounds: normalizedBoundedInteger(autoPlan.certificationRounds, DEFAULT_SETTINGS.autoPlan.certificationRounds, 1, 8, 'settings.autoPlan.certificationRounds', strict),
+      portfolioDiversity: normalizedBoolean(autoPlan.portfolioDiversity, DEFAULT_SETTINGS.autoPlan.portfolioDiversity, 'settings.autoPlan.portfolioDiversity', strict)
     }
   };
 }

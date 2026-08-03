@@ -337,7 +337,18 @@ export function easeOut(t) {
  * Monatskontrast dadurch gegen den gedämpften Basiston getauscht.
  */
 export function colorDirectorOwnsSurface() {
-  return typeof document !== 'undefined' && Boolean(document.documentElement?.dataset?.colorDirector);
+  if (typeof document === 'undefined') return false;
+  const root = document.documentElement;
+  /**
+   * `neutral` verzichtet vollständig auf die monatliche Einfärbung.
+   *
+   * Behandelt wird das wie eine fremde Zuständigkeit für die Farbfläche: Diese
+   * Schicht schreibt dann keine Variablen, und die Grundwerte des Stylesheets
+   * bleiben stehen. Das ist genau die Wirkung, die gewünscht ist – und sie
+   * kommt ohne einen zweiten Weg durch dieselbe Funktion aus.
+   */
+  if (root?.dataset?.monthColors === 'neutral') return true;
+  return Boolean(root?.dataset?.colorDirector);
 }
 
 function writeVariables(root, values) {

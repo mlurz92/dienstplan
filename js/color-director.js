@@ -103,9 +103,27 @@ function playSpectrumSweep(root, accent) {
   void root;
 }
 
+/**
+ * Das Monatsfarbsystem ist abschaltbar.
+ *
+ * `spectrum` ist der Trend-Atlas dieses Moduls, `classic` überlässt die
+ * Einfärbung der festen Monatspalette aus `theme.js`, `neutral` verzichtet
+ * ganz darauf. Der Color Director tritt in den beiden letzten Fällen zurück,
+ * statt seine Variablen gegen die der anderen Quelle zu setzen.
+ */
+function spectrumEnabled() {
+  const mode = document.documentElement.dataset.monthColors;
+  return mode === undefined || mode === 'spectrum';
+}
+
 export function applySpectrumProfile(year, month, { animate = true } = {}) {
   if (typeof document === 'undefined') return null;
   const root = document.documentElement;
+  if (!spectrumEnabled()) {
+    delete root.dataset.colorDirector;
+    activeKey = null;
+    return null;
+  }
   const palette = colorProfileForDate(year, month);
   const target = spectrumVariables(palette);
   const changed = activeKey !== palette.key;
@@ -197,6 +215,9 @@ function initializeColorDirector() {
   }
   document.getElementById('monthSelect')?.addEventListener('change', update);
   document.getElementById('yearSelect')?.addEventListener('change', update);
+  // Eine Änderung des Farbsystems in den Einstellungen wirkt sofort, ohne dass
+  // die Seite neu geladen werden muss.
+  window.addEventListener('appsettingschange', update);
 }
 
 if (typeof document !== 'undefined') {
