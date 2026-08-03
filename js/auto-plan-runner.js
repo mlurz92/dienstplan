@@ -19,35 +19,31 @@
  *
  * Arbeitsstränge, und zwar in beiden Phasen:
  *
- * 1. **Aufbau.** Die Suchläufe eines Monats – reguläre Null-Rot-Suche,
- *    vertiefte Null-Rot-Suche, Minimal-Rot-Rückfall – bilden nacheinander eine
- *    Kette: Der nächste startet nur, wenn der vorige scheitert. Bei schwierigen
- *    Monaten läuft dadurch alles dreimal hintereinander. Gleichzeitig gestartet
- *    dauert es nur so lange wie der längste, und es gewinnt derselbe Lauf, den
- *    auch die Kette gewählt hätte.
+ * 1. **Aufbau.** Alle freigegebenen Konstruktionsprofile laufen vollständig.
+ *    Ein früher Null-Rot-Treffer beendet die übrigen Profile bewusst nicht:
+ *    Vollständigkeit und Konfliktfreiheit sind nur die obersten Ebenen der
+ *    lexikografischen Zielordnung; orange, gelbe, Wünsche und Fairness können
+ *    zwischen zwei sauberen Aufbauten erheblich differieren. Erst nach Abschluss
+ *    des gesamten Portfolios wird der objektiv beste Aufbau an die Perfektion
+ *    übergeben.
  * 2. **Perfektion.** Mehrere Stränge verbessern denselben Aufbau mit
  *    verschiedenen Startwerten. Weil die Suche stochastisch ist, streuen ihre
  *    Ergebnisse; der beste aus mehreren unabhängigen Läufen ist verlässlich
  *    besser als ein einzelner.
  *
- * Der Aufbau wird dabei genau einmal berechnet und an alle Perfektionsläufe
- * verteilt. Ihn je Strang zu wiederholen wäre dieselbe Arbeit mehrfach.
+ * Der Aufbau wird dabei genau einmal je Suchprofil berechnet und der Gewinner
+ * an alle Perfektionsläufe verteilt. Ihn je Perfektionsstrang zu wiederholen
+ * wäre dieselbe Arbeit mehrfach.
  *
  * Fehlt die Unterstützung für Arbeitsstränge, läuft alles unverändert im
  * Anzeigestrang weiter.
  */
 
-import { buildAutoPlan } from './auto-planner.js?v=20260803.4';
-import { planProfileIds } from './auto-planner-engine.js?v=20260803.4';
+import { buildAutoPlan } from './auto-planner.js?v=20260803.5';
+import { planProfileIds } from './auto-planner-engine.js?v=20260803.5';
 
-const WORKER_URL = '/js/auto-plan-worker.js?v=20260803.4';
+const WORKER_URL = '/js/auto-plan-worker.js?v=20260803.5';
 
-/**
- * Wie viele Perfektionsläufe parallel starten.
- *
- * Ein Kern bleibt für Anzeige und Animation frei. Mehr als vier Läufe bringen
- * kaum noch Streuungsgewinn, kosten aber Speicher und Startzeit.
- */
 export function createAutoPlanExecutionPlan({
   hardwareConcurrency = 2,
   deviceMemory,
@@ -105,15 +101,7 @@ export function workersAvailable() {
   return typeof Worker === 'function';
 }
 
-/**
- * Vergleicht zwei Ergebnisse in derselben Ordnung, die auch die Suche verwendet.
- *
- * Die Zielbewertung trägt Obergrenzen, gesperrte Zellen, unbesetzte Felder und
- * rote Ausnahmen an ihrer Spitze. Damit wählt derselbe Vergleich sowohl unter
- * den Aufbauläufen den richtigen aus – eine Null-Rot-Lösung schlägt jeden
- * Minimal-Rot-Rückfall – als auch unter den Perfektionsläufen den besten.
- */
-function isBetter(candidate, incumbent) {
+export function isBetterAutoPlanResult(candidate, incumbent) {
   if (!incumbent) return Boolean(candidate);
   if (!candidate) return false;
   if (candidate.complete !== incumbent.complete) return Boolean(candidate.complete);
@@ -140,12 +128,6 @@ function isBetter(candidate, incumbent) {
   return false;
 }
 
-/**
- * Startet den Lauf und liefert das beste Ergebnis.
- *
- * `onProgress` erhält zusätzlich `searchIndex` und `searchCount`, damit die
- * Oberfläche sichtbar machen kann, dass mehrere Läufe gleichzeitig arbeiten.
- */
 export async function runAutoPlan({ state, monthData, year, month, runConfig, onProgress, signal }) {
   const inline = () => buildAutoPlan({
     state,
@@ -181,28 +163,15 @@ export async function runAutoPlan({ state, monthData, year, month, runConfig, on
   onProgress?.({
     phase: 'analysis',
     progress: .035,
-    message: `v7.5 Worker-Portfolio · ${executionPlan.constructionWorkers} Aufbau · ${executionPlan.perfectionWorkers} Perfektion · ${executionPlan.reserveCores} UI-Reserve`,
+    message: `v8 Worker-Portfolio · ${executionPlan.constructionWorkers} Aufbau · ${executionPlan.perfectionWorkers} Perfektion · ${executionPlan.reserveCores} UI-Reserve`,
     executionPlan
   });
 
-  /**
-   * Ein Strang je Aufbaulauf, danach ein Strang je Perfektionslauf. Die bereits
-   * gestarteten Stränge werden für die zweite Phase weiterverwendet: Sie haben
-   * ihre Module geladen, ein neuer Strang müsste das wiederholen.
-   */
   const pool = [];
   const cleanup = () => {
     for (const worker of pool) worker?.terminate();
     pool.length = 0;
   };
-  /**
-   * Der übertragbare Zustand wird genau einmal gebildet.
-   *
-   * Zuvor entstand er je Auftrag neu. Er trägt sämtliche geladenen Monate; bei
-   * vier Arbeitssträngen wurde dieselbe Datenmenge damit viermal aufgebaut,
-   * bevor sie ohnehin von der Strukturkopie des Nachrichtenkanals ein zweites
-   * Mal durchlaufen wurde.
-   */
   const sharedState = {
     months: state.months,
     staff: state.staff,
@@ -211,15 +180,6 @@ export async function runAutoPlan({ state, monthData, year, month, runConfig, on
     monthSources: state.monthSources
   };
 
-  /**
-   * Parametrierung der Perfektionsstränge.
-   *
-   * Ein Portfolio lebt von Streuung. Sie allein über den Startwert zu erzeugen
-   * verschenkt den größeren Teil des möglichen Gewinns: Alle Stränge liefen
-   * dann mit demselben Late-Acceptance-Fenster und derselben Abstiegsfrequenz
-   * durch dieselbe Landschaft. Strang 0 bleibt bewusst konvergenzbetont – er
-   * ist der verlässliche Amtsinhaber –, die übrigen suchen breiter.
-   */
   const diversify = (runConfig?.portfolioDiversity ?? state?.settings?.autoPlan?.portfolioDiversity) !== false;
   const perfectionVariant = index => {
     if (index === 0 || !diversify) return { seedSalt: index };
@@ -241,7 +201,6 @@ export async function runAutoPlan({ state, monthData, year, month, runConfig, on
       let firstError = null;
       let closed = false;
       let nextConstruction = 0;
-      const constructionWorkerOf = new Map();
       let portfolioCompleted = 0;
       let portfolioCancelled = 0;
       let portfolioFailed = 0;
@@ -321,9 +280,6 @@ export async function runAutoPlan({ state, monthData, year, month, runConfig, on
           worker.addEventListener('error', event => {
             event.preventDefault?.();
             if (!firstError) firstError = new Error(event.message || 'Arbeitsstrang fehlgeschlagen.');
-            // Ein Worker mit einem unbehandelten Laufzeitfehler wird nicht für
-            // den nächsten Portfolioauftrag wiederverwendet. Die Queue startet
-            // bei Bedarf an derselben Position einen frischen Modul-Worker.
             worker.terminate();
             if (pool[index] === worker) pool[index] = null;
             settle(index, { failed: true });
@@ -333,9 +289,6 @@ export async function runAutoPlan({ state, monthData, year, month, runConfig, on
           worker.postMessage(message);
           return true;
         } catch (error) {
-          // Strukturierte Klonfehler (etwa durch unerwartete Fremddaten im
-          // Zustand) passieren synchron. Sie müssen denselben Abschlussweg wie
-          // asynchrone Workerfehler nehmen, damit Listener und Pool frei werden.
           fail(error);
           return false;
         }
@@ -346,10 +299,6 @@ export async function runAutoPlan({ state, monthData, year, month, runConfig, on
         const runId = nextConstruction;
         const profileId = profileIds[nextConstruction];
         nextConstruction += 1;
-        // Wer welchen Auftrag bearbeitet, muss festgehalten werden: Sobald
-        // weniger Stränge als Profile vorhanden sind, rücken Aufträge nach und
-        // Auftragsnummer und Strangnummer laufen auseinander.
-        constructionWorkerOf.set(runId, workerIndex);
         return send(workerIndex, {
           type: 'construct',
           runId,
@@ -357,15 +306,6 @@ export async function runAutoPlan({ state, monthData, year, month, runConfig, on
           monthData,
           year,
           month,
-          /**
-           * Der Minimal-Rot-Strang verzichtet auf seine eigene Null-Rot-Rescue.
-           *
-           * Sie ist inhaltlich dieselbe verbreiterte `strict-coverage`-Suche,
-           * die bereits ein eigener Strang rechnet. Ohne diese Abschaltung
-           * verbrauchte das Portfolio rund ein Drittel seiner Aufbauzeit damit,
-           * dieselbe Suche ein zweites Mal auszuführen — und der Strang, der
-           * eigentlich den Rückfall prüfen soll, kam entsprechend später dazu.
-           */
           runConfig: profileId === 'confirmable-balanced'
             ? { ...runConfig, profileFilter: [profileId], zeroRedRescue: false }
             : { ...runConfig, profileFilter: [profileId] }
@@ -389,7 +329,6 @@ export async function runAutoPlan({ state, monthData, year, month, runConfig, on
           });
           if (!started) return;
         }
-        // Überzählige Stränge aus der Aufbauphase werden nicht mehr gebraucht.
         for (let index = perfectionCount; index < pool.length; index += 1) pool[index]?.terminate();
         pool.length = Math.min(pool.length, perfectionCount);
         reportPortfolio();
@@ -434,50 +373,16 @@ export async function runAutoPlan({ state, monthData, year, month, runConfig, on
           return;
         }
         if (message.type === 'constructed') {
-          if (isBetter(message.result, bestConstruction)) bestConstruction = message.result;
-          /**
-           * Kurzschluss auf den ersten Suchlauf.
-           *
-           * Nacheinander ausgeführt bricht die Kette ab, sobald der erste Lauf
-           * eine vollständige Belegung ohne rote Ausnahme liefert – die
-           * späteren Stufen laufen dann gar nicht erst. Genau dieser Fall wird
-           * hier nachgebildet: Meldet der erste Lauf Erfolg, werden die übrigen
-           * beendet, statt auf den langsamsten zu warten. Scheitert er, zahlt
-           * sich aus, dass die anderen längst mitgelaufen sind.
-           */
-          if (Number(message.runId) === 0 && message.result?.complete && !(message.result.metrics?.red > 0)) {
-            /**
-             * Beendet wird anhand des tatsächlich zugeordneten Strangs.
-             *
-             * Die frühere Fassung nahm an, Auftrag null liege stets auf Strang
-             * null, und beendete alles ab Index eins. Sobald weniger Stränge als
-             * Profile zur Verfügung stehen, stimmt diese Annahme nicht mehr —
-             * dann wurde der gewinnende Strang selbst beendet und ein anderer
-             * blieb stehen.
-             */
-            const winner = constructionWorkerOf.get(0) ?? workerIndex;
-            portfolioCancelled += Math.max(0, pending - 1);
-            for (let index = 0; index < pool.length; index += 1) {
-              if (index === winner) continue;
-              pool[index]?.terminate();
-              pool[index] = null;
-            }
-            nextConstruction = profileIds.length;
-            pending = 1;
-          }
+          if (isBetterAutoPlanResult(message.result, bestConstruction)) bestConstruction = message.result;
           settle(workerIndex);
           return;
         }
         if (message.type === 'done') {
-          if (isBetter(message.result, best)) best = message.result;
+          if (isBetterAutoPlanResult(message.result, best)) best = message.result;
           settle(workerIndex);
           return;
         }
         if (message.type === 'error') {
-          // Ein AbortError aus einem Worker ist kein Abbruchsignal des
-          // Dialogs: Worker erhalten bewusst kein übertragbares Signal. Er ist
-          // daher ein beendeter, fehlgeschlagener Auftrag und muss die
-          // Portfoliozählung fortsetzen; andernfalls wartet der Lauf endlos.
           if (!firstError) firstError = new Error(message.message);
           settle(workerIndex, { failed: true });
           return;

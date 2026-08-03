@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { DEFAULT_SETTINGS, normalizeSettings } from '../js/defaults.js';
-import { createAutoPlanExecutionPlan } from '../js/auto-plan-runner.js';
+import { createAutoPlanExecutionPlan, isBetterAutoPlanResult } from '../js/auto-plan-runner.js';
 
 test('v7 settings defaults are complete and safe', () => {
   const settings = normalizeSettings(null);
@@ -54,8 +54,6 @@ test('legacy settings migrate without losing explicit values', () => {
 
   assert.equal(settings.schemaVersion, 4);
   assert.equal(settings.appearance.density, 'compact');
-  // Ein Stand ohne die v8-Gruppen erhält deren Vorschlagswerte, ohne dass
-  // ausdrücklich gesetzte Altwerte verlorengehen.
   assert.equal(settings.appearance.monthColors, 'spectrum');
   assert.equal(settings.workflow.autoSaveDelayMs, 1100);
   assert.equal(settings.autoPlan.certificationRounds, 4);
@@ -141,4 +139,27 @@ test('explicit parallel search limit remains authoritative', () => {
   assert.equal(plan.workerBudget, 6);
   assert.equal(plan.perfectionWorkers, 3);
   assert.equal(plan.constructionWorkers, 3);
+});
+
+test('portfolio comparison keeps searching beyond the first clean construction', () => {
+  const firstClean = {
+    complete: true,
+    objectiveKey: [0, 0, 0, 6, 12, 9, 7]
+  };
+  const laterCleaner = {
+    complete: true,
+    objectiveKey: [0, 0, 0, 2, 4, 3, 1]
+  };
+
+  assert.equal(isBetterAutoPlanResult(firstClean, null), true);
+  assert.equal(isBetterAutoPlanResult(laterCleaner, firstClean), true);
+  assert.equal(isBetterAutoPlanResult(firstClean, laterCleaner), false);
+});
+
+test('portfolio comparison never lets an incomplete result replace a complete result', () => {
+  const complete = { complete: true, objectiveKey: [0, 0, 0, 20] };
+  const incomplete = { complete: false, objectiveKey: [0, 0, 0, 0] };
+
+  assert.equal(isBetterAutoPlanResult(incomplete, complete), false);
+  assert.equal(isBetterAutoPlanResult(complete, incomplete), true);
 });
