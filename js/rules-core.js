@@ -1,5 +1,5 @@
-import { MONTH_NAMES, OPTION_TYPES, PREFERENCE_TYPES, STAFF_ORDER, createEmptyMonth, toIsoDate, WEEKDAYS } from './defaults.js?v=20260803.6';
-import { isFirstRegularWorkdayAfter } from './holidays.js?v=20260803.6';
+import { MONTH_NAMES, OPTION_TYPES, PREFERENCE_TYPES, STAFF_ORDER, createEmptyMonth, toIsoDate, WEEKDAYS } from './defaults.js?v=20260803.4';
+import { isFirstRegularWorkdayAfter } from './holidays.js?v=20260803.4';
 
 /**
  * Kalenderhilfen mit Zwischenspeicher.

@@ -4,26 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>DienstplanRAD</title>
-  <meta name="color-scheme" content="light dark" />
   <meta name="application-name" content="DienstplanRAD" />
   <meta name="apple-mobile-web-app-title" content="DienstplanRAD" />
-  <meta name="theme-color" content="#107c41" />
-  <script>
-    (() => {
-      let theme = 'system';
-      try {
-        const cached = JSON.parse(localStorage.getItem('dienstplanrad:bootstrap') || 'null');
-        const stored = cached?.settings?.appearance?.theme;
-        if (['system', 'light', 'dark'].includes(stored)) theme = stored;
-      } catch { /* Gesperrter oder beschädigter Speicher fällt sicher auf System zurück. */ }
-
-      const dark = theme === 'dark'
-        || (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
-      document.documentElement.dataset.appTheme = theme;
-      document.documentElement.style.colorScheme = theme === 'system' ? 'light dark' : theme;
-      document.querySelector('meta[name="theme-color"]').content = dark ? '#0a5f34' : '#107c41';
-    })();
-  </script>
+  <meta name="theme-color" content="#0b0f14" />
   <!--
     Auslieferungsstempel. Er macht von außen prüfbar, welcher Stand tatsächlich
     online ist – mit einem einzigen Aufruf:
@@ -35,7 +18,7 @@
     Zweig als main auslieferte. Von außen war das nicht zu erkennen, weil die
     Anwendung im Übrigen normal funktionierte.
   -->
-  <meta name="dienstplanrad-build" content="20260803.6" />
+  <meta name="dienstplanrad-build" content="20260803.4" />
   <script>
     (() => {
       const cachePrefix = 'dienstplanrad';
@@ -80,14 +63,13 @@
   <link rel="icon" href="/icons/icon-32.png?icon=algorithm-spectrum-2" type="image/png" sizes="32x32" />
   <link rel="shortcut icon" href="/icons/icon-32.png?icon=algorithm-spectrum-2" type="image/png" />
   <link rel="apple-touch-icon" href="/icons/icon-180.png?icon=algorithm-spectrum-2" sizes="180x180" />
-  <link rel="manifest" href="/manifest.webmanifest?v=20260803.6" />
-  <link rel="stylesheet" href="/styles.css?v=20260803.6" />
-  <link rel="stylesheet" href="/controls.css?v=20260803.6" />
-  <link rel="stylesheet" href="/workspace.css?v=20260803.6" />
+  <link rel="manifest" href="/manifest.webmanifest?manifest=algorithm-spectrum-2" />
+  <link rel="stylesheet" href="/styles.css?v=20260803.4" />
+  <link rel="stylesheet" href="/controls.css?v=20260803.4" />
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" defer></script>
-  <script type="module" src="/js/app.js?v=20260803.6"></script>
-  <script type="module" src="/js/ui-controls.js?v=20260803.6"></script>
-  <script type="module" src="/js/auto-plan-ui.js?v=20260803.6"></script>
+  <script type="module" src="/js/app.js?v=20260803.4"></script>
+  <script type="module" src="/js/ui-controls.js?v=20260803.4"></script>
+  <script type="module" src="/js/auto-plan-ui.js?v=20260803.4"></script>
   <script type="module">
     document.addEventListener('DOMContentLoaded', () => {
       const reasons = document.getElementById('conflictReasons');
@@ -128,34 +110,16 @@
     <span class="ambient-orb ambient-orb-two"></span>
     <span class="ambient-orb ambient-orb-three"></span>
   </div>
-  <div class="office-workspace" data-active-ribbon-tab="home" data-ribbon-collapsed="false">
   <div class="app-shell">
-    <header class="topbar glass-panel office-titlebar">
-      <div class="brand-block office-brand">
-        <span class="office-app-tile" aria-hidden="true">D</span>
+    <header class="topbar glass-panel">
+      <div class="brand-block">
         <img class="brand-mark" src="/icons/icon.svg?icon=algorithm-spectrum-2" alt="" aria-hidden="true" draggable="false" />
         <div>
           <div class="eyebrow">Klinik für Radiologie und Nuklearmedizin</div>
           <h1>DienstplanRAD</h1>
-          <div class="subline">Dienstplan · gespeichert in der Cloud</div>
+          <div class="subline">Regelgestützte Dienstplanung · Auto-Plan · Cloud-Synchronisierung</div>
         </div>
       </div>
-      <label class="office-command-search" for="officeCommandSearch">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 5 5"/></svg>
-        <input id="officeCommandSearch" type="search" list="officeCommandList" autocomplete="off"
-               placeholder="Befehle suchen (Alt+Q)" aria-label="Befehle durchsuchen" />
-        <datalist id="officeCommandList">
-          <option value="Aktueller Monat"></option>
-          <option value="Abwesenheiten"></option>
-          <option value="Wünsche"></option>
-          <option value="Auto-Plan Studio"></option>
-          <option value="Neu laden"></option>
-          <option value="Excel öffnen"></option>
-          <option value="Excel-Arbeitsmappe"></option>
-          <option value="PDF / Drucken"></option>
-          <option value="Einstellungen"></option>
-        </datalist>
-      </label>
       <div class="topbar-controls">
         <div class="month-selector glass-inset">
           <button id="prevMonthBtn" class="icon-btn" title="Vormonat">‹</button>
@@ -167,28 +131,10 @@
           <span class="status-dot" id="statusDot"></span>
           <span id="saveStatus">Lädt …</span>
         </div>
-        <button type="button" id="officeRibbonToggle" class="icon-btn office-ribbon-toggle"
-                aria-expanded="true" aria-controls="officeRibbonCommands"
-                aria-label="Ribbon ausblenden" title="Ribbon ausblenden (Strg+F1)">⌃</button>
       </div>
     </header>
 
-    <nav class="office-ribbon-tabs" role="tablist" aria-label="Menüband">
-      <button type="button" id="officeRibbonTab-file" role="tab" data-ribbon-tab="file"
-              aria-controls="officeRibbonPanel-file" aria-selected="false" tabindex="-1">Datei</button>
-      <button type="button" id="officeRibbonTab-home" role="tab" data-ribbon-tab="home"
-              aria-controls="officeRibbonPanel-home" aria-selected="true" tabindex="0">Start</button>
-      <button type="button" id="officeRibbonTab-planning" role="tab" data-ribbon-tab="planning"
-              aria-controls="officeRibbonPanel-planning" aria-selected="false" tabindex="-1">Planung</button>
-      <button type="button" id="officeRibbonTab-auto-plan" role="tab" data-ribbon-tab="auto-plan"
-              aria-controls="officeRibbonPanel-auto-plan" aria-selected="false" tabindex="-1">Auto-Plan</button>
-      <button type="button" id="officeRibbonTab-data" role="tab" data-ribbon-tab="data"
-              aria-controls="officeRibbonPanel-data" aria-selected="false" tabindex="-1">Daten</button>
-      <button type="button" id="officeRibbonTab-view" role="tab" data-ribbon-tab="view"
-              aria-controls="officeRibbonPanel-view" aria-selected="false" tabindex="-1">Ansicht</button>
-    </nav>
-
-    <section class="toolbar glass-panel office-ribbon" id="officeRibbonCommands" aria-label="Menübandbefehle">
+    <section class="toolbar glass-panel" aria-label="Werkzeugleiste">
       <div class="toolbar-group">
         <button id="todayBtn">Aktueller Monat</button>
         <button id="absenceManagerBtn">Abwesenheiten</button>
@@ -212,13 +158,7 @@
       </div>
     </section>
 
-    <div class="office-formula-bar" role="group" aria-label="Ausgewählte Planzelle">
-      <output class="office-formula-name" aria-label="Zellbezug">MONAT</output>
-      <span class="office-formula-fx" aria-hidden="true">fx</span>
-      <output class="office-formula-value" aria-live="polite">Bereitschaftsdienstplan · Monat</output>
-    </div>
-
-    <main class="sheet-layout office-workbook">
+    <main class="sheet-layout">
       <section class="sheet-panel glass-panel">
         <div class="sheet-heading">
           <div>
@@ -237,8 +177,7 @@
           </div>
         </div>
 
-        <p class="table-scroll-hint" id="planScrollHint">Die ersten beiden Spalten bleiben sichtbar. Seitwärts scrollen zeigt weitere Planbereiche.</p>
-        <div class="plan-table-wrap" id="printArea" role="region" aria-label="Dienstplan für den gewählten Monat" aria-describedby="planScrollHint" tabindex="0">
+        <div class="plan-table-wrap" id="printArea">
           <table class="plan-table excel-plan" id="planTable">
             <thead>
               <tr>
@@ -277,25 +216,6 @@
         </section>
       </section>
     </main>
-
-    <footer class="office-workbook-footer">
-      <nav class="office-sheet-tabs" aria-label="Bereiche der Arbeitsmappe">
-        <button type="button" class="office-sheet-tab" data-sheet-target="#printArea" aria-current="true">Dienstplan</button>
-        <button type="button" class="office-sheet-tab" data-sheet-target="#statsGrid">Statistik</button>
-        <button type="button" class="office-sheet-tab" data-sheet-target="#issueList">Offene Punkte</button>
-        <button type="button" class="office-sheet-tab" data-sheet-action="autoPlanBtn">Auto-Plan</button>
-        <button type="button" class="office-sheet-add" aria-label="Neues Blatt nicht verfügbar" title="Alle Arbeitsbereiche sind bereits angelegt" disabled>＋</button>
-      </nav>
-      <div class="office-statusbar">
-        <span id="workbookSaveStatus" class="office-ready" role="status" aria-live="polite"
-              aria-atomic="true" data-save-mode="loading">
-          <i aria-hidden="true"></i><span id="workbookSaveStatusText">Bereit</span>
-        </span>
-        <span>Barrierefreiheit: geprüft</span>
-        <span class="office-zoom" aria-label="Zoomstufe 100 Prozent">− <b>100 %</b> ＋</span>
-      </div>
-    </footer>
-  </div>
   </div>
 
   <dialog id="pickerDialog" class="app-dialog picker-dialog" aria-labelledby="pickerTitle" aria-describedby="pickerCurrent">

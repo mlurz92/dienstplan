@@ -1,7 +1,7 @@
-import { DEFAULT_SETTINGS, normalizeSettings } from './defaults.js?v=20260803.6';
-import { markBootstrapDirty, persistBootstrap, state } from './state.js?v=20260803.6';
+import { DEFAULT_SETTINGS, normalizeSettings } from './defaults.js?v=20260803.4';
+import { markBootstrapDirty, persistBootstrap, state } from './state.js?v=20260803.4';
 
-const RELEASE = '20260803.6';
+const RELEASE = '20260803.4';
 const byId = id => document.getElementById(id);
 
 function addStylesheet() {
@@ -31,9 +31,6 @@ function dialogMarkup() {
             <div><h3 id="settingsAppearanceTitle">Darstellung &amp; Bedienung</h3><p>Ruhige, dichte Arbeitsoberfläche ohne die Systempräferenzen zu übergehen.</p></div>
           </div>
           <div class="settings-grid">
-            <label><span>Farbschema</span><small>System folgt Windows automatisch; Hell und Dunkel bleiben unabhängig davon aktiv.</small>
-              <select id="settingsTheme"><option value="system">Systemeinstellung</option><option value="light">Hell</option><option value="dark">Dunkel</option></select>
-            </label>
             <label><span>Informationsdichte</span><small>Komfortabel bietet mehr Luft, kompakt zeigt mehr Plan auf einmal.</small>
               <select id="settingsDensity"><option value="comfortable">Komfortabel</option><option value="compact">Kompakt</option></select>
             </label>
@@ -100,7 +97,6 @@ function valueOrNull(value) {
 
 function populate(settings) {
   const normalized = normalizeSettings(settings);
-  byId('settingsTheme').value = normalized.appearance.theme;
   byId('settingsDensity').value = normalized.appearance.density;
   byId('settingsMotion').value = normalized.appearance.motion;
   byId('settingsRichTooltips').checked = normalized.appearance.richTooltips;
@@ -119,7 +115,6 @@ function readForm() {
   return normalizeSettings({
     schemaVersion: DEFAULT_SETTINGS.schemaVersion,
     appearance: {
-      theme: byId('settingsTheme').value,
       density: byId('settingsDensity').value,
       motion: byId('settingsMotion').value,
       richTooltips: byId('settingsRichTooltips').checked
@@ -140,25 +135,12 @@ function readForm() {
 export function applyApplicationSettings(settings = state.settings) {
   const normalized = normalizeSettings(settings);
   const root = document.documentElement;
-  root.dataset.appTheme = normalized.appearance.theme;
-  root.style.colorScheme = normalized.appearance.theme === 'system' ? 'light dark' : normalized.appearance.theme;
   root.dataset.appDensity = normalized.appearance.density;
   root.dataset.motion = normalized.appearance.motion;
   root.dataset.richTooltips = String(normalized.appearance.richTooltips);
   root.classList.toggle('reduce-motion', normalized.appearance.motion === 'reduced');
-  syncBrowserTheme(normalized.appearance.theme);
   window.dispatchEvent(new CustomEvent('appsettingschange', { detail: structuredClone(normalized) }));
   return normalized;
-}
-
-const systemDark = typeof window !== 'undefined' && typeof window.matchMedia === 'function'
-  ? window.matchMedia('(prefers-color-scheme: dark)')
-  : null;
-
-function syncBrowserTheme(theme) {
-  const dark = theme === 'dark' || (theme === 'system' && Boolean(systemDark?.matches));
-  const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.content = dark ? '#0a5f34' : '#107c41';
 }
 
 function closeDialog() {
@@ -203,9 +185,6 @@ export function openSettings() {
 function initialize() {
   addStylesheet();
   byId('settingsBtn')?.addEventListener('click', openSettings);
-  systemDark?.addEventListener?.('change', () => {
-    if (document.documentElement.dataset.appTheme === 'system') syncBrowserTheme('system');
-  });
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initialize, { once: true });

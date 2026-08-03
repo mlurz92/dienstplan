@@ -1,7 +1,7 @@
 /** Auto-Plan Studio v7.5 – truthful constraint observatory. */
-import './auto-plan-studio-v7.js?v=20260803.6';
+import './auto-plan-studio-v7.js?v=20260803.4';
 
-const RELEASE = '20260803.6';
+const RELEASE = '20260803.4';
 
 function addStylesheet() {
   if (document.querySelector('link[data-auto-plan-v7-5-style]')) return;

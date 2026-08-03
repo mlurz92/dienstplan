@@ -1,4 +1,4 @@
-.settings-dialog { width: min(1040px, calc(100vw - 24px)); max-width: none; max-height: calc(100dvh - 24px); }
+.settings-dialog { width: min(1040px, calc(100vw - 24px)); max-width: none; }
 .settings-card { width: 100%; max-height: min(880px, calc(100dvh - 24px)); padding: 0; overflow: hidden; display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto; }
 .settings-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; padding: 26px 28px 18px; border-bottom: 1px solid color-mix(in srgb, var(--accent) 16%, transparent); }
 .settings-header h2 { margin: 3px 0 5px; font-size: clamp(1.55rem, 3vw, 2.15rem); }
@@ -30,7 +30,7 @@ html[data-app-density="compact"] .plan-table th, html[data-app-density="compact"
 html.reduce-motion *, html.reduce-motion *::before, html.reduce-motion *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .001ms !important; }
 @media (max-width: 820px) { .settings-grid--three, .settings-grid { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 560px) {
-  .settings-dialog { width: calc(100vw - 12px); max-height: calc(100dvh - 12px); }
+  .settings-dialog { width: calc(100vw - 12px); }
   .settings-card { max-height: calc(100dvh - 12px); }
   .settings-header { padding: 20px 18px 14px; }
   .settings-body { padding: 14px 14px 6px; }

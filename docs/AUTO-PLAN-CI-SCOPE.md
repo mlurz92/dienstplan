@@ -1,4 +1,4 @@
-# DienstplanRAD CI-Prüfumfang
+# Auto-Plan CI-Prüfumfang
 
 Der Pull Request muss vor dem Merge mindestens folgende Prüfungen bestehen:
 
@@ -26,29 +26,3 @@ Für Auto-Plan v7.5 gehören zusätzlich zum verbindlichen Umfang:
 - Reduced Motion, kleine Fensterhöhe, Tastaturabbruch, Fokus-Rückgabe und Tooltip-Deaktivierung im Browser;
 - sichere Textausgabe aller Worker- und Algorithmuskommentare;
 - aktuelle README, Forschungsnotiz, Teststrategie und Changelog ohne unbelegte Build-, Mess- oder Mergeaussagen.
-
-Für Release 0.7.0 / Clinical Fluent Workspace gehören zusätzlich zum verbindlichen Umfang:
-
-- Settings-Schema v4 mit Migration älterer Werte und strikter Validierung von `system`, `light` und `dark`;
-- Wiederherstellung eines gespeicherten expliziten Themes vor Abschluss eines verzögerten Bootstrap-Abrufs;
-- Mindestgröße zentraler Topbar-/Action-Bar-Bedienungen von 36 Pixeln beziehungsweise 44 Pixeln auf groben Zeigegeräten;
-- keine dauerhafte rein dekorative Animation sowie vollständige Reduced-Motion-Steuerung;
-- mindestens 4,5:1 Textkontrast auf dunklen Monats-, Wochenend-, Sammeldialog- und Auto-Plan-Flächen;
-- Betriebssystem-Dark-Mode sowie Forced-Colors-Grundzustand mit ausgeblendeter Dekoration und sichtbarem Tastaturfokus;
-- sticky Tag-/Wochentag-Orientierung, mobile Statistikkarten und kein horizontaler Seitenüberlauf;
-- vollständig innerhalb des dynamischen Viewports liegende mobile Einstellungen mit eigenem Inhalts-Scrollbereich;
-- damaliger gemeinsamer Release-Token `20260803.5` für Browsermodule, Styles und Manifest sowie Paketversion `0.7.0`.
-
-Für Release 0.7.1 / Excel 365 Aero Workspace gehören zusätzlich zum verbindlichen Umfang:
-
-- genau sechs semantische Registerkarten mit eindeutiger Zuordnung jedes Menübandbefehls;
-- sichtbare, korrekt zugeordnete Registerflächen sowie automatische Tastaturaktivierung mit Pfeiltasten, `Pos1` und `Ende`;
-- zuverlässiges Ein- und Ausklappen der Befehlsfläche per `Strg+F1` und Titelbefehl;
-- funktionierende Befehlssuche per `Alt+Q` einschließlich Wiederöffnung eines eingeklappten Menübands, kontextbezogene Formelzeile sowie Dienstplan-, Statistik-, Offene-Punkte- und Auto-Plan-Blattreiter;
-- Hell, Dunkel und Systemeinstellung mit deckendem Arbeitsblatt und ausschließlich auf App-Chrome beziehungsweise Dialograhmen begrenzter Transparenz;
-- kein horizontaler Seitenüberlauf bei 360, 390, 768 und 1024 Pixel Breite; aktive Befehle bleiben erreichbar und ausreichend groß;
-- sichtbarer, zugänglicher und wahrheitsgetreu gespiegelter Speicher-/Offline-Status, wenn die Titelleistenanzeige responsiv ausgeblendet ist;
-- expliziter Tastaturfokus in Windows Forced Colors und unveränderte Reduced-Motion-/Reduced-Transparency-Pfade;
-- Druckausgabe ohne Titelbereich, Register, Menüband, Formelzeile, Blattreiter oder Statusleiste;
-- unveränderte IDs, Ereignisbindungen, Auto-Plan-v7.5-Regeln, Fixpunkte und Persistenzverträge;
-- gemeinsamer Release-Token `20260803.6` für Browsermodule, Styles und Manifest sowie Paketversion `0.7.1`.

@@ -21,17 +21,14 @@ test('palette tooltip keeps season, family and year but hides the edition label'
   );
 });
 
-test('toolbar groups follow the Excel ribbon information architecture', () => {
-  assert.deepEqual(
-    TOOLBAR_GROUPS.map(group => group.key),
-    ['open', 'output', 'home', 'planning', 'auto-plan', 'data', 'application']
-  );
+test('toolbar is split into planning, data, output and application with unique actions and icons', () => {
+  assert.deepEqual(TOOLBAR_GROUPS.map(group => group.key), ['planning', 'data', 'output', 'application']);
   const items = TOOLBAR_GROUPS.flatMap(group => group.items);
-  assert.equal(items.length, 12);
+  assert.equal(items.length, 11);
   assert.equal(new Set(items.map(item => item.id)).size, items.length);
   assert.ok(items.every(item => item.icon && item.label && item.shortLabel));
   assert.deepEqual(
     TOOLBAR_GROUPS.map(group => group.items.length),
-    [2, 3, 3, 1, 1, 1, 1]
+    [4, 3, 3, 1]
   );
 });

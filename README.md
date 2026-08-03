@@ -6,7 +6,7 @@
 
 <p align="center"><strong>Regelgestützte Monatsplanung für Bereitschaftsdienst, Hintergrunddienst und neuroradiologische Rufbereitschaft</strong></p>
 
-> **Paketversion:** `0.7.1`<br>
+> **Paketversion:** `0.6.5`<br>
 > **Regelwerk:** Eignungsregeln `v4.9`  
 > **Auto-Plan:** Algorithmus `v7.5` mit globaler Engpasssuche, wahrheitsgetreuem Portfoliofortschritt, inkrementellem Last-Ledger, adaptivem Worker-Portfolio, cost-aware ALNS, Null-Rot-Guardrail und Zertifizierung<br>
 > **Feiertagsregion:** Sachsen (`SN`)  
@@ -68,32 +68,15 @@ Konfigurierbar sind:
 
 Alle Felder besitzen erklärende, tastaturfähige Tooltips. Die Mitarbeitendentabelle zeigt vorhandene Dienste und Laufobergrenzen gemeinsam. Die Konfiguration wird vor dem Start vollständig validiert.
 
-Das Register **Ansicht** des Menübands enthält ein Zahnrad für das native Einstellungsmodal. Es verwaltet:
+Die Action Bar besitzt zusätzlich eine eigene Gruppe **App** mit Zahnrad. Das native Einstellungsmodal verwaltet:
 
-- Farbschema `Systemeinstellung`, `Hell` oder `Dunkel`;
 - Informationsdichte und reduzierte Bewegung;
 - erklärende Auto-Plan-Tooltips;
 - Standard-Leistungsprofil, Suchintensität und Optimierungsfokus;
 - Standard-Zeitbudget und optionale Zahl paralleler Suchläufe;
 - Perfektionsphase, Rot-Fallback und Rot-Obergrenze.
 
-Die Einstellungen verwenden Schema `v4`, werden lokal offlinefest gesichert, über den bestehenden Bootstrap-Pfad synchronisiert, in JSON-Sicherungen einbezogen und vor jeder Verwendung normalisiert. Ältere oder unvollständige Einstellungen werden defensiv ergänzt; unbekannte Theme-Werte fallen auf die Systemeinstellung zurück.
-
-### Excel 365 Aero Workspace
-
-Release 0.7.1 richtet die gesamte Arbeitsoberfläche an der aktuellen, dichten Informationsarchitektur von Microsoft 365 Excel aus und ergänzt sie um zurückhaltendes Aero Glass. DienstplanRAD bleibt ein eigenständiges Produkt ohne Verbindung zu Microsoft.
-
-- Die grüne Titelleiste vereint App-Identität, Befehlssuche mit `Alt+Q`, Monatsnavigation, Speicherstatus und den Schalter zum Einklappen des Menübands.
-- Sechs zugängliche Register – **Datei**, **Start**, **Planung**, **Auto-Plan**, **Daten** und **Ansicht** – ordnen jeden Produktbefehl genau einmal. `Strg+F1` klappt die Befehlsfläche ein; Pfeiltasten sowie `Pos1` und `Ende` navigieren innerhalb der Register.
-- Die Befehlsfläche verwendet Excel-typische Symbol-/Beschriftungsgruppen. Import, Export, Monatsbearbeitung, Auto-Plan, Aktualisierung und Einstellungen bleiben anhand ihrer Aufgabe auffindbar.
-- Eine Formelzeile zeigt den sichtbaren Monatskontext und bei Tastatur- oder Zeigerfokus die aktuell gewählte Tabellenzelle.
-- Die Dienstplantabelle bleibt wie ein Arbeitsblatt vollständig deckend, präzise gerastert und auch im Dunkelmodus kontraststark. Transparenz und Unschärfe sind auf Titelbereich, Menüband und Dialograhmen begrenzt.
-- Blattreiter führen direkt zu **Dienstplan**, **Statistik**, **Offene Punkte** und **Auto-Plan**; die Statusleiste spiegelt den tatsächlichen Speicher-, Offline- und Fehlerzustand auch dann, wenn die kompakte Titelleistenanzeige responsiv ausgeblendet ist.
-- `Systemeinstellung`, Hell und Dunkel teilen Struktur und Bedienlogik. Die lokale Präferenz wird vor dem ersten Paint gelesen; `color-scheme` und Browser-`theme-color` folgen dem aktiven Modus. Manifest und helle Browser-Chrome verwenden Office-Grün `#107c41`, die dunkle Browser-Chrome `#0a5f34`.
-- Schmale Ansichten erhalten ein horizontal bedienbares Menüband, sticky Tag-/Wochentagsspalten und kartenförmige Statistik. Grobe Zeigegeräte erhalten mindestens 44 Pixel große Ziele.
-- Picker, Sammeldialoge, Einstellungen und Auto-Plan Studio verwenden dieselbe Office-Hierarchie, semantische Statusfarben und deckende Inhaltsflächen.
-- `prefers-reduced-motion`, `prefers-reduced-transparency`, `prefers-contrast` und Windows Forced Colors besitzen explizite Darstellungen. Dekorative Effekte laufen nicht dauerhaft.
-- Die Druckansicht blendet Titelbereich, Menüband, Formelzeile, Blattreiter und Statusleiste aus; fachliche Monatsfarben bleiben unabhängig von den Bildschirm-Overrides.
+Die Einstellungen verwenden Schema `v3`, werden lokal offlinefest gesichert, über den bestehenden Bootstrap-Pfad synchronisiert, in JSON-Sicherungen einbezogen und vor jeder Verwendung normalisiert.
 
 ---
 
@@ -367,7 +350,7 @@ Das Icon enthält keine Schrift. Die zentrale Metapher bleibt auch bei 32 Pixeln
 
 - semantischer Dialog mit Fokus-Rückgabe;
 - vollständige Tastaturbedienung;
-- kontraststabile, sichtbare Fokusindikatoren in Hell, Dunkel und Windows High Contrast;
+- sichtbare Fokusindikatoren;
 - semantische Tabellenköpfe;
 - ARIA-Live-Bereiche für Status und Algorithmuskommentar;
 - programmatische Fortschrittssemantik mit `role="progressbar"`, `aria-valuemin`, `aria-valuemax`, `aria-valuenow` und phasenbezogenem `aria-valuetext`;
@@ -375,14 +358,10 @@ Das Icon enthält keine Schrift. Die zentrale Metapher bleibt auch bei 32 Pixeln
 - Tooltips auf Hover und Fokus;
 - Tooltip-Schließen mit `Escape`;
 - hoverbare und ausreichend persistente Tooltip-Inhalte;
-- Reduced-Motion- und Reduced-Transparency-Unterstützung;
+- Reduced-Motion-Unterstützung;
 - native HTML-Dialoge mit browserseitiger Inert-Schaltung und Fokus-Rückgabe;
-- Forced-Colors- und erhöhte-Kontrast-Anpassungen;
-- semantisches ARIA-Registermuster mit automatischer Aktivierung, roving `tabindex` und zugeordneten Registerflächen;
-- sichtbare Fokusrahmen auch im Windows-Hochkontrastmodus;
-- kompakte Titelleistensteuerungen ab 30 Pixeln, Menübandbefehle ab 36 Pixeln und mindestens 44 Pixel auf groben Zeigegeräten;
-- horizontales Tabellenscrolling auf schmalen Ansichten mit dauerhaft sichtbaren Orientierungszellen;
-- mobile Statistikkarten mit programmatisch erzeugten Feldbeschriftungen;
+- Forced-Colors-Anpassungen;
+- horizontales Tabellenscrolling auf schmalen Ansichten;
 - ein gemeinsamer vertikaler Scrollbereich ohne unerreichbare Aktionsleisten.
 
 ---
@@ -401,7 +380,7 @@ Ein Monatsobjekt enthält unter anderem:
 - `overrideLog`;
 - `importLog`.
 
-Die globalen Einstellungen liegen getrennt vom Monatsobjekt unter `settings` (Schema `v4`) mit den Bereichen `appearance` und `autoPlan`. `appearance.theme` enthält `system`, `light` oder `dark`.
+Die globalen Einstellungen liegen getrennt vom Monatsobjekt unter `settings` (Schema `v3`) mit den Bereichen `appearance` und `autoPlan`.
 
 ### Persistenz
 
@@ -420,7 +399,6 @@ index.html
 styles.css
 controls.css
 transitions.css
-workspace.css
 auto-plan-studio.css
 auto-plan-studio-v6.css
 auto-plan-studio-v7.css
@@ -567,8 +545,6 @@ Die CI führt aus:
 3. Node-Test-Suite
 4. Playwright-Browsertests
 
-Für Release 0.7.1 wurden lokal **355/355 Node-Tests** und **54/54 Chromium-E2E-Szenarien** erfolgreich ausgeführt.
-
 Neue v7.5-Regressionstests prüfen zusätzlich zu den v7-Gates insbesondere:
 
 - vollständige, migrationssichere Settings-Defaults und strikte Validierung;
@@ -593,21 +569,6 @@ Neue v7.5-Regressionstests prüfen zusätzlich zu den v7-Gates insbesondere:
 - Fortschrittssemantik, Reduced Motion und Tooltip-Lebenszyklus im Browser;
 - plattformneutrale Syntax-Gate-Pfade unter Windows und POSIX;
 - identische Quelltextprüfungen bei LF- und CRLF-Zeilenenden.
-
-Die Designsystem-Regressionen aus Release 0.7.1 prüfen darüber hinaus:
-
-- Auswahl, Session-Erhalt und Normalisierung der drei Farbschemata;
-- Theme-Wiederherstellung vor Abschluss eines künstlich verzögerten Bootstrap-Abrufs;
-- eindeutige Zuordnung aller Befehle zu sechs Registerkarten und semantisch korrekte Registerflächen;
-- Tastatursteuerung mit Pfeiltasten, `Pos1`, `Ende` und `Strg+F1`;
-- Befehlssuche bei zuvor eingeklapptem Menüband sowie responsiv sichtbare Offline-/Fehlerzustände nach fehlgeschlagener Speicherung;
-- Mindestgrößen der kompakten Titelleiste und der Menübandbefehle;
-- statisches dekoratives Chrom und Reduced Motion;
-- Textkontrast von mindestens 4,5:1 auf dunklen Monats-, Wochenend-, Sammeldialog- und Auto-Plan-Flächen;
-- Betriebssystem-Dark-Mode sowie Forced-Colors-Grundzustand mit ausgeblendeter Dekoration und sichtbarem Tastaturfokus;
-- auf App-Chrome beschränkte Transparenz bei vollständig deckendem Arbeitsblatt;
-- sticky Orientierungszellen und kartenförmige Statistik auf schmalen Viewports;
-- ausbruchfreie mobile Einstellungen mit eigenem scrollbaren Inhaltsbereich.
 
 Ein Merge nach `main` ist nur nach erfolgreicher CI vorgesehen.
 
@@ -637,28 +598,7 @@ Die fachliche und technische Begründung der v7.5-Architektur einschließlich Su
 
 ---
 
-## 15. Release 0.7.1 / Excel 365 Aero Workspace
-
-- neue Office-Fensterhierarchie aus grüner Titelleiste, Befehlssuche, sechs Registern, Menüband, Formelzeile, deckendem Arbeitsblatt, Blattreitern und Statusleiste;
-- vollständige Befehlszuordnung zu **Datei**, **Start**, **Planung**, **Auto-Plan**, **Daten** und **Ansicht**, ohne doppelte IDs oder veränderte Fachereignisse;
-- Excel-typische Symbol-/Textbefehle, Gruppentitel und eigener hervorgehobener Auto-Plan-Einstieg;
-- zugängliches Registermuster mit Pfeiltasten, `Pos1`, `Ende`, automatischer Aktivierung sowie `Strg+F1` zum Ein- und Ausklappen;
-- Befehlssuche mit `Alt+Q`, kontextbezogene Formelzeile und direkt navigierbare Blattreiter;
-- Aero Glass ausschließlich in App-Chrome und Dialograhmen; deckende, kontraststabile Dienstplan-, Statistik- und Auto-Plan-Flächen in Hell, Dunkel und Systemeinstellung;
-- expliziter Windows-Forced-Colors-Fokus, Reduced Motion, Reduced Transparency, mobile Ribbon-Navigation und druckgerechtes Ausblenden sämtlicher Office-Chrome;
-- Paketversion `0.7.1` und durchgängiger Browser-Release-Token `20260803.6` für Module, Styles und Manifest;
-- zusätzliche Unit- und Chromium-Regressionen für Ribbon-Verträge, Themes, responsive Geometrie, Tastaturbedienung, Druck und Transparenzgrenzen.
-
-### Historie 0.7.0 / Clinical Fluent Workspace
-
-- vollständige Modernisierung von Hauptplan, damaliger Action Bar, Statistik, offenen Punkten, Picker, Sammeldialogen, Einstellungen und Auto-Plan Studio;
-- semantische Zwei-Ebenen-Tokens und persistente Farbschemata `Systemeinstellung`, `Hell` und `Dunkel` im Settings-Schema v4;
-- kontraststabile dunkle Monats-, Wochenend-, Feiertags-, Sammeldialog- und Auto-Plan-Flächen;
-- responsive Diensttabelle, mobile Statistikkarten und viewport-sicheres Einstellungsmodal;
-- Unterstützung für Reduced Motion, Reduced Transparency, erhöhten Kontrast und Windows Forced Colors;
-- damalige Paketversion `0.7.0` und Browser-Release-Token `20260803.5`.
-
-### Historie 0.6.5 / Auto-Plan v7.5
+## 15. Release 0.6.5 / Auto-Plan v7.5
 
 - neues **Truthful Constraint Observatory** mit Fortschrittsring, Arbeitsmenge, Portfoliozustand und Qualitätsgewinnen;
 - monotones, portfolioaggregiertes Fortschrittsmodell mit 99-Prozent-Schranke bis zum echten Gesamtabschluss;
@@ -673,8 +613,8 @@ Die fachliche und technische Begründung der v7.5-Architektur einschließlich Su
 - strikt validierte negative, gebrochene und nichtnumerische Laufobergrenzen;
 - sichere Standardgrenzen auch bei partieller Engine-Konfiguration;
 - sofortiges Schließen sichtbarer Rich Tooltips nach Deaktivierung;
-- v7.5-Identität in Planner, Studio, Einstellungen, damaliger Paketversion und vollständigem Browser-Modulgraphen;
-- einheitlicher v7.5-Release-Token `20260803.4` im damaligen Browser-Modulgraphen;
+- v7.5-Identität in Planner, Studio, Einstellungen, Paketversion und vollständigem Browser-Modulgraphen;
+- einheitlicher v7.5-Release-Token `20260803.4` im ausgelieferten Browser-Modulgraphen;
 - neue Unit-, Integrations-, Property- und Browserregressionen sowie ein dokumentiertes v7.5-Risikomodell.
 
 ### Historie 0.6.0 / Auto-Plan v7
