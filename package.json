@@ -1,7 +1,7 @@
 {
   "name": "dienstplanrad",
   "private": true,
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "Regelgestützter Dienstplaner für Radiologie mit Auto-Plan v7.5, Null-Rot-Guardrail und adaptivem Worker-Portfolio",
   "type": "module",
   "scripts": {

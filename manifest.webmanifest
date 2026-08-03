@@ -5,8 +5,8 @@
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#eef2f6",
-  "theme_color": "#eef2f6",
+  "background_color": "#107c41",
+  "theme_color": "#107c41",
   "description": "Regelgestützter Radiologie-Dienstplaner mit Auto-Plan und Cloud-Synchronisierung",
   "icons": [
     {
