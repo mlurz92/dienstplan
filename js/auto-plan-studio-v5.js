@@ -18,8 +18,8 @@ import {
   applyAutoPlanProposal,
   createDefaultAutoPlanConfig,
   validateAutoPlanConfig
-} from './auto-planner.js?v=20260803.2';
-import { parallelSearchCount, runAutoPlan, workersAvailable } from './auto-plan-runner.js?v=20260803.2';
+} from './auto-planner.js?v=20260803.3';
+import { createAutoPlanExecutionPlan, runAutoPlan, workersAvailable } from './auto-plan-runner.js?v=20260803.3';
 import {
   getMonthData,
   getMonthLabel,
@@ -27,7 +27,7 @@ import {
   persistMonth,
   setMonthData,
   state
-} from './state.js?v=20260803.2';
+} from './state.js?v=20260803.3';
 import {
   assignmentLabel,
   computeWeekendEquivalent,
@@ -38,12 +38,12 @@ import {
   parseIso,
   roleLabelForMonth,
   weekdayLabel
-} from './rules.js?v=20260803.2';
-import { holidayName } from './holidays.js?v=20260803.2';
-import { AlgorithmCommentary } from './auto-plan-commentary.js?v=20260803.2';
-import { AutoPlanVisualizer } from './auto-plan-visualizer.js?v=20260803.2';
+} from './rules.js?v=20260803.3';
+import { holidayName } from './holidays.js?v=20260803.3';
+import { AlgorithmCommentary } from './auto-plan-commentary.js?v=20260803.3';
+import { AutoPlanVisualizer } from './auto-plan-visualizer.js?v=20260803.3';
 
-const RELEASE = '20260803.2';
+const RELEASE = '20260803.3';
 const STYLESHEETS = ['/auto-plan-studio.css'];
 
 const PHASES = Object.freeze([
@@ -449,22 +449,38 @@ function renderLimitRows(monthData, { reset = false } = {}) {
 
 function renderConfig(monthData) {
   const defaults = createDefaultAutoPlanConfig(state, monthData);
+  const saved = state.settings?.autoPlan || {};
   const staff = planningStaff(monthData);
-  byId('autoPlanSearchIntensity').value = defaults.searchIntensity || 'deep';
-  byId('autoPlanOptimizationFocus').value = defaults.optimizationFocus || 'balanced';
-  byId('autoPlanAllowRed').checked = defaults.allowRedFallback !== false;
-  byId('autoPlanPerfection').checked = true;
-  byId('autoPlanMaxRed').value = defaults.maxRedViolations ?? '';
+  if (byId('autoPlanPerformanceProfile')) byId('autoPlanPerformanceProfile').value = saved.performanceProfile || 'adaptive';
+  byId('autoPlanSearchIntensity').value = saved.searchIntensity || defaults.searchIntensity || 'deep';
+  byId('autoPlanOptimizationFocus').value = saved.optimizationFocus || defaults.optimizationFocus || 'balanced';
+  byId('autoPlanAllowRed').checked = saved.allowRedFallback ?? defaults.allowRedFallback !== false;
+  byId('autoPlanPerfection').checked = saved.perfectionEnabled !== false;
+  byId('autoPlanMaxRed').value = saved.maxRedViolations ?? defaults.maxRedViolations ?? '';
   syncIntensityDefaults({ force: true });
+  if (Number.isFinite(Number(saved.timeBudgetSeconds))) {
+    byId('autoPlanTimeBudget').value = String(saved.timeBudgetSeconds);
+    syncTimeBudgetLabel();
+  }
   renderLimitRows(monthData);
 
   const open = Object.values(monthData.days || {}).reduce((sum, day) => sum + Number(!day.bd) + Number(!day.hg), 0);
   const fixed = Object.values(monthData.days || {}).reduce((sum, day) => sum + Number(Boolean(day.bd)) + Number(Boolean(day.hg)), 0);
+  const execution = createAutoPlanExecutionPlan({
+    hardwareConcurrency: navigator.hardwareConcurrency,
+    deviceMemory: navigator.deviceMemory,
+    openSlots: open,
+    profileCount: defaults.allowRedFallback === false ? 2 : 3,
+    performanceProfile: byId('autoPlanPerformanceProfile')?.value || 'adaptive',
+    parallelSearches: saved.parallelSearches ?? null
+  });
   byId('autoPlanConfigSummary').innerHTML = [
     ['Monat', getMonthLabel(monthData.year, monthData.month)],
     ['Offene BD/HG', String(open)],
     ['Geschützte Fixpunkte', String(fixed)],
     ['Planbarer Pool', `${staff.length} Personen`],
+    ['Worker-Portfolio', `${execution.constructionWorkers} Aufbau · ${execution.perfectionWorkers} Perfektion`],
+    ['UI-Reserve', `${execution.reserveCores} Kern${execution.reserveCores === 1 ? '' : 'e'}`],
     ['Feiertagsregion', 'Sachsen']
   ].map(([label, value]) => `<div><span>${esc(label)}</span><strong>${esc(value)}</strong></div>`).join('');
   syncConfigValidation();
@@ -519,6 +535,8 @@ function readConfig() {
     }
   }
   return {
+    performanceProfile: byId('autoPlanPerformanceProfile')?.value || state.settings?.autoPlan?.performanceProfile || 'adaptive',
+    parallelSearches: state.settings?.autoPlan?.parallelSearches ?? null,
     searchIntensity: byId('autoPlanSearchIntensity').value,
     optimizationFocus: byId('autoPlanOptimizationFocus').value,
     allowRedFallback: byId('autoPlanAllowRed').checked,
@@ -787,6 +805,8 @@ function renderSearch(result) {
   const metrics = result.metrics || {};
   const iterative = metrics.iterative || {};
   const optimizer = metrics.optimizer || {};
+  const execution = metrics.executionPlan || {};
+  const learnedOperators = Object.values(optimizer.operatorLearning || {}).filter(item => item.uses > 0).length;
   const entries = [
     // Nicht mit den parallelen Suchläufen verwechseln: gezählt werden die
     // Aufbauversuche des Gewinnerlaufs bis zu seiner ersten gültigen Belegung.
@@ -795,6 +815,8 @@ function renderSearch(result) {
     ['Nachfolger', formatNumber(metrics.generatedNodes), ''],
     ['Sackgassen', formatNumber(metrics.deadEnds), ''],
     ['Exakte Restknoten', formatNumber(metrics.exactNodes), ''],
+    ['Ledger-Treffer', formatNumber(metrics.assignmentLedgerHits), ''],
+    ['Worker-Portfolio', execution.workerBudget ? `${execution.constructionWorkers}/${execution.perfectionWorkers} · ${execution.reserveCores} UI` : 'Inline', ''],
     ['Tauschrunden', String(iterative.rounds || 0), 'iterative'],
     ['Nachbarschaften', formatNumber(iterative.neighbors), 'iterative'],
     ['Lokale Neuplanungen', `${iterative.localRebuilds || 0} · ${formatNumber(iterative.localNodes)} Knoten`, 'iterative'],
@@ -804,6 +826,7 @@ function renderSearch(result) {
     ['Angenommen', formatNumber(optimizer.accepted), 'perfect'],
     ['Neustarts', formatNumber(optimizer.restarts), 'perfect'],
     ['Verbesserungen', formatNumber(optimizer.improvements), 'perfect'],
+    ['Lernende Operatoren', String(learnedOperators), 'perfect'],
     ['Zertifizierungszüge', formatNumber(optimizer.certificationMoves), 'certify'],
     ['Optimalitätsnachweis', optimizer.certified ? 'bestanden' : optimizer.skipped ? 'nicht ausgeführt' : 'offen', 'certify'],
     ['Laufzeit', `${formatNumber(result.elapsedMs)} ms`, '']
@@ -816,9 +839,11 @@ function renderSearch(result) {
 
 function renderRunConfig(result) {
   const config = result.runConfig || {};
+  const execution = result.executionConfig || {};
   const iterative = result.iterativeConfig || {};
   const optimizer = result.optimizerConfig || {};
   byId('autoPlanRunConfig').innerHTML = [
+    ['Leistung', execution.performanceProfile],
     ['Suche', config.searchIntensity],
     ['Fokus', config.optimizationFocus],
     ['Rote Fallbacks', config.allowRedFallback ? 'erlaubt' : 'gesperrt'],
@@ -993,13 +1018,22 @@ function openStudio() {
 async function startPlanner() {
   if (!syncConfigValidation()) return;
   const runConfig = readConfig();
+  const open = Object.values(activeMonth.days || {}).reduce((sum, day) => sum + Number(!day.bd) + Number(!day.hg), 0);
+  const execution = createAutoPlanExecutionPlan({
+    hardwareConcurrency: navigator.hardwareConcurrency,
+    deviceMemory: navigator.deviceMemory,
+    openSlots: open,
+    profileCount: runConfig.allowRedFallback ? 3 : 2,
+    performanceProfile: runConfig.performanceProfile,
+    parallelSearches: runConfig.parallelSearches
+  });
   dialog.classList.remove('is-configuring');
   dialog.classList.add('is-running');
   dialog.dataset.phase = 'analysis';
   byId('autoPlanConfig').hidden = true;
   byId('autoPlanStage').hidden = false;
   byId('autoPlanSubtitle').textContent = workersAvailable()
-    ? `${getMonthLabel(activeMonth.year, activeMonth.month)} · ${parallelSearchCount()} parallele Suchläufe auf eigenen Kernen`
+    ? `${getMonthLabel(activeMonth.year, activeMonth.month)} · v7 Portfolio ${execution.constructionWorkers}/${execution.perfectionWorkers} Worker · ${execution.reserveCores} UI-Reserve`
     : `${getMonthLabel(activeMonth.year, activeMonth.month)} · Optimierung läuft`;
   byId('autoPlanStartBtn').hidden = true;
   byId('autoPlanBody').scrollTop = 0;
@@ -1012,9 +1046,8 @@ async function startPlanner() {
 
   resetLog();
   commentary = new AlgorithmCommentary({ onEntry: appendLogEntry });
-  const open = Object.values(activeMonth.days || {}).reduce((sum, day) => sum + Number(!day.bd) + Number(!day.hg), 0);
   const fixed = Object.values(activeMonth.days || {}).reduce((sum, day) => sum + Number(Boolean(day.bd)) + Number(Boolean(day.hg)), 0);
-  commentary.begin({ open, fixed, searches: workersAvailable() ? parallelSearchCount() : 1 });
+  commentary.begin({ open, fixed, searches: workersAvailable() ? execution.perfectionWorkers : 1 });
 
   try {
     proposal = await runAutoPlan({

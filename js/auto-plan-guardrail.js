@@ -40,7 +40,7 @@ function installGuardrail(dialog) {
   panel.setAttribute('aria-labelledby', 'autoPlanZeroRedTitle');
   const header = make('header');
   header.append(
-    make('span', '', 'Null-Rot-Guardrail · Algorithmus v6'),
+    make('span', '', 'Null-Rot-Guardrail · Algorithmus v7'),
     make('h3', '', 'Rote Vorschläge erst nach vollständig ausgeschöpfter strikter Suche'),
     make('p', '', 'Die fachlichen Regeln bleiben unverändert hart. Verbreitert wird ausschließlich der Suchraum.')
   );
@@ -95,7 +95,7 @@ function installNarrative(dialog) {
   const badge = make('div', 'auto-plan-engine-badge');
   const dot = make('i');
   dot.setAttribute('aria-hidden', 'true');
-  badge.append(dot, make('span', '', 'Constraint Engine v6'));
+  badge.append(dot, make('span', '', 'Constraint Engine v7'));
   visual.append(narrative, badge);
 }
 

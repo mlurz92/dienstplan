@@ -1,4 +1,4 @@
-import { holidayBlocks, isFirstRegularWorkdayAfter, isHoliday } from './holidays.js?v=20260803.2';
+import { holidayBlocks, isFirstRegularWorkdayAfter, isHoliday } from './holidays.js?v=20260803.3';
 import {
   addDays, countHgForAaBdExcept, countRoleInMonthExcept, countSaturdayBdExcept,
   countServicesInLoadedYearExcept, getAbsenceFromState, getEffectiveAbsence,
@@ -6,7 +6,7 @@ import {
   hasCompleteLoadedHistory, hasOption, isAaOn, isFaOn, isPositivePreference,
   isStaffActiveOn, labelForAbsence, listOwnRoleDates, monthForIso, parseIso,
   projectedWeekendEquivalent, severityRank, toLocalIso, weekendEquivalentFromMap, weekendMap
-} from './rules-core.js?v=20260803.2';
+} from './rules-core.js?v=20260803.3';
 
 export const RECOMMENDATION_LANES = Object.freeze([
   'coupling',

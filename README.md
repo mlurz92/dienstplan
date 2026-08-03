@@ -6,9 +6,9 @@
 
 <p align="center"><strong>Regelgestützte Monatsplanung für Bereitschaftsdienst, Hintergrunddienst und neuroradiologische Rufbereitschaft</strong></p>
 
-> **Paketversion:** `0.5.1`<br>
+> **Paketversion:** `0.6.0`<br>
 > **Regelwerk:** Eignungsregeln `v4.9`  
-> **Auto-Plan:** Algorithmus `v6` mit Null-Rot-Guardrail, adaptiver Strict-Rescue, iterativer Tauschreparatur, ALNS-Perfektion und Zertifizierung  
+> **Auto-Plan:** Algorithmus `v7` mit globaler Engpasssuche, inkrementellem Last-Ledger, adaptivem Worker-Portfolio, cost-aware ALNS, Null-Rot-Guardrail und Zertifizierung<br>
 > **Feiertagsregion:** Sachsen (`SN`)  
 > **Betrieb:** Cloudflare Pages · Pages Functions · Cloudflare KV · lokale Browser-Sicherung
 
@@ -54,6 +54,7 @@ Das Studio besitzt drei getrennte Arbeitsphasen in einem einzigen durchgehend sc
 
 Konfigurierbar sind:
 
+- Leistungsprofil `Responsiv`, `Adaptiv` oder `Power`;
 - Suchintensität `Standard`, `Tief` oder `Maximum`;
 - Optimierungsschwerpunkt `Ausgewogen`, `Wünsche`, `Lastenausgleich` oder `Wochenenden`;
 - Zeitrahmen der Perfektionsphase;
@@ -67,9 +68,19 @@ Konfigurierbar sind:
 
 Alle Felder besitzen erklärende, tastaturfähige Tooltips. Die Mitarbeitendentabelle zeigt vorhandene Dienste und Laufobergrenzen gemeinsam. Die Konfiguration wird vor dem Start vollständig validiert.
 
+Die Action Bar besitzt zusätzlich eine eigene Gruppe **App** mit Zahnrad. Das native Einstellungsmodal verwaltet:
+
+- Informationsdichte und reduzierte Bewegung;
+- erklärende Auto-Plan-Tooltips;
+- Standard-Leistungsprofil, Suchintensität und Optimierungsfokus;
+- Standard-Zeitbudget und optionale Zahl paralleler Suchläufe;
+- Perfektionsphase, Rot-Fallback und Rot-Obergrenze.
+
+Die Einstellungen verwenden Schema `v3`, werden lokal offlinefest gesichert, über den bestehenden Bootstrap-Pfad synchronisiert, in JSON-Sicherungen einbezogen und vor jeder Verwendung normalisiert.
+
 ---
 
-## 3. Null-Rot-Guardrail v6
+## 3. Null-Rot-Guardrail v7
 
 ### 3.1 Eskalationsfolge
 
@@ -83,7 +94,7 @@ Der Algorithmus darf nicht unmittelbar von einer erfolglosen Standardsuche in ro
            └─ nicht vollständig
                     │
                     ▼
-2. adaptive Null-Rot-Rescue
+2. adaptive Null-Rot-Rescue (aus v6 übernommen und in v7 beibehalten)
    - größerer Suchstrahl
    - breiterer Kandidatenfächer
    - höheres Backtracking-Budget
@@ -125,15 +136,16 @@ Der Suchprofiltext weist die Rescue ebenfalls aus.
 
 ---
 
-## 4. Algorithmusarchitektur
+## 4. Algorithmusarchitektur v7
 
 ### 4.1 Pipeline
 
 ```text
 Ausgangsmonat
     │
-    ├─ Konstruktion
-    │   Beam Search · MRV · Forward Checking · strikte Profile
+    ├─ Constraint-Konstruktion v7
+    │   globale BD/HG-MRV · Beam Search · Forward Checking
+    │   inkrementelles Belegungs-Ledger · strikte Profile
     │
     ├─ Null-Rot-Rescue v6
     │   verbreiterte Strict-Suche vor jedem Fallback
@@ -141,9 +153,10 @@ Ausgangsmonat
     ├─ iterative Tauschreparatur
     │   Einzelumsetzung · Paartausch · Dreierkette · Tagespaket · lokale Neuplanung
     │
-    ├─ Perfektionsphase
+    ├─ Perfektionsphase v7
     │   Adaptive Large Neighborhood Search
-    │   Ruin-and-Recreate · Late Acceptance · absteigende Nachbarschaften
+    │   cost-aware UCB-Operatorwahl · Ruin-and-Recreate
+    │   Late Acceptance · absteigende Nachbarschaften
     │
     └─ Zertifizierung und Schlussaudit
         vollständige Einzelumsetzungen und Paartausche
@@ -151,7 +164,9 @@ Ausgangsmonat
 
 ### 4.2 Konstruktion
 
-Die Konstruktion verarbeitet ausschließlich Slots, die im Ausgangsmonat leer waren. Für jeden Zwischenzustand werden:
+Die Konstruktion verarbeitet ausschließlich Slots, die im Ausgangsmonat leer waren. Anders als v6 trennt v7 die Rollen nicht mehr in „erst alle BD, dann alle HG“. Alle offenen BD- und HG-Felder konkurrieren gemeinsam um den nächsten Suchschritt. Das Feld mit der kleinsten echten Kandidatendomäne wird zuerst bearbeitet; Samstags-BD und Wochenendfelder entscheiden bei Gleichstand. Dadurch wird eine knappe HG-Ressource geschützt, bevor eine scheinbar leichte BD-Entscheidung sie verbraucht.
+
+Für jeden Zwischenzustand werden:
 
 - technisch nicht wählbare Kandidaten entfernt;
 - strikte Profile zusätzlich von roten Kandidaten bereinigt;
@@ -160,6 +175,8 @@ Die Konstruktion verarbeitet ausschließlich Slots, die im Ausgangsmonat leer wa
 - Kandidaten anhand Regelstufe, Empfehlungsvektor und Last sortiert;
 - künftige Sackgassen durch Forward Checking verworfen;
 - nur die besten entdoppelten Varianten im Suchstrahl behalten.
+
+Jeder unveränderliche Suchknoten trägt zusätzlich ein **Assignment Ledger**. Die BD- und HG-Zahl jeder Person wird einmal aufgebaut und beim Erzeugen eines Nachfolgers inkrementell fortgeschrieben. Obergrenzen, BD-Sollanteile und kombinierte Lasten benötigen damit keine erneute Monatsabtastung pro Kandidat. Der Ledger ist nur eine Beschleunigungsstruktur; verbindliche Finalisten durchlaufen weiterhin die vollständige produktive Regelengine.
 
 Die Zielordnung ist lexikografisch. Harte Kriterien dominieren jede weiche Qualität:
 
@@ -202,6 +219,16 @@ Die adaptive Large Neighborhood Search entfernt gezielt einen Ausschnitt der sel
 
 Late Acceptance erlaubt kontrollierte Zwischenverschlechterungen, während der beste gefundene Zustand separat geschützt bleibt. Die Ausschnittsgröße reagiert auf verbleibende Zeit und Stagnation.
 
+v7 ersetzt die rein gewichtete Roulette-Auswahl der Zerstöroperatoren durch eine **cost-aware Upper-Confidence-Bound-Auswahl**:
+
+1. jeder Operator wird mindestens einmal erprobt;
+2. Qualitätsgewinn wird gegen seine tatsächlich benötigte Rechenzeit normalisiert;
+3. ein Explorationsbonus hält selten verwendete Operatoren erreichbar;
+4. erfolgreiche Operatoren erhalten keine pauschale Belohnung, sondern müssen ihren Aufwand im aktuellen Monat rechtfertigen;
+5. Nutzung, Reward, Kosten und Reward pro Sekunde werden als Lauftelemetrie ausgegeben.
+
+Das Lernen ist online, deterministisch seedbar und benötigt weder Trainingsdaten noch ein zweites Regelmodell.
+
 ### 4.5 Zertifizierung
 
 Am Ende werden sämtliche Einzelumsetzungen und sämtliche Paartausche ohne Suchabkürzung geprüft. Findet sich keine Verbesserung, ist der Plan bezüglich dieser Nachbarschaften lokal optimal. Ein Zeitlimit kann einen vollständigen Nachweis verhindern; der Vorschlag bleibt dennoch vollständig regelgeprüft.
@@ -218,18 +245,23 @@ Fixpunkte sind mehrfach abgesichert:
 
 ---
 
-## 5. Mehrkern-Ausführung
+## 5. Adaptive Mehrkern-Ausführung
 
 Der Auto-Plan läuft in Modul-Web-Workern.
 
-- reguläre Suchprofile laufen parallel;
-- der bisherige Fallback-Strang führt in v6 zuerst die adaptive Strict-Rescue aus;
+- v7 berechnet vor jedem Lauf einen erklärbaren Ausführungsplan aus offenen Feldern, logischen Kernen, gemeldetem Gerätespeicher, Leistungsprofil und optionalem Nutzerlimit;
+- auf speicherarmen Geräten werden Profile geordnet im selben Worker wiederverwendet;
+- auf leistungsfähigen Geräten laufen unterschiedliche Suchprofile und deterministisch diversifizierte Perfektionsläufe parallel;
+- ein abgestürzter Worker wird isoliert beendet und für den nächsten Portfolioauftrag frisch aufgebaut;
+- der bisherige Fallback-Strang führt zuerst die adaptive Strict-Rescue aus;
 - mehrere Perfektionsläufe verbessern denselben Aufbau mit unterschiedlichen deterministischen Startwerten;
 - der beste Lauf gewinnt anhand derselben Zielordnung, die auch intern optimiert wird;
-- ein Kern bleibt für Anzeige und Animation frei;
+- je nach Gerät bleiben ein oder zwei Kerne für Anzeige, Eingabe und Animation frei;
 - ohne Worker-Unterstützung fällt die Anwendung auf den Anzeigestrang zurück.
 
 Die produktive Regelengine wird nicht dupliziert. Worker und Hauptthread importieren dieselben Module.
+
+Die Profile `Responsiv`, `Adaptiv` und `Power` begrenzen das Portfolio auf zwei, vier beziehungsweise sechs Worker. Diese Obergrenzen werden weiter durch Speicher und Problemgröße reduziert; `navigator.hardwareConcurrency` wird ausdrücklich nicht als absolute Freigabe interpretiert. Ein explizites Parallelitätslimit begrenzt die Perfektionsläufe zusätzlich.
 
 ---
 
@@ -246,8 +278,11 @@ Die Canvas-Visualisierung bildet den tatsächlichen Lauf ab:
 - ein Phasenkommentar erklärt die aktuelle Rechenstufe;
 - die Verlaufslinie visualisiert Qualitätsverbesserungen;
 - `prefers-reduced-motion` wird respektiert.
+- die App-Einstellung „Bewegung reduziert“ wirkt auch dann, wenn das Betriebssystem keine reduzierte Bewegung meldet;
+- ein v7-Orbit und eine monatlich eingefärbte Portfolio-Leiste visualisieren Engine, Worker-Plan und aktuelle Architektur;
+- Ledger-Treffer, Worker-Aufteilung und lernende Operatoren erscheinen im Ergebnisbericht.
 
-Der v6-Guardrail macht zusätzlich sichtbar, dass der Minimal-Rot-Fallback erst nach der verbreiterten Strict-Rescue erreicht werden kann.
+Der v7-Guardrail macht zusätzlich sichtbar, dass der Minimal-Rot-Fallback erst nach der verbreiterten Strict-Rescue erreicht werden kann.
 
 ### App-Icon
 
@@ -276,6 +311,7 @@ Das Icon enthält keine Schrift. Die zentrale Metapher bleibt auch bei 32 Pixeln
 - Tooltip-Schließen mit `Escape`;
 - hoverbare und ausreichend persistente Tooltip-Inhalte;
 - Reduced-Motion-Unterstützung;
+- native HTML-Dialoge mit browserseitiger Inert-Schaltung und Fokus-Rückgabe;
 - Forced-Colors-Anpassungen;
 - horizontales Tabellenscrolling auf schmalen Ansichten;
 - ein gemeinsamer vertikaler Scrollbereich ohne unerreichbare Aktionsleisten.
@@ -296,6 +332,8 @@ Ein Monatsobjekt enthält unter anderem:
 - `overrideLog`;
 - `importLog`.
 
+Die globalen Einstellungen liegen getrennt vom Monatsobjekt unter `settings` (Schema `v3`) mit den Bereichen `appearance` und `autoPlan`.
+
 ### Persistenz
 
 - Cloudflare KV speichert Monats-, Personal- und Einstellungsdaten.
@@ -315,6 +353,8 @@ controls.css
 transitions.css
 auto-plan-studio.css
 auto-plan-studio-v6.css
+auto-plan-studio-v7.css
+app-settings.css
 
 icons/
   icon.svg
@@ -327,6 +367,7 @@ icons/
 
 js/
   app.js
+  app-settings.js
   state.js
   rules.js
   rules-core.js
@@ -340,6 +381,7 @@ js/
   auto-planner-v4.js
   auto-planner-v5.js
   auto-planner-v6.js
+  auto-planner-v7.js
   auto-planner-optimizer.js
 
   auto-plan-runner.js
@@ -347,6 +389,7 @@ js/
   auto-plan-ui.js
   auto-plan-studio-v5.js
   auto-plan-studio-v6.js
+  auto-plan-studio-v7.js
   auto-plan-guardrail.js
   auto-plan-tooltip.js
   auto-plan-visualizer.js
@@ -363,6 +406,8 @@ tests/
 
 docs/
   AUTO-PLAN-V6-RESEARCH-20260803.md
+  AUTO-PLAN-V7-RESEARCH-20260803.md
+  auto-plan-v7-test-strategy.yml
 ```
 
 ---
@@ -444,8 +489,14 @@ Die CI führt aus:
 3. Node-Test-Suite
 4. Playwright-Browsertests
 
-Neue v6-Regressionstests prüfen insbesondere:
+Neue v7-Regressionstests prüfen insbesondere:
 
+- vollständige, migrationssichere Settings-Defaults und strikte Validierung;
+- adaptives Worker-Budget bei kleinem Speicher, großen Geräten und explizitem Limit;
+- rollenübergreifende Fail-first-Auswahl;
+- Belegungs-Ledger und v7-Telemetrie;
+- cost-aware Operatorlernen einschließlich Exploration;
+- Zahnrad, Modal, Fokus-Rückgabe, Persistenz und Studio-v7 im Browser;
 - Erhalt abgeleiteter HG-Grenzen bei partiellen Konfigurationen;
 - bewusste Aufhebung durch explizites `null`;
 - ausschließlich strikte Profile in der Rescue;
@@ -469,15 +520,31 @@ Ein Merge nach `main` ist nur nach erfolgreicher CI vorgesehen.
 
 ## 14. Recherche und Entscheidungsprotokoll
 
-Die fachliche und technische Begründung der v6-Architektur einschließlich Constraint-Programming-, ALNS- und Accessibility-Quellen steht in:
+Die fachliche und technische Begründung der v7-Architektur einschließlich Constraint-Programming-, ALNS-, Browser- und Accessibility-Quellen steht in:
 
+- [`docs/AUTO-PLAN-V7-RESEARCH-20260803.md`](docs/AUTO-PLAN-V7-RESEARCH-20260803.md)
+- [`docs/auto-plan-v7-test-strategy.yml`](docs/auto-plan-v7-test-strategy.yml)
 - [`docs/AUTO-PLAN-V6-RESEARCH-20260803.md`](docs/AUTO-PLAN-V6-RESEARCH-20260803.md)
 - [`docs/AUTO-PLAN-RESEARCH-20260802.md`](docs/AUTO-PLAN-RESEARCH-20260802.md)
 - [`docs/AUTO-PLAN-HARDENING-20260802.md`](docs/AUTO-PLAN-HARDENING-20260802.md)
 
 ---
 
-## 15. Release 0.5.1
+## 15. Release 0.6.0 / Auto-Plan v7
+
+- globale MRV-/Fail-first-Auswahl über BD und HG statt rollenweiser Konstruktion;
+- inkrementelles Assignment Ledger für Obergrenzen und Lastanteile;
+- cost-aware Online-Bandit für die ALNS-Operatorwahl;
+- geräte-, speicher-, profil- und problemadaptives Worker-Portfolio mit UI-Reserve;
+- drei Leistungsprofile sowie explizite Parallelitätsbegrenzung;
+- neue v7-Lauftelemetrie für Ledger, Worker und Operatorlernen;
+- v7-Portfolio-Leiste und monatlich eingefärbte, Reduced-Motion-sichere Orbit-Animation;
+- neue App-Gruppe in der Action Bar mit Zahnrad und barrierearmem Einstellungsmodal;
+- persistentes Settings-Schema v3 für Darstellung und Auto-Plan-Voreinstellungen;
+- lokale v6/v7-Stressmessung: etwa `22,7 s → 1,7 s` sowie `45.288 → 9.738` Kandidatenbewertungen im dokumentierten strikten Leermonatsfall;
+- vollständige Forschungs-, Architektur-, Test- und Betriebsdokumentation.
+
+### Historie 0.5.1 / Auto-Plan v6
 
 - Auto-Plan-Algorithmus v6;
 - adaptive Null-Rot-Rescue vor jedem bestätigbaren Fallback;
@@ -492,5 +559,5 @@ Die fachliche und technische Begründung der v6-Architektur einschließlich Cons
 - vollständige 32/180/192/512-Pixel-Ableitungen und separates Maskable-PWA-Icon;
 - plattformneutrale Qualitätsgates für Windows-, macOS- und Linux-Arbeitskopien;
 - deterministische E2E-Synchronisation des Monatsfarbverlaufs über echte Start- und Abschlusszustände statt fester Wartezeit;
-- einheitlicher Release-Token `20260803.2` im vollständigen Browser-Modulgraphen und ein Gate gegen künftige Teilversionen;
+- einheitlicher Release-Token `20260803.3` im vollständigen Browser-Modulgraphen und ein Gate gegen künftige Teilversionen;
 - GitHub-CI-Actions mit nativer Node-24-Laufzeit ohne Node-20-Abkündigungswarnung.

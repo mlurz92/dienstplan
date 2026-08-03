@@ -37,10 +37,10 @@
  * Anzeigestrang weiter.
  */
 
-import { buildAutoPlan } from './auto-planner.js?v=20260803.2';
-import { planProfileIds } from './auto-planner-engine.js?v=20260803.2';
+import { buildAutoPlan } from './auto-planner.js?v=20260803.3';
+import { planProfileIds } from './auto-planner-engine.js?v=20260803.3';
 
-const WORKER_URL = '/js/auto-plan-worker.js?v=20260803.2';
+const WORKER_URL = '/js/auto-plan-worker.js?v=20260803.3';
 
 /**
  * Wie viele Perfektionsläufe parallel starten.
@@ -48,9 +48,57 @@ const WORKER_URL = '/js/auto-plan-worker.js?v=20260803.2';
  * Ein Kern bleibt für Anzeige und Animation frei. Mehr als vier Läufe bringen
  * kaum noch Streuungsgewinn, kosten aber Speicher und Startzeit.
  */
+export function createAutoPlanExecutionPlan({
+  hardwareConcurrency = 2,
+  deviceMemory,
+  openSlots = 62,
+  profileCount = 3,
+  performanceProfile = 'adaptive',
+  parallelSearches = null
+} = {}) {
+  const cores = Math.max(1, Math.min(64, Math.round(Number(hardwareConcurrency) || 2)));
+  const memory = Number(deviceMemory);
+  const slots = Math.max(0, Math.min(62, Math.round(Number(openSlots) || 0)));
+  const reserveCores = cores >= 12 ? 2 : cores > 1 ? 1 : 0;
+  const coreBudget = Math.max(1, cores - reserveCores);
+  const profileCap = performanceProfile === 'power' ? 6 : performanceProfile === 'responsive' ? 2 : 4;
+  const memoryCap = Number.isFinite(memory)
+    ? memory <= 2 ? 1 : memory <= 4 ? 2 : memory <= 8 ? 3 : 6
+    : 4;
+  const problemCap = slots <= 8 ? 1 : slots <= 24 ? 2 : performanceProfile === 'power' ? 6 : 4;
+  const workerBudget = Math.max(1, Math.min(coreBudget, profileCap, memoryCap, problemCap));
+  const explicit = parallelSearches === null || parallelSearches === undefined
+    ? null
+    : Math.max(1, Math.min(8, Math.round(Number(parallelSearches) || 1)));
+  const reason = Number.isFinite(memory) && memory <= 2
+    ? 'memory-constrained'
+    : slots <= 8
+      ? 'small-problem'
+      : performanceProfile === 'responsive'
+        ? 'responsive-ui'
+        : performanceProfile === 'power'
+          ? 'maximum-throughput'
+          : 'balanced-throughput';
+  return {
+    performanceProfile,
+    hardwareConcurrency: cores,
+    deviceMemory: Number.isFinite(memory) ? memory : null,
+    openSlots: slots,
+    reserveCores,
+    workerBudget,
+    constructionWorkers: Math.max(1, Math.min(workerBudget, Math.max(1, Number(profileCount) || 1))),
+    perfectionWorkers: explicit === null ? workerBudget : Math.min(workerBudget, explicit),
+    reason
+  };
+}
+
 export function parallelSearchCount() {
-  const cores = Number(globalThis.navigator?.hardwareConcurrency) || 2;
-  return Math.max(1, Math.min(4, cores - 1));
+  return createAutoPlanExecutionPlan({
+    hardwareConcurrency: globalThis.navigator?.hardwareConcurrency,
+    deviceMemory: globalThis.navigator?.deviceMemory,
+    openSlots: 62,
+    performanceProfile: 'adaptive'
+  }).perfectionWorkers;
 }
 
 export function workersAvailable() {
@@ -119,9 +167,23 @@ export async function runAutoPlan({ state, monthData, year, month, runConfig, on
   }
   if (!profileIds.length) return inline();
 
-  const perfectionCount = runConfig?.parallelSearches === undefined
-    ? parallelSearchCount()
-    : Math.max(1, Math.min(8, Number(runConfig.parallelSearches) || 1));
+  const openSlots = Object.values(monthData?.days || {}).reduce((sum, day) =>
+    sum + Number(!day?.bd) + Number(!day?.hg), 0);
+  const executionPlan = createAutoPlanExecutionPlan({
+    hardwareConcurrency: globalThis.navigator?.hardwareConcurrency,
+    deviceMemory: globalThis.navigator?.deviceMemory,
+    openSlots,
+    profileCount: profileIds.length,
+    performanceProfile: runConfig?.performanceProfile || state?.settings?.autoPlan?.performanceProfile || 'adaptive',
+    parallelSearches: runConfig?.parallelSearches ?? state?.settings?.autoPlan?.parallelSearches ?? null
+  });
+  const perfectionCount = executionPlan.perfectionWorkers;
+  onProgress?.({
+    phase: 'analysis',
+    progress: .035,
+    message: `v7 Worker-Portfolio · ${executionPlan.constructionWorkers} Aufbau · ${executionPlan.perfectionWorkers} Perfektion · ${executionPlan.reserveCores} UI-Reserve`,
+    executionPlan
+  });
 
   /**
    * Ein Strang je Aufbaulauf, danach ein Strang je Perfektionslauf. Die bereits
@@ -130,7 +192,7 @@ export async function runAutoPlan({ state, monthData, year, month, runConfig, on
    */
   const pool = [];
   const cleanup = () => {
-    for (const worker of pool) worker.terminate();
+    for (const worker of pool) worker?.terminate();
     pool.length = 0;
   };
   const workerState = () => ({
@@ -149,6 +211,7 @@ export async function runAutoPlan({ state, monthData, year, month, runConfig, on
       let best = null;
       let firstError = null;
       let closed = false;
+      let nextConstruction = 0;
 
       const fail = error => {
         if (closed) return;
@@ -159,6 +222,8 @@ export async function runAutoPlan({ state, monthData, year, month, runConfig, on
       const succeed = result => {
         if (closed) return;
         closed = true;
+        result.metrics ||= {};
+        result.metrics.executionPlan = executionPlan;
         cleanup();
         resolve(result);
       };
@@ -187,14 +252,36 @@ export async function runAutoPlan({ state, monthData, year, month, runConfig, on
             return false;
           }
           pool[index] = worker;
-          worker.addEventListener('message', event => handleMessage(event.data));
+          worker.addEventListener('message', event => handleMessage(event.data, index));
           worker.addEventListener('error', event => {
+            event.preventDefault?.();
             if (!firstError) firstError = new Error(event.message || 'Arbeitsstrang fehlgeschlagen.');
-            settle();
+            // Ein Worker mit einem unbehandelten Laufzeitfehler wird nicht für
+            // den nächsten Portfolioauftrag wiederverwendet. Die Queue startet
+            // bei Bedarf an derselben Position einen frischen Modul-Worker.
+            worker.terminate();
+            if (pool[index] === worker) pool[index] = null;
+            settle(index);
           });
         }
         worker.postMessage(message);
         return true;
+      };
+
+      const startConstruction = workerIndex => {
+        if (nextConstruction >= profileIds.length) return false;
+        const runId = nextConstruction;
+        const profileId = profileIds[nextConstruction];
+        nextConstruction += 1;
+        return send(workerIndex, {
+          type: 'construct',
+          runId,
+          state: workerState(),
+          monthData,
+          year,
+          month,
+          runConfig: { ...runConfig, profileFilter: [profileId] }
+        });
       };
 
       const startPerfection = () => {
@@ -216,9 +303,10 @@ export async function runAutoPlan({ state, monthData, year, month, runConfig, on
         pool.length = Math.min(pool.length, perfectionCount);
       };
 
-      const settle = () => {
+      const settle = workerIndex => {
         if (closed) return;
         pending -= 1;
+        if (phase === 'construct' && nextConstruction < profileIds.length) startConstruction(workerIndex);
         if (pending > 0) return;
         if (phase === 'construct') {
           if (!bestConstruction) return fallback();
@@ -229,7 +317,7 @@ export async function runAutoPlan({ state, monthData, year, month, runConfig, on
         else fail(firstError || new Error('Auto-Plan lieferte kein Ergebnis.'));
       };
 
-      const handleMessage = message => {
+      const handleMessage = (message, workerIndex) => {
         if (!message || closed) return;
         if (message.type === 'progress') {
           onProgress?.({
@@ -254,33 +342,26 @@ export async function runAutoPlan({ state, monthData, year, month, runConfig, on
           if (Number(message.runId) === 0 && message.result?.complete && !(message.result.metrics?.red > 0)) {
             for (let index = 1; index < pool.length; index += 1) pool[index]?.terminate();
             pool.length = 1;
+            nextConstruction = profileIds.length;
             pending = 1;
           }
-          settle();
+          settle(workerIndex);
           return;
         }
         if (message.type === 'done') {
           if (isBetter(message.result, best)) best = message.result;
-          settle();
+          settle(workerIndex);
           return;
         }
         if (message.type === 'error') {
           if (message.name === 'AbortError') return;
           if (!firstError) firstError = new Error(message.message);
-          settle();
+          settle(workerIndex);
         }
       };
 
-      for (const [index, profileId] of profileIds.entries()) {
-        const started = send(index, {
-          type: 'construct',
-          runId: index,
-          state: workerState(),
-          monthData,
-          year,
-          month,
-          runConfig: { ...runConfig, profileFilter: [profileId] }
-        });
+      for (let index = 0; index < executionPlan.constructionWorkers; index += 1) {
+        const started = startConstruction(index);
         if (!started) return;
       }
     });

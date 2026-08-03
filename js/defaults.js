@@ -2,7 +2,24 @@ export const MONTH_NAMES = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni'
 export const SHEET_NAMES = ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
 export const WEEKDAYS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
 
-export const DEFAULT_SETTINGS = Object.freeze({ schemaVersion: 2 });
+export const DEFAULT_SETTINGS = Object.freeze({
+  schemaVersion: 3,
+  appearance: Object.freeze({
+    density: 'comfortable',
+    motion: 'system',
+    richTooltips: true
+  }),
+  autoPlan: Object.freeze({
+    performanceProfile: 'adaptive',
+    searchIntensity: 'deep',
+    optimizationFocus: 'balanced',
+    timeBudgetSeconds: 120,
+    allowRedFallback: true,
+    maxRedViolations: null,
+    perfectionEnabled: true,
+    parallelSearches: null
+  })
+});
 
 export const STAFF_ORDER = [
   'lurz', 'polednia', 'dalitz', 'becker', 'hellmann', 'martin', 'elhouba', 'licenji', 'sebastian'
@@ -101,6 +118,21 @@ function normalizedBoolean(value, fallback, field, strict) {
   return fallback;
 }
 
+function normalizedEnum(value, allowed, fallback, field, strict) {
+  if (allowed.has(value)) return value;
+  if (strict && value !== undefined) throw new Error(`„${field}“ enthält einen nicht unterstützten Wert.`);
+  return fallback;
+}
+
+function normalizedBoundedInteger(value, fallback, min, max, field, strict, nullable = false) {
+  if (nullable && (value === null || value === undefined || value === '')) return null;
+  const number = Number(value);
+  if (Number.isInteger(number) && number >= min && number <= max) return number;
+  if (strict && value !== undefined) throw new Error(`„${field}“ muss eine ganze Zahl zwischen ${min} und ${max} sein.`);
+  if (Number.isFinite(number) && number >= 0) return Math.max(min, Math.min(max, Math.round(number)));
+  return fallback;
+}
+
 function normalizedText(value, fallback, field, strict, required = false) {
   if (typeof value === 'string' && value.trim()) return value.trim();
   if (required && strict) throw new Error(`„${field}“ darf nicht leer sein.`);
@@ -112,8 +144,33 @@ export function normalizeSettings(value, { strict = false } = {}) {
     if (strict) throw new Error('„settings“ muss ein JSON-Objekt sein.');
     return structuredClone(DEFAULT_SETTINGS);
   }
-  const schemaVersion = normalizedNonNegativeInteger(value.schemaVersion, DEFAULT_SETTINGS.schemaVersion, 'settings.schemaVersion', strict);
-  return { schemaVersion: Math.max(1, schemaVersion) };
+  const appearance = isPlainRecord(value.appearance) ? value.appearance : {};
+  const autoPlan = isPlainRecord(value.autoPlan) ? value.autoPlan : {};
+  if (strict && value.appearance !== undefined && !isPlainRecord(value.appearance)) {
+    throw new Error('„settings.appearance“ muss ein JSON-Objekt sein.');
+  }
+  if (strict && value.autoPlan !== undefined && !isPlainRecord(value.autoPlan)) {
+    throw new Error('„settings.autoPlan“ muss ein JSON-Objekt sein.');
+  }
+  normalizedNonNegativeInteger(value.schemaVersion, DEFAULT_SETTINGS.schemaVersion, 'settings.schemaVersion', strict);
+  return {
+    schemaVersion: DEFAULT_SETTINGS.schemaVersion,
+    appearance: {
+      density: normalizedEnum(appearance.density, new Set(['comfortable', 'compact']), DEFAULT_SETTINGS.appearance.density, 'settings.appearance.density', strict),
+      motion: normalizedEnum(appearance.motion, new Set(['system', 'reduced']), DEFAULT_SETTINGS.appearance.motion, 'settings.appearance.motion', strict),
+      richTooltips: normalizedBoolean(appearance.richTooltips, DEFAULT_SETTINGS.appearance.richTooltips, 'settings.appearance.richTooltips', strict)
+    },
+    autoPlan: {
+      performanceProfile: normalizedEnum(autoPlan.performanceProfile, new Set(['responsive', 'adaptive', 'power']), DEFAULT_SETTINGS.autoPlan.performanceProfile, 'settings.autoPlan.performanceProfile', strict),
+      searchIntensity: normalizedEnum(autoPlan.searchIntensity, new Set(['standard', 'deep', 'maximum']), DEFAULT_SETTINGS.autoPlan.searchIntensity, 'settings.autoPlan.searchIntensity', strict),
+      optimizationFocus: normalizedEnum(autoPlan.optimizationFocus, new Set(['balanced', 'wishes', 'workload', 'weekends']), DEFAULT_SETTINGS.autoPlan.optimizationFocus, 'settings.autoPlan.optimizationFocus', strict),
+      timeBudgetSeconds: normalizedBoundedInteger(autoPlan.timeBudgetSeconds, DEFAULT_SETTINGS.autoPlan.timeBudgetSeconds, 10, 900, 'settings.autoPlan.timeBudgetSeconds', strict),
+      allowRedFallback: normalizedBoolean(autoPlan.allowRedFallback, DEFAULT_SETTINGS.autoPlan.allowRedFallback, 'settings.autoPlan.allowRedFallback', strict),
+      maxRedViolations: normalizedBoundedInteger(autoPlan.maxRedViolations, DEFAULT_SETTINGS.autoPlan.maxRedViolations, 0, 62, 'settings.autoPlan.maxRedViolations', strict, true),
+      perfectionEnabled: normalizedBoolean(autoPlan.perfectionEnabled, DEFAULT_SETTINGS.autoPlan.perfectionEnabled, 'settings.autoPlan.perfectionEnabled', strict),
+      parallelSearches: normalizedBoundedInteger(autoPlan.parallelSearches, DEFAULT_SETTINGS.autoPlan.parallelSearches, 1, 8, 'settings.autoPlan.parallelSearches', strict, true)
+    }
+  };
 }
 
 export function normalizeRbnNames(value, { strict = false } = {}) {

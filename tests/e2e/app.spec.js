@@ -27,6 +27,7 @@ async function mockApi(page, month) {
   await page.route('**/api/bootstrap', route => route.fulfill({
     json: { ok: true, settings: { schemaVersion: 2 }, staff, rbnNames: [] }
   }));
+  await page.route('**/api/import', route => route.fulfill({ json: { ok: true } }));
   await page.route('**/api/month/**', async route => {
     if (route.request().method() === 'PUT') return route.fulfill({ json: { ok: true } });
     const url = new URL(route.request().url());
@@ -96,9 +97,9 @@ test('Werkzeugleiste ist semantisch gruppiert und das Farbbadge bleibt frei vom 
 
   const toolbar = page.locator('.toolbar.toolbar-organized');
   await expect(toolbar).toBeVisible();
-  await expect(toolbar.locator('.toolbar-section')).toHaveCount(3);
-  await expect(toolbar.locator('.toolbar-section-label')).toHaveText(['Planung', 'Daten', 'Ausgabe']);
-  await expect(toolbar.locator('.toolbar-section .tool-action')).toHaveCount(11);
+  await expect(toolbar.locator('.toolbar-section')).toHaveCount(4);
+  await expect(toolbar.locator('.toolbar-section-label')).toHaveText(['Planung', 'Daten', 'Ausgabe', 'App']);
+  await expect(toolbar.locator('.toolbar-section .tool-action')).toHaveCount(12);
   await expect(toolbar.locator('#autoPlanBtn')).toBeVisible();
   await expect(toolbar.locator('#autoPlanBtn .tool-icon')).toHaveCount(1);
   // Die Überlauf-Schaltfläche gehört zur Leiste, aber zu keiner Gruppe.
@@ -106,6 +107,7 @@ test('Werkzeugleiste ist semantisch gruppiert und das Farbbadge bleibt frei vom 
   await expect(page.locator('#todayBtn .tool-icon')).toHaveCount(1);
   await expect(page.locator('#clearMonthBtn')).toHaveClass(/tool-action--danger/);
   await expect(page.locator('#excelImportInput').locator('xpath=..')).toHaveAttribute('aria-label', 'Excel-Datei importieren');
+  await expect(page.locator('#settingsBtn .tool-icon')).toHaveCount(1);
 
   await expect(page.locator('html')).toHaveAttribute('data-spectrum-key', '2026-01');
   const badge = page.locator('#monthPaletteLabel');
@@ -116,4 +118,41 @@ test('Werkzeugleiste ist semantisch gruppiert und das Farbbadge bleibt frei vom 
     const name = document.documentElement.dataset.spectrumPalette || '';
     return document.getElementById('monthPaletteLabel')?.textContent === `Monatskontrast · ${name}`;
   })).toBe(true);
+});
+
+test('Einstellungen öffnen fokussiert, validiert, speichert und stellt Fokus wieder her', async ({ page }) => {
+  const month = emptyMonth(2026, 7);
+  await mockApi(page, month);
+  await page.goto('/');
+
+  const trigger = page.locator('#settingsBtn');
+  await trigger.click();
+  const dialog = page.locator('#settingsDialog');
+  await expect(dialog).toBeVisible();
+  await expect(page.locator('#settingsTitle')).toBeFocused();
+  await expect(page.locator('#settingsPerformanceProfile')).toHaveValue('adaptive');
+  await expect(page.locator('#settingsSearchIntensity')).toHaveValue('deep');
+  await expect(page.locator('#settingsTimeBudget')).toHaveValue('120');
+
+  await page.locator('#settingsDensity').selectOption('compact');
+  await page.locator('#settingsMotion').selectOption('reduced');
+  await page.locator('#settingsPerformanceProfile').selectOption('responsive');
+  await page.locator('#settingsSearchIntensity').selectOption('standard');
+  await page.locator('#settingsTimeBudget').fill('45');
+  await page.locator('#settingsAllowRed').uncheck();
+  await page.locator('#settingsSaveBtn').click();
+
+  await expect(dialog).toBeHidden();
+  await expect(trigger).toBeFocused();
+  await expect(page.locator('html')).toHaveAttribute('data-app-density', 'compact');
+  await expect(page.locator('html')).toHaveAttribute('data-motion', 'reduced');
+
+  await trigger.click();
+  await expect(page.locator('#settingsPerformanceProfile')).toHaveValue('responsive');
+  await expect(page.locator('#settingsSearchIntensity')).toHaveValue('standard');
+  await expect(page.locator('#settingsTimeBudget')).toHaveValue('45');
+  await expect(page.locator('#settingsAllowRed')).not.toBeChecked();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(trigger).toBeFocused();
 });

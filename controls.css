@@ -159,6 +159,28 @@
   text-overflow: ellipsis;
 }
 
+/* Die einzelne App-Aktion bleibt in der Action Bar als vertrautes Zahnrad
+   kompakt. Volltext und Gruppentitel bleiben für Screenreader erhalten und
+   erscheinen wieder, sobald die Gruppe in das Überlaufmenü wandert. */
+.toolbar .toolbar-section--application .toolbar-section-label,
+.toolbar .toolbar-section--application .tool-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.toolbar .toolbar-section--application .tool-action {
+  width: 34px;
+  min-width: 34px;
+  padding: 0;
+}
+
 .toolbar .tool-action--file,
 .toolbar-overflow-panel .tool-action--file{
   position: relative;
