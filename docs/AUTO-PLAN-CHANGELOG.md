@@ -1,4 +1,19 @@
-# Auto-Plan Changelog
+# DienstplanRAD Changelog
+
+## 2026-08-03 – Release 0.7.0 / Clinical Fluent Workspace
+
+- Die vollständige Anwendung verwendet ein gemeinsames semantisches Designsystem für Hauptplan, Action Bar, Dialoge, Einstellungen und Auto-Plan Studio.
+- Systemeinstellung, Hell und Dunkel sind als persistente, normalisierte Darstellung im Settings-Schema v4 verfügbar.
+- Sehr helle Monatsakzente werden im Dark Mode auf kontraststabile Bildschirmflächen abgebildet, ohne Druckfarben oder Monatsidentität zu verändern.
+- Die Diensttabelle behält auf schmalen Ansichten Tag und Wochentag als sticky Orientierung; die Statistik fließt in zugänglich beschriftete Karten um.
+- Zentrale Topbar-/Action-Bar-Bedienungen sind mindestens 36 Pixel, auf groben Zeigegeräten 44 Pixel groß.
+- Reduced Motion, Reduced Transparency, erhöhter Kontrast und Windows Forced Colors besitzen explizite, getestete Darstellungen.
+- Mobile Einstellungen bleiben vollständig innerhalb der dynamischen Viewport-Höhe und scrollen nur ihren Inhaltsbereich.
+- Dekoratives Chrom ist statisch; die Auto-Plan-Bewegung bleibt fortschritts- und zustandsbezogen sowie adaptiv budgetiert.
+- `color-scheme` und synchronisiertes Browser-`theme-color` folgen dem gewählten Theme; Manifest und bewusst neutrale helle PWA-Startfläche sind versioniert.
+- Die lokale Theme-Präferenz wird vor dem ersten Paint defensiv angewendet; ein verzögerter Bootstrap erzeugt keinen Hell-/Dunkelblitz.
+- Neue E2E-Gates messen Theme-Auswahl und Session-Erhalt, Action-Bar-Zielgrößen, ausgewählte dunkle Textkontraste, Forced-Colors-Grundzustand, Motion, Responsive-Tabelle, Statistikkarten und mobile Dialoggrenzen.
+- Paketversion `0.7.0`; Browser-Modulgraph und Styles verwenden Release-Token `20260803.5`.
 
 ## 2026-08-03 – Release 0.6.5 / Auto-Plan v7.5
 

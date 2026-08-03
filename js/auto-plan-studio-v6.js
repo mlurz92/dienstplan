@@ -2,11 +2,11 @@
  * Auto-Plan Studio v6 – progressive Erweiterung der stabilen v5-Oberfläche.
  */
 
-import './auto-plan-studio-v5.js?v=20260803.4';
-import { installAutoPlanGuardrail } from './auto-plan-guardrail.js?v=20260803.4';
-import { installAutoPlanTooltips } from './auto-plan-tooltip.js?v=20260803.4';
+import './auto-plan-studio-v5.js?v=20260803.5';
+import { installAutoPlanGuardrail } from './auto-plan-guardrail.js?v=20260803.5';
+import { installAutoPlanTooltips } from './auto-plan-tooltip.js?v=20260803.5';
 
-const RELEASE = '20260803.4';
+const RELEASE = '20260803.5';
 
 function addStylesheet() {
   if (document.querySelector('link[data-auto-plan-v6-style]')) return;

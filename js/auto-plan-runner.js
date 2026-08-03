@@ -37,10 +37,10 @@
  * Anzeigestrang weiter.
  */
 
-import { buildAutoPlan } from './auto-planner.js?v=20260803.4';
-import { planProfileIds } from './auto-planner-engine.js?v=20260803.4';
+import { buildAutoPlan } from './auto-planner.js?v=20260803.5';
+import { planProfileIds } from './auto-planner-engine.js?v=20260803.5';
 
-const WORKER_URL = '/js/auto-plan-worker.js?v=20260803.4';
+const WORKER_URL = '/js/auto-plan-worker.js?v=20260803.5';
 
 /**
  * Wie viele Perfektionsläufe parallel starten.

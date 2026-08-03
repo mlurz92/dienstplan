@@ -1,7 +1,7 @@
-import { evaluateCandidate as evaluateCandidateBase } from './rules-evaluation.js?v=20260803.4';
-import { addDays, getAssignment, parseIso, toLocalIso } from './rules-core.js?v=20260803.4';
+import { evaluateCandidate as evaluateCandidateBase } from './rules-evaluation.js?v=20260803.5';
+import { addDays, getAssignment, parseIso, toLocalIso } from './rules-core.js?v=20260803.5';
 
-export * from './rules-evaluation.js?v=20260803.4';
+export * from './rules-evaluation.js?v=20260803.5';
 
 const REASON = 'HG am Tag vor eigenem BD (HG am Werktag vor eigenem BD)';
 const LEGACY_REASONS = new Set([

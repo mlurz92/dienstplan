@@ -4,9 +4,9 @@
  * v7 keeps the strict-before-fallback escalation from v6 and adds the settings
  * and diagnostics contract used by the adaptive worker portfolio.
  */
-import * as V6 from './auto-planner-v6.js?v=20260803.4';
+import * as V6 from './auto-planner-v6.js?v=20260803.5';
 
-export * from './auto-planner-v6.js?v=20260803.4';
+export * from './auto-planner-v6.js?v=20260803.5';
 
 const clone = value => typeof structuredClone === 'function'
   ? structuredClone(value)

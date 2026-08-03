@@ -8,8 +8,9 @@ test('v7 settings defaults are complete and safe', () => {
   const settings = normalizeSettings(null);
 
   assert.deepEqual(settings, DEFAULT_SETTINGS);
-  assert.equal(settings.schemaVersion, 3);
+  assert.equal(settings.schemaVersion, 4);
   assert.deepEqual(settings.appearance, {
+    theme: 'system',
     density: 'comfortable',
     motion: 'system',
     richTooltips: true
@@ -42,7 +43,8 @@ test('legacy settings migrate without losing explicit values', () => {
     }
   });
 
-  assert.equal(settings.schemaVersion, 3);
+  assert.equal(settings.schemaVersion, 4);
+  assert.equal(settings.appearance.theme, 'system');
   assert.equal(settings.appearance.density, 'compact');
   assert.equal(settings.appearance.motion, 'reduced');
   assert.equal(settings.appearance.richTooltips, false);
@@ -79,6 +81,20 @@ test('strict settings normalization rejects invalid enum values', () => {
   assert.throws(
     () => normalizeSettings({ appearance: { density: 'tiny' } }, { strict: true }),
     /settings\.appearance\.density/
+  );
+  assert.throws(
+    () => normalizeSettings({ appearance: { theme: 'neon' } }, { strict: true }),
+    /settings\.appearance\.theme/
+  );
+});
+
+test('appearance theme preserves system, light and dark modes', () => {
+  for (const theme of ['system', 'light', 'dark']) {
+    assert.equal(normalizeSettings({ appearance: { theme } }).appearance.theme, theme);
+  }
+  assert.equal(
+    normalizeSettings({ appearance: { theme: 'unsupported' } }).appearance.theme,
+    DEFAULT_SETTINGS.appearance.theme
   );
 });
 
