@@ -26,3 +26,15 @@ Für Auto-Plan v7.5 gehören zusätzlich zum verbindlichen Umfang:
 - Reduced Motion, kleine Fensterhöhe, Tastaturabbruch, Fokus-Rückgabe und Tooltip-Deaktivierung im Browser;
 - sichere Textausgabe aller Worker- und Algorithmuskommentare;
 - aktuelle README, Forschungsnotiz, Teststrategie und Changelog ohne unbelegte Build-, Mess- oder Mergeaussagen.
+
+Für Release 0.7.0 / Clinical Fluent Workspace gehören zusätzlich zum verbindlichen Umfang:
+
+- Settings-Schema v4 mit Migration älterer Werte und strikter Validierung von `system`, `light` und `dark`;
+- Wiederherstellung eines gespeicherten expliziten Themes vor Abschluss eines verzögerten Bootstrap-Abrufs;
+- Mindestgröße zentraler Topbar-/Action-Bar-Bedienungen von 36 Pixeln beziehungsweise 44 Pixeln auf groben Zeigegeräten;
+- keine dauerhafte rein dekorative Animation sowie vollständige Reduced-Motion-Steuerung;
+- mindestens 4,5:1 Textkontrast auf dunklen Monats-, Wochenend-, Sammeldialog- und Auto-Plan-Flächen;
+- Betriebssystem-Dark-Mode sowie Forced-Colors-Grundzustand mit ausgeblendeter Dekoration und sichtbarem Tastaturfokus;
+- sticky Tag-/Wochentag-Orientierung, mobile Statistikkarten und kein horizontaler Seitenüberlauf;
+- vollständig innerhalb des dynamischen Viewports liegende mobile Einstellungen mit eigenem Inhalts-Scrollbereich;
+- gemeinsamer Release-Token `20260803.5` für Browsermodule, Styles und Manifest sowie Paketversion `0.7.0`.

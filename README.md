@@ -6,7 +6,7 @@
 
 <p align="center"><strong>Regelgestützte Monatsplanung für Bereitschaftsdienst, Hintergrunddienst und neuroradiologische Rufbereitschaft</strong></p>
 
-> **Paketversion:** `0.6.5`<br>
+> **Paketversion:** `0.7.0`<br>
 > **Regelwerk:** Eignungsregeln `v4.9`  
 > **Auto-Plan:** Algorithmus `v7.5` mit globaler Engpasssuche, wahrheitsgetreuem Portfoliofortschritt, inkrementellem Last-Ledger, adaptivem Worker-Portfolio, cost-aware ALNS, Null-Rot-Guardrail und Zertifizierung<br>
 > **Feiertagsregion:** Sachsen (`SN`)  
@@ -70,13 +70,30 @@ Alle Felder besitzen erklärende, tastaturfähige Tooltips. Die Mitarbeitendenta
 
 Die Action Bar besitzt zusätzlich eine eigene Gruppe **App** mit Zahnrad. Das native Einstellungsmodal verwaltet:
 
+- Farbschema `Systemeinstellung`, `Hell` oder `Dunkel`;
 - Informationsdichte und reduzierte Bewegung;
 - erklärende Auto-Plan-Tooltips;
 - Standard-Leistungsprofil, Suchintensität und Optimierungsfokus;
 - Standard-Zeitbudget und optionale Zahl paralleler Suchläufe;
 - Perfektionsphase, Rot-Fallback und Rot-Obergrenze.
 
-Die Einstellungen verwenden Schema `v3`, werden lokal offlinefest gesichert, über den bestehenden Bootstrap-Pfad synchronisiert, in JSON-Sicherungen einbezogen und vor jeder Verwendung normalisiert.
+Die Einstellungen verwenden Schema `v4`, werden lokal offlinefest gesichert, über den bestehenden Bootstrap-Pfad synchronisiert, in JSON-Sicherungen einbezogen und vor jeder Verwendung normalisiert. Ältere oder unvollständige Einstellungen werden defensiv ergänzt; unbekannte Theme-Werte fallen auf die Systemeinstellung zurück.
+
+### Clinical Fluent Workspace
+
+Release 0.7.0 vereinheitlicht die gesamte Anwendung in einer ruhigen, klinisch geprägten Fluent-Arbeitsoberfläche:
+
+- ein zweistufiges semantisches Tokenmodell trennt neutrale Arbeitsflächen und Statusfarben von den weiterhin monatsabhängigen Akzentfarben;
+- `Systemeinstellung`, Hell und Dunkel teilen dieselben Komponenten, Informationshierarchien, Abstände, Radien und Interaktionszustände;
+- die Action Bar bleibt dicht und scanbar, während ihre zentralen Aktionsbedienungen mindestens 36 Pixel, auf groben Zeigegeräten 44 Pixel groß sind;
+- auf kleinen Ansichten bleiben Tag und Wochentag beim horizontalen Scrollen der Diensttabelle sichtbar; ein expliziter Bedienhinweis erklärt die Scrollrichtung;
+- die Statistik wird unter 700 Pixeln zu visuell beschrifteten Karten, während die semantische Tabellenstruktur erhalten bleibt;
+- Hauptplan, Picker, Sammeldialoge, Einstellungen und Auto-Plan Studio verwenden dieselben semantischen Flächen und Kontrastregeln;
+- dekoratives Chrom besitzt keine dauerhaft laufende Animation; Bewegung vermittelt nur Zustandswechsel oder echten Arbeitsfortschritt;
+- `prefers-reduced-motion`, `prefers-reduced-transparency`, `prefers-contrast`, `forced-colors` und das Betriebssystem-Farbschema werden berücksichtigt;
+- `color-scheme` und das laufend synchronisierte Browser-`theme-color` folgen dem Theme; die PWA startet bewusst auf einer neutralen hellen Fläche;
+- eine defensiv gelesene lokale Theme-Präferenz wird vor dem ersten Paint angewendet und verhindert Aufblitzen des falschen Farbschemas bei langsamer Verbindung;
+- Druckansicht und fachliche Monatsfarben bleiben von den reinen Bildschirm-Overrides getrennt.
 
 ---
 
@@ -350,7 +367,7 @@ Das Icon enthält keine Schrift. Die zentrale Metapher bleibt auch bei 32 Pixeln
 
 - semantischer Dialog mit Fokus-Rückgabe;
 - vollständige Tastaturbedienung;
-- sichtbare Fokusindikatoren;
+- kontraststabile, sichtbare Fokusindikatoren in Hell, Dunkel und Windows High Contrast;
 - semantische Tabellenköpfe;
 - ARIA-Live-Bereiche für Status und Algorithmuskommentar;
 - programmatische Fortschrittssemantik mit `role="progressbar"`, `aria-valuemin`, `aria-valuemax`, `aria-valuenow` und phasenbezogenem `aria-valuetext`;
@@ -358,10 +375,12 @@ Das Icon enthält keine Schrift. Die zentrale Metapher bleibt auch bei 32 Pixeln
 - Tooltips auf Hover und Fokus;
 - Tooltip-Schließen mit `Escape`;
 - hoverbare und ausreichend persistente Tooltip-Inhalte;
-- Reduced-Motion-Unterstützung;
+- Reduced-Motion- und Reduced-Transparency-Unterstützung;
 - native HTML-Dialoge mit browserseitiger Inert-Schaltung und Fokus-Rückgabe;
-- Forced-Colors-Anpassungen;
-- horizontales Tabellenscrolling auf schmalen Ansichten;
+- Forced-Colors- und erhöhte-Kontrast-Anpassungen;
+- mindestens 36 Pixel große Topbar-/Action-Bar-Bedienungen und 44 Pixel auf groben Zeigegeräten;
+- horizontales Tabellenscrolling auf schmalen Ansichten mit dauerhaft sichtbaren Orientierungszellen;
+- mobile Statistikkarten mit programmatisch erzeugten Feldbeschriftungen;
 - ein gemeinsamer vertikaler Scrollbereich ohne unerreichbare Aktionsleisten.
 
 ---
@@ -380,7 +399,7 @@ Ein Monatsobjekt enthält unter anderem:
 - `overrideLog`;
 - `importLog`.
 
-Die globalen Einstellungen liegen getrennt vom Monatsobjekt unter `settings` (Schema `v3`) mit den Bereichen `appearance` und `autoPlan`.
+Die globalen Einstellungen liegen getrennt vom Monatsobjekt unter `settings` (Schema `v4`) mit den Bereichen `appearance` und `autoPlan`. `appearance.theme` enthält `system`, `light` oder `dark`.
 
 ### Persistenz
 
@@ -399,6 +418,7 @@ index.html
 styles.css
 controls.css
 transitions.css
+workspace.css
 auto-plan-studio.css
 auto-plan-studio-v6.css
 auto-plan-studio-v7.css
@@ -545,6 +565,8 @@ Die CI führt aus:
 3. Node-Test-Suite
 4. Playwright-Browsertests
 
+Für Release 0.7.0 wurden lokal **352/352 Node-Tests** und **42/42 Chromium-E2E-Szenarien** erfolgreich ausgeführt.
+
 Neue v7.5-Regressionstests prüfen zusätzlich zu den v7-Gates insbesondere:
 
 - vollständige, migrationssichere Settings-Defaults und strikte Validierung;
@@ -569,6 +591,17 @@ Neue v7.5-Regressionstests prüfen zusätzlich zu den v7-Gates insbesondere:
 - Fortschrittssemantik, Reduced Motion und Tooltip-Lebenszyklus im Browser;
 - plattformneutrale Syntax-Gate-Pfade unter Windows und POSIX;
 - identische Quelltextprüfungen bei LF- und CRLF-Zeilenenden.
+
+Die Designsystem-Regressionen aus Release 0.7.0 prüfen darüber hinaus:
+
+- Auswahl, Session-Erhalt und Normalisierung der drei Farbschemata;
+- Theme-Wiederherstellung vor Abschluss eines künstlich verzögerten Bootstrap-Abrufs;
+- Mindestgrößen der zentralen Bedienelemente;
+- statisches dekoratives Chrom und Reduced Motion;
+- Textkontrast von mindestens 4,5:1 auf dunklen Monats-, Wochenend-, Sammeldialog- und Auto-Plan-Flächen;
+- Betriebssystem-Dark-Mode sowie Forced-Colors-Grundzustand mit ausgeblendeter Dekoration und sichtbarem Tastaturfokus;
+- sticky Orientierungszellen und kartenförmige Statistik auf schmalen Viewports;
+- ausbruchfreie mobile Einstellungen mit eigenem scrollbaren Inhaltsbereich.
 
 Ein Merge nach `main` ist nur nach erfolgreicher CI vorgesehen.
 
@@ -598,7 +631,21 @@ Die fachliche und technische Begründung der v7.5-Architektur einschließlich Su
 
 ---
 
-## 15. Release 0.6.5 / Auto-Plan v7.5
+## 15. Release 0.7.0 / Clinical Fluent Workspace
+
+- vollständige Modernisierung von Hauptplan, Action Bar, Statistik, offenen Punkten, Picker, Sammeldialogen, Einstellungen und Auto-Plan Studio;
+- semantische Zwei-Ebenen-Tokens für Canvas, Flächen, Text, Konturen, Fokus, Schatten, Radien und statusbezogene Farben;
+- persistente Farbschemata `Systemeinstellung`, `Hell` und `Dunkel` im migrationssicheren Settings-Schema v4;
+- kontraststabile dunkle Monats-, Wochenend-, Feiertags-, Sammeldialog- und Auto-Plan-Flächen, einschließlich des besonders hellen Monatsakzents „Pale Banana“;
+- responsive Diensttabelle mit sticky Tag-/Wochentag-Orientierung und mobile Statistik als zugängliche Karten;
+- viewport-sicheres Einstellungsmodal mit eigenem scrollbaren Inhaltsbereich;
+- systemgerechte Unterstützung für Reduced Motion, Reduced Transparency, erhöhten Kontrast und Windows Forced Colors;
+- ressourcenschonende Gestaltung ohne dauerhaft laufende Dekorationsanimationen; fachliche Auto-Plan-Bewegung bleibt fortschritts- und zustandsbezogen sowie adaptiv budgetiert;
+- Browser- und PWA-Integration über `color-scheme`, synchronisiertes `theme-color`, helle Startfläche und versioniertes Manifest;
+- neue messbare Browsergates für Topbar-/Action-Bar-Zielgrößen, Farbschema, ausgewählte 4,5:1-Kontrastflächen, Forced-Colors-Grundzustand, Motion und Responsive-Reflow;
+- Paketversion `0.7.0` und durchgängiger Browser-Release-Token `20260803.5` zur sicheren Cache-Aktualisierung.
+
+### Historie 0.6.5 / Auto-Plan v7.5
 
 - neues **Truthful Constraint Observatory** mit Fortschrittsring, Arbeitsmenge, Portfoliozustand und Qualitätsgewinnen;
 - monotones, portfolioaggregiertes Fortschrittsmodell mit 99-Prozent-Schranke bis zum echten Gesamtabschluss;
@@ -613,8 +660,8 @@ Die fachliche und technische Begründung der v7.5-Architektur einschließlich Su
 - strikt validierte negative, gebrochene und nichtnumerische Laufobergrenzen;
 - sichere Standardgrenzen auch bei partieller Engine-Konfiguration;
 - sofortiges Schließen sichtbarer Rich Tooltips nach Deaktivierung;
-- v7.5-Identität in Planner, Studio, Einstellungen, Paketversion und vollständigem Browser-Modulgraphen;
-- einheitlicher v7.5-Release-Token `20260803.4` im ausgelieferten Browser-Modulgraphen;
+- v7.5-Identität in Planner, Studio, Einstellungen, damaliger Paketversion und vollständigem Browser-Modulgraphen;
+- einheitlicher v7.5-Release-Token `20260803.4` im damaligen Browser-Modulgraphen;
 - neue Unit-, Integrations-, Property- und Browserregressionen sowie ein dokumentiertes v7.5-Risikomodell.
 
 ### Historie 0.6.0 / Auto-Plan v7

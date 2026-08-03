@@ -1,4 +1,4 @@
-import { renderPolicyFor } from './auto-plan-animation-policy.js?v=20260803.4';
+import { renderPolicyFor } from './auto-plan-animation-policy.js?v=20260803.5';
 
 /**
  * Lebende Visualisierung des laufenden Auto-Plans.

@@ -4,9 +4,26 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>DienstplanRAD</title>
+  <meta name="color-scheme" content="light dark" />
   <meta name="application-name" content="DienstplanRAD" />
   <meta name="apple-mobile-web-app-title" content="DienstplanRAD" />
-  <meta name="theme-color" content="#0b0f14" />
+  <meta name="theme-color" content="#eef2f6" />
+  <script>
+    (() => {
+      let theme = 'system';
+      try {
+        const cached = JSON.parse(localStorage.getItem('dienstplanrad:bootstrap') || 'null');
+        const stored = cached?.settings?.appearance?.theme;
+        if (['system', 'light', 'dark'].includes(stored)) theme = stored;
+      } catch { /* Gesperrter oder beschädigter Speicher fällt sicher auf System zurück. */ }
+
+      const dark = theme === 'dark'
+        || (theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
+      document.documentElement.dataset.appTheme = theme;
+      document.documentElement.style.colorScheme = theme === 'system' ? 'light dark' : theme;
+      document.querySelector('meta[name="theme-color"]').content = dark ? '#111820' : '#eef2f6';
+    })();
+  </script>
   <!--
     Auslieferungsstempel. Er macht von außen prüfbar, welcher Stand tatsächlich
     online ist – mit einem einzigen Aufruf:
@@ -18,7 +35,7 @@
     Zweig als main auslieferte. Von außen war das nicht zu erkennen, weil die
     Anwendung im Übrigen normal funktionierte.
   -->
-  <meta name="dienstplanrad-build" content="20260803.4" />
+  <meta name="dienstplanrad-build" content="20260803.5" />
   <script>
     (() => {
       const cachePrefix = 'dienstplanrad';
@@ -63,13 +80,14 @@
   <link rel="icon" href="/icons/icon-32.png?icon=algorithm-spectrum-2" type="image/png" sizes="32x32" />
   <link rel="shortcut icon" href="/icons/icon-32.png?icon=algorithm-spectrum-2" type="image/png" />
   <link rel="apple-touch-icon" href="/icons/icon-180.png?icon=algorithm-spectrum-2" sizes="180x180" />
-  <link rel="manifest" href="/manifest.webmanifest?manifest=algorithm-spectrum-2" />
-  <link rel="stylesheet" href="/styles.css?v=20260803.4" />
-  <link rel="stylesheet" href="/controls.css?v=20260803.4" />
+  <link rel="manifest" href="/manifest.webmanifest?v=20260803.5" />
+  <link rel="stylesheet" href="/styles.css?v=20260803.5" />
+  <link rel="stylesheet" href="/controls.css?v=20260803.5" />
+  <link rel="stylesheet" href="/workspace.css?v=20260803.5" />
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" defer></script>
-  <script type="module" src="/js/app.js?v=20260803.4"></script>
-  <script type="module" src="/js/ui-controls.js?v=20260803.4"></script>
-  <script type="module" src="/js/auto-plan-ui.js?v=20260803.4"></script>
+  <script type="module" src="/js/app.js?v=20260803.5"></script>
+  <script type="module" src="/js/ui-controls.js?v=20260803.5"></script>
+  <script type="module" src="/js/auto-plan-ui.js?v=20260803.5"></script>
   <script type="module">
     document.addEventListener('DOMContentLoaded', () => {
       const reasons = document.getElementById('conflictReasons');
@@ -177,7 +195,8 @@
           </div>
         </div>
 
-        <div class="plan-table-wrap" id="printArea">
+        <p class="table-scroll-hint" id="planScrollHint">Die ersten beiden Spalten bleiben sichtbar. Seitwärts scrollen zeigt weitere Planbereiche.</p>
+        <div class="plan-table-wrap" id="printArea" role="region" aria-label="Dienstplan für den gewählten Monat" aria-describedby="planScrollHint" tabindex="0">
           <table class="plan-table excel-plan" id="planTable">
             <thead>
               <tr>

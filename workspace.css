@@ -1,0 +1,886 @@
+/**
+ * Clinical Fluent Workspace
+ *
+ * Diese Datei ist die semantische Präsentationsschicht der Anwendung. Die
+ * fachlichen Monatsfarben bleiben in theme.js, während neutrale Flächen,
+ * Konturen, Typografie, Fokus und Zustände hier aus Alias-Tokens entstehen.
+ * Dadurch teilen Hauptplan, Dialoge, Einstellungen und Auto-Plan Studio eine
+ * Designsprache, ohne ihre jeweilige Informationsdichte zu verlieren.
+ */
+
+:root {
+  --workspace-canvas: #edf2f7;
+  --workspace-canvas-deep: #e3eaf1;
+  --workspace-surface-1: #ffffff;
+  --workspace-surface-2: #f6f8fb;
+  --workspace-surface-3: #eef3f7;
+  --workspace-surface-elevated: #ffffff;
+  --workspace-text: #17212b;
+  --workspace-text-muted: #5a6877;
+  --workspace-accent-ink: var(--month-accent-strong);
+  --workspace-border: #c7d1dc;
+  --workspace-border-strong: #94a3b3;
+  --workspace-focus: var(--month-accent-strong);
+  --workspace-shadow-sm: 0 1px 2px rgba(19, 33, 47, .08), 0 4px 12px rgba(19, 33, 47, .05);
+  --workspace-shadow-md: 0 14px 36px rgba(18, 31, 44, .13), 0 2px 8px rgba(18, 31, 44, .07);
+  --workspace-shadow-lg: 0 28px 72px rgba(8, 16, 25, .28), 0 4px 12px rgba(8, 16, 25, .12);
+  --workspace-radius-xs: 6px;
+  --workspace-radius-sm: 9px;
+  --workspace-radius-md: 14px;
+  --workspace-radius-lg: 20px;
+  --workspace-control-height: 36px;
+  --font-ui: "Segoe UI Variable Text", "Segoe UI", Arial, sans-serif;
+
+  /* Kompatibilitäts-Aliase für bestehende Komponenten. */
+  --bg: var(--workspace-canvas);
+  --sheet: var(--workspace-surface-1);
+  --sheet-solid: var(--workspace-surface-1);
+  --line: var(--workspace-border-strong);
+  --line-soft: var(--workspace-border);
+  --text: var(--workspace-text);
+  --muted: var(--workspace-text-muted);
+  --accent: var(--month-accent-strong);
+  --border: var(--workspace-border);
+  --panel: var(--workspace-surface-1);
+  --surface: var(--workspace-surface-2);
+  --warning: var(--orange);
+  --app-radius: var(--workspace-radius-md);
+  --app-radius-sm: var(--workspace-radius-sm);
+  --app-elevation-1: var(--workspace-shadow-sm);
+  --app-elevation-2: var(--workspace-shadow-md);
+}
+
+html[data-app-theme="light"] { color-scheme: light; }
+html[data-app-theme="system"] { color-scheme: light dark; }
+
+@media screen {
+  html[data-app-theme="dark"] {
+    color-scheme: dark;
+  }
+
+  html[data-app-theme="dark"] {
+    --workspace-canvas: #0f151c;
+    --workspace-canvas-deep: #0a0f15;
+    --workspace-surface-1: #171f28;
+    --workspace-surface-2: #1d2732;
+    --workspace-surface-3: #24303c;
+    --workspace-surface-elevated: #222d38;
+    --workspace-text: #f2f6fa;
+    --workspace-text-muted: #aeb9c5;
+    --workspace-accent-ink: color-mix(in srgb, var(--month-accent) 42%, white 58%);
+    --workspace-border: #344250;
+    --workspace-border-strong: #536476;
+    --workspace-shadow-sm: 0 1px 2px rgba(0, 0, 0, .28), 0 5px 14px rgba(0, 0, 0, .17);
+    --workspace-shadow-md: 0 16px 38px rgba(0, 0, 0, .35), 0 3px 9px rgba(0, 0, 0, .22);
+    --workspace-shadow-lg: 0 30px 82px rgba(0, 0, 0, .62), 0 4px 14px rgba(0, 0, 0, .32);
+    --green: #63d391;
+    --yellow: #f0ca5a;
+    --orange: #ff9f5b;
+    --red: #ff7a83;
+    --weekday-field-bg: color-mix(in srgb, var(--month-accent) 25%, var(--workspace-surface-2)) !important;
+    --saturday-row-bg: color-mix(in srgb, var(--month-accent) 10%, var(--workspace-surface-1)) !important;
+    --sunday-row-bg: color-mix(in srgb, var(--month-accent) 16%, var(--workspace-surface-1)) !important;
+    --holiday-row-bg: color-mix(in srgb, var(--month-accent) 22%, var(--workspace-surface-1)) !important;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    html[data-app-theme="system"] {
+      --workspace-canvas: #0f151c;
+      --workspace-canvas-deep: #0a0f15;
+      --workspace-surface-1: #171f28;
+      --workspace-surface-2: #1d2732;
+      --workspace-surface-3: #24303c;
+      --workspace-surface-elevated: #222d38;
+      --workspace-text: #f2f6fa;
+      --workspace-text-muted: #aeb9c5;
+      --workspace-accent-ink: color-mix(in srgb, var(--month-accent) 42%, white 58%);
+      --workspace-border: #344250;
+      --workspace-border-strong: #536476;
+      --workspace-shadow-sm: 0 1px 2px rgba(0, 0, 0, .28), 0 5px 14px rgba(0, 0, 0, .17);
+      --workspace-shadow-md: 0 16px 38px rgba(0, 0, 0, .35), 0 3px 9px rgba(0, 0, 0, .22);
+      --workspace-shadow-lg: 0 30px 82px rgba(0, 0, 0, .62), 0 4px 14px rgba(0, 0, 0, .32);
+      --green: #63d391;
+      --yellow: #f0ca5a;
+      --orange: #ff9f5b;
+      --red: #ff7a83;
+      --weekday-field-bg: color-mix(in srgb, var(--month-accent) 25%, var(--workspace-surface-2)) !important;
+      --saturday-row-bg: color-mix(in srgb, var(--month-accent) 10%, var(--workspace-surface-1)) !important;
+      --sunday-row-bg: color-mix(in srgb, var(--month-accent) 16%, var(--workspace-surface-1)) !important;
+      --holiday-row-bg: color-mix(in srgb, var(--month-accent) 22%, var(--workspace-surface-1)) !important;
+    }
+  }
+
+  html,
+  body,
+  button,
+  select,
+  input,
+  textarea {
+    font-family: var(--font-ui);
+  }
+
+  html {
+    background: var(--workspace-canvas-deep);
+  }
+
+  body {
+    color: var(--workspace-text);
+    background:
+      radial-gradient(circle at 8% -8%, color-mix(in srgb, var(--month-accent) 17%, transparent), transparent 32rem),
+      linear-gradient(150deg, var(--workspace-canvas) 0%, var(--workspace-canvas-deep) 100%);
+    background-attachment: fixed;
+  }
+
+  body::before {
+    opacity: .42;
+    background:
+      linear-gradient(118deg, color-mix(in srgb, white 12%, transparent), transparent 25%, transparent 78%, color-mix(in srgb, white 4%, transparent)),
+      repeating-linear-gradient(90deg, color-mix(in srgb, var(--workspace-border) 8%, transparent) 0 1px, transparent 1px 96px);
+  }
+
+  body::after { display: none; }
+
+  .ambient-orb,
+  .glass-panel::before {
+    animation: none;
+    will-change: auto;
+  }
+
+  .ambient-orb { opacity: .23; mix-blend-mode: normal; }
+  .ambient-orb-one { transform: translate3d(3%, 2%, 0); }
+  .ambient-orb-two { transform: translate3d(-4%, 4%, 0); }
+  .ambient-orb-three { opacity: .13; transform: none; }
+
+  .app-shell {
+    max-width: 1760px;
+    padding: clamp(8px, 1.2vw, 18px);
+    gap: 10px;
+    perspective: none;
+  }
+
+  .topbar,
+  .toolbar,
+  .sheet-panel {
+    animation: workspace-surface-in .32s cubic-bezier(.2, .8, .2, 1) both;
+  }
+
+  .toolbar { animation-delay: 35ms; }
+  .sheet-panel { animation-delay: 70ms; }
+
+  @keyframes workspace-surface-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: none; }
+  }
+
+  .glass-panel,
+  .topbar.glass-panel,
+  .toolbar.glass-panel,
+  .sheet-panel {
+    border: 1px solid color-mix(in srgb, var(--workspace-border) 82%, var(--month-accent) 18%);
+    background: color-mix(in srgb, var(--workspace-surface-1) 96%, var(--month-accent) 4%);
+    box-shadow: var(--workspace-shadow-md);
+  }
+
+  .glass-panel { contain: paint; }
+  .glass-panel::after { opacity: .34; background: linear-gradient(180deg, color-mix(in srgb, white 24%, transparent), transparent 38%); }
+  .glass-panel::before { opacity: .23; }
+
+  .topbar,
+  .toolbar {
+    transform: none;
+    transition: border-color .16s ease, box-shadow .16s ease, background-color .16s ease;
+  }
+
+  .topbar:hover,
+  .toolbar:hover {
+    transform: none;
+    border-color: color-mix(in srgb, var(--workspace-border-strong) 62%, var(--month-accent) 38%);
+    box-shadow: var(--workspace-shadow-md);
+  }
+
+  .topbar {
+    min-height: 70px;
+    padding: 11px 13px;
+    border-radius: var(--workspace-radius-lg);
+  }
+
+  .brand-block { gap: 12px; }
+  .brand-block > div { min-width: 0; }
+  .brand-block h1,
+  .brand-block .eyebrow,
+  .brand-block .subline { font-family: Arial, "Helvetica Neue", sans-serif; }
+  .brand-block h1 { font-size: clamp(1.2rem, 2vw, 1.45rem); line-height: 1.08; }
+  .brand-mark { width: 44px; height: 44px; border-radius: 12px; box-shadow: 0 7px 18px color-mix(in srgb, var(--ksg-red) 25%, rgba(0, 0, 0, .18)); }
+  .subline { color: var(--workspace-text-muted); }
+  .eyebrow { color: var(--workspace-text-muted); font-weight: 650; }
+
+  button,
+  .file-btn,
+  select,
+  textarea,
+  input[type="text"],
+  input[type="number"],
+  input[list] {
+    min-height: var(--workspace-control-height);
+    color: var(--workspace-text);
+    border: 1px solid var(--workspace-border);
+    border-radius: var(--workspace-radius-sm);
+    background: var(--workspace-surface-elevated);
+    box-shadow: 0 1px 1px rgba(14, 27, 40, .06);
+  }
+
+  button,
+  .file-btn {
+    min-width: var(--workspace-control-height);
+    font-weight: 600;
+    transition: transform .12s ease, border-color .12s ease, background-color .12s ease, box-shadow .12s ease;
+  }
+
+  button::before,
+  .file-btn::before { display: none; }
+
+  button:hover,
+  .file-btn:hover {
+    color: var(--workspace-text);
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--month-accent) 58%, var(--workspace-border));
+    background: color-mix(in srgb, var(--workspace-surface-elevated) 92%, var(--month-accent) 8%);
+    box-shadow: var(--workspace-shadow-sm);
+  }
+
+  button:active,
+  .file-btn:active { transform: none; box-shadow: inset 0 1px 2px rgba(9, 18, 28, .12); }
+  button.secondary,
+  .file-btn.secondary { color: var(--workspace-text-muted); background: var(--workspace-surface-2); }
+
+  select:focus-visible,
+  textarea:focus-visible,
+  input:focus-visible,
+  button:focus-visible,
+  .file-btn:focus-within,
+  .plan-table-wrap:focus-visible {
+    outline: 2px solid var(--workspace-focus);
+    outline-offset: 2px;
+  }
+
+  .glass-inset {
+    background: var(--workspace-surface-2);
+    border: 1px solid var(--workspace-border);
+    box-shadow: inset 0 1px 2px rgba(18, 31, 44, .06);
+  }
+
+  .month-selector { min-height: 44px; padding: 3px; border-radius: 12px; }
+  .month-selector select { min-height: 36px; color: var(--workspace-text); background: var(--workspace-surface-elevated); }
+  .icon-btn { width: 36px; min-width: 36px; height: 36px; min-height: 36px; }
+  .status-wrap { min-height: 44px; min-width: 142px; color: var(--workspace-text-muted); border-radius: 12px; }
+  .status-dot { animation: none; width: 9px; height: 9px; box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 13%, transparent); }
+
+  .toolbar.toolbar-organized {
+    min-height: 50px;
+    padding: 6px;
+    gap: 7px;
+    border-radius: var(--workspace-radius-md);
+  }
+
+  .toolbar-section {
+    padding: 3px;
+    border-color: var(--workspace-border);
+    border-radius: 11px;
+    background: var(--workspace-surface-2);
+    box-shadow: none;
+  }
+
+  .toolbar-section-label { color: var(--workspace-text-muted); }
+
+  .toolbar .tool-action,
+  .toolbar-overflow-panel .tool-action,
+  .toolbar .file-btn.tool-action,
+  .toolbar-overflow-panel .file-btn.tool-action {
+    min-width: 36px;
+    min-height: 36px;
+    height: 36px;
+    color: var(--workspace-text);
+    border-color: var(--workspace-border);
+    border-radius: 8px;
+    background: var(--workspace-surface-elevated);
+    box-shadow: 0 1px 1px rgba(14, 27, 40, .05);
+  }
+
+  .toolbar .toolbar-section--application .tool-action,
+  .toolbar[data-toolbar-density="secondary"] .toolbar-section--data .tool-action,
+  .toolbar[data-toolbar-density="secondary"] .toolbar-section--output .tool-action,
+  .toolbar[data-toolbar-density="icons"] .tool-action,
+  .toolbar[data-toolbar-density="icons"] .file-btn.tool-action,
+  .toolbar[data-toolbar-density="overflow"] .toolbar-section--planning .tool-action,
+  .toolbar[data-toolbar-density="overflow"] .tool-action--overflow {
+    width: 36px;
+    min-width: 36px;
+  }
+
+  .toolbar .tool-action--accent,
+  .toolbar-overflow-panel .tool-action--accent {
+    color: var(--workspace-accent-ink);
+    border-color: color-mix(in srgb, var(--month-accent) 45%, var(--workspace-border));
+    background: color-mix(in srgb, var(--workspace-surface-elevated) 90%, var(--month-accent) 10%);
+  }
+
+  .toolbar .tool-action--danger,
+  .toolbar-overflow-panel .tool-action--danger {
+    color: var(--red);
+    border-color: color-mix(in srgb, var(--red) 34%, var(--workspace-border));
+    background: color-mix(in srgb, var(--workspace-surface-elevated) 94%, var(--red) 6%);
+  }
+
+  .toolbar-overflow-panel {
+    border-color: var(--workspace-border);
+    background: var(--workspace-surface-elevated);
+    box-shadow: var(--workspace-shadow-lg);
+  }
+
+  .sheet-panel {
+    padding: clamp(12px, 1.4vw, 20px);
+    border-radius: var(--workspace-radius-lg);
+    background: var(--workspace-surface-1);
+  }
+
+  .sheet-heading { margin-bottom: 12px; }
+  .sheet-heading h2 { font-size: clamp(1.35rem, 2.4vw, 1.75rem); line-height: 1.1; }
+  .legend-stack { gap: 7px; }
+  .rule-legend { color: var(--workspace-text-muted); }
+
+  .month-palette-label {
+    min-height: 28px;
+    padding: 5px 10px;
+    color: var(--workspace-accent-ink);
+    border-color: color-mix(in srgb, var(--month-accent) 40%, var(--workspace-border));
+    background: color-mix(in srgb, var(--workspace-surface-elevated) 88%, var(--month-accent) 12%);
+    box-shadow: none;
+  }
+
+  .table-scroll-hint {
+    display: none;
+    margin: 0 0 8px;
+    color: var(--workspace-text-muted);
+    font-size: .75rem;
+    line-height: 1.4;
+  }
+
+  .plan-table-wrap {
+    overflow-x: auto;
+    overflow-y: visible;
+    border-color: var(--workspace-border-strong);
+    border-radius: 10px;
+    background: var(--workspace-surface-1);
+    box-shadow: var(--workspace-shadow-sm);
+    scrollbar-color: color-mix(in srgb, var(--month-accent) 48%, var(--workspace-border)) transparent;
+  }
+
+  .plan-table th,
+  .plan-table td {
+    color: var(--workspace-text);
+    border-color: var(--workspace-border-strong);
+    background: var(--workspace-surface-1);
+  }
+
+  .plan-table th {
+    color: var(--workspace-text);
+    background: color-mix(in srgb, var(--workspace-surface-2) 86%, var(--month-accent) 14%);
+    box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--month-accent) 58%, transparent);
+  }
+
+  .plan-table td.date-cell { color: var(--workspace-text); background: var(--workspace-surface-2); }
+  .plan-table td.weekday-cell { color: var(--workspace-text); }
+
+  /* Die Monatsengine schreibt ihre hellen Tabellenfarben absichtlich als
+     Inline-!important. Im dunklen Workspace werden deshalb nicht diese
+     Druckfarben umgebogen, sondern die Bildschirmzellen explizit auf
+     semantische, kontraststabile Flächen gesetzt. */
+  html[data-app-theme="dark"] .plan-table tr.saturday-row td {
+    color: var(--workspace-text);
+    background: color-mix(in srgb, var(--workspace-surface-1) 90%, var(--month-accent) 10%);
+  }
+  html[data-app-theme="dark"] .plan-table tr.sunday-row td {
+    color: var(--workspace-text);
+    background: color-mix(in srgb, var(--workspace-surface-1) 84%, var(--month-accent) 16%);
+  }
+  html[data-app-theme="dark"] .plan-table tr.holiday-row td {
+    color: var(--workspace-text);
+    background: color-mix(in srgb, var(--workspace-surface-1) 78%, var(--month-accent) 22%);
+  }
+  html[data-app-theme="dark"] .plan-table tr:is(.saturday-row, .sunday-row, .holiday-row) td:is(.date-cell, .weekday-cell) {
+    color: var(--workspace-text);
+  }
+  html[data-app-theme="dark"] .plan-table tr:not(.saturday-row):not(.sunday-row):not(.holiday-row) td.weekday-cell {
+    color: var(--workspace-text);
+    background: color-mix(in srgb, var(--workspace-surface-2) 72%, var(--month-accent) 28%);
+  }
+  html[data-app-theme="dark"] .batch-day:is(.saturday, .sunday, .holiday) {
+    color: var(--workspace-text);
+    border-color: color-mix(in srgb, var(--month-accent) 48%, var(--workspace-border));
+    background: color-mix(in srgb, var(--workspace-surface-2) 78%, var(--month-accent) 22%);
+  }
+  html[data-app-theme="dark"] .batch-day.selected {
+    color: var(--workspace-text);
+    background: color-mix(in srgb, var(--workspace-surface-2) 66%, var(--month-accent) 34%);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    html[data-app-theme="system"] .plan-table tr.saturday-row td {
+      color: var(--workspace-text);
+      background: color-mix(in srgb, var(--workspace-surface-1) 90%, var(--month-accent) 10%);
+    }
+    html[data-app-theme="system"] .plan-table tr.sunday-row td {
+      color: var(--workspace-text);
+      background: color-mix(in srgb, var(--workspace-surface-1) 84%, var(--month-accent) 16%);
+    }
+    html[data-app-theme="system"] .plan-table tr.holiday-row td {
+      color: var(--workspace-text);
+      background: color-mix(in srgb, var(--workspace-surface-1) 78%, var(--month-accent) 22%);
+    }
+    html[data-app-theme="system"] .plan-table tr:is(.saturday-row, .sunday-row, .holiday-row) td:is(.date-cell, .weekday-cell) {
+      color: var(--workspace-text);
+    }
+    html[data-app-theme="system"] .plan-table tr:not(.saturday-row):not(.sunday-row):not(.holiday-row) td.weekday-cell {
+      color: var(--workspace-text);
+      background: color-mix(in srgb, var(--workspace-surface-2) 72%, var(--month-accent) 28%);
+    }
+    html[data-app-theme="system"] .batch-day:is(.saturday, .sunday, .holiday) {
+      color: var(--workspace-text);
+      border-color: color-mix(in srgb, var(--month-accent) 48%, var(--workspace-border));
+      background: color-mix(in srgb, var(--workspace-surface-2) 78%, var(--month-accent) 22%);
+    }
+    html[data-app-theme="system"] .batch-day.selected {
+      color: var(--workspace-text);
+      background: color-mix(in srgb, var(--workspace-surface-2) 66%, var(--month-accent) 34%);
+    }
+  }
+  .plan-table tbody tr:hover td { filter: none; background-image: linear-gradient(color-mix(in srgb, var(--month-accent) 5%, transparent), color-mix(in srgb, var(--month-accent) 5%, transparent)); }
+  .plan-table tbody tr:hover { transform: none; filter: none; }
+  .plan-table tbody tr { animation: none; }
+
+  .assignment-btn,
+  .cell-summary-button,
+  .rbn-input {
+    color: var(--workspace-text);
+  }
+
+  .assignment-btn:hover,
+  .cell-summary-button:hover { background: color-mix(in srgb, var(--month-accent) 9%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--month-accent) 24%, transparent); }
+  .summary-entry { color: var(--workspace-text); background: color-mix(in srgb, var(--workspace-surface-elevated) 80%, transparent); box-shadow: inset 0 0 0 1px var(--workspace-border); }
+  .absence-summary-detail,
+  .rbn2-inactive-note { color: var(--workspace-text-muted); }
+
+  .small-chip {
+    color: var(--workspace-text-muted);
+    border-color: var(--workspace-border);
+    background: var(--workspace-surface-2);
+    box-shadow: none;
+  }
+
+  .small-chip.green { color: var(--green); border-color: color-mix(in srgb, var(--green) 48%, var(--workspace-border)); background: color-mix(in srgb, var(--workspace-surface-2) 91%, var(--green) 9%); }
+  .small-chip.yellow { color: var(--yellow); border-color: color-mix(in srgb, var(--yellow) 48%, var(--workspace-border)); background: color-mix(in srgb, var(--workspace-surface-2) 91%, var(--yellow) 9%); }
+  .small-chip.orange { color: var(--orange); border-color: color-mix(in srgb, var(--orange) 48%, var(--workspace-border)); background: color-mix(in srgb, var(--workspace-surface-2) 91%, var(--orange) 9%); }
+  .small-chip.red { color: var(--red); border-color: color-mix(in srgb, var(--red) 48%, var(--workspace-border)); background: color-mix(in srgb, var(--workspace-surface-2) 91%, var(--red) 9%); }
+  .small-chip.gray { color: var(--workspace-text-muted); border-color: var(--workspace-border); background: var(--workspace-surface-2); }
+
+  .below-plan { max-width: 1040px; margin-top: 18px; }
+  .section-title-row { margin-bottom: 8px; }
+  .section-note { color: var(--workspace-text-muted); }
+
+  .excel-stats {
+    border-color: var(--workspace-border-strong);
+    border-radius: 10px;
+    background: var(--workspace-surface-1);
+    box-shadow: var(--workspace-shadow-sm);
+  }
+
+  .distribution-table th,
+  .distribution-table td {
+    color: var(--workspace-text);
+    border-color: var(--workspace-border-strong);
+    background: var(--workspace-surface-1);
+  }
+
+  .distribution-table th { background: var(--workspace-surface-2); }
+  .distribution-table .open-row,
+  .distribution-table .open-row td { background: color-mix(in srgb, var(--workspace-surface-1) 88%, var(--red) 12%); }
+
+  .issue-items { gap: 6px; }
+  .issue-item {
+    padding: 8px 10px;
+    border-color: var(--workspace-border);
+    border-radius: 9px;
+    background: var(--workspace-surface-2);
+  }
+  .issue-item.red { background: color-mix(in srgb, var(--workspace-surface-2) 91%, var(--red) 9%); }
+  .issue-item.orange { background: color-mix(in srgb, var(--workspace-surface-2) 91%, var(--orange) 9%); }
+  .issue-text strong { color: var(--workspace-text); }
+  .issue-text span,
+  .issue-empty { color: var(--workspace-text-muted); }
+
+  .app-dialog::backdrop {
+    background: color-mix(in srgb, var(--workspace-canvas-deep) 70%, transparent);
+    backdrop-filter: blur(8px) saturate(.85);
+  }
+
+  html[data-app-theme] .dialog-card {
+    color: var(--workspace-text);
+    border-color: var(--workspace-border);
+    border-radius: var(--workspace-radius-lg);
+    background: var(--workspace-surface-elevated);
+    box-shadow: var(--workspace-shadow-lg);
+  }
+
+  .dialog-header {
+    position: sticky;
+    top: -13px;
+    z-index: 4;
+    padding: 13px 13px 10px;
+    margin: -13px -13px 10px;
+    border-bottom: 1px solid var(--workspace-border);
+    background: color-mix(in srgb, var(--workspace-surface-elevated) 94%, transparent);
+    backdrop-filter: blur(10px);
+  }
+
+  .dialog-header p,
+  label { color: var(--workspace-text-muted); }
+  .dialog-actions { position: sticky; bottom: -13px; z-index: 4; padding: 10px 13px 13px; margin: 10px -13px -13px; border-top: 1px solid var(--workspace-border); background: color-mix(in srgb, var(--workspace-surface-elevated) 94%, transparent); backdrop-filter: blur(10px); }
+
+  .picker-card { border-radius: var(--workspace-radius-lg); }
+  .picker-header { border-color: var(--workspace-border); background: color-mix(in srgb, var(--workspace-surface-2) 88%, var(--month-accent) 12%); }
+  .picker-current,
+  .picker-group-label,
+  .picker-item .reasons,
+  .picker-note,
+  .picker-keys { color: var(--workspace-text-muted); }
+  .picker-group-label { background: linear-gradient(180deg, var(--workspace-surface-elevated) 72%, transparent); }
+  .picker-item,
+  .picker-detail,
+  .picker-footer,
+  .day-meta-row,
+  .batch-day,
+  .meta-chip {
+    color: var(--workspace-text);
+    border-color: var(--workspace-border);
+    background: var(--workspace-surface-2);
+    box-shadow: none;
+  }
+  .picker-item.is-active:not(:disabled) { border-color: var(--month-accent); background: color-mix(in srgb, var(--workspace-surface-elevated) 88%, var(--month-accent) 12%); box-shadow: 0 0 0 2px color-mix(in srgb, var(--month-accent) 24%, transparent); }
+  .picker-load,
+  .picker-group-count,
+  .picker-detail-reason,
+  .picker-keys kbd { color: var(--workspace-text-muted); border-color: var(--workspace-border); background: var(--workspace-surface-3); }
+  .picker-footer { border-color: var(--workspace-border); }
+
+  html[data-app-theme] .settings-card { background: var(--workspace-surface-elevated); }
+  html[data-app-theme] .settings-header { border-color: var(--workspace-border); background: color-mix(in srgb, var(--workspace-surface-elevated) 96%, var(--month-accent) 4%); }
+  html[data-app-theme] .settings-body { background: var(--workspace-surface-2); }
+  html[data-app-theme] .settings-section {
+    border-color: var(--workspace-border);
+    border-radius: var(--workspace-radius-md);
+    background: var(--workspace-surface-1);
+    box-shadow: var(--workspace-shadow-sm);
+  }
+  html[data-app-theme] .settings-section--accent { border-color: color-mix(in srgb, var(--month-accent) 38%, var(--workspace-border)); background: color-mix(in srgb, var(--workspace-surface-1) 95%, var(--month-accent) 5%); }
+  html[data-app-theme] .settings-grid > label { border: 1px solid transparent; background: var(--workspace-surface-2); transition: border-color .14s ease, background-color .14s ease; }
+  html[data-app-theme] .settings-grid > label:focus-within { border-color: color-mix(in srgb, var(--month-accent) 45%, var(--workspace-border)); background: var(--workspace-surface-1); }
+  html[data-app-theme] .settings-section-icon { color: var(--workspace-accent-ink); border-color: color-mix(in srgb, var(--month-accent) 30%, var(--workspace-border)); background: color-mix(in srgb, var(--workspace-surface-2) 86%, var(--month-accent) 14%); }
+  html[data-app-theme] .settings-actions { border-color: var(--workspace-border); background: var(--workspace-surface-elevated); }
+
+  /* Auto-Plan erbt dieselben Alias-Tokens, behält jedoch seine beobachtende
+     Informationsarchitektur und die laufbezogene Fortschrittsbewegung. */
+  html[data-app-theme] .auto-plan-dialog {
+    --ap-ink: var(--workspace-text);
+    --ap-muted: var(--workspace-text-muted);
+    --ap-accent-strong: var(--workspace-accent-ink);
+    --ap-panel: var(--workspace-surface-1);
+    --ap-surface: var(--workspace-surface-2);
+    --ap-line: var(--workspace-border);
+    --ap-hairline: var(--workspace-border);
+  }
+
+  html[data-app-theme] .auto-plan-dialog .auto-plan-shell,
+  html[data-app-theme] .auto-plan-dialog[data-algorithm-revision="6"] .auto-plan-shell,
+  html[data-app-theme] .auto-plan-dialog[data-algorithm-revision="7.5"] .auto-plan-shell {
+    color: var(--workspace-text);
+    border-color: color-mix(in srgb, var(--month-accent) 34%, var(--workspace-border));
+    border-radius: var(--workspace-radius-lg);
+    background:
+      radial-gradient(circle at 8% -12%, color-mix(in srgb, var(--month-accent) 12%, transparent), transparent 32%),
+      var(--workspace-surface-elevated);
+    box-shadow: var(--workspace-shadow-lg);
+  }
+
+  html[data-app-theme] .auto-plan-header,
+  html[data-app-theme] .auto-plan-footer {
+    border-color: var(--workspace-border);
+    background: color-mix(in srgb, var(--workspace-surface-elevated) 94%, var(--month-accent) 6%);
+  }
+
+  html[data-app-theme] .auto-plan-card,
+  html[data-app-theme] .auto-plan-switch,
+  html[data-app-theme] .auto-plan-context-list div,
+  html[data-app-theme] .auto-plan-console,
+  html[data-app-theme] .auto-plan-result-hero,
+  html[data-app-theme] .auto-plan-scorecard,
+  html[data-app-theme] .auto-plan-result-section,
+  html[data-app-theme] .auto-plan-red-review,
+  html[data-app-theme] .auto-plan-red-item,
+  html[data-app-theme] .auto-plan-zero-red-guardrail,
+  html[data-app-theme] .auto-plan-guardrail-flow li,
+  html[data-app-theme] .auto-plan-phase-narrative,
+  html[data-app-theme] .auto-plan-engine-badge,
+  html[data-app-theme] .auto-plan-truth-strip > div,
+  html[data-app-theme] .auto-plan-dialog[data-algorithm-revision="7.5"] .auto-plan-phase-narrative {
+    color: var(--workspace-text);
+    border-color: var(--workspace-border);
+    background: var(--workspace-surface-2);
+    box-shadow: none;
+  }
+
+  html[data-app-theme] .auto-plan-range output,
+  html[data-app-theme] .auto-plan-limit-head,
+  html[data-app-theme] .auto-plan-limit-table thead th {
+    color: var(--workspace-text);
+    border-color: var(--workspace-border);
+    background: color-mix(in srgb, var(--workspace-surface-2) 86%, var(--month-accent) 14%);
+  }
+
+  html[data-app-theme] .auto-plan-v7-5-ribbon b,
+  html[data-app-theme] .auto-plan-v7-5-ribbon > strong,
+  html[data-app-theme] .auto-plan-card header > span,
+  html[data-app-theme] .auto-plan-limit-head span,
+  html[data-app-theme] .auto-plan-context-list strong,
+  html[data-app-theme] .auto-plan-guardrail-flow strong {
+    color: var(--workspace-text);
+  }
+
+  html[data-app-theme] .auto-plan-guardrail-flow li > b {
+    color: var(--workspace-text);
+    border-color: color-mix(in srgb, var(--month-accent) 42%, var(--workspace-border));
+    background: color-mix(in srgb, var(--workspace-surface-3) 78%, var(--month-accent) 22%);
+    box-shadow: none;
+  }
+
+  html[data-app-theme] .auto-plan-guardrail-note,
+  html[data-app-theme] .auto-plan-validation {
+    color: var(--workspace-text);
+    border: 1px solid color-mix(in srgb, var(--green) 38%, var(--workspace-border));
+    background: color-mix(in srgb, var(--workspace-surface-2) 88%, var(--green) 12%);
+  }
+
+  html[data-app-theme] .auto-plan-limit-table tbody tr.is-hg-blocked td:nth-child(5) input {
+    color: var(--workspace-text-muted);
+    background: var(--workspace-surface-3);
+  }
+
+  html[data-app-theme] .auto-plan-start,
+  html[data-app-theme] .auto-plan-apply {
+    color: var(--workspace-text);
+    border-color: color-mix(in srgb, var(--month-accent) 48%, var(--workspace-border));
+    background: color-mix(in srgb, var(--workspace-surface-3) 72%, var(--month-accent) 28%);
+  }
+
+  html[data-app-theme] .auto-plan-start:hover,
+  html[data-app-theme] .auto-plan-apply:hover {
+    background: color-mix(in srgb, var(--workspace-surface-3) 62%, var(--month-accent) 38%);
+  }
+
+  html[data-app-theme] .auto-plan-dialog[data-algorithm-revision="7.5"] .auto-plan-visual,
+  html[data-app-theme] .auto-plan-dialog[data-algorithm-revision="6"] .auto-plan-visual {
+    border-color: var(--workspace-border);
+    background:
+      linear-gradient(color-mix(in srgb, var(--workspace-surface-1) 90%, transparent), color-mix(in srgb, var(--workspace-surface-2) 94%, transparent)),
+      radial-gradient(circle at 50% 44%, color-mix(in srgb, var(--month-accent) 18%, var(--workspace-surface-1)), var(--workspace-surface-1) 62%);
+    box-shadow: inset 0 1px color-mix(in srgb, white 18%, transparent), var(--workspace-shadow-sm);
+  }
+
+  html[data-app-theme] .auto-plan-dialog[data-algorithm-revision="7.5"] .auto-plan-core,
+  html[data-app-theme] .auto-plan-core {
+    color: var(--workspace-text);
+    background: color-mix(in srgb, var(--workspace-surface-elevated) 91%, var(--month-accent) 9%);
+    border-color: color-mix(in srgb, var(--month-accent) 34%, var(--workspace-border));
+  }
+
+  html[data-app-theme] .auto-plan-dialog[data-algorithm-revision="7.5"] .auto-plan-core strong { color: var(--workspace-text); }
+  html[data-app-theme] .auto-plan-v7-5-ribbon,
+  html[data-app-theme] .auto-plan-v7-ribbon { background: color-mix(in srgb, var(--workspace-surface-2) 91%, var(--month-accent) 9%); box-shadow: none; }
+  html[data-app-theme] .auto-plan-limit-table input,
+  html[data-app-theme] .auto-plan-comment-label textarea { color: var(--workspace-text); background: var(--workspace-surface-elevated); border-color: var(--workspace-border); }
+  html[data-app-theme] .auto-plan-proposal-table th,
+  html[data-app-theme] .auto-plan-proposal-table td,
+  html[data-app-theme] .auto-plan-distribution-table th,
+  html[data-app-theme] .auto-plan-distribution-table td { color: var(--workspace-text); border-color: var(--workspace-border); }
+
+  @media (max-width: 700px) {
+    .app-shell { padding: 8px; gap: 8px; }
+    .topbar { border-radius: 16px; }
+    .brand-mark { width: 42px; height: 42px; }
+    .subline { line-height: 1.25; }
+    .topbar-controls { gap: 7px; }
+    .month-selector { width: 100%; }
+    .status-wrap { min-width: 138px; }
+    .sheet-panel { padding: 12px; border-radius: 16px; }
+    .sheet-heading { align-items: flex-start; }
+    .month-palette-label { max-width: 160px; white-space: normal; line-height: 1.2; }
+    .table-scroll-hint { display: block; }
+    .plan-table { min-width: 980px; }
+
+    .plan-table th:nth-child(1),
+    .plan-table td:nth-child(1) {
+      position: sticky;
+      left: 0;
+      z-index: 3;
+    }
+
+    .plan-table th:nth-child(2),
+    .plan-table td:nth-child(2) {
+      position: sticky;
+      left: 42px;
+      z-index: 3;
+      box-shadow: inset 3px 0 0 var(--month-accent-strong), 7px 0 10px -9px rgba(0, 0, 0, .65);
+    }
+
+    .plan-table th:nth-child(1),
+    .plan-table th:nth-child(2) { z-index: 6; }
+
+    .below-plan { max-width: 100%; }
+    .section-title-row { align-items: flex-end; }
+    .excel-stats { overflow: visible; border: 0; background: transparent; box-shadow: none; }
+    .distribution-table,
+    .distribution-table tbody { display: block; width: 100%; }
+    .distribution-table thead {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+      border: 0;
+    }
+    .distribution-table tbody { display: grid; gap: 8px; }
+    .distribution-table tbody tr {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0;
+      overflow: hidden;
+      border: 1px solid var(--workspace-border);
+      border-radius: 10px;
+      background: var(--workspace-surface-1);
+      box-shadow: var(--workspace-shadow-sm);
+    }
+    .distribution-table tbody td {
+      min-width: 0;
+      width: auto !important;
+      min-height: 46px;
+      display: grid;
+      align-content: center;
+      gap: 2px;
+      padding: 7px 9px;
+      text-align: left !important;
+      border: 0;
+      border-top: 1px solid var(--workspace-border);
+      border-right: 1px solid var(--workspace-border);
+      background: transparent;
+    }
+    .distribution-table tbody td::before {
+      content: attr(data-label);
+      color: var(--workspace-text-muted);
+      font-size: .61rem;
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    .distribution-table tbody td:first-child {
+      grid-column: 1 / -1;
+      min-height: 40px;
+      border-top: 0;
+      border-right: 0;
+      color: var(--workspace-text);
+      font-weight: 700;
+      background: var(--workspace-surface-2);
+    }
+    .distribution-table tbody td:nth-child(4),
+    .distribution-table tbody td:nth-child(7) { border-right: 0; }
+    .distribution-table tbody tr.open-row { background: color-mix(in srgb, var(--workspace-surface-1) 90%, var(--red) 10%); }
+    .issue-items { max-height: 420px; }
+    .issue-item { align-items: flex-start; }
+    .dialog-card { width: min(100%, calc(100vw - 12px)); max-height: calc(100dvh - 12px); }
+  }
+
+  @media (max-width: 430px) {
+    .app-shell { padding: 6px; }
+    .brand-block { align-items: flex-start; gap: 9px; }
+    .brand-block .eyebrow { font-size: .58rem; }
+    .brand-block h1 { font-size: 1.22rem; }
+    .topbar { padding: 10px; }
+    .toolbar.toolbar-organized { min-height: 48px; }
+    .sheet-heading { gap: 8px; }
+    .section-note { max-width: 55%; text-align: right; }
+    .distribution-table tbody td { min-height: 43px; padding: 6px 8px; }
+  }
+
+  @media (pointer: coarse) {
+    :root { --workspace-control-height: 44px; }
+    .icon-btn,
+    .toolbar .tool-action,
+    .toolbar .file-btn.tool-action { min-width: 44px; min-height: 44px; height: 44px; }
+  }
+
+  @media (prefers-contrast: more) {
+    :root {
+      --workspace-border: color-mix(in srgb, CanvasText 48%, Canvas);
+      --workspace-border-strong: color-mix(in srgb, CanvasText 72%, Canvas);
+    }
+    .glass-panel,
+    .toolbar-section,
+    button,
+    select,
+    input,
+    textarea { box-shadow: none; }
+    .plan-table th,
+    .plan-table td { border-width: 1px; }
+  }
+
+  @media (prefers-reduced-transparency: reduce) {
+    .app-dialog::backdrop,
+    .dialog-header,
+    .dialog-actions,
+    .auto-plan-core,
+    .auto-plan-truth-strip > div { backdrop-filter: none !important; }
+    .dialog-header,
+    .dialog-actions { background: var(--workspace-surface-elevated); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .topbar,
+    .toolbar,
+    .sheet-panel { animation: none; }
+  }
+
+  @media (forced-colors: active) {
+    body,
+    .glass-panel,
+    .topbar.glass-panel,
+    .toolbar.glass-panel,
+    .sheet-panel,
+    .toolbar-section,
+    .dialog-card,
+    .settings-section,
+    .auto-plan-shell,
+    .auto-plan-card { color: CanvasText; background: Canvas; border-color: CanvasText; box-shadow: none; }
+    .ambient-layer,
+    .glass-panel::before,
+    .glass-panel::after { display: none; }
+    button:focus-visible,
+    select:focus-visible,
+    input:focus-visible,
+    textarea:focus-visible { outline-color: Highlight; }
+  }
+}
+
+@media print {
+  .table-scroll-hint { display: none !important; }
+}
