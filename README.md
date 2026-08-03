@@ -492,4 +492,5 @@ Die fachliche und technische Begründung der v6-Architektur einschließlich Cons
 - vollständige 32/180/192/512-Pixel-Ableitungen und separates Maskable-PWA-Icon;
 - plattformneutrale Qualitätsgates für Windows-, macOS- und Linux-Arbeitskopien;
 - deterministische E2E-Synchronisation des Monatsfarbverlaufs über echte Start- und Abschlusszustände statt fester Wartezeit;
-- einheitlicher Release-Token `20260803.2` im vollständigen Browser-Modulgraphen und ein Gate gegen künftige Teilversionen.
+- einheitlicher Release-Token `20260803.2` im vollständigen Browser-Modulgraphen und ein Gate gegen künftige Teilversionen;
+- GitHub-CI-Actions mit nativer Node-24-Laufzeit ohne Node-20-Abkündigungswarnung.
