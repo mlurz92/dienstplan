@@ -8,6 +8,26 @@ export const STAFF_ORDER = [
   'lurz', 'polednia', 'dalitz', 'becker', 'hellmann', 'martin', 'elhouba', 'licenji', 'sebastian'
 ];
 
+/**
+ * Vorgabe der monatlichen BD-Obergrenze je Person für den Auto-Plan.
+ *
+ * Diese Werte füllen die Laufgrenzen im Studio vor. Sie sind dort frei
+ * änderbar und ersetzen weder das im Personalstamm hinterlegte harte
+ * Monatsmaximum noch eine fachliche Regel: Liegt beides vor, gilt der
+ * jeweils strengere Wert.
+ */
+export const AUTO_PLAN_BD_LIMITS = Object.freeze({
+  lurz: 5,
+  dalitz: 5,
+  polednia: 4,
+  becker: 3,
+  martin: 4,
+  elhouba: 4,
+  licenji: 4,
+  sebastian: 4,
+  hellmann: 2
+});
+
 export const DEFAULT_STAFF = [
   { id: 'schaefer', name: 'Prof. Schäfer', short: 'Schäfer', category: 'urlaub-only', roleLabel: 'Chefarzt', activeFrom: '2025-01-01', activeUntil: null, includeInPlanning: false, includeInAbsenceList: true },
   { id: 'lurz', name: 'Dr. Lurz', short: 'Lurz', category: 'fa', roleLabel: 'FA/OA', activeFrom: '2025-01-01', activeUntil: null, includeInPlanning: true, includeInAbsenceList: true, bdTarget: 4, maxBd: null, canHg: true, canSaturdayBd: true },

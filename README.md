@@ -56,6 +56,20 @@ Vor **Optimierung starten** können festgelegt werden:
 - feste maximale HG-Zahl je Mitarbeitendem;
 - feste maximale Gesamtzahl `BD + HG` je Mitarbeitendem.
 
+**Vorbelegte Obergrenzen.** Die Tabelle startet mit festgelegten Vorgaben:
+
+| Person | BD max. | Person | BD max. |
+|---|---|---|---|
+| Dr. Lurz | 5 | Dr. Martin | 4 |
+| Fr. Dalitz | 5 | Hr. El Houba | 4 |
+| Dr. Polednia | 4 | Fr. Licenji | 4 |
+| Dr. Becker | 3 | Hr. Sebastian | 4 |
+| Fr. Hellmann | 2 | | |
+
+Die HG-Obergrenze steht auf `0` für alle, die im gesamten Monat an keinem Tag HG-berechtigt sind – Assistenzärztinnen und Assistenzärzte planen keinen Hintergrunddienst. Abgeleitet wird das aus der datumsabhängigen Qualifikation und nicht aus einer festen Namensliste: Eine Beförderung hebt die Vorgabe von selbst wieder auf, wie bei Hr. El Houba ab dem 22.09.2026.
+
+Liegt bereits mehr an, als eine Vorgabe zulässt, hebt sie sich auf den bestehenden Stand. Eine Vorgabe blockiert damit nie den Start; sichtbar und änderbar bleibt sie trotzdem. Ist im Personalstamm zusätzlich ein hartes Monatsmaximum hinterlegt, gilt der strengere Wert.
+
 Der Zeitrahmen ist die wirksamste Stellgröße. Die Ruin-and-Recreate-Suche nutzt ihn vollständig aus; mehr Zeit führt zu besseren Plänen und macht den abschließenden Optimalitätsnachweis wahrscheinlicher. Die Suchintensität schlägt für Zeitrahmen, Reparaturrunden, Neuplanungsbudget und Late-Acceptance-Fenster passende Werte vor. Ein selbst eingetragener Wert bleibt dabei erhalten und wird durch einen späteren Wechsel der Intensität nicht überschrieben.
 
 Die Tabelle der Obergrenzen führt jede planbare Person mit ihren bestehenden BD und HG sowie drei Eingabefeldern. Zwei Schaltflächen setzen alle Zeilen gemeinsam auf die Vorschlagswerte zurück oder leeren sämtliche Grenzen. Eine Zeile, deren Grenze eine bestehende Dienstzahl unterschreitet, wird hervorgehoben und blockiert den Start.
@@ -64,7 +78,7 @@ Die personengebundenen Obergrenzen sind **harte Laufbedingungen**. Sie können a
 
 Personalstamm-Maxima bleiben zusätzlich wirksam. Für Personen ohne dauerhaft hinterlegtes Maximum wird ein editierbarer Laufwert angeboten. Leere HG- oder Gesamtfelder bedeuten keine zusätzliche Laufobergrenze.
 
-Die Konfiguration wird validiert, bevor der Startbutton aktiv bleibt. Laufparameter und Vorschläge sind fingerprintgeschützt; eine nachträgliche Manipulation wird beim Übernahmeaudit verworfen.
+Jedes Bedienelement, jede Tabellenüberschrift und jede Live-Kennzahl trägt einen erklärenden Tooltip. Die Konfiguration wird validiert, bevor der Startbutton aktiv bleibt. Laufparameter und Vorschläge sind fingerprintgeschützt; eine nachträgliche Manipulation wird beim Übernahmeaudit verworfen.
 
 ### 2.2 Animation und Live-Telemetrie
 
@@ -249,7 +263,23 @@ Die Zertifizierung beweist genau das, was sie prüft: dass **keine Einzelumsetzu
 
 Es ist ausdrücklich **kein** Beweis globaler Optimalität. Eine Verbesserung, die nur durch das gleichzeitige Umstellen von drei oder mehr Diensten erreichbar wäre, kann bestehen bleiben, auch wenn die Perfektionsphase Dreierketten, Tagespakete und Wochenendpakete zusätzlich absucht. Ein vollständiger externer MIP- oder CP-SAT-Lauf kann in Einzelfällen weiter kommen; im Browser ist er nicht verfügbar. Die Oberfläche benennt diesen Unterschied und behauptet nie mehr, als nachgewiesen wurde.
 
-### 3.9 Rechenleistung
+### 3.9 Ausführung auf mehreren Kernen
+
+Der Lauf verlässt den Anzeigestrang vollständig und arbeitet in eigenen Arbeitssträngen. Das hat zwei Wirkungen, die sich mit Taktung allein nicht erreichen lassen:
+
+- **Die Oberfläche bleibt frei.** Fortschrittsbalken, Animation und Abbruch laufen weiter, während gerechnet wird. Gemessen bleibt die Antwortzeit des Anzeigestrangs während eines vollen Laufs im Bereich von zehn bis vierzig Millisekunden.
+- **Die Rechnung wird schneller.** Im Anzeigestrang musste sie regelmäßig bis zum nächsten Bildaufbau abgeben und verlor dadurch einen erheblichen Teil ihrer Zeit ans Warten. Im Arbeitsstrang gibt es nichts zu zeichnen; die Taktung entfällt vollständig.
+
+Parallel gearbeitet wird in beiden Phasen:
+
+1. **Aufbau.** Die Suchläufe eines Monats – reguläre Null-Rot-Suche, vertiefte Null-Rot-Suche, Minimal-Rot-Rückfall – bilden nacheinander eine Kette: Der nächste startet nur, wenn der vorige scheitert. Bei schwierigen Monaten läuft dadurch alles dreimal hintereinander. Gleichzeitig gestartet dauert es nur so lange wie der längste. Liefert der erste Lauf eine vollständige Belegung ohne rote Ausnahme, werden die übrigen sofort beendet – genau der Punkt, an dem auch die Kette abgebrochen hätte.
+2. **Perfektion.** Mehrere Stränge verbessern denselben Aufbau mit verschiedenen Startwerten und der beste Vorschlag gewinnt. Weil die Suche stochastisch ist, streuen ihre Ergebnisse; der beste aus mehreren unabhängigen Läufen ist verlässlich besser als ein einzelner. Der Aufbau wird dabei genau einmal berechnet und an alle Perfektionsläufe verteilt.
+
+Verglichen wird in beiden Phasen mit derselben lexikografischen Zielordnung, nach der auch optimiert wird. Ein Kern bleibt für Anzeige und Animation frei. Fehlt die Unterstützung für Arbeitsstränge, läuft alles unverändert im Anzeigestrang.
+
+**Warum nicht die Grafikkarte.** Grafikprozessoren gewinnen ihre Leistung daraus, dass tausende Rechenwerke denselben Befehlsstrom auf flachen Zahlenfeldern ausführen. Die Regelbewertung ist das Gegenteil davon: verzweigungsreich, auf Zeichenketten und Objektgraphen arbeitend, mit Datumsrechnung und Nachschlagen in Nachbarmonaten. Sie ließe sich dort nur ausführen, indem das gesamte Regelwerk ein zweites Mal als numerische Fassung nachgebaut würde – und genau das ist ausgeschlossen: Die bestehende Regelengine ist die einzige fachliche Wahrheitsquelle, eine zweite Fassung würde von ihr abweichen, ohne dass es jemand bemerkt. Hinzu kommt, dass die Suche in ihrem Kern aufeinanderfolgend ist: Jede Annahmeentscheidung hängt am Ergebnis der vorigen.
+
+### 3.10 Rechenleistung
 
 Der Lauf wurde messbar beschleunigt, damit der Zeitrahmen der Suche zugutekommt und nicht der Verwaltung:
 
@@ -259,6 +289,8 @@ Der Lauf wurde messbar beschleunigt, damit der Zeitrahmen der Suche zugutekommt 
 - Zwischenzustände der Konstruktion werden aus der bereits vorliegenden Bewertungsmitschrift gerankt statt mit einem vollständigen Monats-Audit je erzeugtem Nachfolger.
 - Das Vorwärts-Checking läuft erst nach billigem Ranking und Entdopplung und nur für so viele Varianten, wie in den Suchstrahl passen.
 - Die Perfektionsphase prüft Züge zuerst an den veränderten Zellen und bewertet nur die Überlebenden vollständig.
+- Die Vergleichsgruppe eines Dienstfelds – der mit Abstand teuerste Teil einer Bewertung – wird je Belegungszustand einmal bestimmt statt für jeden Kandidaten erneut. Der Speicher hängt an einer Marke, die den vollständigen Belegungszustand beschreibt: Ändert sich ein Dienst, wird er verworfen. Ein Gleichwertigkeitstest über tausende zufällig erzeugte Belegungszustände belegt, dass keine einzige Bewertung davon abweicht; die Kandidatenaufzählung wird dabei rund viermal schneller.
+- Die absteigende Suche beginnt bei den auffälligsten Zellen und findet ihre nächste Verbesserung dadurch früher.
 
 In der Summe fällt ein voller 31-Tage-Monat von deutlich über zehn Minuten auf einen Aufbau im Bereich weniger Sekunden; die verbleibende Zeit gehört der Perfektionsphase.
 
@@ -379,6 +411,8 @@ Der Jahresverlauf bleibt ein neutraler Hinweis und beeinflusst die automatische 
 | `js/auto-planner.js` | öffentliche Auto-Plan-Schnittstelle |
 | `js/cooperative-scheduling.js` | zeitgesteuerte Rückgabe an den Browser während langer Läufe |
 | `js/auto-plan-visualizer.js` | Canvas-Darstellung des laufenden Algorithmus |
+| `js/auto-plan-runner.js` | Verteilung des Laufs auf mehrere Kerne und Auswahl des besten Ergebnisses |
+| `js/auto-plan-worker.js` | Rechenkern als eigener Arbeitsstrang |
 | `js/auto-plan-studio-v5.js` | Konfiguration, Laufansicht, Tagesvorschau und Bestätigung |
 | `js/auto-plan-ui.js` | Einstiegspunkt des Studios |
 | `auto-plan-studio.css` | vollständiges Layout und Design des Studios |
@@ -422,6 +456,8 @@ Die Tests decken insbesondere ab:
 - fingerprintgeschützte Perfektionsparameter;
 - genau eine Abschlussmeldung je Lauf;
 - Erreichbarkeit und Bedienbarkeit jeder Personenzeile im Parameterbereich;
+- festgelegte BD-Obergrenzen und abgeleitete HG-Vorgaben;
+- Gleichwertigkeit des Vergleichsgruppen-Speichers über zufällig erzeugte Belegungszustände;
 - zeitabhängige Beförderung;
 - rote Werktagsfolge HG → BD in beiden Eingabereihenfolgen;
 - Freitag-/Samstag-Ausnahme;

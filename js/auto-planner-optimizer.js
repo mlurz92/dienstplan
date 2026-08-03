@@ -55,7 +55,8 @@ import {
   listOpenSlots,
   listProposedAssignments,
   planRespectsLimits,
-  planningContextFor
+  planningContextFor,
+  syncPeerCache as syncPlanPeerCache
 } from './auto-planner-engine.js?v=20260801.11';
 import { createPacer, createTicker, now } from './cooperative-scheduling.js?v=20260801.11';
 import {
@@ -65,6 +66,7 @@ import {
   getPlanningStaff,
   parseIso,
   setAssignment,
+  setPeerGroupCacheToken,
   toLocalIso
 } from './rules.js?v=20260801.11';
 
@@ -158,6 +160,10 @@ const NEIGHBOURHOODS = Object.freeze([
 
 export class PlanOptimizer {
   constructor({ state, baseline, config, allowRed, seed }) {
+    // Zuerst den Bewertungsspeicher stilllegen: Der Planungskontext unten wird
+    // bereits bewertet, und eine Marke aus einem früheren Lauf würde dabei
+    // fremde Vergleichsgruppen liefern.
+    setPeerGroupCacheToken(null);
     this.state = state;
     this.baseline = baseline;
     this.config = config;
@@ -219,6 +225,7 @@ export class PlanOptimizer {
    * wie die spätere Übernahme.
    */
   objective() {
+    this.syncPeerCache();
     this.evaluations += 1;
     return evaluatePlanObjective(this.state, this.working, this.baseline, this.config);
   }
@@ -229,6 +236,7 @@ export class PlanOptimizer {
 
   /** Bewertung einer einzelnen Zelle im aktuellen Arbeitsmonat. */
   evaluateCell(dateIso, role, staffId) {
+    this.syncPeerCache();
     this.candidateChecks += 1;
     return evaluateCandidate({ state: this.sandbox, monthData: this.working, dateIso, role, staffId });
   }
@@ -241,6 +249,7 @@ export class PlanOptimizer {
    * Zusätzlich gelten die vor dem Lauf festgelegten Obergrenzen.
    */
   candidates(dateIso, role) {
+    this.syncPeerCache();
     const result = [];
     for (const person of getPlanningStaff(this.state.staff, dateIso)) {
       const evaluation = this.evaluateCell(dateIso, role, person.id);
@@ -252,6 +261,20 @@ export class PlanOptimizer {
     result.sort((left, right) => (LEVEL_RANK[left.evaluation.level] ?? 9) - (LEVEL_RANK[right.evaluation.level] ?? 9)
       || compareObjectiveKeys(left.vector.map(value => -value), right.vector.map(value => -value)));
     return result;
+  }
+
+  /**
+   * Meldet den aktuellen Belegungszustand an den Bewertungsspeicher.
+   *
+   * Verwendet wird dieselbe Marke wie in Konstruktion und Tauschreparatur: Zwei
+   * unterschiedliche Markenformate würden sich gegenseitig verwerfen und den
+   * Speicher wirkungslos machen. Sie wird an jeder bewertenden Stelle neu
+   * gebildet – das kostet einen Bruchteil dessen, was der Speicher einspart,
+   * und ist im Gegensatz zu einem mitgeführten Änderungszähler nicht dadurch zu
+   * unterlaufen, dass irgendwo eine Änderung nicht gemeldet wird.
+   */
+  syncPeerCache() {
+    syncPlanPeerCache(this.working);
   }
 
   /**
@@ -410,14 +433,41 @@ export async function descend({ optimizer, current, until, stats, signal, onStep
  * abschließende Zertifizierungslauf prüft Einzelumsetzung und Paartausch
  * weiterhin ungedeckelt und vollständig.
  */
+
+/**
+ * Die selbst gesetzten Dienste, nach Auffälligkeit ihrer Bewertung sortiert:
+ * erst rot, dann orange, dann gelb, innerhalb gleicher Stufe die mit der
+ * geringsten Empfehlung.
+ */
+function orderedAssignments(optimizer, objective) {
+  const rank = new Map((objective?.audit?.entries || []).map(entry => [
+    keyFor(entry.dateIso, entry.role),
+    (LEVEL_RANK[entry.evaluation.level] ?? 0) * 1000 - (entry.evaluation.meta?.recommendationScore || 0)
+  ]));
+  return optimizer.plannedSlots()
+    .map(slot => ({
+      dateIso: slot.dateIso,
+      role: slot.role,
+      staffId: optimizer.working.days[slot.dateIso][slot.role],
+      weight: rank.get(keyFor(slot.dateIso, slot.role)) || 0
+    }))
+    .sort((left, right) => right.weight - left.weight
+      || left.dateIso.localeCompare(right.dateIso)
+      || left.role.localeCompare(right.role));
+}
+
 async function exploreNeighbourhood({ optimizer, neighbourhood, objective, stats, signal, onStep, until = Infinity, moveCap = Infinity, pace = null }) {
   const gate = pace || createPacer();
-  const planned = optimizer.plannedSlots();
-  const assignments = planned.map(slot => ({
-    dateIso: slot.dateIso,
-    role: slot.role,
-    staffId: optimizer.working.days[slot.dateIso][slot.role]
-  }));
+  /**
+   * Die schlechtesten Zellen zuerst.
+   *
+   * Eine absteigende Suche bricht bei der ersten Verbesserung ab. Beginnt sie
+   * bei den auffälligsten Zellen, findet sie diese Verbesserung im Mittel
+   * deutlich früher und spart die vollständigen Bewertungen aller Züge davor.
+   * Auf das Ergebnis wirkt sich die Reihenfolge nicht aus – gesucht wird
+   * dieselbe Nachbarschaft.
+   */
+  const assignments = orderedAssignments(optimizer, objective);
 
   let inspected = 0;
   let exhausted = false;
@@ -774,11 +824,7 @@ export async function certify({ optimizer, objective, stats, signal, onStep, rou
   for (let round = 1; round <= rounds; round += 1) {
     abortIfRequested(signal);
     let improvedThisRound = false;
-    const assignments = optimizer.plannedSlots().map(slot => ({
-      dateIso: slot.dateIso,
-      role: slot.role,
-      staffId: optimizer.working.days[slot.dateIso][slot.role]
-    }));
+    const assignments = orderedAssignments(optimizer, current);
 
     for (const assignment of assignments) {
       if (now() >= until) return { objective: current, certified: false, rounds: round };
@@ -880,6 +926,16 @@ export async function perfect({
 }) {
   const optimizer = new PlanOptimizer({ state, baseline, config, allowRed, seed });
   optimizer.load(plannedMonth);
+  try {
+    return await runPerfection({ optimizer, timeBudgetMs, mode, lateAcceptanceSize, descentInterval, onProgress, progressStart, progressSpan, signal });
+  } finally {
+    // Außerhalb des Laufs darf niemand auf zwischengespeicherte
+    // Vergleichsgruppen stoßen – auch nicht nach einem Abbruch.
+    setPeerGroupCacheToken(null);
+  }
+}
+
+async function runPerfection({ optimizer, timeBudgetMs, mode, lateAcceptanceSize, descentInterval, onProgress, progressStart, progressSpan, signal }) {
   const stats = emptyOptimizerStats();
   const pace = createPacer();
   const tick = createTicker();
