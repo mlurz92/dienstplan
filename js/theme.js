@@ -461,3 +461,44 @@ export function applyMonthTheme(month, { animate = true, year } = {}) {
   animationHandle = requestAnimationFrame(step);
   return { palette, changed };
 }
+
+/**
+ * Sofortige Wirkung des gewählten Monatsfarbsystems.
+ *
+ * Ohne diesen Weg wirkte eine Umstellung erst beim nächsten Monatswechsel:
+ * `neutral` ließ die zuletzt geschriebenen Inline-Variablen stehen, und
+ * `classic` wartete auf den nächsten Aufruf von `applyMonthTheme`. Beides
+ * widerspricht dem, was das Einstellungsmodal zusagt.
+ *
+ * Bei `neutral` werden die Inline-Variablen entfernt, statt neue zu schreiben —
+ * damit greifen wieder die Grundwerte des Stylesheets. Bei `classic` wird die
+ * feste Monatspalette unmittelbar und ohne Übergang gesetzt; ein Übergang wäre
+ * hier irreführend, weil er einen Monatswechsel andeutet, der nicht stattfand.
+ */
+export function refreshMonthColorMode() {
+  if (typeof document === 'undefined') return null;
+  const root = document.documentElement;
+  const mode = root.dataset.monthColors || 'spectrum';
+  const month = Number(root.dataset.month) || new Date().getMonth() + 1;
+
+  if (mode === 'neutral') {
+    activeThemeKey = null;
+    for (const name of Object.keys(paletteVariables(paletteForMonth(month, resolveThemeYear())))) {
+      root.style.removeProperty(name);
+    }
+    return null;
+  }
+
+  if (mode === 'classic') {
+    // Der Director hat seine Zuständigkeit bereits abgegeben; der
+    // Zwischenspeicher muss zurückgesetzt werden, damit der nächste Aufruf die
+    // Palette tatsächlich schreibt statt sie als unverändert zu überspringen.
+    activeThemeKey = null;
+    return applyMonthTheme(month, { animate: false });
+  }
+  return null;
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('appsettingschange', () => refreshMonthColorMode());
+}
