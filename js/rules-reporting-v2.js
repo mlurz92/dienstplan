@@ -2,8 +2,8 @@ import {
   buildStats,
   collectIssues as collectIssuesBase,
   roleLabelForMonth
-} from './rules-reporting.js?v=20260803.2';
-import { evaluateCandidate } from './rules-evaluation-v2.js?v=20260803.2';
+} from './rules-reporting.js?v=20260803.3';
+import { evaluateCandidate } from './rules-evaluation-v2.js?v=20260803.3';
 
 export { buildStats, roleLabelForMonth };
 

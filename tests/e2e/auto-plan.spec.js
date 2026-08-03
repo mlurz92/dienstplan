@@ -70,6 +70,9 @@ async function openJuly(page) {
 async function openStudio(page) {
   await page.locator('#autoPlanBtn').click();
   await expect(page.locator('#autoPlanDialog')).toBeVisible();
+  await expect(page.locator('#autoPlanDialog')).toHaveAttribute('data-algorithm-revision', '7');
+  await expect(page.locator('#autoPlanV7Ribbon')).toContainText('Adaptive Constraint Portfolio');
+  await expect(page.locator('#autoPlanPerformanceProfile')).toHaveValue('adaptive');
   await expect(page.locator('#autoPlanConfig')).toBeVisible();
   await expect(page.locator('#autoPlanStage')).toBeHidden();
   await expect(page.locator('#autoPlanStartBtn')).toBeEnabled();

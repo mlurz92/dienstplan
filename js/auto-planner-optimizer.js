@@ -57,8 +57,8 @@ import {
   planRespectsLimits,
   planningContextFor,
   syncPeerCache as syncPlanPeerCache
-} from './auto-planner-engine.js?v=20260803.2';
-import { createPacer, createTicker, now } from './cooperative-scheduling.js?v=20260803.2';
+} from './auto-planner-engine.js?v=20260803.3';
+import { createPacer, createTicker, now } from './cooperative-scheduling.js?v=20260803.3';
 import {
   basicallyEligiblePeers,
   countRoleInMonth,
@@ -68,7 +68,7 @@ import {
   setAssignment,
   setPeerGroupCacheToken,
   toLocalIso
-} from './rules.js?v=20260803.2';
+} from './rules.js?v=20260803.3';
 
 const ROLE_ORDER = Object.freeze(['bd', 'hg']);
 const LEVEL_RANK = Object.freeze({ green: 0, yellow: 1, orange: 2, red: 3, gray: 4 });
@@ -904,7 +904,8 @@ export function emptyOptimizerStats() {
     certificationRounds: 0,
     elapsedMs: 0,
     byNeighbourhood: {},
-    byOperator: {}
+    byOperator: {},
+    operatorLearning: {}
   };
 }
 
@@ -985,9 +986,7 @@ async function runPerfection({ optimizer, timeBudgetMs, mode, lateAcceptanceSize
 
   let best = { monthData: optimizer.snapshot(), objective: current };
   const late = new LateAcceptance(lateAcceptanceSize, current.key);
-  const weights = new Map(DESTROY_OPERATORS.map(operator => [operator, 1]));
-  const scores = new Map(DESTROY_OPERATORS.map(operator => [operator, 0]));
-  const uses = new Map(DESTROY_OPERATORS.map(operator => [operator, 0]));
+  const learning = new Map(DESTROY_OPERATORS.map(operator => [operator, { uses: 0, reward: 0, costMs: 0 }]));
 
   const report = async (phase, message, extra = {}) => {
     if (typeof onProgress !== 'function') return;
@@ -1044,8 +1043,8 @@ async function runPerfection({ optimizer, timeBudgetMs, mode, lateAcceptanceSize
     abortIfRequested(signal);
     stats.rounds += 1;
 
-    const operator = rouletteOperator(optimizer.random, weights);
-    uses.set(operator, uses.get(operator) + 1);
+    const operator = selectAdaptiveOperator(optimizer.random, DESTROY_OPERATORS, learning);
+    const roundStartedAt = now();
     // Wie viele Runden passen bei der bisher gemessenen Rundendauer noch in die
     // Suchphase? Daraus leitet sich ab, wie groß ein Ausschnitt sein darf.
     const affordableRounds = stats.rounds > 4
@@ -1101,7 +1100,10 @@ async function runPerfection({ optimizer, timeBudgetMs, mode, lateAcceptanceSize
     }
 
     stats.byOperator[operator] = (stats.byOperator[operator] || 0) + 1;
-    scores.set(operator, scores.get(operator) + [0, 3, 9, 33][outcome]);
+    const operatorStats = learning.get(operator);
+    operatorStats.uses += 1;
+    operatorStats.reward += [0, 3, 9, 33][outcome];
+    operatorStats.costMs += Math.max(.05, now() - roundStartedAt);
     late.record(current.key);
     sinceImprovement += 1;
 
@@ -1122,7 +1124,6 @@ async function runPerfection({ optimizer, timeBudgetMs, mode, lateAcceptanceSize
       }
     }
 
-    if (stats.rounds % 50 === 0) adaptWeights(weights, scores, uses);
     // Jede Runde gibt zeitgesteuert ab und meldet in festem Takt, damit
     // Fortschrittsbalken und Animation dem Lauf durchgehend folgen können.
     await pace();
@@ -1200,39 +1201,41 @@ async function runPerfection({ optimizer, timeBudgetMs, mode, lateAcceptanceSize
   stats.evaluations = optimizer.evaluations;
   stats.candidateChecks = optimizer.candidateChecks;
   stats.elapsedMs = Math.round(now() - startedAt);
+  stats.operatorLearning = Object.fromEntries([...learning].map(([operator, value]) => [operator, {
+    uses: value.uses,
+    reward: value.reward,
+    costMs: Number(value.costMs.toFixed(2)),
+    rewardPerSecond: value.costMs > 0 ? Number((value.reward / value.costMs * 1000).toFixed(3)) : 0
+  }]));
 
   return { monthData: best.monthData, objective: best.objective, stats, skipped: false };
 }
 
 /**
- * Adaptive Operatorwahl.
+ * Cost-aware UCB operator selection.
  *
- * Die Gewichte folgen dem üblichen Schema: Erfolg in einem Abschnitt erhöht die
- * Auswahlwahrscheinlichkeit, der bisherige Wert bleibt zu einem festen Anteil
- * erhalten. So setzt sich durch, was in diesem Monat tatsächlich trägt, ohne
- * dass ein Operator ganz verschwindet.
+ * Every destroy operator is tried before exploitation begins. Afterwards the
+ * score combines observed quality gain per compute time with an exploration
+ * bonus. The search therefore learns the current month online without training
+ * data, while expensive operators must justify their cost.
  */
-function adaptWeights(weights, scores, uses) {
-  const decay = .8;
-  for (const operator of weights.keys()) {
-    const used = uses.get(operator) || 0;
-    if (!used) continue;
-    const reward = (scores.get(operator) || 0) / used;
-    weights.set(operator, Math.max(.05, weights.get(operator) * decay + (1 - decay) * reward));
-    scores.set(operator, 0);
-    uses.set(operator, 0);
+export function selectAdaptiveOperator(random, operators, learning) {
+  const untried = operators.filter(operator => !(learning.get(operator)?.uses > 0));
+  if (untried.length) return untried[Math.min(untried.length - 1, Math.floor(random() * untried.length))];
+  const totalUses = operators.reduce((sum, operator) => sum + Number(learning.get(operator)?.uses || 0), 0);
+  let best = operators[0];
+  let bestScore = -Infinity;
+  for (const operator of operators) {
+    const stats = learning.get(operator) || { uses: 0, reward: 0, costMs: 0 };
+    const efficiency = Number(stats.reward || 0) / Math.max(.05, Number(stats.costMs || 0)) * 100;
+    const exploration = Math.sqrt(2 * Math.log(Math.max(2, totalUses)) / Math.max(1, Number(stats.uses || 0)));
+    const score = efficiency + exploration;
+    if (score > bestScore) {
+      best = operator;
+      bestScore = score;
+    }
   }
-}
-
-function rouletteOperator(random, weights) {
-  const entries = [...weights.entries()];
-  const total = entries.reduce((sum, [, weight]) => sum + weight, 0);
-  let ticket = random() * total;
-  for (const [operator, weight] of entries) {
-    ticket -= weight;
-    if (ticket <= 0) return operator;
-  }
-  return entries[entries.length - 1][0];
+  return best;
 }
 
 /**

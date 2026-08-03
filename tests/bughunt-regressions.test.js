@@ -208,7 +208,7 @@ test('Serverexport gewinnt gegen sauberen lokalen Cache, Dirty-Daten behalten Vo
   server.days['2026-07-01'].bd = 'becker';
   const serverPayload = { settings: { schemaVersion: 7 }, staff: DEFAULT_STAFF, rbnNames: ['Server'], months: [['2026-07', server]] };
   const cleanBackup = module.buildBackupPayload(serverPayload);
-  assert.equal(cleanBackup.settings.schemaVersion, 7);
+  assert.equal(cleanBackup.settings.schemaVersion, 3, 'Serverbestand wird auf das aktuelle Settings-Schema migriert');
   assert.deepEqual(cleanBackup.rbnNames, ['Server']);
   assert.equal(new Map(cleanBackup.months).get('2026-07').days['2026-07-01'].bd, 'becker');
   module.state.settings = { schemaVersion: 9 };

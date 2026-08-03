@@ -46,7 +46,7 @@ test('PDF-Export lässt den Monatskontrast unverändert und kräftig', async ({ 
   // steht auch noch vom vorherigen Monat, bevor der neue Verlauf überhaupt
   // beginnt. Verlässlich ist erst die Zielfarbe selbst.
   const target = await page.evaluate(async () => {
-    const module = await import('/js/color-director.js?v=20260803.2');
+    const module = await import('/js/color-director.js?v=20260803.3');
     const [r, g, b] = module.colorProfileForDate(2026, 7).accent.slice(0, 3).map(value => Math.round(value));
     return `rgb(${r}, ${g}, ${b})`;
   });
@@ -85,7 +85,7 @@ test('Druck während des Farbverlaufs friert die Zielfarbe ein, nicht einen Zwis
   await expect(page.locator('html')).toHaveAttribute('data-spectrum-motion', 'settled');
 
   const target = await page.evaluate(async () => {
-    const module = await import('/js/color-director.js?v=20260803.2');
+    const module = await import('/js/color-director.js?v=20260803.3');
     const palette = module.colorProfileForDate(2026, 1);
     const [r, g, b] = palette.accent.slice(0, 3).map(value => Math.round(value));
     return { accent: `rgb(${r}, ${g}, ${b})`, name: palette.name };

@@ -65,7 +65,7 @@ test('die Werkzeugleiste überlagert sich bei keiner Fensterbreite', async ({ pa
   await expect(page.locator('.toolbar.toolbar-organized')).toBeVisible();
 
   const densities = new Set();
-  for (let width = 1500; width >= 340; width -= 40) {
+  for (let width = 1700; width >= 340; width -= 40) {
     await page.setViewportSize({ width, height: 900 });
     const report = await expect.poll(async () => {
       const state = await inspectToolbar(page);
@@ -93,7 +93,7 @@ test('die Dichte folgt dem Platz und nicht festen Schwellen', async ({ page }) =
   };
 
   const order = ['full', 'groups', 'secondary', 'icons', 'overflow'];
-  const wide = await densityAt(1500);
+  const wide = await densityAt(1700);
   const medium = await densityAt(1200);
   const narrow = await densityAt(900);
   const tiny = await densityAt(360);
@@ -104,8 +104,8 @@ test('die Dichte folgt dem Platz und nicht festen Schwellen', async ({ page }) =
   expect(tiny).toBe('overflow');
 
   // Zurück in die Breite: Die Leiste muss ihre volle Stufe wiederfinden.
-  expect(await densityAt(1500)).toBe('full');
-  await expect(page.locator('.toolbar-section')).toHaveCount(3);
+  expect(await densityAt(1700)).toBe('full');
+  await expect(page.locator('.toolbar-section')).toHaveCount(4);
 });
 
 test('das Überlaufmenü zeigt die ausgelagerten Aktionen vollständig beschriftet', async ({ page }) => {
@@ -123,9 +123,10 @@ test('das Überlaufmenü zeigt die ausgelagerten Aktionen vollständig beschrift
   await trigger.click();
   await expect(panel).toBeVisible();
   await expect(trigger).toHaveAttribute('aria-expanded', 'true');
-  await expect(panel.locator('.tool-action')).toHaveCount(6);
+  await expect(panel.locator('.tool-action')).toHaveCount(7);
   await expect(panel).toContainText('Neu laden');
   await expect(panel).toContainText('PDF');
+  await expect(panel).toContainText('Einstellungen');
 
   // Das Menü liegt über der Monatskarte und wird von der Leiste nicht beschnitten.
   const covering = await page.evaluate(() => {
@@ -140,8 +141,8 @@ test('das Überlaufmenü zeigt die ausgelagerten Aktionen vollständig beschrift
   await expect(trigger).toHaveAttribute('aria-expanded', 'false');
 
   // Wird es wieder breit, kehren die Gruppen in die Leiste zurück.
-  await page.setViewportSize({ width: 1500, height: 900 });
+  await page.setViewportSize({ width: 1700, height: 900 });
   await expect.poll(async () => (await inspectToolbar(page)).density).toBe('full');
-  await expect(page.locator('.toolbar .toolbar-section')).toHaveCount(3);
+  await expect(page.locator('.toolbar .toolbar-section')).toHaveCount(4);
   await expect(page.locator('#exportPdfBtn')).toBeVisible();
 });

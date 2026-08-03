@@ -66,7 +66,8 @@ function phaseColor(accent, phase) {
 
 const TAU = Math.PI * 2;
 const prefersReducedMotion = () => typeof matchMedia === 'function'
-  && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  && (document?.documentElement?.dataset?.motion === 'reduced'
+    || matchMedia('(prefers-reduced-motion: reduce)').matches);
 
 export class AutoPlanVisualizer {
   constructor(canvas, monthData) {

@@ -1,6 +1,6 @@
-import './month-view-transition.js?v=20260803.2';
-import './color-director.js?v=20260803.2';
-import './month-transition-stability.js?v=20260803.2';
+import './month-view-transition.js?v=20260803.3';
+import './color-director.js?v=20260803.3';
+import './month-transition-stability.js?v=20260803.3';
 
 const ICONS = Object.freeze({
   calendar: '<svg viewBox="0 0 24 24"><path d="M7 3v3M17 3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z"/><path d="m9 15 2 2 4-5"/></svg>',
@@ -12,7 +12,8 @@ const ICONS = Object.freeze({
   restore: '<svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="7" ry="3"/><path d="M5 5v6c0 1.7 3.1 3 7 3s7-1.3 7-3V5M5 11v6c0 1.7 3.1 3 7 3 1.2 0 2.3-.1 3.2-.4"/><path d="M18 20v-6M15.5 16.5 18 14l2.5 2.5"/></svg>',
   spreadsheet: '<svg viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6Z"/><path d="M14 3v5h5M8.5 11h7M8.5 15h7M12 11v7"/></svg>',
   print: '<svg viewBox="0 0 24 24"><path d="M7 8V3h10v5M7 17H5a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M7 14h10v7H7ZM17 11h.01"/></svg>',
-  backup: '<svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="7" ry="3"/><path d="M5 5v6c0 1.7 3.1 3 7 3s7-1.3 7-3V5M5 11v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/><path d="M12 9v7M9.5 13.5 12 16l2.5-2.5"/></svg>'
+  backup: '<svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="7" ry="3"/><path d="M5 5v6c0 1.7 3.1 3 7 3s7-1.3 7-3V5M5 11v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/><path d="M12 9v7M9.5 13.5 12 16l2.5-2.5"/></svg>',
+  settings: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3V2.8h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"/></svg>'
 });
 
 export const TOOLBAR_GROUPS = Object.freeze([
@@ -42,6 +43,13 @@ export const TOOLBAR_GROUPS = Object.freeze([
       Object.freeze({ id: 'exportExcelBtn', label: 'Monatsplan als Excel exportieren', shortLabel: 'Excel', icon: 'spreadsheet' }),
       Object.freeze({ id: 'exportPdfBtn', label: 'Monatsplan als PDF drucken', shortLabel: 'PDF', icon: 'print' }),
       Object.freeze({ id: 'exportJsonBtn', label: 'Vollständige JSON-Sicherung erstellen', shortLabel: 'JSON sichern', icon: 'backup' })
+    ])
+  }),
+  Object.freeze({
+    key: 'application',
+    label: 'App',
+    items: Object.freeze([
+      Object.freeze({ id: 'settingsBtn', label: 'Anwendungseinstellungen öffnen', shortLabel: 'Einstellungen', icon: 'settings', tone: 'quiet' })
     ])
   })
 ]);
@@ -122,7 +130,7 @@ function decorateAction(element, item) {
  */
 export const TOOLBAR_DENSITY_STEPS = Object.freeze(['full', 'groups', 'secondary', 'icons', 'overflow']);
 
-const OVERFLOW_SECTIONS = Object.freeze(['data', 'output']);
+const OVERFLOW_SECTIONS = Object.freeze(['data', 'output', 'application']);
 
 function overflowButtonMarkup() {
   return '<svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">'

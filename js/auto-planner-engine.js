@@ -10,9 +10,9 @@ import {
   parseIso,
   setAssignment,
   setPeerGroupCacheToken
-} from './rules.js?v=20260803.2';
-import { createPacer, yieldToBrowser } from './cooperative-scheduling.js?v=20260803.2';
-import { AUTO_PLAN_BD_LIMITS } from './defaults.js?v=20260803.2';
+} from './rules.js?v=20260803.3';
+import { createPacer, yieldToBrowser } from './cooperative-scheduling.js?v=20260803.3';
+import { AUTO_PLAN_BD_LIMITS } from './defaults.js?v=20260803.3';
 
 const LEVEL_RANK = Object.freeze({ green: 0, yellow: 1, orange: 2, red: 3, gray: 4 });
 const ROLE_ORDER = Object.freeze(['bd', 'hg']);
@@ -21,6 +21,7 @@ const FOCUS_VALUES = new Set(['balanced', 'wishes', 'workload', 'weekends']);
 const INTENSITY_VALUES = new Set(['standard', 'deep', 'maximum']);
 const EPSILON = 1e-9;
 const MAX_EXACT_REMAINING = 7;
+const assignmentLedgers = new WeakMap();
 /**
  * Suchstrahlbreiten der Konstruktionsphase.
  *
@@ -113,6 +114,32 @@ function simulatedState(state, monthData) {
 
 function monthDates(monthData) {
   return Object.keys(monthData?.days || {}).sort();
+}
+
+function buildAssignmentLedger(monthData) {
+  const bd = Object.create(null);
+  const hg = Object.create(null);
+  for (const day of Object.values(monthData?.days || {})) {
+    if (day?.bd) bd[day.bd] = (bd[day.bd] || 0) + 1;
+    if (day?.hg) hg[day.hg] = (hg[day.hg] || 0) + 1;
+  }
+  return { bd, hg };
+}
+
+function cloneLedger(ledger) {
+  return { bd: { ...ledger.bd }, hg: { ...ledger.hg } };
+}
+
+function ledgerFor(monthData, stats = null) {
+  let ledger = assignmentLedgers.get(monthData);
+  if (ledger) {
+    if (stats) stats.assignmentLedgerHits += 1;
+    return ledger;
+  }
+  ledger = buildAssignmentLedger(monthData);
+  assignmentLedgers.set(monthData, ledger);
+  if (stats) stats.assignmentLedgerMisses += 1;
+  return ledger;
 }
 
 function openSlots(monthData) {
@@ -374,21 +401,21 @@ function planningContext(state, baseline) {
   return cached;
 }
 
-function respectsLimits(monthData, staffId, role, config) {
+function respectsLimits(monthData, staffId, role, config, ledger = null) {
   const limits = config.staffLimits?.[staffId];
   if (!limits) return true;
-  const bd = countRoleInMonth(monthData, staffId, 'bd') + Number(role === 'bd');
-  const hg = countRoleInMonth(monthData, staffId, 'hg') + Number(role === 'hg');
+  const bd = (ledger ? Number(ledger.bd[staffId] || 0) : countRoleInMonth(monthData, staffId, 'bd')) + Number(role === 'bd');
+  const hg = (ledger ? Number(ledger.hg[staffId] || 0) : countRoleInMonth(monthData, staffId, 'hg')) + Number(role === 'hg');
   return (limits.maxBd === null || bd <= limits.maxBd)
     && (limits.maxHg === null || hg <= limits.maxHg)
     && (limits.maxTotal === null || bd + hg <= limits.maxTotal);
 }
 
-function limitsAudit(monthData, config) {
+function limitsAudit(monthData, config, ledger = null) {
   const violations = [];
   for (const [staffId, limits] of Object.entries(config.staffLimits || {})) {
-    const bd = countRoleInMonth(monthData, staffId, 'bd');
-    const hg = countRoleInMonth(monthData, staffId, 'hg');
+    const bd = ledger ? Number(ledger.bd[staffId] || 0) : countRoleInMonth(monthData, staffId, 'bd');
+    const hg = ledger ? Number(ledger.hg[staffId] || 0) : countRoleInMonth(monthData, staffId, 'hg');
     if (limits.maxBd !== null && bd > limits.maxBd) violations.push(`${staffId}: ${bd} BD > ${limits.maxBd}`);
     if (limits.maxHg !== null && hg > limits.maxHg) violations.push(`${staffId}: ${hg} HG > ${limits.maxHg}`);
     if (limits.maxTotal !== null && bd + hg > limits.maxTotal) violations.push(`${staffId}: ${bd + hg} Dienste > ${limits.maxTotal}`);
@@ -428,7 +455,7 @@ function createCandidateResolver(state, mode, strategy, config, stats) {
       stats.candidateEvaluations += 1;
       if (candidate.evaluation?.canSelect === false || candidate.evaluation?.level === 'gray') return false;
       if (mode === SEARCH_MODE.STRICT && candidate.evaluation?.level === 'red') return false;
-      if (!respectsLimits(monthData, candidate.person.id, role, config)) {
+      if (!respectsLimits(monthData, candidate.person.id, role, config, ledgerFor(monthData, stats))) {
         stats.limitRejects += 1;
         return false;
       }
@@ -478,18 +505,20 @@ function variance(values) {
   return values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / values.length;
 }
 
-function fairnessSnapshot(state, monthData, context) {
+function fairnessSnapshot(state, monthData, context, ledger = null) {
   const staff = context?.staff || monthPlanningStaff(state, monthData);
   const specialists = context?.specialists
     || staff.filter(person => monthDates(monthData).some(dateIso => getRoleProperties(person, dateIso).canHg));
   const bdPenalty = staff.reduce((sum, person) => {
-    const deviation = countRoleInMonth(monthData, person.id, 'bd') - Number(person.bdTarget || 0);
+    const deviation = (ledger ? Number(ledger.bd[person.id] || 0) : countRoleInMonth(monthData, person.id, 'bd')) - Number(person.bdTarget || 0);
     return sum + (deviation < 0 ? deviation ** 2 : 1.3 * deviation ** 2);
   }, 0);
   const sandbox = simulatedState(state, monthData);
   return {
     bdPenalty,
-    combinedVariance: variance(specialists.map(person => countRoleInMonth(monthData, person.id, 'bd') + countRoleInMonth(monthData, person.id, 'hg'))),
+    combinedVariance: variance(specialists.map(person => ledger
+      ? Number(ledger.bd[person.id] || 0) + Number(ledger.hg[person.id] || 0)
+      : countRoleInMonth(monthData, person.id, 'bd') + countRoleInMonth(monthData, person.id, 'hg'))),
     aaHgVariance: variance(specialists.map(person => countHgForAaBdExcept(sandbox, monthData, person.id, ''))),
     weekendVariance: variance(staff.map(person => computeWeekendEquivalent(monthData, person.id)))
   };
@@ -593,9 +622,9 @@ function traceAudit(node) {
 function partialObjective(state, node, baseline, config, flexibility = null) {
   const context = planningContext(state, baseline);
   const audit = traceAudit(node);
-  const fairness = fairnessSnapshot(state, node.monthData, context);
+  const fairness = fairnessSnapshot(state, node.monthData, context, node.ledger);
   const wishes = wishSnapshot(state, node.monthData, baseline);
-  const limitViolations = limitsAudit(node.monthData, config).length;
+  const limitViolations = limitsAudit(node.monthData, config, node.ledger).length;
   const redLimitExceeded = config.maxRedViolations !== null && audit.red > config.maxRedViolations;
   return {
     audit, fairness, wishes, limitViolations, redLimitExceeded,
@@ -616,15 +645,19 @@ function partialObjective(state, node, baseline, config, flexibility = null) {
   };
 }
 
-function emptyNode(monthData) {
-  return { monthData, trace: [], depth: 0 };
+function emptyNode(monthData, stats = null) {
+  return { monthData, ledger: ledgerFor(monthData, stats), trace: [], depth: 0 };
 }
 
 function assignNode(node, slot, candidate) {
   const monthData = clone(node.monthData);
   setAssignment(monthData, slot.dateIso, slot.role, candidate.person.id);
+  const ledger = cloneLedger(node.ledger || ledgerFor(node.monthData));
+  ledger[slot.role][candidate.person.id] = (ledger[slot.role][candidate.person.id] || 0) + 1;
+  assignmentLedgers.set(monthData, ledger);
   return {
     monthData,
+    ledger,
     trace: [...node.trace, {
       ...slot,
       staffId: candidate.person.id,
@@ -791,15 +824,14 @@ function exactComplete({ state, seeds, baseline, config, mode, candidatesFor, bu
 }
 
 async function runPass({ state, baseline, config, mode, strategy, width, branch, exactBudget, lookahead, label, progressStart, progressSpan, passIndex, onProgress, signal }) {
-  const stats = { id: `${mode}-${strategy}-${passIndex}`, mode, strategy, beamWidth: width, branchLimit: branch, exploredNodes: 0, generatedNodes: 0, candidateEvaluations: 0, limitRejects: 0, deadEnds: 0, exactNodes: 0, forwardChecks: 0, forwardChecksAtSlot: 0, maxBeam: 1, complete: false };
+  const stats = { id: `${mode}-${strategy}-${passIndex}`, mode, strategy, beamWidth: width, branchLimit: branch, exploredNodes: 0, generatedNodes: 0, candidateEvaluations: 0, limitRejects: 0, deadEnds: 0, exactNodes: 0, forwardChecks: 0, forwardChecksAtSlot: 0, maxBeam: 1, assignmentLedgerHits: 0, assignmentLedgerMisses: 0, complete: false };
   const candidatesFor = createCandidateResolver(state, mode, strategy, config, stats);
-  let beam = [emptyNode(clone(baseline))];
+  let beam = [emptyNode(clone(baseline), stats)];
   const allSlots = openSlots(baseline);
   let processed = 0;
 
-  for (const role of ROLE_ORDER) {
-    let remaining = allSlots.filter(slot => slot.role === role);
-    while (remaining.length && beam.length) {
+  let remaining = [...allSlots];
+  while (remaining.length && beam.length) {
       abortIfRequested(signal);
       const selected = selectNextSlot(beam[0], remaining, candidatesFor);
       if (!selected?.domain) {
@@ -809,7 +841,7 @@ async function runPass({ state, baseline, config, mode, strategy, width, branch,
       }
       const slot = selected.slot;
       const roleRemaining = remaining.filter(item => item.dateIso !== slot.dateIso || item.role !== slot.role);
-      const future = [...roleRemaining, ...allSlots.filter(item => ROLE_ORDER.indexOf(item.role) > ROLE_ORDER.indexOf(role))]
+      const future = [...roleRemaining]
         .sort((left, right) => slotCriticality(left) - slotCriticality(right) || left.dateIso.localeCompare(right.dateIso));
       const expanded = [];
       let candidateCount = 0;
@@ -826,13 +858,12 @@ async function runPass({ state, baseline, config, mode, strategy, width, branch,
       remaining = roleRemaining;
       processed += 1;
       await report(onProgress, {
-        phase: 'search', subphase: role, progress: progressStart + processed / Math.max(1, allSlots.length) * progressSpan,
-        message: `${label} · ${role.toUpperCase()} ${slot.dateIso}: ${candidateCount} Kandidaten · ${beam.length} Varianten`,
-        dateIso: slot.dateIso, role, processed, total: allSlots.length, candidateCount, beamSize: beam.length,
+        phase: 'search', subphase: slot.role, progress: progressStart + processed / Math.max(1, allSlots.length) * progressSpan,
+        message: `${label} · ${slot.role.toUpperCase()} ${slot.dateIso}: ${candidateCount} Kandidaten · ${beam.length} Varianten`,
+        dateIso: slot.dateIso, role: slot.role, processed, total: allSlots.length, candidateCount, beamSize: beam.length,
         exploredNodes: stats.exploredNodes, generatedNodes: stats.generatedNodes, deadEnds: stats.deadEnds, limitRejects: stats.limitRejects, passIndex
       });
       await yieldToBrowser();
-    }
   }
 
   let best = selectBest(state, beam.length ? beam : [emptyNode(clone(baseline))], baseline, config);
@@ -994,7 +1025,7 @@ export async function buildAutoPlan({ state, monthData, year = monthData?.year, 
   }
 
   const aggregate = attempts.reduce((sum, item) => {
-    for (const key of ['exploredNodes', 'generatedNodes', 'candidateEvaluations', 'limitRejects', 'deadEnds', 'exactNodes']) sum[key] += Number(item[key] || 0);
+    for (const key of ['exploredNodes', 'generatedNodes', 'candidateEvaluations', 'limitRejects', 'deadEnds', 'exactNodes', 'assignmentLedgerHits', 'assignmentLedgerMisses']) sum[key] += Number(item[key] || 0);
     sum.maxBeam = Math.max(sum.maxBeam, Number(item.maxBeam || 0));
     return sum;
   }, emptyStats());
@@ -1007,7 +1038,7 @@ export async function buildAutoPlan({ state, monthData, year = monthData?.year, 
 }
 
 function emptyStats() {
-  return { exploredNodes: 0, generatedNodes: 0, candidateEvaluations: 0, limitRejects: 0, deadEnds: 0, exactNodes: 0, maxBeam: 0, improvements: 0, swapChecks: 0 };
+  return { exploredNodes: 0, generatedNodes: 0, candidateEvaluations: 0, limitRejects: 0, deadEnds: 0, exactNodes: 0, assignmentLedgerHits: 0, assignmentLedgerMisses: 0, maxBeam: 0, improvements: 0, swapChecks: 0 };
 }
 
 function makeResult({ state, baseline, best, config, fixed, slots, attempts, startedAt, searchProfile, aggregate }) {

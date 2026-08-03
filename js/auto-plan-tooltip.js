@@ -60,6 +60,7 @@ export function installAutoPlanTooltips(dialog) {
   };
 
   const show = trigger => {
+    if (document.documentElement.dataset.richTooltips === 'false') return;
     if (!trigger?.dataset?.autoTooltip) return;
     clearTimeout(hideTimer);
     active = trigger;
