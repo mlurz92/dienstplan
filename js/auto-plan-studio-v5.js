@@ -658,24 +658,34 @@ function rowReview(result, audits, dateIso) {
   </div>`;
 }
 
+const LONG_WEEKDAYS = Object.freeze({
+  Mo: 'Montag', Di: 'Dienstag', Mi: 'Mittwoch', Do: 'Donnerstag',
+  Fr: 'Freitag', Sa: 'Samstag', So: 'Sonntag'
+});
+
 /**
- * Der Vorschlag in der Form der Diensttabelle: eine Zeile je Kalendertag mit BD
- * und HG nebeneinander, Wochenenden und Feiertage farblich abgesetzt.
+ * Der Vorschlag in der Form der Diensttabelle.
+ *
+ * Übernommen sind bewusst auch die Kleinigkeiten, an denen die Ansicht sonst
+ * fremd wirkt: die Tagesnummer ohne führende Null, der ausgeschriebene
+ * Wochentag und dieselbe Unterscheidung von Samstag, Sonntag und Feiertag.
+ * Die Spalten RBN und 2. RBN fehlen, weil der Auto-Plan sie nicht plant; an
+ * ihre Stelle tritt die Prüfspalte.
  */
 function renderProposalTable(result) {
   const audits = auditMap(result);
   byId('autoPlanProposalBody').innerHTML = Object.keys(result.plannedMonth.days || {}).sort().map(dateIso => {
     const holiday = holidayName(dateIso);
-    const weekday = parseIso(dateIso).getDay();
+    const short = weekdayLabel(dateIso);
     const level = rowLevel(audits, dateIso);
     const flags = [
-      weekday === 6 || weekday === 0 ? 'is-weekend' : '',
-      weekday === 5 ? 'is-friday' : '',
-      holiday ? 'is-holiday' : ''
+      short === 'Sa' ? 'saturday-row' : '',
+      short === 'So' ? 'sunday-row' : '',
+      holiday ? 'holiday-row' : ''
     ].filter(Boolean).join(' ');
-    return `<tr id="auto-plan-row-${dateIso}" data-level="${esc(level)}" class="${flags}">
-      <th scope="row" class="auto-plan-day-number"><strong>${dateIso.slice(-2)}</strong>${holiday ? `<small>${esc(holiday)}</small>` : ''}</th>
-      <td class="auto-plan-weekday"><span>${esc(weekdayLabel(dateIso))}</span><small>${esc(fmtGermanDate(dateIso))}</small></td>
+    return `<tr id="auto-plan-row-${dateIso}" data-level="${esc(level)}" class="${flags}"${holiday ? ` title="${esc(holiday)}"` : ''}>
+      <th scope="row" class="auto-plan-day-number"><strong>${Number(dateIso.slice(-2))}</strong></th>
+      <td class="auto-plan-weekday"><span>${esc(LONG_WEEKDAYS[short] || short)}</span>${holiday ? `<small class="auto-plan-holiday-name">${esc(holiday)}</small>` : `<small>${esc(fmtGermanDate(dateIso))}</small>`}</td>
       <td>${roleCell(result, audits, dateIso, 'bd')}</td>
       <td>${roleCell(result, audits, dateIso, 'hg')}</td>
       <td>${rowReview(result, audits, dateIso)}</td>
