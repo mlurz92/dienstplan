@@ -4,7 +4,7 @@ import { api } from './api.js?v=20260801.11';
 import { applyMonthTheme, prefersReducedMotion, resolveThemeYear } from './theme.js?v=20260801.11';
 import { applySpectrumProfile } from './color-director.js?v=20260801.11';
 import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260801.11';
-import { assignmentLabel, buildStats, clearedMonthData, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getEffectiveAbsence, getPlanningStaff, getOptions, getPreference, getStaffById, isExternalAssignment, labelForAbsence, labelForOption, labelForPreference, monthContentSummary, setAbsence, setAssignment, setOptions, setPreference, toggleOption, weekdayLabel } from './rules.js?v=20260801.11';
+import { assignmentLabel, buildStats, clearedMonthData, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getEffectiveAbsence, getPlanningStaff, getOptions, getRoleProperties, getPreference, getStaffById, isExternalAssignment, labelForAbsence, labelForOption, labelForPreference, monthContentSummary, setAbsence, setAssignment, setOptions, setPreference, toggleOption, weekdayLabel } from './rules.js?v=20260801.11';
 import { getRbnOptions, isRbnValueAllowed, isSecondRbnAvailable, rbnDisplayName } from './rbn.js?v=20260801.11';
 import { additionalReasons, buildPickerModel, filterPickerModel, flattenPickerModel, loadSummary, nextSelectableIndex, primaryReason } from './picker-view.js?v=20260801.11';
 import { analyzeWorkbook } from './excel-import.js?v=20260801.11';
@@ -696,11 +696,23 @@ function optionId(staffId) {
   return `picker-option-${staffId}`;
 }
 
+/**
+ * Funktionsbezeichnung einer Person an einem bestimmten Tag.
+ *
+ * Der Stammwert bliebe nach einer Beförderung dauerhaft auf dem alten Stand
+ * stehen – Hr. El Houba stünde ab dem 22.09.2026 weiterhin als AA in Picker
+ * und Markierungsliste, obwohl er dort längst als Facharzt geführt wird.
+ */
+function roleLabelOn(person, dateIso) {
+  return (dateIso ? getRoleProperties(person, dateIso).roleLabel : person.roleLabel) || '';
+}
+
 function pickerCandidates(dateIso, role) {
   const monthData = getMonthData(state.currentYear, state.currentMonth);
   return getPlanningStaff(state.staff, dateIso).map(person => ({
     person,
     role,
+    dateIso,
     evaluation: evaluateCandidate({ state, monthData, dateIso, role, staffId: person.id })
   }));
 }
@@ -749,7 +761,7 @@ function pickerItemMarkup(candidate) {
   const assigned = candidate.isAssigned ? '<span class="picker-assigned" title="Aktuell eingeteilt">aktuell</span>' : '';
   return `<span class="picker-identity">
       <span class="picker-name">${esc(person.name)}</span>
-      ${person.roleLabel ? `<span class="picker-function">${esc(person.roleLabel)}</span>` : ''}
+      ${roleLabelOn(person, candidate.dateIso) ? `<span class="picker-function">${esc(roleLabelOn(person, candidate.dateIso))}</span>` : ''}
       ${assigned}
     </span>
     <span class="picker-load${load.exceeded ? ' is-exceeded' : ''}" title="${esc(load.title)}">
@@ -919,7 +931,7 @@ function openDayMetaDialog(dateIso) {
     row.className = 'day-meta-row';
     const absence = getAbsence(monthData, person.id, dateIso);
     const pref = getPreference(monthData, person.id, dateIso);
-    row.innerHTML = `<div class="row-title"><strong>${esc(person.name)}</strong><span class="small-chip">${esc(person.roleLabel || '')}</span></div>`;
+    row.innerHTML = `<div class="row-title"><strong>${esc(person.name)}</strong><span class="small-chip">${esc(roleLabelOn(person, dateIso))}</span></div>`;
     const absGroup = document.createElement('div');
     absGroup.className = 'meta-group';
     ABSENCE_TYPES.forEach(type => absGroup.appendChild(buildMetaChip({ kind:'absence', dateIso, staffId: person.id, typeId: type.id, active: absence === type.id, label: type.label })));

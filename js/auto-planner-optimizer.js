@@ -408,6 +408,9 @@ export async function descend({ optimizer, current, until, stats, signal, onStep
     guard += 1;
     for (const neighbourhood of NEIGHBOURHOODS) {
       if (now() >= until) break;
+      // Eine erfolglose Absuche kann viele Sekunden dauern. Ohne diese Meldung
+      // bliebe die Oberfläche solange stumm, obwohl durchgehend gerechnet wird.
+      await onStep?.({ kind: 'scan', neighbourhood });
       const result = await exploreNeighbourhood({ optimizer, neighbourhood, objective, stats, signal, onStep, until, moveCap, pace: gate });
       if (!result) continue;
       optimizer.commit(result.changes);
@@ -826,9 +829,13 @@ export async function certify({ optimizer, objective, stats, signal, onStep, rou
     let improvedThisRound = false;
     const assignments = orderedAssignments(optimizer, current);
 
+    // Der Nachweis läuft minutenlang ohne jedes Zwischenergebnis. Die
+    // Lebenszeichen unten sind gedrosselt und kosten nichts, machen die Phase
+    // aber sichtbar arbeitend statt hängend.
     for (const assignment of assignments) {
       if (now() >= until) return { objective: current, certified: false, rounds: round };
       await gate();
+      await onStep?.({ kind: 'scan', neighbourhood: 'Einzelumsetzungen', phase: 'certify' });
       const alternatives = optimizer.probe(
         [{ dateIso: assignment.dateIso, role: assignment.role, staffId: '' }],
         () => optimizer.candidates(assignment.dateIso, assignment.role)
@@ -873,6 +880,7 @@ export async function certify({ optimizer, objective, stats, signal, onStep, rou
         await onStep?.({ kind: 'improvement', neighbourhood: 'zertifizierung', changes, objective: current });
       }
       await gate();
+      await onStep?.({ kind: 'scan', neighbourhood: 'Paartausche', phase: 'certify' });
     }
 
     if (!improvedThisRound) return { objective: current, certified: true, rounds: round };
@@ -1002,7 +1010,19 @@ async function runPerfection({ optimizer, timeBudgetMs, mode, lateAcceptanceSize
     });
   };
 
+  // Absuchmeldungen sind Lebenszeichen, keine Erkenntnisse. Sie kommen
+  // gedrosselt; Verbesserungen dagegen immer sofort.
+  let lastScanReport = 0;
   const onStep = async step => {
+    if (step.kind === 'scan') {
+      if (now() - lastScanReport < 1500) return;
+      lastScanReport = now();
+      await report(step.phase || 'perfect', `Nachbarschaft wird abgesucht: ${step.neighbourhood}`, {
+        scanning: step.neighbourhood,
+        ...(step.phase === 'certify' ? { moves: stats.certificationMoves } : {})
+      });
+      return;
+    }
     if (step.kind !== 'improvement') return;
     await report('perfect', `${step.neighbourhood}: Verbesserung übernommen`, {
       neighbourhood: step.neighbourhood,

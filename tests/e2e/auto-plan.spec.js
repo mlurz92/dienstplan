@@ -97,7 +97,9 @@ test('Auto-Plan startet erst nach Parameterfreigabe und schreibt erst nach Ergeb
   await page.locator('#autoPlanStartBtn').click();
   await expect(page.locator('#autoPlanCanvas')).toBeVisible();
   await expect(page.locator('#autoPlanPhaseList .auto-plan-phase')).toHaveCount(6);
-  await expect(page.locator('#autoPlanGrid > span')).toHaveCount(62);
+  // Die Laufansicht erklärt in Klartext, was der Algorithmus gerade tut.
+  await expect(page.locator('#autoPlanLog .auto-plan-log-entry').first()).toBeVisible();
+  await expect(page.locator('#autoPlanLog')).toContainText('Lauf gestartet');
 
   await expect(page.locator('#autoPlanResult')).toBeVisible({ timeout: 120_000 });
   await expect(page.locator('#autoPlanResultTitle')).toHaveText('Regelkonformer Vorschlag bereit');

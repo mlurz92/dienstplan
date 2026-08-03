@@ -20,18 +20,49 @@
  * Systemeinstellung für reduzierte Bewegung.
  */
 
-const PHASE_COLORS = Object.freeze({
-  analysis: [111, 198, 255],
-  search: [133, 151, 255],
-  propagate: [102, 222, 206],
-  repair: [219, 139, 255],
-  polish: [255, 189, 104],
-  perfect: [255, 141, 209],
-  certify: [104, 231, 181],
-  audit: [104, 231, 181],
-  complete: [104, 231, 181],
-  blocked: [255, 116, 139]
+/**
+ * Farbwelt der Darstellung.
+ *
+ * Die Fläche ist hell und trägt die Monatsfarbe der Anwendung. Die Phasen
+ * verschieben den Akzent nur, statt die gesamte Darstellung umzufärben – auf
+ * einer weißen Karte in einer markengebundenen Anwendung wäre ein bunter
+ * Phasenwechsel unruhig. Die Monatsfarbe wird zur Laufzeit aus den CSS-Token
+ * gelesen; sie ändert sich mit dem angezeigten Monat.
+ */
+const PHASE_TINT = Object.freeze({
+  analysis: [0, 0, 0],
+  search: [-14, -6, 26],
+  propagate: [-26, 16, 6],
+  repair: [34, -18, 40],
+  polish: [46, 4, -34],
+  perfect: [58, -18, 24],
+  certify: [-42, 26, -22],
+  audit: [-42, 26, -22],
+  complete: [-42, 26, -22],
+  blocked: [78, -46, -34]
 });
+
+const DEFAULT_ACCENT = [79, 143, 189];
+
+function readAccent() {
+  if (typeof getComputedStyle !== 'function' || typeof document === 'undefined') return [...DEFAULT_ACCENT];
+  const raw = getComputedStyle(document.documentElement).getPropertyValue('--month-accent').trim();
+  const hex = raw.match(/^#([0-9a-f]{6})$/i);
+  if (hex) {
+    const value = parseInt(hex[1], 16);
+    return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
+  }
+  const rgb = raw.match(/(-?[\d.]+)[,\s]+(-?[\d.]+)[,\s]+(-?[\d.]+)/);
+  if (rgb) return [Number(rgb[1]), Number(rgb[2]), Number(rgb[3])];
+  return [...DEFAULT_ACCENT];
+}
+
+const clampChannel = value => Math.max(0, Math.min(255, value));
+
+function phaseColor(accent, phase) {
+  const tint = PHASE_TINT[phase] || PHASE_TINT.analysis;
+  return accent.map((channel, index) => clampChannel(channel + tint[index]));
+}
 
 const TAU = Math.PI * 2;
 const prefersReducedMotion = () => typeof matchMedia === 'function'
@@ -57,8 +88,9 @@ export class AutoPlanVisualizer {
     this.lastMoves = 0;
     this.lastActivityAt = 0;
 
-    this.color = [...PHASE_COLORS.analysis];
-    this.targetColor = [...PHASE_COLORS.analysis];
+    this.accent = readAccent();
+    this.color = phaseColor(this.accent, 'analysis');
+    this.targetColor = [...this.color];
 
     this.nodes = [];
     this.slotIndex = new Map();
@@ -134,9 +166,9 @@ export class AutoPlanVisualizer {
   update(update) {
     if (!this.active) return;
     this.progress = Math.max(this.progress, Math.min(1, Number(update.progress) || 0));
-    if (update.phase && PHASE_COLORS[update.phase]) {
+    if (update.phase && PHASE_TINT[update.phase]) {
       this.phase = update.phase;
-      this.targetColor = [...PHASE_COLORS[update.phase]];
+      this.targetColor = phaseColor(this.accent, update.phase);
     }
     this.explored = Math.max(this.explored, Number(update.exploredNodes ?? update.evaluations) || 0);
     this.deadEnds = Math.max(this.deadEnds, Number(update.deadEnds ?? update.rejected) || 0);
@@ -231,8 +263,8 @@ export class AutoPlanVisualizer {
 
   paintAtmosphere(context, centerX, centerY, size, seconds) {
     const glow = context.createRadialGradient(centerX, centerY, 0, centerX, centerY, size * 1.9);
-    glow.addColorStop(0, this.rgba(.20 + this.activity * .16));
-    glow.addColorStop(.5, this.rgba(.06 + this.activity * .05));
+    glow.addColorStop(0, this.rgba(.16 + this.activity * .14));
+    glow.addColorStop(.5, this.rgba(.05 + this.activity * .04));
     glow.addColorStop(1, 'rgba(0,0,0,0)');
     context.fillStyle = glow;
     context.beginPath();
@@ -265,7 +297,7 @@ export class AutoPlanVisualizer {
       context.save();
       context.translate(centerX, centerY);
       context.rotate(spin);
-      context.strokeStyle = this.rgba(.05 + ring * .016 + this.activity * .03);
+      context.strokeStyle = this.rgba(.09 + ring * .022 + this.activity * .04);
       context.lineWidth = ring === 3 ? 1.4 : .8;
       context.setLineDash(ring === 3 ? [6, 11] : ring === 1 ? [2, 7] : []);
       context.beginPath();
@@ -412,10 +444,10 @@ export class AutoPlanVisualizer {
     const visible = Math.round(this.displayProgress * this.nodes.length);
     this.nodes.forEach((node, index) => {
       const done = node.settled || index < visible;
-      const radius = done ? 2.1 + node.pulse * 4.6 : 1.2;
+      const radius = done ? 2.4 + node.pulse * 4.8 : 1.5;
       context.fillStyle = node.fixed
-        ? `rgba(176,196,224,${.4 + node.glow * .3})`
-        : done ? this.rgba(.6 + node.glow * .4) : 'rgba(154,176,207,.14)';
+        ? `rgba(122,136,152,${.42 + node.glow * .3})`
+        : done ? this.rgba(.72 + node.glow * .28) : 'rgba(150,163,178,.26)';
       context.beginPath();
       context.arc(node.x, node.y, radius, 0, TAU);
       context.fill();
