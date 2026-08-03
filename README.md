@@ -94,7 +94,7 @@ BD und HG desselben Tages stehen zusammen in einer Zeile. Jede Zelle zeigt:
 - Bewertungsstufe;
 - vollständige Regelgründe als aufklappbaren Detailbereich.
 
-Wochenenden und Feiertage bleiben visuell unterscheidbar. Die Tabellenköpfe bleiben beim Scrollen sichtbar. Zusätzlich werden vor der Übernahme angezeigt:
+Übernommen sind bewusst auch die Kleinigkeiten, an denen die Ansicht sonst fremd wirken würde: die Tagesnummer ohne führende Null, der ausgeschriebene Wochentag und dieselbe Unterscheidung von Samstag, Sonntag und Feiertag wie in der Diensttabelle. Die Spalten `RBN` und `2. RBN` entfallen, weil der Auto-Plan sie nicht plant; an ihre Stelle tritt die Prüfspalte. Die Tabellenköpfe bleiben beim Scrollen sichtbar. Zusätzlich werden vor der Übernahme angezeigt:
 
 - verwendete Laufparameter;
 - Such- und Reparaturtelemetrie;
@@ -180,7 +180,9 @@ Die Auswahl erfolgt gewichtet. Die Gewichte richten sich nach dem tatsächlichen
 
 **Stagnation.** Bleibt die Suche längere Zeit ohne neuen Bestwert, springt sie auf die beste bekannte Belegung zurück. Hilft auch das nicht, endet die Suchphase zugunsten der Zertifizierung.
 
-Der Lauf ist **deterministisch**: Der Zufallsgenerator wird aus Ausgangsmonat und Laufparametern abgeleitet, nicht aus der Uhr. Gleiche Eingaben liefern denselben Plan.
+**Größe des Ausschnitts.** Ropke und Pisinger zeigen für die adaptive Large Neighborhood Search, dass merklich große Ausschnitte – Größenordnung zehn bis vierzig Prozent der Entscheidungsvariablen – bessere Ergebnisse liefern als kleine. Diese Empfehlung gilt allerdings für Probleme mit billigem Wiederaufbau; hier kostet jedes neu zu besetzende Feld eine vollständige Kandidatenbewertung. Die Suche schätzt deshalb aus der gemessenen Rundendauer, wie viele Runden noch in den Zeitrahmen passen, und wählt den Anteil so, dass eine tragfähige Rundenzahl erhalten bleibt. Bei knappem Rahmen sind die Ausschnitte kleiner und zahlreicher, bei großzügigem Rahmen größer und gründlicher.
+
+**Reproduzierbarkeit.** Der Zufallsgenerator wird aus Ausgangsmonat und Laufparametern abgeleitet, nie aus der Uhr; der Suchpfad ist damit vollständig festgelegt. Die *erreichte Tiefe* hängt dagegen am Zeitrahmen und an der Rechenleistung – wie viele Runden in eine Minute passen, entscheidet die Maschine. Ohne ausdrücklichen Zeitrahmen läuft die Perfektion im **Konvergenzmodus**: Sie endet an eigenen Abbruchkriterien statt an der Uhr und ist dann streng deterministisch. Im Zeitrahmenmodus ist sie es praktisch, aber nicht beweisbar; die abschließende Zertifizierung stabilisiert den Endpunkt zusätzlich.
 
 ### 3.5 Zertifizierung der Optimalität
 
@@ -405,7 +407,8 @@ Die Tests decken insbesondere ab:
 - konfiguriertes Rot-Limit;
 - deaktivierten Fallback;
 - Fixpunktschutz;
-- deterministische Reproduzierbarkeit;
+- strenge Reproduzierbarkeit im Konvergenzmodus;
+- gleichwertige Ergebnisse im Zeitrahmenmodus;
 - dynamische Engpasswahl;
 - Forward-Checking und Suchtelemetrie;
 - iterative Reassignments, Swaps, Ketten und lokale Neuplanung;

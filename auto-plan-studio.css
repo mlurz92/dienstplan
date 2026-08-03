@@ -826,9 +826,10 @@
   vertical-align: top;
   text-align: left;
 }
-.auto-plan-proposal-table tbody tr.is-weekend { background: rgba(126, 158, 216, .07); }
-.auto-plan-proposal-table tbody tr.is-friday { background: rgba(126, 158, 216, .035); }
-.auto-plan-proposal-table tbody tr.is-holiday { background: rgba(226, 143, 92, .1); }
+/* Dieselbe Unterscheidung wie in der Diensttabelle: Samstag, Sonntag, Feiertag. */
+.auto-plan-proposal-table tbody tr.saturday-row { background: rgba(126, 158, 216, .06); }
+.auto-plan-proposal-table tbody tr.sunday-row { background: rgba(126, 158, 216, .1); }
+.auto-plan-proposal-table tbody tr.holiday-row { background: rgba(226, 143, 92, .1); }
 .auto-plan-proposal-table tbody tr:hover { background: rgba(var(--ap-accent), .07); }
 .auto-plan-proposal-table tbody tr[data-level="red"] { box-shadow: inset 3px 0 #ff7d89; }
 .auto-plan-proposal-table tbody tr[data-level="orange"] { box-shadow: inset 3px 0 #ff9b61; }
@@ -836,9 +837,11 @@
 .auto-plan-day-number { width: 62px; white-space: nowrap; }
 .auto-plan-day-number strong { color: #eaf2ff; font-size: .92rem; font-variant-numeric: tabular-nums; }
 .auto-plan-day-number small { display: block; margin-top: 2px; color: #e2a072; font-size: .56rem; }
-.auto-plan-weekday { width: 108px; white-space: nowrap; }
+.auto-plan-weekday { white-space: nowrap; }
 .auto-plan-weekday span { color: #cfdcee; font-weight: 700; }
+.auto-plan-weekday { width: 124px; }
 .auto-plan-weekday small { display: block; margin-top: 2px; color: var(--ap-dim); font-size: .58rem; }
+.auto-plan-weekday .auto-plan-holiday-name { color: #e2a072; }
 
 .auto-plan-assignment-cell {
   display: grid;

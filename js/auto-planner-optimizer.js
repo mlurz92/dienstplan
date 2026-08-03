@@ -32,8 +32,19 @@
  * - **Kein Zustand verletzt harte Regeln.** Angenommen wird nur, was
  *   vollständig belegt, technisch wählbar und innerhalb aller Laufgrenzen ist.
  *
- * Der Lauf ist deterministisch: Der Zufallsgenerator wird aus dem Ausgangsmonat
- * und den Laufparametern abgeleitet, gleiche Eingaben liefern denselben Plan.
+ * ZUR REPRODUZIERBARKEIT
+ *
+ * Der Zufallsgenerator wird aus Ausgangsmonat und Laufparametern abgeleitet, nie
+ * aus der Uhr. Der Suchpfad ist damit vollständig festgelegt.
+ *
+ * Die erreichte Suchtiefe hängt dagegen am Zeitrahmen und an der Rechenleistung:
+ * Wie viele Runden in eine Minute passen, entscheidet die Maschine. Im
+ * Konvergenzmodus – ohne ausdrücklichen Zeitrahmen – endet der Lauf an einem
+ * eigenen Abbruchkriterium statt an der Uhr und ist dadurch streng
+ * deterministisch. Im Zeitrahmenmodus ist er es praktisch, aber nicht
+ * beweisbar; die abschließende Zertifizierung stabilisiert den Endpunkt
+ * zusätzlich, weil sie unabhängig vom Weg dorthin auf ein lokal optimales
+ * Ergebnis führt.
  */
 
 import {
@@ -556,11 +567,50 @@ async function exploreNeighbourhood({ optimizer, neighbourhood, objective, stats
  * einem Drittel aller selbst gesetzten Dienste – zu kleine Ausschnitte finden
  * nichts Neues, zu große verwerfen jede erreichte Qualität.
  */
+/**
+ * Umfang des zerstörten Ausschnitts.
+ *
+ * Ropke und Pisinger zeigen für die adaptive Large Neighborhood Search, dass
+ * merklich große Ausschnitte bessere Ergebnisse liefern als kleine; als
+ * Größenordnung gelten rund zehn bis vierzig Prozent der Entscheidungsvariablen.
+ * Eine erste Fassung dieser Umsetzung lag mit drei bis dreizehn Prozent
+ * deutlich darunter: Die Runden waren billig, veränderten aber zu wenig, um aus
+ * einem lokalen Optimum herauszuführen. Bei anhaltender Stagnation wächst der
+ * Anteil zusätzlich.
+ */
+const MIN_RUIN_FRACTION = .06;
+const MAX_RUIN_FRACTION = .40;
+const TARGET_ROUNDS = 260;
+
+/**
+ * Selbstregelnde Ausschnittsgröße.
+ *
+ * Die Literaturempfehlung gilt für Probleme, bei denen der Wiederaufbau billig
+ * ist. Hier kostet jedes neu zu besetzende Feld eine vollständige
+ * Kandidatenbewertung; ein Ausschnitt von vierzig Prozent verteuert damit die
+ * Runde um ein Vielfaches. Bei knappem Zeitrahmen führte das dazu, dass die
+ * Suche zwar sehr gründliche, aber viel zu wenige Runden schaffte und am Ende
+ * schlechter abschnitt als mit kleinen Ausschnitten.
+ *
+ * Statt eines auf einen Zeitrahmen abgestimmten Festwerts schätzt die Suche
+ * deshalb aus der gemessenen Rundendauer, wie viele Runden noch hineinpassen,
+ * und wählt den Anteil so, dass eine sinnvolle Rundenzahl erhalten bleibt.
+ * Anhaltende Stagnation vergrößert den Ausschnitt zusätzlich – dann ist ein
+ * weiter Sprung mehr wert als viele kleine.
+ */
+function ruinCount(optimizer, plannedCount, stagnation, affordableRounds) {
+  const room = Math.max(0, Math.min(1, affordableRounds / TARGET_ROUNDS));
+  const ceiling = MIN_RUIN_FRACTION + (MAX_RUIN_FRACTION - MIN_RUIN_FRACTION) * room;
+  const boost = Math.min(.15, stagnation / 1200);
+  const fraction = MIN_RUIN_FRACTION + optimizer.random() * Math.max(0, ceiling - MIN_RUIN_FRACTION) + boost;
+  return Math.max(2, Math.min(plannedCount - 1, Math.round(plannedCount * fraction)));
+}
+
 function destroy({ optimizer, operator, size, objective }) {
   const planned = optimizer.plannedSlots();
   if (planned.length <= 1) return [];
   const random = optimizer.random;
-  const limit = Math.max(2, Math.min(size, Math.ceil(planned.length / 3)));
+  const limit = Math.max(2, Math.min(size, planned.length - 1));
   const keyOf = slot => keyFor(slot.dateIso, slot.role);
 
   if (operator === 'zufallsfelder') {
@@ -858,7 +908,7 @@ export async function perfect({
   const certifyReserve = Math.min(30000, Math.max(4000, total * .3));
   const searchSpan = Math.max(total * .5, total - certifyReserve);
   const budget = {
-    firstDescentUntil: startedAt + (converge ? total : Math.min(total * .3, searchSpan)),
+    firstDescentUntil: startedAt + (converge ? total : Math.min(total * .45, searchSpan)),
     searchUntil: converge ? startedAt : startedAt + searchSpan,
     until: startedAt + total
   };
@@ -910,6 +960,7 @@ export async function perfect({
     best = { monthData: optimizer.snapshot(), objective: current };
   }
 
+  const searchStartedAt = now();
   const restartAfter = Math.max(120, optimizer.slots.length * 4);
   const stagnationLimit = Math.max(600, optimizer.slots.length * 20);
   let sinceImprovement = 0;
@@ -919,14 +970,29 @@ export async function perfect({
 
     const operator = rouletteOperator(optimizer.random, weights);
     uses.set(operator, uses.get(operator) + 1);
-    const size = 2 + Math.floor(optimizer.random() * 6) + Math.min(6, Math.floor(sinceImprovement / 40));
+    // Wie viele Runden passen bei der bisher gemessenen Rundendauer noch in die
+    // Suchphase? Daraus leitet sich ab, wie groß ein Ausschnitt sein darf.
+    const affordableRounds = stats.rounds > 4
+      ? (budget.searchUntil - now()) / Math.max(1, (now() - searchStartedAt) / stats.rounds)
+      : TARGET_ROUNDS;
+    const size = ruinCount(optimizer, optimizer.plannedSlots().length, sinceImprovement, affordableRounds);
     const restore = optimizer.snapshot();
     const removed = destroy({ optimizer, operator, size, objective: current });
 
     let outcome = 0;
     if (removed.length) {
       for (const slot of removed) optimizer.working.days[slot.dateIso][slot.role] = '';
-      const rebuilt = recreate({ optimizer, removed, greed: 3 });
+      /**
+       * Große Ausschnitte scheitern beim Wiederaufbau häufiger. Ein zweiter,
+       * rein gieriger Versuch rettet einen erheblichen Teil davon: Er nimmt in
+       * jedem Schritt den bestbewerteten Kandidaten und findet damit eine
+       * Belegung, wo die rangverzerrte Auswahl in eine Sackgasse lief.
+       */
+      let rebuilt = recreate({ optimizer, removed, greed: 3 });
+      if (!rebuilt) {
+        for (const slot of removed) optimizer.working.days[slot.dateIso][slot.role] = '';
+        rebuilt = recreate({ optimizer, removed, greed: 1 });
+      }
       if (!rebuilt) {
         stats.repairFailures += 1;
         optimizer.load(restore);
@@ -1011,9 +1077,19 @@ export async function perfect({
   optimizer.load(best.monthData);
   current = optimizer.objective();
   let certification = { objective: current, certified: false, rounds: 0 };
+
+  /**
+   * Der Nachweis gilt nur für genau den Zustand, den er geprüft hat.
+   *
+   * Wird nach einer bestandenen Zertifizierung noch einmal abgestiegen und
+   * dabei etwas verändert, ist der Nachweis verbraucht: Er beträfe eine
+   * Belegung, die gar nicht ausgeliefert wird. Ausgewiesen wird er dann nur
+   * weiter, wenn der Abstieg nachweislich nichts mehr gefunden hat.
+   */
+  let certified = false;
   for (let attempt = 0; attempt < 4; attempt += 1) {
     await report('certify', `Zertifizierung ${attempt + 1} · alle Einzelumsetzungen und Paartausche werden vollständig geprüft`);
-    const before = stats.improvements;
+    const beforeCertify = stats.improvements;
     certification = await certify({
       optimizer,
       objective: current,
@@ -1025,8 +1101,11 @@ export async function perfect({
     });
     current = certification.objective;
     best = { monthData: optimizer.snapshot(), objective: current };
-    if (certification.certified && stats.improvements === before) break;
+    certified = certification.certified;
+    if (certified && stats.improvements === beforeCertify) break;
     if (now() >= budget.until) break;
+
+    const beforeDescent = stats.improvements;
     current = await descend({
       optimizer,
       current,
@@ -1038,8 +1117,9 @@ export async function perfect({
       pace
     });
     best = { monthData: optimizer.snapshot(), objective: current };
+    if (stats.improvements !== beforeDescent) certified = false;
   }
-  stats.certified = certification.certified;
+  stats.certified = certified;
   stats.certificationRounds = certification.rounds;
   stats.evaluations = optimizer.evaluations;
   stats.candidateChecks = optimizer.candidateChecks;

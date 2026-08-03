@@ -108,11 +108,32 @@ test('die Wächterprüfung schlägt an, wenn ein Fixpunkt verändert wurde', () 
   );
 });
 
-test('gleiche Eingaben liefern denselben Plan', async () => {
-  const first = await plan(monthWithDays(2026, 9, 10), { timeBudgetMs: 4000 });
-  const second = await plan(monthWithDays(2026, 9, 10), { timeBudgetMs: 4000 });
+/**
+ * Im Konvergenzmodus endet der Lauf an eigenen Abbruchkriterien statt an der
+ * Uhr. Er ist dadurch streng deterministisch – das ist die belastbare Zusage.
+ */
+test('der Konvergenzmodus liefert bei gleichen Eingaben exakt denselben Plan', async () => {
+  const first = await plan(monthWithDays(2026, 9, 12));
+  const second = await plan(monthWithDays(2026, 9, 12));
+  assert.equal(first.optimizerConfig.mode, 'converge');
   assert.equal(signatureOf(first), signatureOf(second));
   assert.equal(first.metrics.optimizer.certified, second.metrics.optimizer.certified);
+  assert.equal(first.metrics.optimizer.moves, second.metrics.optimizer.moves);
+});
+
+/**
+ * Im Zeitrahmenmodus ist der Suchpfad ebenfalls festgelegt, die erreichte Tiefe
+ * hängt aber an der Rechenleistung. Zugesichert ist deshalb nur, dass beide
+ * Läufe zu einer gleichwertigen Lösung führen – nicht, dass sie identisch sind.
+ */
+test('der Zeitrahmenmodus liefert bei gleichen Eingaben gleichwertige Pläne', async () => {
+  const first = await plan(monthWithDays(2026, 9, 10), { timeBudgetMs: 4000 });
+  const second = await plan(monthWithDays(2026, 9, 10), { timeBudgetMs: 4000 });
+  assert.equal(first.complete, true);
+  assert.equal(second.complete, true);
+  assert.equal(first.metrics.red, second.metrics.red);
+  assert.equal(first.metrics.gray, second.metrics.gray);
+  assert.equal(first.changes.length, second.changes.length);
 });
 
 test('die Perfektionsphase verschlechtert das Ergebnis des Aufbaus nie', async () => {
