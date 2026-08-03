@@ -19,6 +19,7 @@ import {
   setAssignment
 } from './rules.js?v=20260801.11';
 import { createPacer } from './cooperative-scheduling.js?v=20260801.11';
+import { syncPeerCache } from './auto-planner-engine.js?v=20260801.11';
 
 export {
   autoPlanConfigFingerprint,
@@ -96,6 +97,7 @@ function vectorOf(evaluation) {
 
 function auditPlan(state, monthData, baseline) {
   const sandbox = simulatedState(state, monthData);
+  syncPeerCache(monthData);
   const entries = proposedAssignments(monthData, baseline).map(change => ({
     ...change,
     evaluation: evaluateCandidate({ state: sandbox, monthData, ...change })
@@ -148,6 +150,7 @@ function wishes(state, monthData, baseline) {
   let possible = 0;
   let fulfilled = 0;
   const baselineState = simulatedState(state, baseline);
+  syncPeerCache(baseline);
   for (const dateIso of monthDates(baseline)) {
     for (const role of ROLE_ORDER) {
       if (baseline.days?.[dateIso]?.[role]) continue;
@@ -219,6 +222,7 @@ function respectsLimits(monthData, staffId, role, config) {
 
 function eligibleCandidates(state, monthData, dateIso, role, config, allowRed) {
   const sandbox = simulatedState(state, monthData);
+  syncPeerCache(monthData);
   return getPlanningStaff(state.staff, dateIso).map((person, order) => ({
     person,
     order,

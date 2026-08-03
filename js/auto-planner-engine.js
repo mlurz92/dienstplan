@@ -8,9 +8,11 @@ import {
   getRoleProperties,
   isPositivePreference,
   parseIso,
-  setAssignment
+  setAssignment,
+  setPeerGroupCacheToken
 } from './rules.js?v=20260801.11';
 import { createPacer, yieldToBrowser } from './cooperative-scheduling.js?v=20260801.11';
+import { AUTO_PLAN_BD_LIMITS } from './defaults.js?v=20260801.11';
 
 const LEVEL_RANK = Object.freeze({ green: 0, yellow: 1, orange: 2, red: 3, gray: 4 });
 const ROLE_ORDER = Object.freeze(['bd', 'hg']);
@@ -34,6 +36,38 @@ const PRESETS = Object.freeze({
   deep: { beam: 16, branch: 6, deepBeam: 28, deepBranch: 9, fallbackBeam: 36, fallbackBranch: 11, exact: 9000, lookahead: 4, polish: 2 },
   maximum: { beam: 24, branch: 8, deepBeam: 44, deepBranch: 12, fallbackBeam: 56, fallbackBranch: 14, exact: 22000, lookahead: 5, polish: 3 }
 });
+
+
+/**
+ * Gemeinsame Marke für den Vergleichsgruppen-Speicher der Regelbewertung.
+ *
+ * Alle Stufen des Auto-Plans verwenden dieselbe Marke. Zwei verschiedene
+ * Markenformate würden sich gegenseitig verwerfen und den Speicher wirkungslos
+ * machen. Die Marke beschreibt den vollständigen Belegungszustand eines Monats
+ * und trägt zusätzlich die laufende Nummer des Planungslaufs, damit ein
+ * späterer Lauf mit anderen Abwesenheiten oder Wünschen nie auf Einträge des
+ * vorigen trifft.
+ *
+ * Aufzurufen ist sie vor jeder Stelle, die bewertet – und zwar mit genau dem
+ * Monat, der bewertet wird.
+ */
+let evaluationEpoch = 0;
+
+export function beginEvaluationEpoch() {
+  evaluationEpoch += 1;
+  setPeerGroupCacheToken(null);
+}
+
+export function syncPeerCache(monthData) {
+  const days = monthData?.days;
+  if (!days) {
+    setPeerGroupCacheToken(null);
+    return;
+  }
+  let token = `${evaluationEpoch}|${monthData.year}-${monthData.month}`;
+  for (const iso in days) token += `|${days[iso].bd}>${days[iso].hg}`;
+  setPeerGroupCacheToken(token);
+}
 
 const clone = value => typeof structuredClone === 'function'
   ? structuredClone(value)
@@ -153,6 +187,15 @@ export function candidateEvaluationVector(evaluation) {
   return vectorOf(evaluation);
 }
 
+/**
+ * Die Kennungen der Suchläufe eines Monats, in der Reihenfolge ihrer Stufe.
+ * Der Läufer verteilt sie auf eigene Arbeitsstränge.
+ */
+export function planProfileIds(state, monthData, runConfig = null) {
+  const config = normalizeAutoPlanConfig(state, monthData, runConfig);
+  return profiles(config, {}).map(profile => profile.id);
+}
+
 export function fingerprintMonth(monthData) {
   return JSON.stringify(relevantMonthSnapshot(monthData));
 }
@@ -184,6 +227,37 @@ function normalizeCap(value) {
   return Number.isInteger(number) && number >= 0 ? number : null;
 }
 
+/**
+ * Vorgeschlagene BD-Obergrenze einer Person.
+ *
+ * Zusammengeführt werden das im Personalstamm hinterlegte harte Monatsmaximum
+ * und die für den Auto-Plan festgelegte Vorgabe; es gilt der strengere Wert.
+ * Bereits gesetzte Dienste heben die Grenze bei Bedarf an – eine Vorgabe, die
+ * unter dem bestehenden Stand liegt, würde sonst bei jedem Öffnen des Studios
+ * den Start blockieren, ohne dass jemand etwas falsch gemacht hätte.
+ */
+function defaultBdLimit(monthData, person) {
+  const configured = [normalizeCap(person.maxBd), normalizeCap(AUTO_PLAN_BD_LIMITS[person.id])]
+    .filter(value => value !== null);
+  if (!configured.length) return null;
+  return Math.max(Math.min(...configured), countRoleInMonth(monthData, person.id, 'bd'));
+}
+
+/**
+ * Vorgeschlagene HG-Obergrenze einer Person.
+ *
+ * Wer im gesamten Monat an keinem einzigen Tag HG-berechtigt ist, bekommt die
+ * Grenze null: Assistenzärztinnen und Assistenzärzte planen keinen
+ * Hintergrunddienst. Abgeleitet wird das aus der datumsabhängigen
+ * Qualifikation und nicht aus einer festen Namensliste – eine Beförderung im
+ * laufenden Monat hebt die Vorgabe damit von selbst wieder auf.
+ */
+function defaultHgLimit(state, monthData, person) {
+  const dates = monthDates(monthData);
+  if (dates.some(dateIso => getRoleProperties(person, dateIso).canHg)) return null;
+  return Math.max(0, countRoleInMonth(monthData, person.id, 'hg'));
+}
+
 export function createDefaultAutoPlanConfig(state, monthData) {
   return {
     searchIntensity: 'deep',
@@ -191,8 +265,8 @@ export function createDefaultAutoPlanConfig(state, monthData) {
     allowRedFallback: true,
     maxRedViolations: null,
     staffLimits: Object.fromEntries(monthPlanningStaff(state, monthData).map(person => [person.id, {
-      maxBd: normalizeCap(person.maxBd),
-      maxHg: null,
+      maxBd: defaultBdLimit(monthData, person),
+      maxHg: defaultHgLimit(state, monthData, person),
       maxTotal: null
     }]))
   };
@@ -273,6 +347,7 @@ function planningContext(state, baseline) {
   const staff = monthPlanningStaff(state, baseline);
   const baselineState = simulatedState(state, baseline);
   const possibleWishes = [];
+  syncPeerCache(baseline);
   for (const dateIso of dates) {
     for (const role of ROLE_ORDER) {
       if (baseline.days?.[dateIso]?.[role]) continue;
@@ -343,6 +418,7 @@ function createCandidateResolver(state, mode, strategy, config, stats) {
     const key = `${dateIso}|${role}`;
     if (monthCache.has(key)) return monthCache.get(key);
     const sandbox = simulatedState(state, monthData);
+    syncPeerCache(monthData);
     const planningStaff = getPlanningStaff(sandbox.staff, dateIso);
     const candidates = planningStaff.map((person, order) => ({
       person,
@@ -377,6 +453,7 @@ function proposedAssignments(monthData, baseline) {
 
 function auditProposal(state, monthData, baseline) {
   const sandbox = simulatedState(state, monthData);
+  syncPeerCache(monthData);
   const entries = proposedAssignments(monthData, baseline).map(change => ({
     ...change,
     evaluation: evaluateCandidate({ state: sandbox, monthData, ...change })
@@ -845,6 +922,20 @@ function profiles(config, overrides) {
     { id: 'strict-coverage', mode: SEARCH_MODE.STRICT, strategy: 'coverage', width: Math.max(preset.deepBeam, baseBeam * 2), branch: Math.max(preset.deepBranch, baseBranch + 5), exact: Math.max(3000, Math.floor(baseExact * .8)), lookahead: preset.lookahead + 1, start: .37, span: .29, label: 'Vertiefte Null-Rot-Suche' }
   ];
   if (config.allowRedFallback) result.push({ id: 'confirmable-balanced', mode: SEARCH_MODE.CONFIRMABLE, strategy: 'balanced', width: Math.max(preset.fallbackBeam, baseBeam * 3), branch: Math.max(preset.fallbackBranch, baseBranch + 8), exact: Math.max(6000, baseExact), lookahead: preset.lookahead + 1, start: .69, span: .20, label: 'Minimal-Rot-Suche' });
+  /**
+   * Beschränkung auf einen einzelnen Suchlauf.
+   *
+   * Nacheinander ausgeführt sind die Läufe eine Kette: Der nächste startet nur,
+   * wenn der vorige keine vollständige Belegung fand. Auf mehreren Kernen
+   * lassen sie sich stattdessen gleichzeitig starten und der beste behalten –
+   * bei schwierigen Monaten, die alle Stufen durchlaufen, verkürzt das die
+   * Wartezeit auf die des längsten statt auf die Summe aller.
+   */
+  if (Array.isArray(overrides.profileFilter) && overrides.profileFilter.length) {
+    const wanted = new Set(overrides.profileFilter);
+    const filtered = result.filter(profile => wanted.has(profile.id));
+    if (filtered.length) return filtered;
+  }
   return result;
 }
 
@@ -863,6 +954,7 @@ export async function buildAutoPlan({ state, monthData, year = monthData?.year, 
   const validation = validateAutoPlanConfig(state, monthData, runConfig);
   if (!validation.valid) throw new Error(`Auto-Plan-Konfiguration ungültig: ${validation.errors.join(' ')}`);
   const config = validation.config;
+  beginEvaluationEpoch();
   const baseline = clone(monthData);
   const slots = openSlots(baseline);
   const fixed = fixedAssignmentCount(baseline);
@@ -882,7 +974,7 @@ export async function buildAutoPlan({ state, monthData, year = monthData?.year, 
   let selectedProfile = 'blocked';
   let selectedMode = SEARCH_MODE.STRICT;
   const attempts = [];
-  for (const [index, profile] of profiles(config, { beamWidth, branchLimit, exactBudget }).entries()) {
+  for (const [index, profile] of profiles(config, { beamWidth, branchLimit, exactBudget, profileFilter: runConfig?.profileFilter }).entries()) {
     if (!best.objective.unfilled && !best.objective.audit.red && !best.objective.audit.gray && !best.objective.limitViolations) break;
     if (profile.mode === SEARCH_MODE.CONFIRMABLE) {
       await report(onProgress, { phase: 'repair', progress: profile.start - .012, message: 'Keine vollständige Null-Rot-Variante gefunden · Minimal-Rot-Fallback startet' });

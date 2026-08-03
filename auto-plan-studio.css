@@ -386,6 +386,12 @@
 .auto-plan-limit-table tbody th strong { display: block; font-weight: 780; }
 .auto-plan-limit-table tbody th small { display: block; margin-top: 2px; color: var(--ap-dim); font-size: .58rem; }
 .auto-plan-limit-table tbody tr:hover { background: rgba(var(--ap-accent), .05); }
+/* Wer im Monat an keinem Tag HG planen darf, ist als solcher erkennbar. */
+.auto-plan-limit-table tbody tr.is-hg-blocked td:nth-child(5) input {
+  border-color: rgba(178, 205, 246, .28);
+  color: var(--ap-muted);
+  background: rgba(255, 255, 255, .04);
+}
 .auto-plan-limit-table tbody tr.is-invalid { background: rgba(214, 76, 85, .12); }
 .auto-plan-limit-table tbody tr.is-invalid input { border-color: rgba(255, 128, 142, .6); }
 .auto-plan-fixed-count { color: var(--ap-muted); font-variant-numeric: tabular-nums; }

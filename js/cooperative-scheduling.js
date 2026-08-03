@@ -52,7 +52,19 @@ export function yieldToBrowser() {
  * bezahlbar: Er kostet einen Zeitvergleich, solange das Intervall nicht
  * abgelaufen ist.
  */
+/**
+ * Im Arbeitsstrang gibt es nichts zu zeichnen und nichts zu bedienen.
+ *
+ * Dort ist jede Abgabe reiner Verlust: Nachrichten an den Anzeigestrang werden
+ * ohnehin eingereiht, ohne dass der Rechenlauf dafür pausieren müsste, und ein
+ * Abbruch erfolgt durch Beenden des Strangs. Die Taktung entfällt deshalb
+ * vollständig – das ist der wesentliche Teil des Geschwindigkeitsgewinns
+ * gegenüber der Rechnung im Anzeigestrang.
+ */
+const insideWorker = typeof document === 'undefined' && typeof requestAnimationFrame !== 'function';
+
 export function createPacer(intervalMs = 34) {
+  if (insideWorker) return async () => false;
   let last = now();
   return async () => {
     if (now() - last < intervalMs) return false;

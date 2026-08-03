@@ -545,7 +545,32 @@ function evaluateCandidateInternal({ state, monthData, dateIso, role, staffId, i
   });
 }
 
-function eligiblePeersWithoutRed({ state, monthData, dateIso, role }) {
+/**
+ * Zwischenspeicher für die Vergleichsgruppe eines Dienstfelds.
+ *
+ * Die Fairnessregeln vergleichen eine Person mit allen anderen, die an diesem
+ * Tag ohne roten Konflikt einteilbar wären. Diese Vergleichsgruppe hängt nur am
+ * Feld und am Monatszustand, nicht an der bewerteten Person – bei neun
+ * Kandidaten am selben Feld wurde sie bisher neunmal identisch neu berechnet.
+ * Sie ist mit Abstand der teuerste Teil einer Bewertung.
+ *
+ * Der Speicher ist ausdrücklich abzuschalten und standardmäßig aus: Die
+ * Anwendung verändert Monatsdaten an vielen Stellen und würde von einem
+ * veralteten Eintrag falsch beraten. Nur der Auto-Plan schaltet ihn ein, und
+ * zwar über eine Marke, die den vollständigen Belegungszustand beschreibt.
+ * Ändert sich auch nur ein Dienst, ändert sich die Marke und der Speicher wird
+ * verworfen. Ein veralteter Treffer ist damit ausgeschlossen.
+ */
+let peerCacheToken = null;
+let peerCache = new Map();
+
+export function setPeerGroupCacheToken(token) {
+  if (token === peerCacheToken) return;
+  peerCacheToken = token ?? null;
+  peerCache = new Map();
+}
+
+function computeEligiblePeers({ state, monthData, dateIso, role }) {
   return getPlanningStaff(state.staff, dateIso).filter(person => {
     const base = evaluateCandidateInternal({
       state,
@@ -557,6 +582,16 @@ function eligiblePeersWithoutRed({ state, monthData, dateIso, role }) {
     });
     return base.level !== 'red' && base.level !== 'gray' && base.canSelect !== false;
   });
+}
+
+function eligiblePeersWithoutRed(parameters) {
+  if (peerCacheToken === null) return computeEligiblePeers(parameters);
+  const key = `${parameters.dateIso}|${parameters.role}`;
+  const cached = peerCache.get(key);
+  if (cached) return cached;
+  const peers = computeEligiblePeers(parameters);
+  peerCache.set(key, peers);
+  return peers;
 }
 
 function applyMonthlyBdFairness({ state, monthData, dateIso, staffId, currentBd, peers, push, recommend, note }) {

@@ -83,8 +83,17 @@ export function optimizerFingerprint(config) {
   return JSON.stringify(stableValue(config));
 }
 
-function seedFor(result, optimizer) {
-  return `${result.baselineFingerprint}|${result.runConfigFingerprint}|${optimizerFingerprint(optimizer)}`;
+/**
+ * Startwert der Perfektionsphase.
+ *
+ * Abgeleitet wird er aus dem Ausgangsmonat und den Laufparametern. Der
+ * zusätzliche Streuwert erlaubt es, denselben Monat mehrfach parallel mit
+ * verschiedenen Suchbahnen zu durchsuchen und das beste Ergebnis zu behalten;
+ * ohne ihn wären alle Läufe identisch und der Mehrfachstart wertlos.
+ */
+function seedFor(result, optimizer, runConfig) {
+  const salt = Number.isFinite(Number(runConfig?.seedSalt)) ? Number(runConfig.seedSalt) : 0;
+  return `${result.baselineFingerprint}|${result.runConfigFingerprint}|${optimizerFingerprint(optimizer)}|${salt}`;
 }
 
 function fairnessIndexFrom(objective) {
@@ -130,6 +139,20 @@ function applyObjectiveToResult(state, result, monthData, objective) {
   return result;
 }
 
+/**
+ * Legt die lexikografische Zielbewertung des Ergebnisses offen.
+ *
+ * Mehrere parallel laufende Suchen müssen sich vergleichen lassen, und zwar in
+ * genau der Ordnung, nach der auch optimiert wurde. Die Kennzahlen allein
+ * genügen dafür nicht: Sie bilden nur die oberen Ebenen ab.
+ */
+function withObjectiveKey(state, result) {
+  if (!result?.plannedMonth || !result?.baseline || !result?.runConfig) return result;
+  const objective = evaluatePlanObjective(state, result.plannedMonth, result.baseline, result.runConfig);
+  result.objectiveKey = objective.key.map(value => Number(value) || 0);
+  return result;
+}
+
 function refreshProposalFingerprint(result) {
   result.proposalFingerprint = JSON.stringify(stableValue({
     baselineFingerprint: result.baselineFingerprint,
@@ -148,6 +171,19 @@ function refreshProposalFingerprint(result) {
  * verbessern, und der Befund bleibt unverändert erhalten.
  */
 export async function buildAutoPlan(parameters) {
+  const constructed = await constructAutoPlan(parameters);
+  return perfectAutoPlan({ ...parameters, constructed });
+}
+
+/**
+ * Erste Hälfte des Laufs: Konstruktion und iterative Tauschreparatur.
+ *
+ * Getrennt verfügbar, weil mehrere parallele Perfektionsläufe denselben Aufbau
+ * verwenden. Ihn in jedem Arbeitsstrang erneut zu berechnen wäre dieselbe
+ * Arbeit mehrfach – bei knappen Kernen kostet das mehr, als die zusätzliche
+ * Streuung einbringt.
+ */
+export async function constructAutoPlan(parameters) {
   const runConfig = parameters?.runConfig || null;
   const optimizer = optimizerDefaults(runConfig);
 
@@ -193,11 +229,35 @@ export async function buildAutoPlan(parameters) {
   result.optimizerConfig = optimizer;
   result.optimizerConfigFingerprint = optimizerFingerprint(optimizer);
   result.optimizerRevision = OPTIMIZER_REVISION;
+  // Damit parallel gestartete Aufbauläufe in derselben Ordnung verglichen
+  // werden können, in der auch optimiert wird.
+  return withObjectiveKey(parameters.state, result);
+}
+
+/**
+ * Zweite Hälfte des Laufs: Perfektionsphase und Zertifizierung.
+ *
+ * Erwartet das Ergebnis des Aufbaus in `constructed`. Ohne vollständige,
+ * technisch wählbare Belegung gibt es nichts zu verbessern; der Befund bleibt
+ * dann unverändert erhalten.
+ */
+export async function perfectAutoPlan(parameters) {
+  const runConfig = parameters?.runConfig || null;
+  const result = parameters.constructed;
+  const optimizer = result.optimizerConfig || optimizerDefaults(runConfig);
+
+  let highest = Number(parameters.progressFloor) || 0;
+  const onProgress = parameters?.onProgress
+    ? async update => {
+      highest = Math.max(highest, Number(update.progress) || 0);
+      return parameters.onProgress({ ...update, progress: highest });
+    }
+    : undefined;
 
   if (!optimizer.perfectionEnabled || !result.complete || !result.changes.length) {
     result.metrics.optimizer = emptyOptimizerStats();
     result.metrics.optimizer.skipped = true;
-    return reportCompletion(refreshProposalFingerprint(result), onProgress);
+    return reportCompletion(withObjectiveKey(parameters.state, refreshProposalFingerprint(result)), onProgress);
   }
 
   const outcome = await perfect({
@@ -210,7 +270,7 @@ export async function buildAutoPlan(parameters) {
     mode: optimizer.mode,
     lateAcceptanceSize: optimizer.lateAcceptanceSize,
     descentInterval: optimizer.descentInterval,
-    seed: seedFor(result, optimizer),
+    seed: seedFor(result, optimizer, runConfig),
     onProgress: onProgress
       ? async update => onProgress({ ...update, stage: 'perfektion' })
       : undefined,
@@ -232,7 +292,7 @@ export async function buildAutoPlan(parameters) {
   };
   result.certified = Boolean(outcome.stats.certified);
   result.searchProfile = `${result.searchProfile} + Ruin-and-Recreate-Perfektion${outcome.stats.certified ? ' (zertifiziert)' : ''}`;
-  return reportCompletion(refreshProposalFingerprint(result), onProgress);
+  return reportCompletion(withObjectiveKey(parameters.state, refreshProposalFingerprint(result)), onProgress);
 }
 
 /**

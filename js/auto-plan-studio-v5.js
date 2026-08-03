@@ -16,10 +16,10 @@
 
 import {
   applyAutoPlanProposal,
-  buildAutoPlan,
   createDefaultAutoPlanConfig,
   validateAutoPlanConfig
 } from './auto-planner.js?v=20260801.11';
+import { parallelSearchCount, runAutoPlan, workersAvailable } from './auto-plan-runner.js?v=20260801.11';
 import {
   getMonthData,
   getMonthLabel,
@@ -183,7 +183,7 @@ function template() {
               <div class="auto-plan-field-grid">
                 <label class="auto-plan-field">
                   <span>Suchintensität</span>
-                  <select id="autoPlanSearchIntensity">
+                  <select id="autoPlanSearchIntensity" title="Breite der Konstruktionssuche. Standard baut schnell auf, Maximum prüft beim Aufbau mehr Varianten. Die eigentliche Qualität entsteht danach in der Perfektionsphase.">
                     <option value="standard">Standard</option>
                     <option value="deep" selected>Tief</option>
                     <option value="maximum">Maximum</option>
@@ -192,7 +192,7 @@ function template() {
                 </label>
                 <label class="auto-plan-field">
                   <span>Optimierungsschwerpunkt</span>
-                  <select id="autoPlanOptimizationFocus">
+                  <select id="autoPlanOptimizationFocus" title="Reihenfolge der weichen Ziele. Harte Regeln, vollständige Belegung sowie rote, orange und gelbe Hinweise haben immer Vorrang; der Schwerpunkt ordnet nur das, was danach kommt.">
                     <option value="balanced" selected>Ausgewogen</option>
                     <option value="wishes">Wünsche zuerst</option>
                     <option value="workload">Lastenausgleich zuerst</option>
@@ -203,39 +203,39 @@ function template() {
                 <label class="auto-plan-field auto-plan-field--wide">
                   <span>Zeitrahmen der Perfektionsphase</span>
                   <div class="auto-plan-range">
-                    <input id="autoPlanTimeBudget" type="range" min="10" max="900" step="5" value="60">
+                    <input id="autoPlanTimeBudget" type="range" min="10" max="900" step="5" value="60" title="Zeit für die Ruin-and-Recreate-Suche und den abschließenden Optimalitätsnachweis. Die Suche nutzt den Rahmen vollständig aus; mehr Zeit bedeutet verlässlich bessere Pläne.">
                     <output id="autoPlanTimeBudgetOut">60 s</output>
                   </div>
                   <small>Die Ruin-and-Recreate-Suche nutzt diesen Rahmen vollständig aus. Mehr Zeit bedeutet verlässlich bessere Pläne.</small>
                 </label>
                 <label class="auto-plan-field">
                   <span>Iterative Reparaturrunden</span>
-                  <input id="autoPlanRepairIterations" type="number" min="0" max="30" step="1" value="4">
+                  <input id="autoPlanRepairIterations" type="number" min="0" max="30" step="1" value="4" title="Runden der einfachen Tauschreparatur direkt nach dem Aufbau. Sie glättet grobe Ausreißer, bevor die Perfektionsphase übernimmt.">
                   <small>Vorstufe vor der Perfektion</small>
                 </label>
                 <label class="auto-plan-field">
                   <span>Lokales Neuplanungsbudget</span>
-                  <input id="autoPlanLocalBudget" type="number" min="200" max="12000" step="200" value="3200">
+                  <input id="autoPlanLocalBudget" type="number" min="200" max="12000" step="200" value="3200" title="Zahl der Knoten, die eine lokale Neuplanung auffälliger Tage höchstens durchsuchen darf.">
                   <small>Knoten je Teilneuplanung</small>
                 </label>
                 <label class="auto-plan-field">
                   <span>Late-Acceptance-Fenster</span>
-                  <input id="autoPlanLateAcceptance" type="number" min="10" max="5000" step="10" value="400">
+                  <input id="autoPlanLateAcceptance" type="number" min="10" max="5000" step="10" value="400" title="Wie viele Runden die Suche zurückblickt, bevor sie einen Zustand annimmt. Größere Werte lassen mehr vorübergehende Verschlechterung zu und verlassen lokale Optima leichter.">
                   <small>Toleranz gegen lokale Optima</small>
                 </label>
                 <label class="auto-plan-field">
                   <span>Maximal rote Vorschläge</span>
-                  <input id="autoPlanMaxRed" type="number" min="0" max="62" step="1" placeholder="keine Grenze">
+                  <input id="autoPlanMaxRed" type="number" min="0" max="62" step="1" placeholder="keine Grenze" title="Harte Obergrenze für bestätigungspflichtige rote Vorschläge. Leer bedeutet keine zusätzliche Grenze über die Regeln hinaus.">
                   <small>Leer: keine zusätzliche Grenze</small>
                 </label>
               </div>
               <div class="auto-plan-switch-row">
                 <label class="auto-plan-switch">
-                  <input id="autoPlanAllowRed" type="checkbox" checked>
+                  <input id="autoPlanAllowRed" type="checkbox" checked title="Erlaubt eine vollständige Belegung mit einzeln zu bestätigenden roten Ausnahmen, falls keine vollständige Null-Rot-Lösung existiert.">
                   <span>Minimal-Rot-Fallback erlauben, wenn keine vollständige Null-Rot-Belegung existiert.</span>
                 </label>
                 <label class="auto-plan-switch">
-                  <input id="autoPlanPerfection" type="checkbox" checked>
+                  <input id="autoPlanPerfection" type="checkbox" checked title="Führt nach dem Aufbau die Ruin-and-Recreate-Suche und den abschließenden Optimalitätsnachweis aus. Abgeschaltet endet der Lauf nach der einfachen Tauschreparatur.">
                   <span>Perfektionsphase mit Ruin-and-Recreate und abschließender Zertifizierung ausführen.</span>
                 </label>
               </div>
@@ -259,8 +259,8 @@ function template() {
                 <p>Leere Felder bedeuten keine zusätzliche Laufgrenze. Hinterlegte Personalmaxima und sämtliche fachlichen Regeln gelten unabhängig davon weiter.</p>
               </div>
               <div class="auto-plan-limit-tools">
-                <button type="button" class="auto-plan-mini" id="autoPlanLimitReset">Vorschlagswerte</button>
-                <button type="button" class="auto-plan-mini" id="autoPlanLimitClear">Alle Grenzen leeren</button>
+                <button type="button" class="auto-plan-mini" id="autoPlanLimitReset" title="Setzt alle Zeilen auf die festgelegten Vorgaben zurück: die monatliche BD-Zahl je Person und die HG-Sperre für alle, die im Monat an keinem Tag HG-berechtigt sind.">Vorschlagswerte</button>
+                <button type="button" class="auto-plan-mini" id="autoPlanLimitClear" title="Entfernt sämtliche Laufgrenzen. Hinterlegte Personalmaxima und alle fachlichen Regeln gelten unabhängig davon weiter.">Alle Grenzen leeren</button>
               </div>
             </header>
             <div class="auto-plan-limit-scroll">
@@ -268,11 +268,11 @@ function template() {
                 <thead>
                   <tr>
                     <th scope="col">Person</th>
-                    <th scope="col">BD fix</th>
-                    <th scope="col">BD max.</th>
-                    <th scope="col">HG fix</th>
-                    <th scope="col">HG max.</th>
-                    <th scope="col">Gesamt max.</th>
+                    <th scope="col" title="Bereits im Monat gesetzte Bereitschaftsdienste dieser Person. Sie zählen auf jede Obergrenze an.">BD fix</th>
+                    <th scope="col" title="Höchstzahl an Bereitschaftsdiensten, die dieser Person im Monat insgesamt zugeteilt sein dürfen. Leer bedeutet keine zusätzliche Grenze.">BD max.</th>
+                    <th scope="col" title="Bereits im Monat gesetzte Hintergrunddienste dieser Person.">HG fix</th>
+                    <th scope="col" title="Höchstzahl an Hintergrunddiensten. Für Assistenzärztinnen und Assistenzärzte steht hier null, solange sie im Monat nicht HG-berechtigt sind.">HG max.</th>
+                    <th scope="col" title="Höchstzahl aus Bereitschafts- und Hintergrunddiensten zusammen.">Gesamt max.</th>
                   </tr>
                 </thead>
                 <tbody id="autoPlanLimitBody"></tbody>
@@ -310,12 +310,12 @@ function template() {
             </div>
             <div class="auto-plan-grid" id="autoPlanGrid" aria-label="Fortschritt je Dienstfeld"></div>
             <div class="auto-plan-live-metrics">
-              <div><span>Varianten</span><strong id="autoPlanBeam">—</strong></div>
-              <div><span>Kandidaten</span><strong id="autoPlanCandidates">—</strong></div>
-              <div><span>Geprüft</span><strong id="autoPlanExplored">—</strong></div>
-              <div><span>Verworfen</span><strong id="autoPlanDeadEnds">—</strong></div>
-              <div><span>Besser</span><strong id="autoPlanRepair">—</strong></div>
-              <div><span>Felder</span><strong id="autoPlanFields">—</strong></div>
+              <div title="Zahl der Belegungsvarianten, die der Suchstrahl gerade parallel weiterverfolgt."><span>Varianten</span><strong id="autoPlanBeam">—</strong></div>
+              <div title="Zahl der Personen, die für das zuletzt bearbeitete Dienstfeld regelkonform wählbar waren."><span>Kandidaten</span><strong id="autoPlanCandidates">—</strong></div>
+              <div title="Zahl der vollständig bewerteten Zustände seit Beginn des Laufs."><span>Geprüft</span><strong id="autoPlanExplored">—</strong></div>
+              <div title="Zustände, die als Sackgasse erkannt oder nach der Bewertung abgelehnt wurden."><span>Verworfen</span><strong id="autoPlanDeadEnds">—</strong></div>
+              <div title="Zahl der übernommenen echten Verbesserungen des Gesamtplans."><span>Besser</span><strong id="autoPlanRepair">—</strong></div>
+              <div title="Zahl der offenen BD- und HG-Felder, die dieser Lauf besetzen muss."><span>Felder</span><strong id="autoPlanFields">—</strong></div>
             </div>
           </div>
         </section>
@@ -344,11 +344,11 @@ function template() {
               <table class="auto-plan-proposal-table" id="autoPlanProposalTable">
                 <thead>
                   <tr>
-                    <th scope="col" class="auto-plan-day-number">Tag</th>
+                    <th scope="col" class="auto-plan-day-number" title="Kalendertag des Monats, in derselben Leserichtung wie die Diensttabelle.">Tag</th>
                     <th scope="col">Wochentag</th>
-                    <th scope="col">BD</th>
-                    <th scope="col">HG</th>
-                    <th scope="col">Prüfung</th>
+                    <th scope="col" title="Bereitschaftsdienst des Tages. Vorschläge tragen die Marke Auto-Plan, bestehende Einträge die Marke Fixpunkt.">BD</th>
+                    <th scope="col" title="Hintergrunddienst des Tages.">HG</th>
+                    <th scope="col" title="Höchste Bewertungsstufe des Tages und sämtliche Regelgründe zum Aufklappen.">Prüfung</th>
                   </tr>
                 </thead>
                 <tbody id="autoPlanProposalBody"></tbody>
@@ -382,9 +382,9 @@ function template() {
       </div>
 
       <footer class="auto-plan-footer">
-        <button type="button" class="secondary" id="autoPlanCancelBtn">Abbrechen</button>
-        <button type="button" class="auto-plan-start" id="autoPlanStartBtn">Optimierung starten</button>
-        <button type="button" class="auto-plan-apply" id="autoPlanApplyBtn" hidden>Vorschläge übernehmen</button>
+        <button type="button" class="secondary" id="autoPlanCancelBtn" title="Bricht den Lauf ab und schließt das Studio. Am Monatsplan wird nichts verändert.">Abbrechen</button>
+        <button type="button" class="auto-plan-start" id="autoPlanStartBtn" title="Startet die Optimierung mit den eingestellten Parametern. Bis zur ausdrücklichen Übernahme wird nichts geschrieben.">Optimierung starten</button>
+        <button type="button" class="auto-plan-apply" id="autoPlanApplyBtn" hidden title="Prüft den Vorschlag erneut vollständig gegen alle Regeln und schreibt ihn dann in einem Zug in den Monatsplan.">Vorschläge übernehmen</button>
       </footer>
     </div>
   </dialog>`;
@@ -407,25 +407,31 @@ function planningStaff(monthData) {
   return [...unique.values()];
 }
 
-function suggestedBdLimit(monthData, person, defaults) {
-  const bd = countRoleInMonth(monthData, person.id, 'bd');
-  const configured = defaults.staffLimits?.[person.id]?.maxBd;
-  return configured ?? Math.max(bd, Number(person.bdTarget || 0) + 2);
-}
-
+/**
+ * Die Zeilen der Obergrenzentabelle.
+ *
+ * Vorbelegt wird mit den festgelegten Laufvorgaben: die monatliche BD-Zahl je
+ * Person und die HG-Sperre für alle, die im gesamten Monat an keinem Tag
+ * HG-berechtigt sind. Beides bleibt frei änderbar; „Alle Grenzen leeren" setzt
+ * sämtliche Felder auf unbegrenzt.
+ */
 function renderLimitRows(monthData, { reset = false } = {}) {
   const defaults = createDefaultAutoPlanConfig(state, monthData);
   byId('autoPlanLimitBody').innerHTML = planningStaff(monthData).map(person => {
     const bd = countRoleInMonth(monthData, person.id, 'bd');
     const hg = countRoleInMonth(monthData, person.id, 'hg');
-    const maxBd = reset ? '' : suggestedBdLimit(monthData, person, defaults);
-    return `<tr data-staff-id="${esc(person.id)}">
-      <th scope="row"><strong>${esc(person.short || person.name)}</strong><small>${esc(person.roleLabel || '')}</small></th>
+    const limits = defaults.staffLimits?.[person.id] || {};
+    const maxBd = reset || limits.maxBd === null || limits.maxBd === undefined ? '' : limits.maxBd;
+    const maxHg = reset || limits.maxHg === null || limits.maxHg === undefined ? '' : limits.maxHg;
+    const name = esc(person.short || person.name);
+    const blocked = !reset && limits.maxHg === 0;
+    return `<tr data-staff-id="${esc(person.id)}"${blocked ? ' class="is-hg-blocked"' : ''}>
+      <th scope="row"><strong>${name}</strong><small>${esc(person.roleLabel || '')}</small></th>
       <td class="auto-plan-fixed-count">${bd}</td>
-      <td><input data-limit="maxBd" type="number" min="${bd}" max="31" step="1" value="${maxBd}" aria-label="BD-Obergrenze ${esc(person.short || person.name)}" placeholder="∞"></td>
+      <td><input data-limit="maxBd" type="number" min="${bd}" max="31" step="1" value="${maxBd}" aria-label="BD-Obergrenze ${name}" placeholder="∞"></td>
       <td class="auto-plan-fixed-count">${hg}</td>
-      <td><input data-limit="maxHg" type="number" min="${hg}" max="31" step="1" aria-label="HG-Obergrenze ${esc(person.short || person.name)}" placeholder="∞"></td>
-      <td><input data-limit="maxTotal" type="number" min="${bd + hg}" max="62" step="1" aria-label="Gesamtobergrenze ${esc(person.short || person.name)}" placeholder="∞"></td>
+      <td><input data-limit="maxHg" type="number" min="${hg}" max="31" step="1" value="${maxHg}" aria-label="HG-Obergrenze ${name}" placeholder="∞"></td>
+      <td><input data-limit="maxTotal" type="number" min="${bd + hg}" max="62" step="1" aria-label="Gesamtobergrenze ${name}" placeholder="∞"></td>
     </tr>`;
   }).join('');
 }
@@ -574,7 +580,32 @@ function renderPhases(phase) {
   });
 }
 
-function updateProgress(update) {
+/**
+ * Fortschritt mehrerer paralleler Suchläufe.
+ *
+ * Angezeigt wird der jeweils weiteste Lauf; Zählwerte werden über alle Läufe
+ * summiert. Ohne diese Zusammenführung sprängen Balken und Kennzahlen bei jedem
+ * eintreffenden Ereignis zwischen den Läufen hin und her.
+ */
+const searchProgress = new Map();
+
+function mergeSearchProgress(update) {
+  const index = Number.isInteger(update.searchIndex) ? update.searchIndex : 0;
+  searchProgress.set(index, update);
+  if (searchProgress.size <= 1) return update;
+  let leader = update;
+  let explored = 0;
+  let improvements = 0;
+  for (const entry of searchProgress.values()) {
+    if ((Number(entry.progress) || 0) > (Number(leader.progress) || 0)) leader = entry;
+    explored += Number(entry.exploredNodes ?? entry.evaluations) || 0;
+    improvements += Number(entry.improvements) || 0;
+  }
+  return { ...leader, exploredNodes: explored, evaluations: explored, improvements };
+}
+
+function updateProgress(rawUpdate) {
+  const update = mergeSearchProgress(rawUpdate);
   const percent = Math.round(Math.max(0, Math.min(1, Number(update.progress) || 0)) * 100);
   dialog.dataset.phase = update.phase || 'search';
   byId('autoPlanPercent').textContent = String(percent);
@@ -908,6 +939,7 @@ function resetProgress(monthData) {
   }
   byId('autoPlanBody').scrollTop = 0;
   stopClock();
+  searchProgress.clear();
   renderPhases('analysis');
   buildGrid(monthData);
   visualizer?.stop();
@@ -932,6 +964,9 @@ async function startPlanner() {
   dialog.dataset.phase = 'analysis';
   byId('autoPlanConfig').hidden = true;
   byId('autoPlanStage').hidden = false;
+  byId('autoPlanSubtitle').textContent = workersAvailable()
+    ? `${getMonthLabel(activeMonth.year, activeMonth.month)} · ${parallelSearchCount()} parallele Suchläufe auf eigenen Kernen`
+    : `${getMonthLabel(activeMonth.year, activeMonth.month)} · Optimierung läuft`;
   byId('autoPlanStartBtn').hidden = true;
   byId('autoPlanBody').scrollTop = 0;
   trigger.disabled = true;
@@ -942,20 +977,18 @@ async function startPlanner() {
   startClock();
 
   try {
-    proposal = await buildAutoPlan({
+    proposal = await runAutoPlan({
       state,
       monthData: activeMonth,
       year: activeMonth.year,
       month: activeMonth.month,
       runConfig,
       signal: controller.signal,
-      onProgress: async update => {
-        updateProgress(update);
-        if (update.phase === 'complete' || update.phase === 'blocked') {
-          await new Promise(resolve => setTimeout(resolve, 620));
-        }
-      }
+      onProgress: update => updateProgress(update)
     });
+    // Kurz stehen lassen: Der Balken erreicht sichtbar hundert Prozent, bevor
+    // die Ansicht auf das Ergebnis wechselt.
+    await new Promise(resolve => setTimeout(resolve, 620));
     renderResult(proposal);
   } catch (error) {
     if (error?.name === 'AbortError') return;
