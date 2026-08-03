@@ -1,5 +1,5 @@
-import { api } from './api.js?v=20260801.11';
-import { loadMonth, monthKey, state } from './state.js?v=20260801.11';
+import { api } from './api.js?v=20260803.2';
+import { loadMonth, monthKey, state } from './state.js?v=20260803.2';
 
 const MOTION_DURATION_MS = 430;
 const PREFETCH_TIMEOUT_MS = 5000;
@@ -36,7 +36,7 @@ function installTransitionStylesheet() {
   const link = existing || document.createElement('link');
   if (!existing) {
     link.rel = 'stylesheet';
-    link.href = '/transitions.css?v=20260801.11';
+    link.href = '/transitions.css?v=20260803.2';
     link.dataset.monthMotionStyles = 'true';
     document.head.appendChild(link);
   }

@@ -1,121 +1,80 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
-  <title id="title">DienstplanRAD animiertes App Icon</title>
-  <desc id="desc">Kalendertabelle, deren Felder langsam durch die zwölf Monatsfarben wandern.</desc>
+  <title id="title">DienstplanRAD animiertes App-Icon</title>
+  <desc id="desc">Farbige Dienstknoten kreisen in einer Kalenderfläche um den pulsierenden Auto-Plan-Kern.</desc>
   <style>
-    .orb,.cell,.sheen,.binder{transform-box:fill-box;transform-origin:center}
-    .orb-a{animation:orbA 15s ease-in-out infinite alternate}
-    .orb-b{animation:orbB 17s ease-in-out infinite alternate}
-    .orb-c{animation:orbC 13s ease-in-out infinite alternate}
-    .sheen{animation:sheen 7.5s cubic-bezier(.35,0,.25,1) infinite}
-    .cell{animation:none 24s linear infinite}
-    .m0{animation-name:cellCycle0}
-    .m1{animation-name:cellCycle1}
-    .m2{animation-name:cellCycle2}
-    .m3{animation-name:cellCycle3}
-    .m4{animation-name:cellCycle4}
-    .m5{animation-name:cellCycle5}
-    .m6{animation-name:cellCycle6}
-    .m7{animation-name:cellCycle7}
-    .m8{animation-name:cellCycle8}
-    .m9{animation-name:cellCycle9}
-    .m10{animation-name:cellCycle10}
-    .m11{animation-name:cellCycle11}
-    @keyframes orbA{to{transform:translate(24px,16px) scale(1.12)}}
-    @keyframes orbB{to{transform:translate(-26px,-18px) scale(1.1)}}
-    @keyframes orbC{to{transform:translate(16px,-22px) scale(1.14)}}
-    @keyframes sheen{0%,22%{transform:translateX(-260px) rotate(18deg);opacity:0}38%{opacity:.5}70%,100%{transform:translateX(300px) rotate(18deg);opacity:0}}
-    @keyframes cellCycle0{0.00%{fill:#14b6f7}8.33%{fill:#fec5d0}16.67%{fill:#69a657}25.00%{fill:#fba4fd}33.33%{fill:#afa661}41.67%{fill:#5feedc}50.00%{fill:#f35e26}58.33%{fill:#f7de9b}66.67%{fill:#c44381}75.00%{fill:#eac3b0}83.33%{fill:#5c7cca}91.67%{fill:#a8cdb4}100%{fill:#14b6f7}}@keyframes cellCycle1{0.00%{fill:#fec5d0}8.33%{fill:#69a657}16.67%{fill:#fba4fd}25.00%{fill:#afa661}33.33%{fill:#5feedc}41.67%{fill:#f35e26}50.00%{fill:#f7de9b}58.33%{fill:#c44381}66.67%{fill:#eac3b0}75.00%{fill:#5c7cca}83.33%{fill:#a8cdb4}91.67%{fill:#14b6f7}100%{fill:#fec5d0}}@keyframes cellCycle2{0.00%{fill:#69a657}8.33%{fill:#fba4fd}16.67%{fill:#afa661}25.00%{fill:#5feedc}33.33%{fill:#f35e26}41.67%{fill:#f7de9b}50.00%{fill:#c44381}58.33%{fill:#eac3b0}66.67%{fill:#5c7cca}75.00%{fill:#a8cdb4}83.33%{fill:#14b6f7}91.67%{fill:#fec5d0}100%{fill:#69a657}}@keyframes cellCycle3{0.00%{fill:#fba4fd}8.33%{fill:#afa661}16.67%{fill:#5feedc}25.00%{fill:#f35e26}33.33%{fill:#f7de9b}41.67%{fill:#c44381}50.00%{fill:#eac3b0}58.33%{fill:#5c7cca}66.67%{fill:#a8cdb4}75.00%{fill:#14b6f7}83.33%{fill:#fec5d0}91.67%{fill:#69a657}100%{fill:#fba4fd}}@keyframes cellCycle4{0.00%{fill:#afa661}8.33%{fill:#5feedc}16.67%{fill:#f35e26}25.00%{fill:#f7de9b}33.33%{fill:#c44381}41.67%{fill:#eac3b0}50.00%{fill:#5c7cca}58.33%{fill:#a8cdb4}66.67%{fill:#14b6f7}75.00%{fill:#fec5d0}83.33%{fill:#69a657}91.67%{fill:#fba4fd}100%{fill:#afa661}}@keyframes cellCycle5{0.00%{fill:#5feedc}8.33%{fill:#f35e26}16.67%{fill:#f7de9b}25.00%{fill:#c44381}33.33%{fill:#eac3b0}41.67%{fill:#5c7cca}50.00%{fill:#a8cdb4}58.33%{fill:#14b6f7}66.67%{fill:#fec5d0}75.00%{fill:#69a657}83.33%{fill:#fba4fd}91.67%{fill:#afa661}100%{fill:#5feedc}}@keyframes cellCycle6{0.00%{fill:#f35e26}8.33%{fill:#f7de9b}16.67%{fill:#c44381}25.00%{fill:#eac3b0}33.33%{fill:#5c7cca}41.67%{fill:#a8cdb4}50.00%{fill:#14b6f7}58.33%{fill:#fec5d0}66.67%{fill:#69a657}75.00%{fill:#fba4fd}83.33%{fill:#afa661}91.67%{fill:#5feedc}100%{fill:#f35e26}}@keyframes cellCycle7{0.00%{fill:#f7de9b}8.33%{fill:#c44381}16.67%{fill:#eac3b0}25.00%{fill:#5c7cca}33.33%{fill:#a8cdb4}41.67%{fill:#14b6f7}50.00%{fill:#fec5d0}58.33%{fill:#69a657}66.67%{fill:#fba4fd}75.00%{fill:#afa661}83.33%{fill:#5feedc}91.67%{fill:#f35e26}100%{fill:#f7de9b}}@keyframes cellCycle8{0.00%{fill:#c44381}8.33%{fill:#eac3b0}16.67%{fill:#5c7cca}25.00%{fill:#a8cdb4}33.33%{fill:#14b6f7}41.67%{fill:#fec5d0}50.00%{fill:#69a657}58.33%{fill:#fba4fd}66.67%{fill:#afa661}75.00%{fill:#5feedc}83.33%{fill:#f35e26}91.67%{fill:#f7de9b}100%{fill:#c44381}}@keyframes cellCycle9{0.00%{fill:#eac3b0}8.33%{fill:#5c7cca}16.67%{fill:#a8cdb4}25.00%{fill:#14b6f7}33.33%{fill:#fec5d0}41.67%{fill:#69a657}50.00%{fill:#fba4fd}58.33%{fill:#afa661}66.67%{fill:#5feedc}75.00%{fill:#f35e26}83.33%{fill:#f7de9b}91.67%{fill:#c44381}100%{fill:#eac3b0}}@keyframes cellCycle10{0.00%{fill:#5c7cca}8.33%{fill:#a8cdb4}16.67%{fill:#14b6f7}25.00%{fill:#fec5d0}33.33%{fill:#69a657}41.67%{fill:#fba4fd}50.00%{fill:#afa661}58.33%{fill:#5feedc}66.67%{fill:#f35e26}75.00%{fill:#f7de9b}83.33%{fill:#c44381}91.67%{fill:#eac3b0}100%{fill:#5c7cca}}@keyframes cellCycle11{0.00%{fill:#a8cdb4}8.33%{fill:#14b6f7}16.67%{fill:#fec5d0}25.00%{fill:#69a657}33.33%{fill:#fba4fd}41.67%{fill:#afa661}50.00%{fill:#5feedc}58.33%{fill:#f35e26}66.67%{fill:#f7de9b}75.00%{fill:#c44381}83.33%{fill:#eac3b0}91.67%{fill:#5c7cca}100%{fill:#a8cdb4}}
-    @media (prefers-reduced-motion:reduce){*{animation:none!important}.sheen{display:none}}
+    .orbit-outer,.orbit-inner,.core,.signal{transform-box:fill-box;transform-origin:center}
+    .orbit-outer{animation:spin 26s linear infinite}
+    .orbit-inner{animation:spin-reverse 17s linear infinite}
+    .core{animation:breathe 2.8s ease-in-out infinite}
+    .signal{animation:signal 2.4s ease-in-out infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    @keyframes spin-reverse{to{transform:rotate(-360deg)}}
+    @keyframes breathe{50%{transform:scale(1.08);opacity:.92}}
+    @keyframes signal{0%,100%{opacity:.28}50%{opacity:1}}
+    @media (prefers-reduced-motion:reduce){*{animation:none!important}}
   </style>
   <defs>
-    <linearGradient id="bg" x1="60" y1="30" x2="452" y2="482" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#1b2734"/><stop offset="0.54" stop-color="#0d131b"/><stop offset="1" stop-color="#080b10"/>
+    <linearGradient id="background" x1="56" y1="24" x2="456" y2="488" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#192838"/><stop offset="0.48" stop-color="#0b1320"/><stop offset="1" stop-color="#070a11"/>
     </linearGradient>
-    <linearGradient id="spectrum" x1="96" y1="0" x2="416" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0.0000" stop-color="#14b6f7"/><stop offset="0.0909" stop-color="#fec5d0"/><stop offset="0.1818" stop-color="#69a657"/><stop offset="0.2727" stop-color="#fba4fd"/><stop offset="0.3636" stop-color="#afa661"/><stop offset="0.4545" stop-color="#5feedc"/><stop offset="0.5455" stop-color="#f35e26"/><stop offset="0.6364" stop-color="#f7de9b"/><stop offset="0.7273" stop-color="#c44381"/><stop offset="0.8182" stop-color="#eac3b0"/><stop offset="0.9091" stop-color="#5c7cca"/><stop offset="1.0000" stop-color="#a8cdb4"/></linearGradient>
-    <linearGradient id="card" x1="64" y1="78" x2="448" y2="442" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#ffffff" stop-opacity="0.16"/><stop offset="0.5" stop-color="#eaf2f9" stop-opacity="0.08"/><stop offset="1" stop-color="#dce7f0" stop-opacity="0.05"/>
+    <linearGradient id="spectrum" x1="104" y1="0" x2="408" y2="0" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#14b6f7"/><stop offset="0.18" stop-color="#5feedc"/><stop offset="0.36" stop-color="#69a657"/><stop offset="0.52" stop-color="#f7de9b"/><stop offset="0.68" stop-color="#f35e26"/><stop offset="0.84" stop-color="#fba4fd"/><stop offset="1" stop-color="#5c7cca"/>
     </linearGradient>
-    <linearGradient id="cardStroke" x1="64" y1="78" x2="448" y2="442" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#ffffff" stop-opacity="0.55"/><stop offset="0.5" stop-color="#ffffff" stop-opacity="0.2"/><stop offset="1" stop-color="#ffffff" stop-opacity="0.09"/>
+    <linearGradient id="glass" x1="72" y1="60" x2="440" y2="458" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff" stop-opacity="0.19"/><stop offset="0.48" stop-color="#dcecf7" stop-opacity="0.08"/><stop offset="1" stop-color="#dcecf7" stop-opacity="0.035"/>
     </linearGradient>
-    <radialGradient id="auroraA" cx="0" cy="0" r="1" gradientTransform="translate(120 116) rotate(38) scale(224)">
-      <stop stop-color="#14b6f7" stop-opacity="0.62"/><stop offset="1" stop-color="#14b6f7" stop-opacity="0"/>
+    <linearGradient id="glass-stroke" x1="76" y1="62" x2="436" y2="452" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff" stop-opacity="0.68"/><stop offset="0.42" stop-color="#b9d6ea" stop-opacity="0.24"/><stop offset="1" stop-color="#ffffff" stop-opacity="0.1"/>
+    </linearGradient>
+    <radialGradient id="core-gradient" cx="0" cy="0" r="1" gradientTransform="translate(238 263) rotate(52) scale(94)">
+      <stop stop-color="#ffffff"/><stop offset="0.2" stop-color="#bffaff"/><stop offset="0.48" stop-color="#5feedc"/><stop offset="0.74" stop-color="#5c7cca"/><stop offset="1" stop-color="#1d2d62"/>
     </radialGradient>
-    <radialGradient id="auroraB" cx="0" cy="0" r="1" gradientTransform="translate(408 372) rotate(-146) scale(236)">
-      <stop stop-color="#f35e26" stop-opacity="0.46"/><stop offset="1" stop-color="#f35e26" stop-opacity="0"/>
+    <radialGradient id="aura" cx="0" cy="0" r="1" gradientTransform="translate(256 282) scale(178)">
+      <stop stop-color="#5feedc" stop-opacity="0.24"/><stop offset="0.55" stop-color="#5c7cca" stop-opacity="0.1"/><stop offset="1" stop-color="#5c7cca" stop-opacity="0"/>
     </radialGradient>
-    <radialGradient id="auroraC" cx="0" cy="0" r="1" gradientTransform="translate(96 428) rotate(-28) scale(196)">
-      <stop stop-color="#afa661" stop-opacity="0.4"/><stop offset="1" stop-color="#afa661" stop-opacity="0"/>
-    </radialGradient>
-    <filter id="cardShadow" x="-35%" y="-35%" width="170%" height="180%">
-      <feDropShadow dx="0" dy="22" stdDeviation="22" flood-color="#000000" flood-opacity="0.5"/>
-      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.3"/>
-    </filter>
-    <clipPath id="cardClip"><rect x="64" y="78" width="384" height="364" rx="76"/></clipPath>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="175%"><feDropShadow dx="0" dy="20" stdDeviation="18" flood-color="#000000" flood-opacity="0.52"/></filter>
+    <filter id="glow" x="-120%" y="-120%" width="340%" height="340%"><feGaussianBlur stdDeviation="7" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <clipPath id="outer-clip"><rect width="512" height="512" rx="116"/></clipPath>
+    <clipPath id="page-clip"><rect x="64" y="64" width="384" height="392" rx="92"/></clipPath>
   </defs>
 
-  <rect width="512" height="512" fill="url(#bg)"/>
-  <rect x="7" y="7" width="498" height="498" rx="112" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="2"/>
-  <circle class="orb orb-a" cx="120" cy="116" r="224" fill="url(#auroraA)"/>
-  <circle class="orb orb-b" cx="408" cy="372" r="236" fill="url(#auroraB)"/>
-  <circle class="orb orb-c" cx="96" cy="428" r="196" fill="url(#auroraC)"/>
-
-  <g class="binder">
-    <rect x="150" y="42" width="22" height="62" rx="11" fill="#5feedc" fill-opacity="0.9"/>
-    <rect x="245" y="42" width="22" height="62" rx="11" fill="#eac3b0" fill-opacity="0.9"/>
-    <rect x="340" y="42" width="22" height="62" rx="11" fill="#fec5d0" fill-opacity="0.9"/>
+  <rect width="512" height="512" rx="116" fill="url(#background)"/>
+  <circle cx="92" cy="92" r="170" fill="#14b6f7" opacity="0.08" clip-path="url(#outer-clip)"/>
+  <circle cx="448" cy="392" r="190" fill="#fba4fd" opacity="0.075" clip-path="url(#outer-clip)"/>
+  <rect x="7" y="7" width="498" height="498" rx="110" fill="none" stroke="#ffffff" stroke-opacity="0.08" stroke-width="2"/>
+  <g filter="url(#shadow)"><rect x="64" y="64" width="384" height="392" rx="92" fill="url(#glass)" stroke="url(#glass-stroke)" stroke-width="3"/></g>
+  <g clip-path="url(#page-clip)">
+    <rect x="64" y="64" width="384" height="78" fill="#06101a" fill-opacity="0.46"/>
+    <rect x="100" y="116" width="312" height="10" rx="5" fill="url(#spectrum)"/>
+    <path d="M96 164H416" stroke="#ffffff" stroke-opacity="0.1" stroke-width="2"/>
+    <circle cx="256" cy="286" r="178" fill="url(#aura)"/>
+    <path d="M44 84L214 470" stroke="#ffffff" stroke-opacity="0.045" stroke-width="54"/>
+  </g>
+  <g aria-hidden="true">
+    <rect x="150" y="42" width="24" height="60" rx="12" fill="#14b6f7"/><rect x="244" y="42" width="24" height="60" rx="12" fill="#5feedc"/><rect x="338" y="42" width="24" height="60" rx="12" fill="#fba4fd"/>
+    <path d="M150 70V86M244 70V86M338 70V86" stroke="#ffffff" stroke-opacity="0.55" stroke-width="3" stroke-linecap="round"/>
   </g>
 
-  <g filter="url(#cardShadow)">
-    <rect x="64" y="78" width="384" height="364" rx="76" fill="url(#card)" stroke="url(#cardStroke)" stroke-width="3"/>
+  <g class="orbit-outer" aria-hidden="true">
+    <circle cx="256" cy="286" r="129" fill="none" stroke="#bfe8ff" stroke-opacity="0.2" stroke-width="3"/>
+    <path d="M256 157L314 171L358 216L385 286L358 356L314 401L256 415L198 401L154 356L127 286L154 216L198 171Z" fill="none" stroke="#ccecff" stroke-opacity="0.18" stroke-width="2"/>
+    <g filter="url(#glow)">
+      <circle cx="256" cy="157" r="10" fill="#14b6f7"/><circle cx="314" cy="171" r="8" fill="#fec5d0"/><circle cx="358" cy="216" r="10" fill="#69a657"/><circle cx="385" cy="286" r="9" fill="#fba4fd"/>
+      <circle cx="358" cy="356" r="10" fill="#afa661"/><circle cx="314" cy="401" r="8" fill="#5feedc"/><circle cx="256" cy="415" r="10" fill="#f35e26"/><circle cx="198" cy="401" r="8" fill="#f7de9b"/>
+      <circle cx="154" cy="356" r="10" fill="#c44381"/><circle cx="127" cy="286" r="9" fill="#eac3b0"/><circle cx="154" cy="216" r="10" fill="#5c7cca"/><circle cx="198" cy="171" r="8" fill="#a8cdb4"/>
+    </g>
   </g>
-  <g clip-path="url(#cardClip)">
-    <rect x="64" y="78" width="384" height="52" fill="url(#spectrum)"/>
-    <rect x="82" y="178" width="348" height="262" rx="30" fill="#060a10" fill-opacity="0.42"/>
-    <rect class="sheen" x="40" y="60" width="120" height="420" transform="rotate(18 100 270)" fill="#ffffff" fill-opacity="0.05"/>
-    <rect x="96" y="158" width="38" height="12" rx="6" fill="#14b6f7" fill-opacity="0.7"/>
-    <rect x="143" y="158" width="38" height="12" rx="6" fill="#5feedc" fill-opacity="0.7"/>
-    <rect x="190" y="158" width="38" height="12" rx="6" fill="#5c7cca" fill-opacity="0.7"/>
-    <rect x="237" y="158" width="38" height="12" rx="6" fill="#fba4fd" fill-opacity="0.7"/>
-    <rect x="284" y="158" width="38" height="12" rx="6" fill="#c44381" fill-opacity="0.7"/>
-    <rect x="331" y="158" width="38" height="12" rx="6" fill="#fec5d0" fill-opacity="0.95"/>
-    <rect x="378" y="158" width="38" height="12" rx="6" fill="#f35e26" fill-opacity="0.95"/>
-    <rect class="cell m0" style="animation-delay:0.00s" x="96" y="196" width="38" height="38" rx="12" fill="#14b6f7" fill-opacity="0.6"/>
-    <rect class="cell m5" style="animation-delay:-0.42s" x="143" y="196" width="38" height="38" rx="12" fill="#5feedc" fill-opacity="1"/>
-    <rect class="cell m10" style="animation-delay:-0.84s" x="190" y="196" width="38" height="38" rx="12" fill="#5c7cca" fill-opacity="0.6"/>
-    <rect class="cell m3" style="animation-delay:-1.26s" x="237" y="196" width="38" height="38" rx="12" fill="#fba4fd" fill-opacity="1"/>
-    <rect class="cell m8" style="animation-delay:-1.68s" x="284" y="196" width="38" height="38" rx="12" fill="#c44381" fill-opacity="0.6"/>
-    <rect class="cell m1" style="animation-delay:-2.10s" x="331" y="196" width="38" height="38" rx="12" fill="#fec5d0" fill-opacity="1"/>
-    <rect class="cell m6" style="animation-delay:-2.52s" x="378" y="196" width="38" height="38" rx="12" fill="#f35e26" fill-opacity="0.78"/>
-    <rect class="cell m7" style="animation-delay:-2.94s" x="96" y="243" width="38" height="38" rx="12" fill="#f7de9b" fill-opacity="0.6"/>
-    <rect class="cell m0" style="animation-delay:-3.36s" x="143" y="243" width="38" height="38" rx="12" fill="#14b6f7" fill-opacity="0.6"/>
-    <rect class="cell m5" style="animation-delay:-3.78s" x="190" y="243" width="38" height="38" rx="12" fill="#5feedc" fill-opacity="0.6"/>
-    <rect class="cell m10" style="animation-delay:-4.20s" x="237" y="243" width="38" height="38" rx="12" fill="#5c7cca" fill-opacity="1"/>
-    <rect class="cell m3" style="animation-delay:-4.62s" x="284" y="243" width="38" height="38" rx="12" fill="#fba4fd" fill-opacity="0.6"/>
-    <rect class="cell m8" style="animation-delay:-5.04s" x="331" y="243" width="38" height="38" rx="12" fill="#c44381" fill-opacity="0.78"/>
-    <rect class="cell m1" style="animation-delay:-5.46s" x="378" y="243" width="38" height="38" rx="12" fill="#fec5d0" fill-opacity="1"/>
-    <rect class="cell m2" style="animation-delay:-5.88s" x="96" y="290" width="38" height="38" rx="12" fill="#69a657" fill-opacity="1"/>
-    <rect class="cell m7" style="animation-delay:-6.30s" x="143" y="290" width="38" height="38" rx="12" fill="#f7de9b" fill-opacity="0.6"/>
-    <rect class="cell m0" style="animation-delay:-6.72s" x="190" y="290" width="38" height="38" rx="12" fill="#14b6f7" fill-opacity="0.6"/>
-    <rect class="cell m5" style="animation-delay:-7.14s" x="237" y="290" width="38" height="38" rx="12" fill="#5feedc" fill-opacity="0.6"/>
-    <rect class="cell m10" style="animation-delay:-7.56s" x="284" y="290" width="38" height="38" rx="12" fill="#5c7cca" fill-opacity="0.6"/>
-    <rect class="cell m3" style="animation-delay:-7.98s" x="331" y="290" width="38" height="38" rx="12" fill="#fba4fd" fill-opacity="0.78"/>
-    <rect class="cell m8" style="animation-delay:-8.40s" x="378" y="290" width="38" height="38" rx="12" fill="#c44381" fill-opacity="1"/>
-    <rect class="cell m9" style="animation-delay:-8.82s" x="96" y="337" width="38" height="38" rx="12" fill="#eac3b0" fill-opacity="1"/>
-    <rect class="cell m2" style="animation-delay:-9.24s" x="143" y="337" width="38" height="38" rx="12" fill="#69a657" fill-opacity="0.6"/>
-    <rect class="cell m7" style="animation-delay:-9.66s" x="190" y="337" width="38" height="38" rx="12" fill="#f7de9b" fill-opacity="1"/>
-    <rect class="cell m0" style="animation-delay:-10.08s" x="237" y="337" width="38" height="38" rx="12" fill="#14b6f7" fill-opacity="0.6"/>
-    <rect class="cell m5" style="animation-delay:-10.50s" x="284" y="337" width="38" height="38" rx="12" fill="#5feedc" fill-opacity="1"/>
-    <rect class="cell m10" style="animation-delay:-10.92s" x="331" y="337" width="38" height="38" rx="12" fill="#5c7cca" fill-opacity="0.78"/>
-    <rect class="cell m3" style="animation-delay:-11.34s" x="378" y="337" width="38" height="38" rx="12" fill="#fba4fd" fill-opacity="0.78"/>
-    <rect class="cell m4" style="animation-delay:-11.76s" x="96" y="384" width="38" height="38" rx="12" fill="#afa661" fill-opacity="0.6"/>
-    <rect class="cell m9" style="animation-delay:-12.18s" x="143" y="384" width="38" height="38" rx="12" fill="#eac3b0" fill-opacity="1"/>
-    <rect class="cell m2" style="animation-delay:-12.60s" x="190" y="384" width="38" height="38" rx="12" fill="#69a657" fill-opacity="0.6"/>
-    <rect class="cell m7" style="animation-delay:-13.02s" x="237" y="384" width="38" height="38" rx="12" fill="#f7de9b" fill-opacity="0.6"/>
-    <rect class="cell m0" style="animation-delay:-13.44s" x="284" y="384" width="38" height="38" rx="12" fill="#14b6f7" fill-opacity="0.6"/>
-    <rect class="cell m5" style="animation-delay:-13.86s" x="331" y="384" width="38" height="38" rx="12" fill="#5feedc" fill-opacity="1"/>
-    <rect class="cell m10" style="animation-delay:-14.28s" x="378" y="384" width="38" height="38" rx="12" fill="#5c7cca" fill-opacity="0.78"/>
+  <g class="orbit-inner" fill="none" stroke-linecap="round" aria-hidden="true">
+    <circle cx="256" cy="286" r="88" stroke="#ffffff" stroke-opacity="0.22" stroke-width="2" stroke-dasharray="9 10"/>
+    <circle cx="256" cy="286" r="63" stroke="url(#spectrum)" stroke-opacity="0.62" stroke-width="4" stroke-dasharray="64 18"/>
+    <path class="signal" d="M256 198L318 220L344 286L318 354L256 374L194 354L168 286L194 220Z" stroke="#d8f4ff" stroke-opacity="0.65" stroke-width="2"/>
   </g>
-  <rect x="64" y="78" width="384" height="364" rx="76" fill="none" stroke="#ffffff" stroke-opacity="0.12" stroke-width="2"/>
-
+  <g class="core" aria-hidden="true">
+    <circle cx="256" cy="286" r="48" fill="#06101c" stroke="#ffffff" stroke-opacity="0.42" stroke-width="2"/>
+    <circle cx="256" cy="286" r="38" fill="url(#core-gradient)"/>
+    <circle cx="256" cy="286" r="24" fill="#061521" fill-opacity="0.52" stroke="#ffffff" stroke-opacity="0.5" stroke-width="2"/>
+    <circle cx="256" cy="286" r="7" fill="#ffffff"/>
+    <path d="M236 276C247 258 274 258 283 278M234 296C248 315 275 313 284 292" fill="none" stroke="#ffffff" stroke-opacity="0.76" stroke-width="4" stroke-linecap="round"/>
+  </g>
+  <rect x="64" y="64" width="384" height="392" rx="92" fill="none" stroke="#ffffff" stroke-opacity="0.13" stroke-width="2"/>
 </svg>

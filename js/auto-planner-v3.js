@@ -7,7 +7,7 @@ import {
   normalizeAutoPlanConfig,
   planningFingerprint,
   validateAutoPlanConfig
-} from './auto-planner-engine.js?v=20260801.11';
+} from './auto-planner-engine.js?v=20260803.2';
 import {
   computeWeekendEquivalent,
   countHgForAaBdExcept,
@@ -17,9 +17,9 @@ import {
   getPreference,
   isPositivePreference,
   setAssignment
-} from './rules.js?v=20260801.11';
-import { createPacer } from './cooperative-scheduling.js?v=20260801.11';
-import { syncPeerCache } from './auto-planner-engine.js?v=20260801.11';
+} from './rules.js?v=20260803.2';
+import { createPacer } from './cooperative-scheduling.js?v=20260803.2';
+import { syncPeerCache } from './auto-planner-engine.js?v=20260803.2';
 
 export {
   autoPlanConfigFingerprint,
