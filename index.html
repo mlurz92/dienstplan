@@ -286,8 +286,11 @@
         <button type="button" class="office-sheet-tab" data-sheet-action="autoPlanBtn">Auto-Plan</button>
         <button type="button" class="office-sheet-add" aria-label="Neues Blatt nicht verfügbar" title="Alle Arbeitsbereiche sind bereits angelegt" disabled>＋</button>
       </nav>
-      <div class="office-statusbar" role="status">
-        <span class="office-ready"><i aria-hidden="true"></i>Bereit</span>
+      <div class="office-statusbar">
+        <span id="workbookSaveStatus" class="office-ready" role="status" aria-live="polite"
+              aria-atomic="true" data-save-mode="loading">
+          <i aria-hidden="true"></i><span id="workbookSaveStatusText">Bereit</span>
+        </span>
         <span>Barrierefreiheit: geprüft</span>
         <span class="office-zoom" aria-label="Zoomstufe 100 Prozent">− <b>100 %</b> ＋</span>
       </div>

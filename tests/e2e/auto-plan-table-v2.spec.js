@@ -64,6 +64,7 @@ test('Auto-Plan präsentiert BD und HG jedes Tages gemeinsam wie die Diensttabel
   const api = await mockApi(page);
   await openJuly(page);
 
+  await page.locator('[data-ribbon-tab="auto-plan"]').click();
   await page.locator('#autoPlanBtn').click();
   await expect(page.locator('#autoPlanConfig')).toBeVisible();
   await expect(page.locator('#autoPlanLimitBody tr')).toHaveCount(staff.length);

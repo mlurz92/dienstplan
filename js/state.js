@@ -1,8 +1,8 @@
 import {
   createEmptyMonth, DEFAULT_SETTINGS, DEFAULT_STAFF, MONTH_NAMES, normalizeBackupPayload,
   normalizeMonthData, normalizeRbnNames, normalizeSettings, normalizeStaffList
-} from './defaults.js?v=20260803.5';
-import { api } from './api.js?v=20260803.5';
+} from './defaults.js?v=20260803.6';
+import { api } from './api.js?v=20260803.6';
 
 const LOCAL_KEY_PREFIX = 'dienstplanrad:';
 const DIRTY_MONTHS_KEY = `${LOCAL_KEY_PREFIX}dirty-months`;

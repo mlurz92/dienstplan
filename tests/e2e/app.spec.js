@@ -87,7 +87,7 @@ test('Belegte Dienstfelder zeigen keinen Badge, der Picker aber weiterhin die Be
   await expect(lurz.locator('.reasons')).not.toBeEmpty();
 });
 
-test('Werkzeugleiste ist semantisch gruppiert und das Farbbadge bleibt frei vom Editionsnamen', async ({ page }) => {
+test('Excel-Ribbon ist semantisch gruppiert und das Farbbadge bleibt frei vom Editionsnamen', async ({ page }) => {
   const month = emptyMonth(2026, 1);
   await mockApi(page, month);
   await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -97,13 +97,15 @@ test('Werkzeugleiste ist semantisch gruppiert und das Farbbadge bleibt frei vom 
 
   const toolbar = page.locator('.toolbar.toolbar-organized');
   await expect(toolbar).toBeVisible();
-  await expect(toolbar.locator('.toolbar-section')).toHaveCount(4);
-  await expect(toolbar.locator('.toolbar-section-label')).toHaveText(['Planung', 'Daten', 'Ausgabe', 'App']);
+  await expect(page.locator('.office-ribbon-tabs [role="tab"]')).toHaveCount(6);
+  await expect(toolbar.locator('.toolbar-section')).toHaveCount(7);
+  await expect(toolbar.locator('.toolbar-section-label')).toHaveText([
+    'Öffnen', 'Exportieren', 'Plan bearbeiten', 'Monat', 'Optimieren', 'Aktualisieren', 'Darstellung'
+  ]);
   await expect(toolbar.locator('.toolbar-section .tool-action')).toHaveCount(12);
+  await page.locator('[data-ribbon-tab="auto-plan"]').click();
   await expect(toolbar.locator('#autoPlanBtn')).toBeVisible();
   await expect(toolbar.locator('#autoPlanBtn .tool-icon')).toHaveCount(1);
-  // Die Überlauf-Schaltfläche gehört zur Leiste, aber zu keiner Gruppe.
-  await expect(toolbar.locator('#toolbarOverflowBtn')).toHaveCount(1);
   await expect(page.locator('#todayBtn .tool-icon')).toHaveCount(1);
   await expect(page.locator('#clearMonthBtn')).toHaveClass(/tool-action--danger/);
   await expect(page.locator('#excelImportInput').locator('xpath=..')).toHaveAttribute('aria-label', 'Excel-Datei importieren');
@@ -125,6 +127,7 @@ test('Einstellungen öffnen fokussiert, validiert, speichert und stellt Fokus wi
   await mockApi(page, month);
   await page.goto('/');
 
+  await page.locator('[data-ribbon-tab="view"]').click();
   const trigger = page.locator('#settingsBtn');
   await trigger.click();
   const dialog = page.locator('#settingsDialog');

@@ -88,7 +88,7 @@ Release 0.7.1 richtet die gesamte Arbeitsoberfläche an der aktuellen, dichten I
 - Die Befehlsfläche verwendet Excel-typische Symbol-/Beschriftungsgruppen. Import, Export, Monatsbearbeitung, Auto-Plan, Aktualisierung und Einstellungen bleiben anhand ihrer Aufgabe auffindbar.
 - Eine Formelzeile zeigt den sichtbaren Monatskontext und bei Tastatur- oder Zeigerfokus die aktuell gewählte Tabellenzelle.
 - Die Dienstplantabelle bleibt wie ein Arbeitsblatt vollständig deckend, präzise gerastert und auch im Dunkelmodus kontraststark. Transparenz und Unschärfe sind auf Titelbereich, Menüband und Dialograhmen begrenzt.
-- Blattreiter führen direkt zu **Dienstplan**, **Statistik**, **Offene Punkte** und **Auto-Plan**; die Statusleiste hält Betriebs-, Accessibility- und Ansichtsstatus am Fensterrand sichtbar.
+- Blattreiter führen direkt zu **Dienstplan**, **Statistik**, **Offene Punkte** und **Auto-Plan**; die Statusleiste spiegelt den tatsächlichen Speicher-, Offline- und Fehlerzustand auch dann, wenn die kompakte Titelleistenanzeige responsiv ausgeblendet ist.
 - `Systemeinstellung`, Hell und Dunkel teilen Struktur und Bedienlogik. Die lokale Präferenz wird vor dem ersten Paint gelesen; `color-scheme` und Browser-`theme-color` folgen dem aktiven Modus. Manifest und helle Browser-Chrome verwenden Office-Grün `#107c41`, die dunkle Browser-Chrome `#0a5f34`.
 - Schmale Ansichten erhalten ein horizontal bedienbares Menüband, sticky Tag-/Wochentagsspalten und kartenförmige Statistik. Grobe Zeigegeräte erhalten mindestens 44 Pixel große Ziele.
 - Picker, Sammeldialoge, Einstellungen und Auto-Plan Studio verwenden dieselbe Office-Hierarchie, semantische Statusfarben und deckende Inhaltsflächen.
@@ -567,7 +567,7 @@ Die CI führt aus:
 3. Node-Test-Suite
 4. Playwright-Browsertests
 
-Für Release 0.7.1 wurden lokal **355/355 Node-Tests** und **52/52 Chromium-E2E-Szenarien** erfolgreich ausgeführt.
+Für Release 0.7.1 wurden lokal **355/355 Node-Tests** und **54/54 Chromium-E2E-Szenarien** erfolgreich ausgeführt.
 
 Neue v7.5-Regressionstests prüfen zusätzlich zu den v7-Gates insbesondere:
 
@@ -600,6 +600,7 @@ Die Designsystem-Regressionen aus Release 0.7.1 prüfen darüber hinaus:
 - Theme-Wiederherstellung vor Abschluss eines künstlich verzögerten Bootstrap-Abrufs;
 - eindeutige Zuordnung aller Befehle zu sechs Registerkarten und semantisch korrekte Registerflächen;
 - Tastatursteuerung mit Pfeiltasten, `Pos1`, `Ende` und `Strg+F1`;
+- Befehlssuche bei zuvor eingeklapptem Menüband sowie responsiv sichtbare Offline-/Fehlerzustände nach fehlgeschlagener Speicherung;
 - Mindestgrößen der kompakten Titelleiste und der Menübandbefehle;
 - statisches dekoratives Chrom und Reduced Motion;
 - Textkontrast von mindestens 4,5:1 auf dunklen Monats-, Wochenend-, Sammeldialog- und Auto-Plan-Flächen;

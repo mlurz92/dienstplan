@@ -1,11 +1,11 @@
-import { isRegularWorkdayIso } from './holidays.js?v=20260803.5';
-import { isRbnValueAllowed, isSecondRbnAvailable } from './rbn.js?v=20260803.5';
+import { isRegularWorkdayIso } from './holidays.js?v=20260803.6';
+import { isRbnValueAllowed, isSecondRbnAvailable } from './rbn.js?v=20260803.6';
 import {
   ABSENCE_FOR_CT_LEADERSHIP, computeWeekendEquivalent, countRoleInMonth, dayIso,
   externalAssignmentLabel, fmtGermanDate, getEffectiveAbsence, getRoleProperties, getStaffById,
   isExternalAssignment, isStaffActiveDuringMonth, severityRank
-} from './rules-core.js?v=20260803.5';
-import { evaluateCandidate } from './rules-evaluation.js?v=20260803.5';
+} from './rules-core.js?v=20260803.6';
+import { evaluateCandidate } from './rules-evaluation.js?v=20260803.6';
 
 function matchingOverride(monthData, { dateIso, role, staffId, evaluation }) {
   const entries = Array.isArray(monthData?.overrideLog) ? monthData.overrideLog : [];

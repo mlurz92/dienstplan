@@ -1526,6 +1526,11 @@ html[data-app-theme="system"] { color-scheme: light dark; }
   }
   .office-ready { display: inline-flex; align-items: center; gap: 6px; }
   .office-ready i { width: 7px; height: 7px; border-radius: 50%; background: #a7e5bf; box-shadow: 0 0 0 2px rgba(255,255,255,.18); }
+  .office-ready[data-save-mode="loading"] i,
+  .office-ready[data-save-mode="saving"] i { background: var(--yellow); }
+  .office-ready[data-save-mode="saved"] i { background: var(--green); }
+  .office-ready[data-save-mode="offline"] i { background: var(--orange); }
+  .office-ready[data-save-mode="error"] i { background: var(--red); }
   .office-zoom { display: inline-flex; align-items: center; gap: 7px; }
   .office-zoom b { font-weight: 500; }
 

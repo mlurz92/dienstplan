@@ -1,7 +1,7 @@
-import { DEFAULT_SETTINGS, normalizeSettings } from './defaults.js?v=20260803.5';
-import { markBootstrapDirty, persistBootstrap, state } from './state.js?v=20260803.5';
+import { DEFAULT_SETTINGS, normalizeSettings } from './defaults.js?v=20260803.6';
+import { markBootstrapDirty, persistBootstrap, state } from './state.js?v=20260803.6';
 
-const RELEASE = '20260803.5';
+const RELEASE = '20260803.6';
 const byId = id => document.getElementById(id);
 
 function addStylesheet() {
@@ -158,7 +158,7 @@ const systemDark = typeof window !== 'undefined' && typeof window.matchMedia ===
 function syncBrowserTheme(theme) {
   const dark = theme === 'dark' || (theme === 'system' && Boolean(systemDark?.matches));
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.content = dark ? '#111820' : '#eef2f6';
+  if (meta) meta.content = dark ? '#0a5f34' : '#107c41';
 }
 
 function closeDialog() {
