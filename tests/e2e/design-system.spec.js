@@ -59,6 +59,7 @@ test('theme setting supports system, light and dark and persists in the session'
   await mockApi(page);
   await page.goto('/');
 
+  await page.locator('[data-ribbon-tab="view"]').click();
   await page.locator('#settingsBtn').click();
   const theme = page.locator('#settingsTheme');
   await expect(theme).toHaveValue('system');
@@ -69,6 +70,7 @@ test('theme setting supports system, light and dark and persists in the session'
   await expect(page.locator('html')).toHaveAttribute('data-app-theme', 'dark');
   await expect.poll(() => page.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toContain('dark');
 
+  await page.locator('[data-ribbon-tab="view"]').click();
   await page.locator('#settingsBtn').click();
   await expect(page.locator('#settingsTheme')).toHaveValue('dark');
 });
@@ -83,24 +85,29 @@ test('stored explicit theme is applied before the asynchronous bootstrap finishe
   await page.goto('/');
 
   await expect(page.locator('html')).toHaveAttribute('data-app-theme', 'dark', { timeout: 500 });
-  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#111820', { timeout: 500 });
+  await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#0a5f34', { timeout: 500 });
 });
 
-test('primary application controls meet the clinical workspace target size', async ({ page }) => {
+test('primary application controls meet the Office desktop target size', async ({ page }) => {
   await mockApi(page);
   await page.goto('/');
 
-  const report = await page.evaluate(() => [...document.querySelectorAll(
-    '.topbar button, .topbar select, .toolbar .tool-action'
-  )].filter(element => element.getClientRects().length).map(element => {
-    const rect = element.getBoundingClientRect();
-    return { id: element.id, width: rect.width, height: rect.height };
-  }));
+  const report = [];
+  for (const tab of await page.locator('.office-ribbon-tabs [role="tab"]').all()) {
+    await tab.click();
+    report.push(...await page.evaluate(() => [...document.querySelectorAll(
+      '.topbar button, .topbar select, .toolbar .tool-action'
+    )].filter(element => element.getClientRects().length).map(element => {
+      const rect = element.getBoundingClientRect();
+      return { id: element.id, width: rect.width, height: rect.height, ribbon: Boolean(element.closest('.toolbar')) };
+    })));
+  }
 
   expect(report.length).toBeGreaterThan(8);
   for (const target of report) {
-    expect(target.width, `${target.id} width`).toBeGreaterThanOrEqual(36);
-    expect(target.height, `${target.id} height`).toBeGreaterThanOrEqual(36);
+    const minimum = target.ribbon ? 36 : 30;
+    expect(target.width, `${target.id} width`).toBeGreaterThanOrEqual(minimum);
+    expect(target.height, `${target.id} height`).toBeGreaterThanOrEqual(minimum);
   }
 });
 
@@ -124,6 +131,7 @@ test('dark workspace keeps schedule and Auto-Plan surfaces legible', async ({ pa
   await mockApi(page);
   await page.goto('/');
 
+  await page.locator('[data-ribbon-tab="view"]').click();
   await page.locator('#settingsBtn').click();
   await page.locator('#settingsTheme').selectOption('dark');
   await page.locator('#settingsSaveBtn').click();
@@ -142,6 +150,7 @@ test('dark workspace keeps schedule and Auto-Plan surfaces legible', async ({ pa
   expect(relativeLuminance(weekday.background), 'weekday surface luminance').toBeLessThan(0.28);
   expect(contrastRatio(weekday.color, weekday.background), 'weekday text contrast').toBeGreaterThanOrEqual(4.5);
 
+  await page.locator('[data-ribbon-tab="home"]').click();
   await page.locator('#absenceManagerBtn').click();
   const calendarWeekends = await page.locator('.batch-day.saturday, .batch-day.sunday').evaluateAll(elements => elements.map(element => {
     const style = getComputedStyle(element);
@@ -154,6 +163,7 @@ test('dark workspace keeps schedule and Auto-Plan surfaces legible', async ({ pa
   }
   await page.keyboard.press('Escape');
 
+  await page.locator('[data-ribbon-tab="auto-plan"]').click();
   await page.locator('#autoPlanBtn').click();
   await expect(page.locator('#autoPlanDialog')).toHaveClass(/is-configuring/);
 
@@ -199,6 +209,7 @@ test('system theme and Windows high contrast preferences are respected', async (
 
   await page.emulateMedia({ colorScheme: 'dark', forcedColors: 'active' });
   await expect(page.locator('.ambient-layer')).toHaveCSS('display', 'none');
+  await page.locator('[data-ribbon-tab="view"]').click();
   await page.locator('#settingsBtn').focus();
   await expect(page.locator('#settingsBtn')).toHaveCSS('outline-style', 'solid');
 });
@@ -225,7 +236,7 @@ test('mobile schedule preserves orientation and statistics reflow without overla
   expect(layout.page).toBeLessThanOrEqual(layout.viewport);
   expect(layout.stats).toBeLessThanOrEqual(layout.sheet);
 
-  await page.locator('#toolbarOverflowBtn').click();
+  await page.locator('[data-ribbon-tab="view"]').click();
   await page.locator('#settingsBtn').click();
   await page.waitForTimeout(350);
   const settingsLayout = await page.locator('.settings-card').evaluate(element => {

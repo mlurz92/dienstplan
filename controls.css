@@ -1,194 +1,155 @@
-/* Kompakte, semantisch gruppierte Aktionsleiste. Separates Stylesheet, damit
-   die umfangreiche Tabellen- und Druckgestaltung in styles.css unberührt bleibt. */
+/**
+ * Microsoft-365-artiges Ribbon
+ *
+ * Die Befehle bleiben dieselben DOM-Knoten mit denselben IDs. Diese Schicht
+ * ordnet sie lediglich in zugängliche Ribbon-Tabs und Gruppen ein.
+ */
 
 .toolbar.toolbar-organized {
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: stretch;
-  justify-content: space-between;
-  gap: 6px;
-  padding: 6px;
-  /* Die Leiste klippt weiterhin: Solange eine Dichtestufe noch nicht bestimmt
-     ist, darf überstehender Inhalt weder sichtbar werden noch die Seite
-     waagerecht scrollen lassen. Das Überlaufmenü umgeht die Klippung über
-     `position: fixed`; dafür muss das Paint-Containment der Glaspanels hier
-     entfallen, denn Containment klippt auch fest positionierte Nachfahren. */
+  display: block;
   position: relative;
-  overflow: hidden;
-  contain: none;
   min-width: 0;
   max-width: 100%;
+  min-height: 78px;
+  padding: 0;
+  overflow: hidden;
+  contain: none;
+  border-radius: 0;
 }
 
-/* Die Gruppen schrumpfen bewusst nicht. Nur so überläuft die Leiste messbar,
-   wenn eine Dichtestufe zu breit ist – und nur so kann die Messung überhaupt
-   eine passende Stufe finden, statt die Schaltflächen zu zerdrücken. */
+.office-ribbon-panel {
+  min-width: 0;
+  min-height: 78px;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  padding: 4px 6px 2px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  overscroll-behavior-inline: contain;
+}
+
+.office-ribbon-panel[hidden] { display: none !important; }
+
 .toolbar-section {
   flex: 0 0 auto;
   min-width: 0;
   display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px;
-  border: 1px solid color-mix(in srgb, var(--month-accent) 17%, rgba(154,166,179,.46));
-  border-radius: 11px;
-  background:
-    linear-gradient(180deg, rgba(255,255,255,.91), rgba(245,248,251,.80)),
-    color-mix(in srgb, var(--month-accent) 4%, transparent);
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.98),
-    0 1px 2px rgba(9,14,20,.07);
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 2px;
+  padding: 0 8px;
+  border: 0;
+  border-right: 1px solid var(--office-divider);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
-.toolbar-section-label {
-  flex: 0 0 auto;
-  padding: 0 3px 0 4px;
-  color: #697480;
-  font-size: .57rem;
-  font-weight: 720;
-  line-height: 1;
-  letter-spacing: .075em;
-  text-transform: uppercase;
-  user-select: none;
-}
+.toolbar-section:last-child { border-right: 0; }
 
 .toolbar-actions {
   min-width: 0;
   display: flex;
   flex-wrap: nowrap;
-  align-items: center;
-  gap: 3px;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.toolbar-section-label {
+  display: block;
+  min-height: 13px;
+  padding: 0 4px;
+  color: var(--office-text-muted);
+  font-size: .66rem;
+  font-weight: 400;
+  line-height: 1.2;
+  letter-spacing: 0;
+  text-align: center;
+  text-transform: none;
+  user-select: none;
 }
 
 .toolbar .tool-action,
-.toolbar-overflow-panel .tool-action,
-.toolbar .file-btn.tool-action,
-.toolbar-overflow-panel .file-btn.tool-action{
+.toolbar .file-btn.tool-action {
   flex: 0 0 auto;
-  white-space: nowrap;
-  min-width: 32px;
-  min-height: 32px;
+  width: auto;
+  min-width: 60px;
+  min-height: 54px;
+  max-width: 102px;
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 3px;
   margin: 0;
-  padding: 0 8px;
-  border-radius: 8px;
-  color: #28323d;
-  font-size: .76rem;
-  font-weight: 620;
-  line-height: 1;
-  white-space: nowrap;
-  background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(241,245,249,.91));
-  border: 1px solid color-mix(in srgb, var(--month-accent) 13%, rgba(142,155,169,.43));
-  box-shadow:
-    inset 0 1px 0 #fff,
-    0 1px 2px rgba(9,14,20,.07);
-  transition: transform .15s ease, border-color .15s ease, background .15s ease, box-shadow .15s ease, color .15s ease;
+  padding: 4px 7px 3px;
+  white-space: normal;
+  color: var(--office-text);
+  font-size: .69rem;
+  font-weight: 400;
+  line-height: 1.08;
+  text-align: center;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  box-shadow: none;
+  transition: background-color .12s ease, border-color .12s ease, color .12s ease;
 }
 
 .toolbar .tool-action::before,
-.toolbar-overflow-panel .tool-action::before,
-.toolbar .file-btn.tool-action::before,
-.toolbar-overflow-panel .file-btn.tool-action::before{
-  display: none;
-}
+.toolbar .file-btn.tool-action::before { display: none; }
 
 .toolbar .tool-action:hover,
-.toolbar-overflow-panel .tool-action:hover,
-.toolbar .file-btn.tool-action:hover,
-.toolbar-overflow-panel .file-btn.tool-action:hover{
-  transform: translateY(-1px);
-  color: #15202b;
-  border-color: color-mix(in srgb, var(--month-accent) 44%, rgba(142,155,169,.45));
-  background: linear-gradient(180deg, #fff, color-mix(in srgb, var(--month-accent) 9%, #f5f8fb));
-  box-shadow:
-    inset 0 1px 0 #fff,
-    0 3px 8px rgba(9,14,20,.10),
-    0 0 12px color-mix(in srgb, var(--month-glow) 24%, transparent);
+.toolbar .file-btn.tool-action:hover {
+  color: var(--office-text);
+  transform: none;
+  border-color: var(--office-control-border);
+  background: var(--office-control-hover);
+  box-shadow: none;
 }
 
 .toolbar .tool-action:active,
-.toolbar-overflow-panel .tool-action:active,
-.toolbar .file-btn.tool-action:active,
-.toolbar-overflow-panel .file-btn.tool-action:active{
-  transform: translateY(0);
-  box-shadow: inset 0 1px 2px rgba(9,14,20,.10);
+.toolbar .file-btn.tool-action:active {
+  transform: none;
+  border-color: var(--office-green);
+  background: var(--office-control-pressed);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--office-green) 28%, transparent);
 }
 
-.toolbar .tool-action--accent,
-.toolbar-overflow-panel .tool-action--accent{
-  color: var(--month-accent-strong);
-  border-color: color-mix(in srgb, var(--month-accent) 39%, rgba(142,155,169,.42));
-  background: linear-gradient(180deg, #fff, color-mix(in srgb, var(--month-accent) 13%, #f6f9fb));
+.toolbar .tool-action--accent {
+  color: var(--office-green-strong);
+  background: color-mix(in srgb, var(--office-green) 8%, transparent);
 }
 
-.toolbar .tool-action--quiet,
-.toolbar-overflow-panel .tool-action--quiet{
-  color: #52606d;
-}
-
-.toolbar .tool-action--danger,
-.toolbar-overflow-panel .tool-action--danger{
-  color: #8e2830;
-  border-color: rgba(174,83,91,.27);
-  background: linear-gradient(180deg, #fff, rgba(250,239,240,.91));
-}
-
-.toolbar .tool-action--danger:hover,
-.toolbar-overflow-panel .tool-action--danger:hover{
-  color: #751d25;
-  border-color: rgba(174,83,91,.48);
-  background: linear-gradient(180deg, #fff, rgba(249,229,231,.94));
-}
+.toolbar .tool-action--danger { color: var(--office-danger); }
+.toolbar .tool-action--quiet { color: var(--office-text-muted); }
 
 .tool-icon {
-  width: 15px;
-  height: 15px;
-  flex: 0 0 15px;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.75;
+  stroke-width: 1.65;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 
 .tool-label {
+  display: -webkit-box;
   overflow: hidden;
-  text-overflow: ellipsis;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
-/* Die einzelne App-Aktion bleibt in der Action Bar als vertrautes Zahnrad
-   kompakt. Volltext und Gruppentitel bleiben für Screenreader erhalten und
-   erscheinen wieder, sobald die Gruppe in das Überlaufmenü wandert. */
-.toolbar .toolbar-section--application .toolbar-section-label,
-.toolbar .toolbar-section--application .tool-label {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-  border: 0;
-}
-
-.toolbar .toolbar-section--application .tool-action {
-  width: 34px;
-  min-width: 34px;
-  padding: 0;
-}
-
-.toolbar .tool-action--file,
-.toolbar-overflow-panel .tool-action--file{
+.toolbar .tool-action--file {
   position: relative;
   cursor: pointer;
 }
 
-.toolbar .tool-action--file input[type="file"],
-.toolbar-overflow-panel .tool-action--file input[type="file"]{
+.toolbar .tool-action--file input[type="file"] {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -201,156 +162,28 @@
 }
 
 .toolbar .tool-action--file:focus-visible,
-.toolbar-overflow-panel .tool-action--file:focus-visible,
-.toolbar .tool-action:focus-visible,
-.toolbar-overflow-panel .tool-action:focus-visible{
-  outline: var(--app-focus-ring) solid var(--month-accent-strong);
-  outline-offset: var(--app-focus-offset);
+.toolbar .tool-action:focus-visible {
+  outline: 2px solid var(--office-focus);
+  outline-offset: -1px;
 }
 
-/* --------------------------------------------------------------------------
-   Dichtestufen
-
-   Die Stufe wird gemessen, nicht geraten: js/ui-controls.js probiert von der
-   reichsten Stufe abwärts und nimmt die erste, die vollständig hineinpasst.
-   Feste Viewport-Schwellen hatten die drei Gruppen zwischen 1120 px und 1400 px
-   einander überlagern und Beschriftungen abschneiden lassen.
-   -------------------------------------------------------------------------- */
-
-.toolbar[data-toolbar-density="groups"] .toolbar-section-label,
-.toolbar[data-toolbar-density="secondary"] .toolbar-section-label,
-.toolbar[data-toolbar-density="icons"] .toolbar-section-label,
-.toolbar[data-toolbar-density="overflow"] .toolbar-section-label {
-  display: none;
+.toolbar .auto-plan-trigger {
+  min-width: 94px;
+  color: #fff;
+  border-color: var(--office-green-strong);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--office-green) 88%, white), var(--office-green-strong));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25);
 }
 
-/* Zuerst geben die nachgeordneten Gruppen ihre Beschriftung ab; die
-   Planungsaktionen bleiben am längsten lesbar. */
-.toolbar[data-toolbar-density="secondary"] .toolbar-section--data .tool-label,
-.toolbar[data-toolbar-density="secondary"] .toolbar-section--output .tool-label,
-.toolbar[data-toolbar-density="icons"] .tool-label,
-.toolbar[data-toolbar-density="overflow"] .toolbar-section--planning .tool-label,
-.toolbar[data-toolbar-density="overflow"] .tool-action--overflow .tool-label {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-  border: 0;
+.toolbar .auto-plan-trigger:hover {
+  color: #fff;
+  border-color: color-mix(in srgb, var(--office-green) 70%, black);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--office-green) 78%, white), color-mix(in srgb, var(--office-green-strong) 88%, black));
 }
 
-.toolbar[data-toolbar-density="secondary"] .toolbar-section--data .tool-action,
-.toolbar[data-toolbar-density="secondary"] .toolbar-section--output .tool-action,
-.toolbar[data-toolbar-density="icons"] .tool-action,
-.toolbar[data-toolbar-density="icons"] .file-btn.tool-action,
-.toolbar[data-toolbar-density="overflow"] .toolbar-section--planning .tool-action,
-.toolbar[data-toolbar-density="overflow"] .tool-action--overflow {
-  width: 34px;
-  min-width: 34px;
-  padding: 0;
-}
+.toolbar .auto-plan-trigger .auto-plan-spark { opacity: .32; }
 
-/* Überlaufmenü ------------------------------------------------------------ */
-
-.toolbar-overflow { position: relative; flex: 0 0 auto; display: none; align-items: center; }
-.toolbar[data-toolbar-density="overflow"] .toolbar-overflow { display: flex; }
-
-.toolbar-overflow-panel {
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 2147482500;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 7px;
-  border-radius: 13px;
-  border: 1px solid color-mix(in srgb, var(--month-accent) 26%, rgba(154,166,179,.5));
-  background: linear-gradient(180deg, #fff, color-mix(in srgb, var(--month-accent) 7%, #f7f9fc));
-  box-shadow: 0 18px 44px rgba(9,14,20,.24), 0 2px 6px rgba(9,14,20,.12);
-  animation: toolbar-overflow-in .16s cubic-bezier(.22, 1, .36, 1);
-}
-.toolbar-overflow-panel[hidden] { display: none; }
-
-@keyframes toolbar-overflow-in {
-  from { opacity: 0; transform: translateY(-5px) scale(.985); }
-  to { opacity: 1; transform: none; }
-}
-
-/* Im Menü ist Platz: dort tragen alle Aktionen wieder ihre Beschriftung und
-   stehen als lesbare Liste untereinander. */
-.toolbar-overflow-panel .toolbar-section {
-  flex-direction: column;
-  align-items: stretch;
-  gap: 3px;
-  border: none;
-  background: none;
-  box-shadow: none;
-  padding: 0;
-}
-.toolbar-overflow-panel .toolbar-section + .toolbar-section {
-  padding-top: 6px;
-  border-top: 1px solid rgba(154,166,179,.34);
-}
-.toolbar-overflow-panel .toolbar-actions { flex-direction: column; align-items: stretch; gap: 3px; }
-.toolbar-overflow-panel .tool-action,
-.toolbar-overflow-panel .file-btn.tool-action {
-  width: 100%;
-  min-width: 168px;
-  justify-content: flex-start;
-  padding: 0 10px;
-}
-.toolbar-overflow-panel .tool-label {
-  position: static;
-  width: auto;
-  height: auto;
-  margin: 0;
-  overflow: visible;
-  clip: auto;
-}
-
-/* Sehr schmale Geräte: Die Planungsaktionen dürfen die Breite ausnutzen,
-   das Menü bleibt rechts angeschlagen. */
-/* Letzte Stufe: Selbst wenn die Planungsgruppe nicht mehr vollständig passt,
-   bleibt sie in der Leiste – dann darf sie als einzige schrumpfen. */
-.toolbar[data-toolbar-density="overflow"] .toolbar-section--planning {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-}
-
-@media (max-width: 460px) {
-  .toolbar.toolbar-organized { gap: 5px; }
-  .toolbar-overflow-panel { max-width: calc(100vw - 1.5rem); }
-  .toolbar[data-toolbar-density="overflow"] .toolbar-section--planning .toolbar-actions {
-    width: 100%;
-    justify-content: space-between;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .toolbar .tool-action,
-  .toolbar .file-btn.tool-action {
-    transition: none;
-  }
-  .toolbar .tool-action:hover,
-  .toolbar .file-btn.tool-action:hover {
-    transform: none;
-  }
-}
-
-/* --------------------------------------------------------------------------
-   Stabiler Monatswechsel
-   --------------------------------------------------------------------------
-
-   app.js setzt die neue Tabelle bereits vollständig, bevor die historische
-   Richtungsanimation startet. Deren Startframe hatte opacity: 0 und ließ den
-   eben sichtbaren Plan deshalb noch einmal verschwinden. Die Spektrumebene
-   beendet parallel jeden Farbverlauf atomar; diese Regeln entfernen den zweiten
-   visuellen Zwischenzustand auch aus Überschrift, Tabelle und Statistik. */
+/* Der Farbwechsel wird ohne Zwischenblitz abgeschlossen. */
 .month-enter-next,
 .month-enter-prev {
   animation: none !important;
@@ -362,4 +195,33 @@
 body.month-content-transition .month-palette-label {
   animation: none !important;
   filter: none !important;
+}
+
+@media (max-width: 620px) {
+  .toolbar.toolbar-organized,
+  .office-ribbon-panel { min-height: 70px; }
+  .office-ribbon-panel { padding-inline: 3px; }
+  .toolbar-section { padding-inline: 4px; }
+  .toolbar .tool-action,
+  .toolbar .file-btn.tool-action {
+    min-width: 56px;
+    min-height: 48px;
+    padding-inline: 5px;
+  }
+  .tool-icon { width: 19px; height: 19px; flex-basis: 19px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toolbar .tool-action,
+  .toolbar .file-btn.tool-action { transition: none; }
+}
+
+@media (forced-colors: active) {
+  .toolbar-section { border-color: CanvasText; }
+  .toolbar .tool-action,
+  .toolbar .file-btn.tool-action { border: 1px solid transparent; }
+  .toolbar .tool-action:hover,
+  .toolbar .tool-action:focus-visible,
+  .toolbar .file-btn.tool-action:hover,
+  .toolbar .file-btn.tool-action:focus-visible { border-color: Highlight; }
 }

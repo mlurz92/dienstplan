@@ -68,6 +68,7 @@ async function openJuly(page) {
 }
 
 async function openStudio(page) {
+  await page.locator('[data-ribbon-tab="auto-plan"]').click();
   await page.locator('#autoPlanBtn').click();
   await expect(page.locator('#autoPlanDialog')).toBeVisible();
   await expect(page.locator('#autoPlanDialog')).toHaveAttribute('data-algorithm-revision', '7.5');

@@ -34,7 +34,7 @@ test('algorithm spectrum app icons are complete, accessible and correctly wired'
   assert.match(html, /icon\.svg\?icon=algorithm-spectrum-2/);
   assert.match(html, /icon-32\.png\?icon=algorithm-spectrum-2/);
   assert.match(html, /icon-180\.png\?icon=algorithm-spectrum-2/);
-  assert.match(html, /manifest\.webmanifest\?v=20260803\.5/);
+  assert.match(html, /manifest\.webmanifest\?v=20260803\.6/);
 
   assert.deepEqual(await pngSize('icons/icon-32.png'), [32, 32]);
   assert.deepEqual(await pngSize('icons/icon-180.png'), [180, 180]);

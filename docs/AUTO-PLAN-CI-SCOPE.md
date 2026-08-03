@@ -1,4 +1,4 @@
-# Auto-Plan CI-Prüfumfang
+# DienstplanRAD CI-Prüfumfang
 
 Der Pull Request muss vor dem Merge mindestens folgende Prüfungen bestehen:
 
@@ -37,4 +37,18 @@ Für Release 0.7.0 / Clinical Fluent Workspace gehören zusätzlich zum verbindl
 - Betriebssystem-Dark-Mode sowie Forced-Colors-Grundzustand mit ausgeblendeter Dekoration und sichtbarem Tastaturfokus;
 - sticky Tag-/Wochentag-Orientierung, mobile Statistikkarten und kein horizontaler Seitenüberlauf;
 - vollständig innerhalb des dynamischen Viewports liegende mobile Einstellungen mit eigenem Inhalts-Scrollbereich;
-- gemeinsamer Release-Token `20260803.5` für Browsermodule, Styles und Manifest sowie Paketversion `0.7.0`.
+- damaliger gemeinsamer Release-Token `20260803.5` für Browsermodule, Styles und Manifest sowie Paketversion `0.7.0`.
+
+Für Release 0.7.1 / Excel 365 Aero Workspace gehören zusätzlich zum verbindlichen Umfang:
+
+- genau sechs semantische Registerkarten mit eindeutiger Zuordnung jedes Menübandbefehls;
+- sichtbare, korrekt zugeordnete Registerflächen sowie automatische Tastaturaktivierung mit Pfeiltasten, `Pos1` und `Ende`;
+- zuverlässiges Ein- und Ausklappen der Befehlsfläche per `Strg+F1` und Titelbefehl;
+- funktionierende Befehlssuche per `Alt+Q` einschließlich Wiederöffnung eines eingeklappten Menübands, kontextbezogene Formelzeile sowie Dienstplan-, Statistik-, Offene-Punkte- und Auto-Plan-Blattreiter;
+- Hell, Dunkel und Systemeinstellung mit deckendem Arbeitsblatt und ausschließlich auf App-Chrome beziehungsweise Dialograhmen begrenzter Transparenz;
+- kein horizontaler Seitenüberlauf bei 360, 390, 768 und 1024 Pixel Breite; aktive Befehle bleiben erreichbar und ausreichend groß;
+- sichtbarer, zugänglicher und wahrheitsgetreu gespiegelter Speicher-/Offline-Status, wenn die Titelleistenanzeige responsiv ausgeblendet ist;
+- expliziter Tastaturfokus in Windows Forced Colors und unveränderte Reduced-Motion-/Reduced-Transparency-Pfade;
+- Druckausgabe ohne Titelbereich, Register, Menüband, Formelzeile, Blattreiter oder Statusleiste;
+- unveränderte IDs, Ereignisbindungen, Auto-Plan-v7.5-Regeln, Fixpunkte und Persistenzverträge;
+- gemeinsamer Release-Token `20260803.6` für Browsermodule, Styles und Manifest sowie Paketversion `0.7.1`.

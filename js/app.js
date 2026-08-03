@@ -1,14 +1,14 @@
-import { ABSENCE_TYPES, MONTH_NAMES, OPTION_TYPES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, normalizeBackupPayload, toIsoDate } from './defaults.js?v=20260803.5';
-import { state, bootstrapState, buildBackupPayload, flushLocalMonthWrites, getMonthData, getMonthLabel, isMonthDirty, isMonthMergeSafe, loadMonth, markBootstrapDirty, markBootstrapSynced, markMonthDirty, markMonthSynced, persistDirtyState, persistMonth, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260803.5';
-import { api } from './api.js?v=20260803.5';
-import { applyMonthTheme, prefersReducedMotion, resolveThemeYear } from './theme.js?v=20260803.5';
-import { applySpectrumProfile } from './color-director.js?v=20260803.5';
-import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260803.5';
-import { assignmentLabel, buildStats, clearedMonthData, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getEffectiveAbsence, getPlanningStaff, getOptions, getRoleProperties, getPreference, getStaffById, isExternalAssignment, labelForAbsence, labelForOption, labelForPreference, monthContentSummary, setAbsence, setAssignment, setOptions, setPreference, toggleOption, weekdayLabel } from './rules.js?v=20260803.5';
-import { getRbnOptions, isRbnValueAllowed, isSecondRbnAvailable, rbnDisplayName } from './rbn.js?v=20260803.5';
-import { additionalReasons, buildPickerModel, filterPickerModel, flattenPickerModel, loadSummary, nextSelectableIndex, primaryReason } from './picker-view.js?v=20260803.5';
-import { analyzeWorkbook } from './excel-import.js?v=20260803.5';
-import { applyApplicationSettings } from './app-settings.js?v=20260803.5';
+import { ABSENCE_TYPES, MONTH_NAMES, OPTION_TYPES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, normalizeBackupPayload, toIsoDate } from './defaults.js?v=20260803.6';
+import { state, bootstrapState, buildBackupPayload, flushLocalMonthWrites, getMonthData, getMonthLabel, isMonthDirty, isMonthMergeSafe, loadMonth, markBootstrapDirty, markBootstrapSynced, markMonthDirty, markMonthSynced, persistDirtyState, persistMonth, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260803.6';
+import { api } from './api.js?v=20260803.6';
+import { applyMonthTheme, prefersReducedMotion, resolveThemeYear } from './theme.js?v=20260803.6';
+import { applySpectrumProfile } from './color-director.js?v=20260803.6';
+import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260803.6';
+import { assignmentLabel, buildStats, clearedMonthData, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getEffectiveAbsence, getPlanningStaff, getOptions, getRoleProperties, getPreference, getStaffById, isExternalAssignment, labelForAbsence, labelForOption, labelForPreference, monthContentSummary, setAbsence, setAssignment, setOptions, setPreference, toggleOption, weekdayLabel } from './rules.js?v=20260803.6';
+import { getRbnOptions, isRbnValueAllowed, isSecondRbnAvailable, rbnDisplayName } from './rbn.js?v=20260803.6';
+import { additionalReasons, buildPickerModel, filterPickerModel, flattenPickerModel, loadSummary, nextSelectableIndex, primaryReason } from './picker-view.js?v=20260803.6';
+import { analyzeWorkbook } from './excel-import.js?v=20260803.6';
+import { applyApplicationSettings } from './app-settings.js?v=20260803.6';
 
 const $ = selector => document.querySelector(selector);
 
@@ -1111,6 +1111,10 @@ function setStatus(mode, text) {
   const colorMap = { loading: 'var(--yellow)', saving: 'var(--yellow)', saved: 'var(--green)', offline: 'var(--orange)', error: 'var(--red)' };
   $('#saveStatus').textContent = text;
   $('#statusDot').style.background = colorMap[mode] || 'var(--yellow)';
+  const workbookStatus = $('#workbookSaveStatus');
+  const workbookStatusText = $('#workbookSaveStatusText');
+  if (workbookStatus) workbookStatus.dataset.saveMode = mode;
+  if (workbookStatusText) workbookStatusText.textContent = text;
 }
 
 function labelByLevel(level) {

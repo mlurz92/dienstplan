@@ -18,8 +18,8 @@ import {
   applyAutoPlanProposal,
   createDefaultAutoPlanConfig,
   validateAutoPlanConfig
-} from './auto-planner.js?v=20260803.5';
-import { createAutoPlanExecutionPlan, runAutoPlan, workersAvailable } from './auto-plan-runner.js?v=20260803.5';
+} from './auto-planner.js?v=20260803.6';
+import { createAutoPlanExecutionPlan, runAutoPlan, workersAvailable } from './auto-plan-runner.js?v=20260803.6';
 import {
   getMonthData,
   getMonthLabel,
@@ -27,7 +27,7 @@ import {
   persistMonth,
   setMonthData,
   state
-} from './state.js?v=20260803.5';
+} from './state.js?v=20260803.6';
 import {
   assignmentLabel,
   computeWeekendEquivalent,
@@ -38,14 +38,14 @@ import {
   parseIso,
   roleLabelForMonth,
   weekdayLabel
-} from './rules.js?v=20260803.5';
-import { holidayName } from './holidays.js?v=20260803.5';
-import { AlgorithmCommentary, commentaryParts } from './auto-plan-commentary.js?v=20260803.5';
-import { AutoPlanVisualizer } from './auto-plan-visualizer.js?v=20260803.5';
-import { AutoPlanProgressModel } from './auto-plan-progress.js?v=20260803.5';
-import { AutoPlanRunEpoch, abortableDelay } from './auto-plan-lifecycle.js?v=20260803.5';
+} from './rules.js?v=20260803.6';
+import { holidayName } from './holidays.js?v=20260803.6';
+import { AlgorithmCommentary, commentaryParts } from './auto-plan-commentary.js?v=20260803.6';
+import { AutoPlanVisualizer } from './auto-plan-visualizer.js?v=20260803.6';
+import { AutoPlanProgressModel } from './auto-plan-progress.js?v=20260803.6';
+import { AutoPlanRunEpoch, abortableDelay } from './auto-plan-lifecycle.js?v=20260803.6';
 
-const RELEASE = '20260803.5';
+const RELEASE = '20260803.6';
 const STYLESHEETS = ['/auto-plan-studio.css'];
 
 const PHASES = Object.freeze([
@@ -155,7 +155,8 @@ function installStylesheets() {
 function createTrigger() {
   const existing = byId('autoPlanBtn');
   if (existing) return existing;
-  const actions = document.querySelector('.toolbar-section--planning .toolbar-actions')
+  const actions = document.querySelector('.toolbar-section--auto-plan .toolbar-actions')
+    || document.querySelector('.toolbar-section--planning .toolbar-actions')
     || document.querySelector('.toolbar .toolbar-group');
   if (!actions) return null;
   const button = document.createElement('button');
