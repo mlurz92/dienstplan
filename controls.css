@@ -363,3 +363,62 @@ body.month-content-transition .month-palette-label {
   animation: none !important;
   filter: none !important;
 }
+
+/* ==========================================================================
+   Fixiertes Zahnrad der Aktionsleiste
+   ==========================================================================
+
+   Die Einstellungen sind der einzige Zugang, der in jeder Dichtestufe an
+   derselben Stelle bleiben muss. Er steht deshalb außerhalb der Gruppen und
+   außerhalb des Überlaufmenüs, als quadratische Symbolschaltfläche am rechten
+   Abschluss der Leiste. Die Beschriftung bleibt für Vorlesewerkzeuge erhalten;
+   sichtbar ist nur das Zahnrad. */
+
+.toolbar .tool-action--pinned {
+  margin-inline-start: auto;
+  flex: 0 0 auto;
+}
+
+.toolbar .tool-action--icon-only {
+  inline-size: 2.5rem;
+  padding-inline: 0;
+  justify-content: center;
+  border-radius: 999px;
+}
+
+.toolbar .tool-action--icon-only .visually-hidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.toolbar .tool-action--gear .tool-icon {
+  transition: transform .45s cubic-bezier(.32, .72, 0, 1);
+}
+
+.toolbar .tool-action--gear:hover .tool-icon,
+.toolbar .tool-action--gear:focus-visible .tool-icon {
+  transform: rotate(45deg);
+}
+
+:root.reduce-motion .toolbar .tool-action--gear .tool-icon,
+:root[data-motion="reduced"] .toolbar .tool-action--gear .tool-icon {
+  transition: none;
+}
+
+/* In der engsten Stufe zieht alles Übrige ins Menü; das Zahnrad bleibt und
+   rückt an die Überlauf-Schaltfläche heran. */
+.toolbar[data-toolbar-density="overflow"] .tool-action--pinned,
+.toolbar[data-toolbar-density="icons"] .tool-action--pinned {
+  margin-inline-start: .35rem;
+}
+
+.toolbar[data-toolbar-density="overflow"] .toolbar-overflow {
+  margin-inline-start: auto;
+}

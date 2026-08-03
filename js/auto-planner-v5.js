@@ -75,6 +75,15 @@ export function optimizerDefaults(runConfig) {
       : fallbackBudget,
     lateAcceptanceSize: clampInt(runConfig?.lateAcceptanceSize, 10, 5000, fallbackLate),
     descentInterval: clampInt(runConfig?.descentInterval, 1, 500, intensity === 'standard' ? 40 : 25),
+    /**
+     * Runden des Optimalitätsnachweises.
+     *
+     * Eine Runde prüft Einzelumsetzung, Paartausch und Tagespaket vollständig.
+     * Mehr Runden lohnen, weil eine Verbesserung der ersten Runde eine zweite
+     * erst ermöglichen kann; ohne gefundene Verbesserung endet der Nachweis
+     * ohnehin nach der ersten Runde.
+     */
+    certificationRounds: clampInt(runConfig?.certificationRounds, 1, 8, 4),
     perfectionEnabled: runConfig?.perfectionEnabled !== false
   };
 }
@@ -270,6 +279,7 @@ export async function perfectAutoPlan(parameters) {
     mode: optimizer.mode,
     lateAcceptanceSize: optimizer.lateAcceptanceSize,
     descentInterval: optimizer.descentInterval,
+    certificationRounds: optimizer.certificationRounds,
     seed: seedFor(result, optimizer, runConfig),
     onProgress: onProgress
       ? async update => onProgress({ ...update, stage: 'perfektion' })

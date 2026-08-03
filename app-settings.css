@@ -40,3 +40,61 @@ html.reduce-motion *, html.reduce-motion *::before, html.reduce-motion *::after 
   .settings-actions button { width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { .settings-card { animation: none !important; } }
+
+/* ==========================================================================
+   Bereichsreiter
+   ==========================================================================
+
+   Mit der gewachsenen Zahl an Einstellungen lagen die Abschnitte in einem sehr
+   langen Bildlaufbereich, und der Auto-Plan-Abschnitt war nur über eine weite
+   Rollbewegung erreichbar. Die Reiter machen die drei Bereiche gleichrangig
+   erreichbar und halten die Höhe des Modals stabil. */
+
+.settings-tabs {
+  display: flex;
+  gap: .25rem;
+  padding: .3rem;
+  margin: 0 0 1.1rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--month-accent, #4f8fbd) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--month-accent, #4f8fbd) 20%, transparent);
+}
+
+.settings-tabs button {
+  flex: 1 1 0;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  border-radius: 999px;
+  padding: .5rem .9rem;
+  font: inherit;
+  font-weight: 600;
+  font-size: .86rem;
+  letter-spacing: .01em;
+  color: color-mix(in srgb, currentColor 68%, transparent);
+  cursor: pointer;
+  transition: background-color .22s ease, color .22s ease, box-shadow .22s ease;
+}
+
+.settings-tabs button:hover {
+  color: inherit;
+  background: color-mix(in srgb, var(--month-accent, #4f8fbd) 12%, transparent);
+}
+
+.settings-tabs button[aria-selected="true"] {
+  color: var(--month-ink, #1b4a6d);
+  background: white;
+  box-shadow: 0 1px 3px rgb(15 30 45 / .14), 0 0 0 1px color-mix(in srgb, var(--month-accent, #4f8fbd) 26%, transparent);
+}
+
+.settings-tabs button:focus-visible {
+  outline: 2px solid var(--month-accent, #4f8fbd);
+  outline-offset: 2px;
+}
+
+:root.reduce-motion .settings-tabs button,
+:root[data-motion="reduced"] .settings-tabs button { transition: none; }
+
+/* Nur der jeweils gewählte Bereich ist im Fluss; die übrigen sind über das
+   hidden-Attribut vollständig aus dem Baum genommen, nicht nur unsichtbar. */
+.settings-body > .settings-section[hidden] { display: none; }

@@ -48,24 +48,29 @@
  */
 
 import {
+  adoptPeerCacheToken,
   candidateEvaluationVector,
   compareObjectiveKeys,
   evaluatePlanObjective,
   isObjectiveAdmissible,
   listOpenSlots,
   listProposedAssignments,
-  planRespectsLimits,
-  planningContextFor,
-  syncPeerCache as syncPlanPeerCache
+  planningContextFor
 } from './auto-planner-engine.js?v=20260803.4';
+import {
+  buildLedger,
+  ledgerApply,
+  ledgerCount,
+  lubyValue,
+  monthDatesOf,
+  nextPlanVersion
+} from './auto-plan-index.js?v=20260803.4';
 import { createPacer, createTicker, now } from './cooperative-scheduling.js?v=20260803.4';
 import {
   basicallyEligiblePeers,
-  countRoleInMonth,
   evaluateCandidate,
   getPlanningStaff,
   parseIso,
-  setAssignment,
   setPeerGroupCacheToken,
   toLocalIso
 } from './rules.js?v=20260803.4';
@@ -172,12 +177,74 @@ export class PlanOptimizer {
     this.context = planningContextFor(state, baseline);
     this.slots = listOpenSlots(baseline);
     this.slotSet = new Set(this.slots.map(slot => keyFor(slot.dateIso, slot.role)));
-    this.dates = Object.keys(baseline.days || {}).sort();
+    this.dates = monthDatesOf(baseline);
     this.working = clone(baseline);
     this.sandbox = this.createSandbox(this.working);
     this.evaluations = 0;
     this.candidateChecks = 0;
     this.weekendGroups = this.buildWeekendGroups();
+    /**
+     * Fortgeschriebene Marke des Belegungszustands.
+     *
+     * Die Marke des Vergleichsgruppen-Speichers wurde zuvor bei *jeder*
+     * Bewertung aus dem gesamten Monat abgeleitet – in einer Klasse, die pro
+     * Lauf hunderttausende Zellen bewertet. Hier ist das unnötig: Diese Klasse
+     * ist der einzige Schreiber ihres Arbeitsmonats. Jede Änderung geht durch
+     * `write`; die Marke wird dort in konstanter Zeit fortgeschrieben und ist
+     * dadurch genauso exakt wie die abgeleitete, aber praktisch kostenlos.
+     *
+     * `slotSignature` macht diese Zusicherung prüfbar: gleiche Marke bedeutet
+     * stets gleiche Belegung, jede Änderung erzeugt eine neue Marke.
+     */
+    this.planVersion = nextPlanVersion();
+    /**
+     * Zählwerk der gesetzten Dienste je Person.
+     *
+     * Die Prüfung der Laufgrenzen lief zuvor über `countRoleInMonth` und damit
+     * über einen vollständigen Monatsscan – je Kandidat und je Zug. Mit dem
+     * mitgeführten Zählwerk kostet sie zwei Nachschlageoperationen. Es wird im
+     * selben Trichter fortgeschrieben wie die Marke.
+     */
+    this.ledger = buildLedger(this.working);
+  }
+
+  /**
+   * Der einzige Schreibpfad in den Arbeitsmonat.
+   *
+   * Alles, was eine Zelle verändert – Probe, Übernahme, Wiederaufbau, Laden
+   * einer Belegung, Leeren eines Ausschnitts – geht hier hindurch. Nur so
+   * bleiben Marke und Zählwerk verlässlich.
+   */
+  write(dateIso, role, staffId) {
+    const day = this.working.days?.[dateIso];
+    if (!day) return;
+    const next = staffId || '';
+    const previous = day[role] || '';
+    if (previous === next) return;
+    day[role] = next;
+    ledgerApply(this.ledger, role, previous, next);
+    this.planVersion = nextPlanVersion();
+  }
+
+  /**
+   * Laufgrenzen für einen noch nicht gesetzten Dienst.
+   *
+   * Der zu prüfende Dienst wird hinzugerechnet – im Unterschied zu
+   * `withinLimits`, wo er bereits enthalten ist.
+   */
+  admitsAdditional(staffId, role) {
+    const limits = this.config.staffLimits?.[staffId];
+    if (!limits) return true;
+    const bd = ledgerCount(this.ledger, staffId, 'bd') + Number(role === 'bd');
+    const hg = ledgerCount(this.ledger, staffId, 'hg') + Number(role === 'hg');
+    return (limits.maxBd === null || bd <= limits.maxBd)
+      && (limits.maxHg === null || hg <= limits.maxHg)
+      && (limits.maxTotal === null || bd + hg <= limits.maxTotal);
+  }
+
+  /** Leert einen Ausschnitt selbst gesetzter Felder. */
+  clearSlots(slots) {
+    for (const slot of slots) this.write(slot.dateIso, slot.role, '');
   }
 
   createSandbox(monthData) {
@@ -209,7 +276,7 @@ export class PlanOptimizer {
   /** Übernimmt eine Belegung in den Arbeitsmonat; Fixpunkte bleiben gesperrt. */
   load(monthData) {
     for (const slot of this.slots) {
-      this.working.days[slot.dateIso][slot.role] = monthData.days?.[slot.dateIso]?.[slot.role] || '';
+      this.write(slot.dateIso, slot.role, monthData.days?.[slot.dateIso]?.[slot.role] || '');
     }
   }
 
@@ -255,7 +322,7 @@ export class PlanOptimizer {
       const evaluation = this.evaluateCell(dateIso, role, person.id);
       if (evaluation.canSelect === false || evaluation.level === 'gray') continue;
       if (!this.allowRed && evaluation.level === 'red') continue;
-      if (!planRespectsLimits(this.working, person.id, role, this.config)) continue;
+      if (!this.admitsAdditional(person.id, role)) continue;
       result.push({ person, evaluation, vector: candidateEvaluationVector(evaluation) });
     }
     result.sort((left, right) => (LEVEL_RANK[left.evaluation.level] ?? 9) - (LEVEL_RANK[right.evaluation.level] ?? 9)
@@ -274,7 +341,26 @@ export class PlanOptimizer {
    * unterlaufen, dass irgendwo eine Änderung nicht gemeldet wird.
    */
   syncPeerCache() {
-    syncPlanPeerCache(this.working);
+    adoptPeerCacheToken(this.planVersion);
+  }
+
+  /**
+   * Die Belegung der offenen Felder als vergleichbare Zeichenkette.
+   *
+   * Sie existiert ausschließlich, um die fortgeschriebene Marke prüfbar zu
+   * machen. Der Vergleichsgruppen-Speicher ist der einzige Punkt, an dem eine
+   * Abkürzung fachlich gefährlich wäre: Eine übersehene Schreibstelle lieferte
+   * Einträge aus einem anderen Belegungszustand. Die Testsuite fährt deshalb
+   * zufällige Zugfolgen und prüft, dass gleiche Marke stets gleiche Belegung
+   * bedeutet und jede Änderung eine neue Marke erzeugt.
+   */
+  slotSignature() {
+    const parts = new Array(this.slots.length);
+    for (let index = 0; index < this.slots.length; index += 1) {
+      const slot = this.slots[index];
+      parts[index] = this.working.days?.[slot.dateIso]?.[slot.role] || '';
+    }
+    return parts.join('.');
   }
 
   /**
@@ -286,8 +372,11 @@ export class PlanOptimizer {
    * teure Regelauswertung sicher entscheidbar ist.
    */
   roughDomain(dateIso, role) {
-    return basicallyEligiblePeers(this.sandbox, this.working, dateIso, role)
-      .filter(person => planRespectsLimits(this.working, person.id, role, this.config)).length;
+    let count = 0;
+    for (const person of basicallyEligiblePeers(this.sandbox, this.working, dateIso, role)) {
+      if (this.admitsAdditional(person.id, role)) count += 1;
+    }
+    return count;
   }
 
   /**
@@ -299,15 +388,11 @@ export class PlanOptimizer {
    */
   probe(changes, fn) {
     const previous = changes.map(change => this.working.days[change.dateIso][change.role]);
-    for (const change of changes) {
-      this.working.days[change.dateIso][change.role] = change.staffId;
-    }
+    for (const change of changes) this.write(change.dateIso, change.role, change.staffId);
     try {
       return fn();
     } finally {
-      changes.forEach((change, index) => {
-        this.working.days[change.dateIso][change.role] = previous[index];
-      });
+      changes.forEach((change, index) => this.write(change.dateIso, change.role, previous[index]));
     }
   }
 
@@ -331,8 +416,8 @@ export class PlanOptimizer {
   withinLimits(staffId) {
     const limits = this.config.staffLimits?.[staffId];
     if (!limits) return true;
-    const bd = countRoleInMonth(this.working, staffId, 'bd');
-    const hg = countRoleInMonth(this.working, staffId, 'hg');
+    const bd = ledgerCount(this.ledger, staffId, 'bd');
+    const hg = ledgerCount(this.ledger, staffId, 'hg');
     return (limits.maxBd === null || bd <= limits.maxBd)
       && (limits.maxHg === null || hg <= limits.maxHg)
       && (limits.maxTotal === null || bd + hg <= limits.maxTotal);
@@ -384,7 +469,7 @@ export class PlanOptimizer {
       if (!this.slotSet.has(keyFor(change.dateIso, change.role))) {
         throw new Error(`Auto-Plan wollte den gesetzten Dienst ${change.role.toUpperCase()} am ${change.dateIso} überschreiben.`);
       }
-      setAssignment(this.working, change.dateIso, change.role, change.staffId);
+      this.write(change.dateIso, change.role, change.staffId);
     }
   }
 }
@@ -501,7 +586,6 @@ async function exploreNeighbourhood({ optimizer, neighbourhood, objective, stats
         if (candidate.person.id === assignment.staffId) continue;
         const found = await consider([{ dateIso: assignment.dateIso, role: assignment.role, staffId: candidate.person.id }]);
         if (found) return found;
-      if (exhausted) return null;
         if (exhausted) return null;
       }
     }
@@ -519,7 +603,6 @@ async function exploreNeighbourhood({ optimizer, neighbourhood, objective, stats
           { dateIso: second.dateIso, role: second.role, staffId: first.staffId }
         ]);
         if (found) return found;
-      if (exhausted) return null;
         if (exhausted) return null;
       }
     }
@@ -556,9 +639,7 @@ async function exploreNeighbourhood({ optimizer, neighbourhood, objective, stats
             { dateIso: third.dateIso, role: third.role, staffId: second.staffId }
           ]);
           if (found) return found;
-      if (exhausted) return null;
           if (exhausted) return null;
-        if (exhausted) return null;
         }
       }
     }
@@ -579,7 +660,6 @@ async function exploreNeighbourhood({ optimizer, neighbourhood, objective, stats
           { dateIso: second, role: 'hg', staffId: optimizer.working.days[first].hg }
         ]);
         if (found) return found;
-      if (exhausted) return null;
         if (exhausted) return null;
       }
     }
@@ -603,7 +683,6 @@ async function exploreNeighbourhood({ optimizer, neighbourhood, objective, stats
         }
         const found = await consider(changes);
         if (found) return found;
-      if (exhausted) return null;
         if (exhausted) return null;
       }
     }
@@ -731,7 +810,7 @@ function destroy({ optimizer, operator, size, objective }) {
   if (operator === 'sollabweichung') {
     const deviations = optimizer.context.staff.map(person => ({
       person,
-      deviation: countRoleInMonth(optimizer.working, person.id, 'bd') - Number(person.bdTarget || 0)
+      deviation: ledgerCount(optimizer.ledger, person.id, 'bd') - Number(person.bdTarget || 0)
     })).sort((left, right) => right.deviation - left.deviation);
     const overloaded = deviations[0]?.person;
     if (!overloaded) return shuffled(random, planned).slice(0, limit);
@@ -754,32 +833,99 @@ function destroy({ optimizer, operator, size, objective }) {
  * Bleibt ein Feld ohne Kandidaten, scheitert der Aufbau und der Ausschnitt
  * wird verworfen.
  */
-function recreate({ optimizer, removed, greed }) {
+/**
+ * Die Wiederaufbauoperatoren.
+ *
+ * Der Ausschnitt wird nicht nur zerstört, sondern auch wieder belegt – und
+ * *wie* das geschieht, entscheidet ebenso über die Qualität einer Runde wie die
+ * Wahl des Ausschnitts. Bisher gab es dafür nur eine Strategie. Ropke und
+ * Pisinger führen die Reparatur deshalb als zweite adaptive Dimension:
+ *
+ * - `spielraum`  – kleinster Spielraum zuerst, rangverzerrte Wahl. Schnell, gut
+ *                  für kleine Ausschnitte, neigt bei großen zu Sackgassen.
+ * - `bedauern`   – Regret-2: Bevorzugt wird das Feld, dessen zweitbeste Wahl
+ *                  spürbar schlechter ist als seine beste. Genau dort kostet ein
+ *                  späteres Ausweichen am meisten, also wird es zuerst
+ *                  festgelegt. Deutlich robuster bei großen Ausschnitten.
+ * - `gierig`     – ausschließlich der bestbewertete Kandidat, ohne Streuung.
+ *                  Rettungsversuch, wenn eine der beiden anderen Strategien in
+ *                  eine Sackgasse gelaufen ist.
+ */
+const REPAIR_OPERATORS = Object.freeze(['spielraum', 'bedauern', 'gierig']);
+
+/** Skalares Güteumaß eines Kandidaten; kleiner ist besser. */
+function candidateCost(candidate) {
+  return (LEVEL_RANK[candidate.evaluation.level] ?? 9) * 1000
+    - Number(candidate.evaluation.meta?.recommendationScore || 0);
+}
+
+/**
+ * Regret-2-Wiederaufbau.
+ *
+ * Vollständige Kandidatenlisten für *alle* offenen Felder in *jedem* Schritt zu
+ * bilden wäre quadratisch und damit unbezahlbar. Bewertet werden deshalb nur die
+ * Felder mit dem kleinsten groben Spielraum – dort liegt das Bedauern
+ * erfahrungsgemäß ohnehin am höchsten, und der Aufwand bleibt beschränkt.
+ */
+const REGRET_FRONTIER = 5;
+
+function recreateByRegret({ optimizer }, open) {
+  const ranked = open
+    .map(slot => ({ slot, rough: optimizer.roughDomain(slot.dateIso, slot.role) }))
+    .sort((left, right) => left.rough - right.rough
+      || left.slot.dateIso.localeCompare(right.slot.dateIso)
+      || left.slot.role.localeCompare(right.slot.role))
+    .slice(0, REGRET_FRONTIER);
+
+  let selected = null;
+  let selectedCandidates = null;
+  let bestRegret = -Infinity;
+  for (const entry of ranked) {
+    const candidates = optimizer.candidates(entry.slot.dateIso, entry.slot.role);
+    if (!candidates.length) return { slot: entry.slot, candidates: [] };
+    // Ein Feld ohne Ausweichmöglichkeit hat unendliches Bedauern und wird sofort
+    // festgelegt; jede andere Reihenfolge riskiert, es unbesetzbar zu machen.
+    const regret = candidates.length === 1
+      ? Infinity
+      : candidateCost(candidates[1]) - candidateCost(candidates[0]);
+    if (regret > bestRegret) {
+      bestRegret = regret;
+      selected = entry.slot;
+      selectedCandidates = candidates;
+    }
+    if (regret === Infinity) break;
+  }
+  return { slot: selected || open[0], candidates: selectedCandidates || [] };
+}
+
+function recreateBySlack({ optimizer }, open) {
+  let selected = open[0];
+  let smallest = Infinity;
+  for (const slot of open) {
+    const rough = optimizer.roughDomain(slot.dateIso, slot.role);
+    if (rough < smallest) {
+      selected = slot;
+      smallest = rough;
+      if (rough <= 1) break;
+    }
+  }
+  return { slot: selected, candidates: optimizer.candidates(selected.dateIso, selected.role) };
+}
+
+function recreate({ optimizer, removed, greed, repair = 'spielraum' }) {
   const open = [...removed];
   const applied = [];
   while (open.length) {
-    // Die Reihenfolge bestimmt der billige Eignungsfilter ohne Regelbewertung;
-    // vollständig bewertet wird nur das tatsächlich gewählte Feld. Zuvor wurde
-    // für jedes offene Feld in jedem Schritt die volle Kandidatenliste erzeugt,
-    // was den Wiederaufbau quadratisch teuer machte.
-    let selected = open[0];
-    let smallest = Infinity;
-    for (const slot of open) {
-      const rough = optimizer.roughDomain(slot.dateIso, slot.role);
-      if (rough < smallest) {
-        selected = slot;
-        smallest = rough;
-        if (rough <= 1) break;
-      }
-    }
-    const selectedCandidates = optimizer.candidates(selected.dateIso, selected.role);
-    if (!selectedCandidates.length) return null;
-    const span = Math.max(1, Math.min(selectedCandidates.length, greed));
+    const step = repair === 'bedauern'
+      ? recreateByRegret({ optimizer }, open)
+      : recreateBySlack({ optimizer }, open);
+    if (!step.candidates.length) return null;
+    const span = repair === 'gierig' ? 1 : Math.max(1, Math.min(step.candidates.length, greed));
     const bias = Math.floor(optimizer.random() ** 2 * span);
-    const chosen = selectedCandidates[Math.min(span - 1, bias)];
-    setAssignment(optimizer.working, selected.dateIso, selected.role, chosen.person.id);
-    applied.push({ dateIso: selected.dateIso, role: selected.role, staffId: chosen.person.id });
-    open.splice(open.indexOf(selected), 1);
+    const chosen = step.candidates[Math.min(span - 1, bias)];
+    optimizer.write(step.slot.dateIso, step.slot.role, chosen.person.id);
+    applied.push({ dateIso: step.slot.dateIso, role: step.slot.role, staffId: chosen.person.id });
+    open.splice(open.indexOf(step.slot), 1);
   }
   return applied;
 }
@@ -883,6 +1029,42 @@ export async function certify({ optimizer, objective, stats, signal, onStep, rou
       await onStep?.({ kind: 'scan', neighbourhood: 'Paartausche', phase: 'certify' });
     }
 
+    /**
+     * Tagespakete gehören in den Nachweis.
+     *
+     * Die Suchphase kennt das Tagespaket – den vollständigen Tausch beider
+     * Dienste zweier Tage – als eigene Nachbarschaft, der Nachweis prüfte es
+     * bisher nicht. Ein als „nicht weiter verbesserbar“ ausgewiesener Plan
+     * konnte damit eine Verbesserung enthalten, die die Suche selbst kennt.
+     * Der Aufwand ist vertretbar: Es gibt Tage, nicht Dienstfelder, und damit
+     * rund ein Viertel der Paare des Paartauschs.
+     */
+    const bundleDays = optimizer.dates.filter(dateIso =>
+      optimizer.slotSet.has(keyFor(dateIso, 'bd')) && optimizer.slotSet.has(keyFor(dateIso, 'hg')));
+    for (let left = 0; left < bundleDays.length; left += 1) {
+      for (let right = left + 1; right < bundleDays.length; right += 1) {
+        if (now() >= until) return { objective: current, certified: false, rounds: round };
+        const first = bundleDays[left];
+        const second = bundleDays[right];
+        stats.certificationMoves += 1;
+        const changes = [
+          { dateIso: first, role: 'bd', staffId: optimizer.working.days[second].bd },
+          { dateIso: first, role: 'hg', staffId: optimizer.working.days[second].hg },
+          { dateIso: second, role: 'bd', staffId: optimizer.working.days[first].bd },
+          { dateIso: second, role: 'hg', staffId: optimizer.working.days[first].hg }
+        ];
+        const result = optimizer.tryMove(changes, current);
+        if (!result) continue;
+        optimizer.commit(changes);
+        current = result;
+        improvedThisRound = true;
+        stats.improvements += 1;
+        await onStep?.({ kind: 'improvement', neighbourhood: 'zertifizierung', changes, objective: current });
+      }
+      await gate();
+      await onStep?.({ kind: 'scan', neighbourhood: 'Tagespakete', phase: 'certify' });
+    }
+
     if (!improvedThisRound) return { objective: current, certified: true, rounds: round };
   }
   return { objective: current, certified: false, rounds };
@@ -903,10 +1085,24 @@ export function emptyOptimizerStats() {
     certified: false,
     certificationRounds: 0,
     elapsedMs: 0,
+    segments: 0,
     byNeighbourhood: {},
     byOperator: {},
-    operatorLearning: {}
+    byRepair: {},
+    operatorLearning: {},
+    repairLearning: {}
   };
+}
+
+/** Auslesbare Fassung einer Lerntabelle für die Telemetrie. */
+function learningReport(table) {
+  return Object.fromEntries([...table].map(([operator, value]) => [operator, {
+    uses: value.uses,
+    reward: value.reward,
+    costMs: Number(value.costMs.toFixed(2)),
+    weight: Number(Number(value.weight ?? 1).toFixed(4)),
+    rewardPerSecond: value.costMs > 0 ? Number((value.reward / value.costMs * 1000).toFixed(3)) : 0
+  }]));
 }
 
 /**
@@ -927,6 +1123,7 @@ export async function perfect({
   mode = 'budget',
   lateAcceptanceSize = 400,
   descentInterval = 25,
+  certificationRounds = 4,
   seed,
   onProgress,
   progressStart = .55,
@@ -936,7 +1133,7 @@ export async function perfect({
   const optimizer = new PlanOptimizer({ state, baseline, config, allowRed, seed });
   optimizer.load(plannedMonth);
   try {
-    return await runPerfection({ optimizer, timeBudgetMs, mode, lateAcceptanceSize, descentInterval, onProgress, progressStart, progressSpan, signal });
+    return await runPerfection({ optimizer, timeBudgetMs, mode, lateAcceptanceSize, descentInterval, certificationRounds, onProgress, progressStart, progressSpan, signal });
   } finally {
     // Außerhalb des Laufs darf niemand auf zwischengespeicherte
     // Vergleichsgruppen stoßen – auch nicht nach einem Abbruch.
@@ -944,7 +1141,7 @@ export async function perfect({
   }
 }
 
-async function runPerfection({ optimizer, timeBudgetMs, mode, lateAcceptanceSize, descentInterval, onProgress, progressStart, progressSpan, signal }) {
+async function runPerfection({ optimizer, timeBudgetMs, mode, lateAcceptanceSize, descentInterval, certificationRounds = 4, onProgress, progressStart, progressSpan, signal }) {
   const stats = emptyOptimizerStats();
   const pace = createPacer();
   const tick = createTicker();
@@ -986,7 +1183,11 @@ async function runPerfection({ optimizer, timeBudgetMs, mode, lateAcceptanceSize
 
   let best = { monthData: optimizer.snapshot(), objective: current };
   const late = new LateAcceptance(lateAcceptanceSize, current.key);
-  const learning = new Map(DESTROY_OPERATORS.map(operator => [operator, { uses: 0, reward: 0, costMs: 0 }]));
+  const learning = createOperatorLearning(DESTROY_OPERATORS);
+  // Der Wiederaufbau ist die zweite adaptive Dimension: Welche Reparatur zu
+  // einem Ausschnitt passt, hängt von dessen Größe und Lage ab und lässt sich
+  // ebenso wenig vorab festlegen wie die Wahl des Ausschnitts selbst.
+  const repairLearning = createOperatorLearning(REPAIR_OPERATORS);
 
   const report = async (phase, message, extra = {}) => {
     if (typeof onProgress !== 'function') return;
@@ -1036,14 +1237,25 @@ async function runPerfection({ optimizer, timeBudgetMs, mode, lateAcceptanceSize
   }
 
   const searchStartedAt = now();
-  const restartAfter = Math.max(120, optimizer.slots.length * 4);
+  /**
+   * Neustartplan nach Luby statt fester Schwelle.
+   *
+   * Eine feste Stagnationsschwelle ist immer für die falsche Instanz gewählt:
+   * Auf einem gut konditionierten Monat startet sie viel zu spät neu, auf einem
+   * verwickelten viel zu früh. Die Luby-Folge braucht kein Instanzwissen und ist
+   * dennoch bis auf einen konstanten Faktor so gut wie die beste feste Wahl.
+   */
+  const restartUnit = Math.max(30, Math.round(optimizer.slots.length * 1.5));
   const stagnationLimit = Math.max(600, optimizer.slots.length * 20);
+  let restartIndex = 1;
+  let restartAfter = restartUnit * lubyValue(restartIndex);
   let sinceImprovement = 0;
   while (now() < budget.searchUntil) {
     abortIfRequested(signal);
     stats.rounds += 1;
 
     const operator = selectAdaptiveOperator(optimizer.random, DESTROY_OPERATORS, learning);
+    const repairOperator = selectAdaptiveOperator(optimizer.random, REPAIR_OPERATORS, repairLearning);
     const roundStartedAt = now();
     // Wie viele Runden passen bei der bisher gemessenen Rundendauer noch in die
     // Suchphase? Daraus leitet sich ab, wie groß ein Ausschnitt sein darf.
@@ -1056,17 +1268,17 @@ async function runPerfection({ optimizer, timeBudgetMs, mode, lateAcceptanceSize
 
     let outcome = 0;
     if (removed.length) {
-      for (const slot of removed) optimizer.working.days[slot.dateIso][slot.role] = '';
+      optimizer.clearSlots(removed);
       /**
        * Große Ausschnitte scheitern beim Wiederaufbau häufiger. Ein zweiter,
        * rein gieriger Versuch rettet einen erheblichen Teil davon: Er nimmt in
        * jedem Schritt den bestbewerteten Kandidaten und findet damit eine
        * Belegung, wo die rangverzerrte Auswahl in eine Sackgasse lief.
        */
-      let rebuilt = recreate({ optimizer, removed, greed: 3 });
-      if (!rebuilt) {
-        for (const slot of removed) optimizer.working.days[slot.dateIso][slot.role] = '';
-        rebuilt = recreate({ optimizer, removed, greed: 1 });
+      let rebuilt = recreate({ optimizer, removed, greed: 3, repair: repairOperator });
+      if (!rebuilt && repairOperator !== 'gierig') {
+        optimizer.clearSlots(removed);
+        rebuilt = recreate({ optimizer, removed, repair: 'gierig', greed: 1 });
       }
       if (!rebuilt) {
         stats.repairFailures += 1;
@@ -1099,11 +1311,27 @@ async function runPerfection({ optimizer, timeBudgetMs, mode, lateAcceptanceSize
       }
     }
 
+    /**
+     * Belohnung nach Ropke und Pisinger: gestaffelt nach dem Rang des Ergebnisses
+     * – verworfen, angenommen, aktuellen Zustand verbessert, neue Bestlösung.
+     */
+    const reward = [0, 3, 9, 33][outcome];
+    const roundCost = Math.max(.05, now() - roundStartedAt);
     stats.byOperator[operator] = (stats.byOperator[operator] || 0) + 1;
-    const operatorStats = learning.get(operator);
-    operatorStats.uses += 1;
-    operatorStats.reward += [0, 3, 9, 33][outcome];
-    operatorStats.costMs += Math.max(.05, now() - roundStartedAt);
+    stats.byRepair[repairOperator] = (stats.byRepair[repairOperator] || 0) + 1;
+    for (const [name, table] of [[operator, learning], [repairOperator, repairLearning]]) {
+      const entry = table.get(name);
+      entry.uses += 1;
+      entry.reward += reward;
+      entry.costMs += roundCost;
+      entry.segmentUses += 1;
+      entry.segmentReward += reward;
+    }
+    if (stats.rounds % SEGMENT_LENGTH === 0) {
+      rollOverSegment(DESTROY_OPERATORS, learning);
+      rollOverSegment(REPAIR_OPERATORS, repairLearning);
+      stats.segments += 1;
+    }
     late.record(current.key);
     sinceImprovement += 1;
 
@@ -1138,10 +1366,12 @@ async function runPerfection({ optimizer, timeBudgetMs, mode, lateAcceptanceSize
      * abschließenden Zertifizierung aufgehoben als in weiteren Leerrunden.
      */
     if (sinceImprovement >= stagnationLimit) break;
-    if (sinceImprovement > 0 && sinceImprovement % restartAfter === 0) {
+    if (sinceImprovement > 0 && sinceImprovement >= restartAfter) {
       optimizer.load(best.monthData);
       current = optimizer.objective();
       stats.restarts += 1;
+      restartIndex += 1;
+      restartAfter = sinceImprovement + restartUnit * lubyValue(restartIndex);
     }
   }
 
@@ -1164,7 +1394,8 @@ async function runPerfection({ optimizer, timeBudgetMs, mode, lateAcceptanceSize
    * weiter, wenn der Abstieg nachweislich nichts mehr gefunden hat.
    */
   let certified = false;
-  for (let attempt = 0; attempt < 4; attempt += 1) {
+  const certificationAttempts = Math.max(1, Math.min(8, Math.round(Number(certificationRounds) || 4)));
+  for (let attempt = 0; attempt < certificationAttempts; attempt += 1) {
     await report('certify', `Zertifizierung ${attempt + 1} · alle Einzelumsetzungen und Paartausche werden vollständig geprüft`);
     const beforeCertify = stats.improvements;
     certification = await certify({
@@ -1201,14 +1432,58 @@ async function runPerfection({ optimizer, timeBudgetMs, mode, lateAcceptanceSize
   stats.evaluations = optimizer.evaluations;
   stats.candidateChecks = optimizer.candidateChecks;
   stats.elapsedMs = Math.round(now() - startedAt);
-  stats.operatorLearning = Object.fromEntries([...learning].map(([operator, value]) => [operator, {
-    uses: value.uses,
-    reward: value.reward,
-    costMs: Number(value.costMs.toFixed(2)),
-    rewardPerSecond: value.costMs > 0 ? Number((value.reward / value.costMs * 1000).toFixed(3)) : 0
-  }]));
+  stats.operatorLearning = learningReport(learning);
+  stats.repairLearning = learningReport(repairLearning);
 
   return { monthData: best.monthData, objective: best.objective, stats, skipped: false };
+}
+
+/**
+ * Segmentweise Gewichtsanpassung nach Ropke und Pisinger.
+ *
+ * Die reine kostengewichtete UCB-Auswahl hat eine Schwäche, die sich erst über
+ * längere Läufe zeigt: Sie *vergisst nichts*. Belohnungen aus den ersten
+ * Runden bleiben für immer im Mittelwert und dominieren ihn irgendwann, obwohl
+ * sich die Suchlandschaft mit jeder angenommenen Lösung verändert – ein
+ * Operator, der anfangs viel gefunden hat, ist später oft der falsche.
+ *
+ * Ropke und Pisinger lösen das über Segmente: Nach einer festen Zahl von Runden
+ * wird das Gewicht jedes Operators aus seinem alten Gewicht und seiner Leistung
+ * *in genau diesem Segment* neu gemischt,
+ *
+ *     w_neu = w_alt · (1 − λ) + λ · (Segmentbelohnung / Segmentnutzungen),
+ *
+ * und die Segmentzähler werden zurückgesetzt. Der Reaktionsfaktor λ ist der
+ * einzige Regler: Er bestimmt, wie schnell die Suche ihre Meinung ändert.
+ *
+ * `rollOverSegment` führt genau diesen Schritt aus. Die Auswahl selbst bleibt
+ * kostenbewusst – teure Operatoren müssen ihren Zeitverbrauch rechtfertigen –
+ * und behält den Erkundungsterm, damit kein Operator dauerhaft verhungert.
+ */
+export const SEGMENT_LENGTH = 40;
+export const REACTION_FACTOR = .35;
+
+export function rollOverSegment(operators, learning) {
+  for (const operator of operators) {
+    const stats = learning.get(operator);
+    if (!stats || !stats.segmentUses) continue;
+    const observed = stats.segmentReward / Math.max(1, stats.segmentUses);
+    stats.weight = stats.weight * (1 - REACTION_FACTOR) + REACTION_FACTOR * observed;
+    stats.segmentUses = 0;
+    stats.segmentReward = 0;
+  }
+  return learning;
+}
+
+export function createOperatorLearning(operators) {
+  return new Map(operators.map(operator => [operator, {
+    uses: 0,
+    reward: 0,
+    costMs: 0,
+    weight: 1,
+    segmentUses: 0,
+    segmentReward: 0
+  }]));
 }
 
 /**
@@ -1216,8 +1491,9 @@ async function runPerfection({ optimizer, timeBudgetMs, mode, lateAcceptanceSize
  *
  * Every destroy operator is tried before exploitation begins. Afterwards the
  * score combines observed quality gain per compute time with an exploration
- * bonus. The search therefore learns the current month online without training
- * data, while expensive operators must justify their cost.
+ * bonus and the segment weight learned above. The search therefore learns the
+ * current month online without training data, while expensive operators must
+ * justify their cost.
  */
 export function selectAdaptiveOperator(random, operators, learning) {
   const untried = operators.filter(operator => !(learning.get(operator)?.uses > 0));
@@ -1229,7 +1505,11 @@ export function selectAdaptiveOperator(random, operators, learning) {
     const stats = learning.get(operator) || { uses: 0, reward: 0, costMs: 0 };
     const efficiency = Number(stats.reward || 0) / Math.max(.05, Number(stats.costMs || 0)) * 100;
     const exploration = Math.sqrt(2 * Math.log(Math.max(2, totalUses)) / Math.max(1, Number(stats.uses || 0)));
-    const score = efficiency + exploration;
+    // Das Segmentgewicht ist die kurzfristige Meinung der Suche, die Effizienz
+    // ihre langfristige. Ohne hinterlegtes Gewicht – etwa bei direkten Aufrufen
+    // aus Tests und Integrationen – bleibt es neutral bei eins.
+    const weight = Number.isFinite(Number(stats.weight)) ? Math.max(.05, Number(stats.weight)) : 1;
+    const score = weight * efficiency + exploration;
     if (score > bestScore) {
       best = operator;
       bestScore = score;

@@ -195,13 +195,42 @@ export async function runAutoPlan({ state, monthData, year, month, runConfig, on
     for (const worker of pool) worker?.terminate();
     pool.length = 0;
   };
-  const workerState = () => ({
+  /**
+   * Der übertragbare Zustand wird genau einmal gebildet.
+   *
+   * Zuvor entstand er je Auftrag neu. Er trägt sämtliche geladenen Monate; bei
+   * vier Arbeitssträngen wurde dieselbe Datenmenge damit viermal aufgebaut,
+   * bevor sie ohnehin von der Strukturkopie des Nachrichtenkanals ein zweites
+   * Mal durchlaufen wurde.
+   */
+  const sharedState = {
     months: state.months,
     staff: state.staff,
     currentYear: state.currentYear,
     currentMonth: state.currentMonth,
     monthSources: state.monthSources
-  });
+  };
+
+  /**
+   * Parametrierung der Perfektionsstränge.
+   *
+   * Ein Portfolio lebt von Streuung. Sie allein über den Startwert zu erzeugen
+   * verschenkt den größeren Teil des möglichen Gewinns: Alle Stränge liefen
+   * dann mit demselben Late-Acceptance-Fenster und derselben Abstiegsfrequenz
+   * durch dieselbe Landschaft. Strang 0 bleibt bewusst konvergenzbetont – er
+   * ist der verlässliche Amtsinhaber –, die übrigen suchen breiter.
+   */
+  const diversify = (runConfig?.portfolioDiversity ?? state?.settings?.autoPlan?.portfolioDiversity) !== false;
+  const perfectionVariant = index => {
+    if (index === 0 || !diversify) return { seedSalt: index };
+    const widen = 1 + index * .6;
+    return {
+      seedSalt: index,
+      lateAcceptanceSize: Math.round((runConfig?.lateAcceptanceSize || 400) * widen),
+      descentInterval: Math.max(8, Math.round(25 / widen)),
+      portfolioVariant: index
+    };
+  };
 
   try {
     return await new Promise((resolve, reject) => {
@@ -212,6 +241,7 @@ export async function runAutoPlan({ state, monthData, year, month, runConfig, on
       let firstError = null;
       let closed = false;
       let nextConstruction = 0;
+      const constructionWorkerOf = new Map();
       let portfolioCompleted = 0;
       let portfolioCancelled = 0;
       let portfolioFailed = 0;
@@ -316,14 +346,29 @@ export async function runAutoPlan({ state, monthData, year, month, runConfig, on
         const runId = nextConstruction;
         const profileId = profileIds[nextConstruction];
         nextConstruction += 1;
+        // Wer welchen Auftrag bearbeitet, muss festgehalten werden: Sobald
+        // weniger Stränge als Profile vorhanden sind, rücken Aufträge nach und
+        // Auftragsnummer und Strangnummer laufen auseinander.
+        constructionWorkerOf.set(runId, workerIndex);
         return send(workerIndex, {
           type: 'construct',
           runId,
-          state: workerState(),
+          state: sharedState,
           monthData,
           year,
           month,
-          runConfig: { ...runConfig, profileFilter: [profileId] }
+          /**
+           * Der Minimal-Rot-Strang verzichtet auf seine eigene Null-Rot-Rescue.
+           *
+           * Sie ist inhaltlich dieselbe verbreiterte `strict-coverage`-Suche,
+           * die bereits ein eigener Strang rechnet. Ohne diese Abschaltung
+           * verbrauchte das Portfolio rund ein Drittel seiner Aufbauzeit damit,
+           * dieselbe Suche ein zweites Mal auszuführen — und der Strang, der
+           * eigentlich den Rückfall prüfen soll, kam entsprechend später dazu.
+           */
+          runConfig: profileId === 'confirmable-balanced'
+            ? { ...runConfig, profileFilter: [profileId], zeroRedRescue: false }
+            : { ...runConfig, profileFilter: [profileId] }
         });
       };
 
@@ -337,10 +382,10 @@ export async function runAutoPlan({ state, monthData, year, month, runConfig, on
           const started = send(index, {
             type: 'perfect',
             runId: index,
-            state: workerState(),
+            state: sharedState,
             constructed: bestConstruction,
             progressFloor: .55,
-            runConfig: { ...runConfig, seedSalt: index }
+            runConfig: { ...runConfig, ...perfectionVariant(index) }
           });
           if (!started) return;
         }
@@ -401,9 +446,22 @@ export async function runAutoPlan({ state, monthData, year, month, runConfig, on
            * sich aus, dass die anderen längst mitgelaufen sind.
            */
           if (Number(message.runId) === 0 && message.result?.complete && !(message.result.metrics?.red > 0)) {
+            /**
+             * Beendet wird anhand des tatsächlich zugeordneten Strangs.
+             *
+             * Die frühere Fassung nahm an, Auftrag null liege stets auf Strang
+             * null, und beendete alles ab Index eins. Sobald weniger Stränge als
+             * Profile zur Verfügung stehen, stimmt diese Annahme nicht mehr —
+             * dann wurde der gewinnende Strang selbst beendet und ein anderer
+             * blieb stehen.
+             */
+            const winner = constructionWorkerOf.get(0) ?? workerIndex;
             portfolioCancelled += Math.max(0, pending - 1);
-            for (let index = 1; index < pool.length; index += 1) pool[index]?.terminate();
-            pool.length = 1;
+            for (let index = 0; index < pool.length; index += 1) {
+              if (index === winner) continue;
+              pool[index]?.terminate();
+              pool[index] = null;
+            }
             nextConstruction = profileIds.length;
             pending = 1;
           }

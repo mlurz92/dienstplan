@@ -376,13 +376,26 @@ export async function warmAdjacentMonths(year, month) {
   state.serverReady = previousReady;
 }
 
+/**
+ * Verzögerung des automatischen Speicherns.
+ *
+ * Sie ist einstellbar, weil sie zwei gegenläufige Bedürfnisse bedient: Wer
+ * schnell nacheinander viele Zellen setzt, will nicht bei jedem Tastendruck
+ * einen Serverlauf auslösen; wer einzelne Korrekturen vornimmt, will sie
+ * gesichert wissen, bevor er das Fenster schließt.
+ */
+export function autoSaveDelayMs() {
+  const configured = Number(state.settings?.workflow?.autoSaveDelayMs);
+  return Number.isFinite(configured) ? Math.max(300, Math.min(5000, Math.round(configured))) : 1100;
+}
+
 export function scheduleSave(saveFn, year = state.currentYear, month = state.currentMonth) {
   markMonthDirty(year, month);
   clearTimeout(state.saveTimer);
   state.saveTimer = setTimeout(() => {
     state.saveTimer = null;
     saveFn();
-  }, 1100);
+  }, autoSaveDelayMs());
 }
 
 export async function persistCurrentMonth() {

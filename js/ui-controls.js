@@ -45,11 +45,22 @@ export const TOOLBAR_GROUPS = Object.freeze([
       Object.freeze({ id: 'exportJsonBtn', label: 'Vollständige JSON-Sicherung erstellen', shortLabel: 'JSON sichern', icon: 'backup' })
     ])
   }),
+  /**
+   * Die Einstellungen bilden keine eigene Gruppe mehr.
+   *
+   * Als beschriftete Schaltfläche in einer Gruppe „App“ wanderten sie als
+   * Erstes ins Überlaufmenü, sobald die Leiste eng wurde – ausgerechnet der
+   * Zugang, der immer erreichbar sein soll, war dann zwei Klicks entfernt.
+   * Stattdessen wird `settingsBtn` als fixiertes Zahnrad am rechten Rand der
+   * Leiste geführt: außerhalb der Dichtestufen, außerhalb des Überlaufs, mit
+   * einer Beschriftung nur für Vorlesewerkzeuge.
+   */
   Object.freeze({
     key: 'application',
     label: 'App',
+    pinned: true,
     items: Object.freeze([
-      Object.freeze({ id: 'settingsBtn', label: 'Anwendungseinstellungen öffnen', shortLabel: 'Einstellungen', icon: 'settings', tone: 'quiet' })
+      Object.freeze({ id: 'settingsBtn', label: 'Einstellungen der Anwendung öffnen', shortLabel: 'Einstellungen', icon: 'settings', tone: 'gear', iconOnly: true })
     ])
   })
 ]);
@@ -93,8 +104,11 @@ function decorateAction(element, item) {
   element.setAttribute('aria-label', item.label);
 
   const label = document.createElement('span');
-  label.className = 'tool-label';
+  // Ein reines Symbol braucht trotzdem einen Namen: Vorlesewerkzeuge und die
+  // Tastaturbedienung führen sonst eine unbeschriftete Schaltfläche.
+  label.className = item.iconOnly ? 'visually-hidden' : 'tool-label';
   label.textContent = item.shortLabel;
+  if (item.iconOnly) element.classList.add('tool-action--icon-only');
   element.replaceChildren(iconElement(item.icon), label);
 
   if (input) {
@@ -130,7 +144,7 @@ function decorateAction(element, item) {
  */
 export const TOOLBAR_DENSITY_STEPS = Object.freeze(['full', 'groups', 'secondary', 'icons', 'overflow']);
 
-const OVERFLOW_SECTIONS = Object.freeze(['data', 'output', 'application']);
+const OVERFLOW_SECTIONS = Object.freeze(['data', 'output']);
 
 function overflowButtonMarkup() {
   return '<svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
@@ -326,7 +340,19 @@ export function organizeToolbar() {
 
   const fragment = document.createDocumentFragment();
   const sections = new Map();
+  const pinned = [];
   for (const group of resolved) {
+    if (group.pinned) {
+      // Fixierte Aktionen stehen ohne Gruppenrahmen unmittelbar in der Leiste.
+      // Sie werden zuletzt angehängt, damit die Überlauf-Schaltfläche links von
+      // ihnen bleibt und das Zahnrad den rechten Abschluss bildet.
+      for (const { item, element } of group.items) {
+        decorateAction(element, item);
+        element.classList.add('tool-action--pinned');
+        pinned.push(element);
+      }
+      continue;
+    }
     const section = document.createElement('section');
     section.className = `toolbar-section toolbar-section--${group.key}`;
     section.setAttribute('aria-label', group.label);
@@ -352,6 +378,9 @@ export function organizeToolbar() {
   toolbar.dataset.organized = 'true';
   toolbar.setAttribute('aria-label', 'Werkzeugleiste');
   installToolbarDensity(toolbar, sections);
+  // Nach dem Einbau der Überlauf-Schaltfläche, damit das Zahnrad rechts davon
+  // steht und in jeder Dichtestufe an derselben Stelle bleibt.
+  for (const element of pinned) toolbar.append(element);
   return true;
 }
 

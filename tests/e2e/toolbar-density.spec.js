@@ -105,7 +105,7 @@ test('die Dichte folgt dem Platz und nicht festen Schwellen', async ({ page }) =
 
   // Zurück in die Breite: Die Leiste muss ihre volle Stufe wiederfinden.
   expect(await densityAt(1700)).toBe('full');
-  await expect(page.locator('.toolbar-section')).toHaveCount(4);
+  await expect(page.locator('.toolbar-section')).toHaveCount(3);
 });
 
 test('das Überlaufmenü zeigt die ausgelagerten Aktionen vollständig beschriftet', async ({ page }) => {
@@ -123,10 +123,13 @@ test('das Überlaufmenü zeigt die ausgelagerten Aktionen vollständig beschrift
   await trigger.click();
   await expect(panel).toBeVisible();
   await expect(trigger).toHaveAttribute('aria-expanded', 'true');
-  await expect(panel.locator('.tool-action')).toHaveCount(7);
+  await expect(panel.locator('.tool-action')).toHaveCount(6);
   await expect(panel).toContainText('Neu laden');
   await expect(panel).toContainText('PDF');
-  await expect(panel).toContainText('Einstellungen');
+  // Die Einstellungen wandern nicht mehr ins Menü: Das Zahnrad bleibt auch in
+  // der engsten Stufe unmittelbar in der Leiste erreichbar.
+  await expect(panel.locator('#settingsBtn')).toHaveCount(0);
+  await expect(page.locator('.toolbar #settingsBtn')).toBeVisible();
 
   // Das Menü liegt über der Monatskarte und wird von der Leiste nicht beschnitten.
   const covering = await page.evaluate(() => {
@@ -143,6 +146,6 @@ test('das Überlaufmenü zeigt die ausgelagerten Aktionen vollständig beschrift
   // Wird es wieder breit, kehren die Gruppen in die Leiste zurück.
   await page.setViewportSize({ width: 1700, height: 900 });
   await expect.poll(async () => (await inspectToolbar(page)).density).toBe('full');
-  await expect(page.locator('.toolbar .toolbar-section')).toHaveCount(4);
+  await expect(page.locator('.toolbar .toolbar-section')).toHaveCount(3);
   await expect(page.locator('#exportPdfBtn')).toBeVisible();
 });
