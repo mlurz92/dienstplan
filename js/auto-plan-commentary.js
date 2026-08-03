@@ -108,6 +108,7 @@ export class AlgorithmCommentary {
     this.lastText = '';
     this.count = 0;
     this.improvements = 0;
+    this.finished = false;
     this.startedAt = Date.now();
   }
 
@@ -158,11 +159,14 @@ export class AlgorithmCommentary {
       return;
     }
 
-    // Jeder Perfektionslauf meldet am Ende sein eigenes Ergebnis. Angezeigt
-    // gehört davon nur der erste Eingang; das maßgebliche Schlusswort spricht
-    // ohnehin `finish()` über den gewonnenen Vorschlag.
+    // Jeder Perfektionslauf meldet am Ende sein eigenes Ergebnis, und die
+    // Ergebnisse unterscheiden sich – eine Entdopplung über den Text greift
+    // hier also nicht. Angezeigt gehört nur der erste Eingang; das maßgebliche
+    // Schlusswort spricht ohnehin `finish()` über den gewonnenen Vorschlag.
     if (phase === 'complete') {
-      this.once('final', `<b>Fertig</b> · ${update.message || ''}`);
+      if (this.finished) return;
+      this.finished = true;
+      this.emit('final', `<b>Fertig</b> · ${update.message || ''}`, { force: true });
       return;
     }
     if (phase === 'blocked') {
