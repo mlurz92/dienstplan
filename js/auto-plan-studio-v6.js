@@ -2,11 +2,11 @@
  * Auto-Plan Studio v6 – progressive Erweiterung der stabilen v5-Oberfläche.
  */
 
-import './auto-plan-studio-v5.js?v=20260803.3';
-import { installAutoPlanGuardrail } from './auto-plan-guardrail.js?v=20260803.3';
-import { installAutoPlanTooltips } from './auto-plan-tooltip.js?v=20260803.3';
+import './auto-plan-studio-v5.js?v=20260803.4';
+import { installAutoPlanGuardrail } from './auto-plan-guardrail.js?v=20260803.4';
+import { installAutoPlanTooltips } from './auto-plan-tooltip.js?v=20260803.4';
 
-const RELEASE = '20260803.3';
+const RELEASE = '20260803.4';
 
 function addStylesheet() {
   if (document.querySelector('link[data-auto-plan-v6-style]')) return;
@@ -19,16 +19,14 @@ function addStylesheet() {
 
 function initialize() {
   addStylesheet();
-  const attempt = () => {
-    const dialog = document.getElementById('autoPlanDialog');
-    if (!dialog) {
-      requestAnimationFrame(attempt);
-      return;
-    }
+  const install = event => {
+    const dialog = event?.detail?.dialog || document.getElementById('autoPlanDialog');
+    if (!dialog) return false;
     installAutoPlanGuardrail(dialog);
     installAutoPlanTooltips(dialog);
+    return true;
   };
-  attempt();
+  if (!install()) window.addEventListener('autoplanstudioready', install, { once: true });
 }
 
 if (document.readyState === 'loading') {

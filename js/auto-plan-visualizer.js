@@ -1,3 +1,5 @@
+import { renderPolicyFor } from './auto-plan-animation-policy.js?v=20260803.4';
+
 /**
  * Lebende Visualisierung des laufenden Auto-Plans.
  *
@@ -65,9 +67,9 @@ function phaseColor(accent, phase) {
 }
 
 const TAU = Math.PI * 2;
-const prefersReducedMotion = () => typeof matchMedia === 'function'
-  && (document?.documentElement?.dataset?.motion === 'reduced'
-    || matchMedia('(prefers-reduced-motion: reduce)').matches);
+const prefersReducedMotion = () => globalThis.document?.documentElement?.dataset?.motion === 'reduced'
+  || (typeof globalThis.matchMedia === 'function'
+    && globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
 export class AutoPlanVisualizer {
   constructor(canvas, monthData) {
@@ -76,6 +78,11 @@ export class AutoPlanVisualizer {
     this.reduced = prefersReducedMotion();
     this.active = true;
     this.finished = false;
+    this.documentVisible = globalThis.document?.visibilityState !== 'hidden';
+    this.intersecting = true;
+    this.dirty = true;
+    this.averageFrameMs = 0;
+    this.paintCount = 0;
 
     this.phase = 'analysis';
     this.progress = 0;
@@ -105,11 +112,87 @@ export class AutoPlanVisualizer {
 
     this.resize = this.resize.bind(this);
     this.draw = this.draw.bind(this);
+    this.onVisibilityChange = this.onVisibilityChange.bind(this);
+    this.onMotionChange = this.onMotionChange.bind(this);
+    this.lastFrame = 0;
+    this.lastPaint = 0;
+    this.frame = null;
+    if (!this.context) {
+      // Canvas ist eine progressive Zusatzdarstellung. Verweigert der Browser
+      // den 2D-Kontext (Speicherdruck, Richtlinie oder Testumgebung), bleibt
+      // der Solver vollständig bedienbar und die Visualisierung wird inert.
+      this.active = false;
+      this.canvas.dataset.renderMode = 'unavailable';
+      this.canvas.dataset.frameInterval = 'event';
+      this.observer = null;
+      this.intersectionObserver = null;
+      this.motionQuery = null;
+      return;
+    }
     this.observer = typeof ResizeObserver === 'function' ? new ResizeObserver(this.resize) : null;
     this.observer?.observe(canvas);
+    this.intersectionObserver = typeof IntersectionObserver === 'function'
+      ? new IntersectionObserver(entries => {
+        const entry = entries[entries.length - 1];
+        this.intersecting = Boolean(entry?.isIntersecting);
+        this.syncRenderState();
+        if (this.intersecting) this.requestRender();
+      }, { threshold: .01 })
+      : null;
+    this.intersectionObserver?.observe(canvas);
+    globalThis.document?.addEventListener?.('visibilitychange', this.onVisibilityChange);
+    globalThis.window?.addEventListener?.('appsettingschange', this.onMotionChange);
+    this.motionQuery = typeof globalThis.matchMedia === 'function'
+      ? globalThis.matchMedia('(prefers-reduced-motion: reduce)')
+      : null;
+    this.motionQuery?.addEventListener?.('change', this.onMotionChange);
     this.resize();
-    this.lastFrame = 0;
+    this.syncRenderState();
+    this.requestRender();
+  }
+
+  renderPolicy() {
+    return renderPolicyFor({
+      active: this.active,
+      visible: this.documentVisible && this.intersecting,
+      reduced: this.reduced,
+      finished: this.finished,
+      averageFrameMs: this.averageFrameMs
+    });
+  }
+
+  syncRenderState() {
+    const policy = this.renderPolicy();
+    this.canvas.dataset.renderMode = policy.mode;
+    this.canvas.dataset.frameInterval = policy.frameIntervalMs === null ? 'event' : String(policy.frameIntervalMs);
+    this.policy = policy;
+    return policy;
+  }
+
+  requestRender() {
+    if (!this.active || this.frame || !this.documentVisible || !this.intersecting) return;
+    const policy = this.syncRenderState();
+    if (!policy.continuous && !this.dirty) return;
     this.frame = requestAnimationFrame(this.draw);
+  }
+
+  onVisibilityChange() {
+    this.documentVisible = globalThis.document?.visibilityState !== 'hidden';
+    this.syncRenderState();
+    if (this.documentVisible) {
+      this.dirty = true;
+      this.requestRender();
+    } else if (this.frame) {
+      cancelAnimationFrame(this.frame);
+      this.frame = null;
+    }
+  }
+
+  onMotionChange() {
+    this.reduced = prefersReducedMotion();
+    this.dirty = true;
+    this.syncRenderState();
+    this.requestRender();
   }
 
   buildNodes(monthData) {
@@ -161,6 +244,8 @@ export class AutoPlanVisualizer {
     this.context.setTransform(ratio, 0, 0, ratio, 0, 0);
     this.width = rect.width;
     this.height = rect.height;
+    this.dirty = true;
+    this.requestRender();
   }
 
   /** Aufnahme eines Fortschrittsereignisses aus dem Algorithmus. */
@@ -196,6 +281,8 @@ export class AutoPlanVisualizer {
       if (last === undefined || last !== quality) this.history.push(quality);
       if (this.history.length > 160) this.history.shift();
     }
+    this.dirty = true;
+    this.requestRender();
   }
 
   /** Einen Knoten zünden und einen Kometen aus dem Kern dorthin schicken. */
@@ -213,10 +300,16 @@ export class AutoPlanVisualizer {
 
   /** Abschluss: ein letzter, ruhiger Impuls über alle Knoten. */
   finish() {
+    if (!this.active) return;
     this.finished = true;
+    this.progress = 1;
+    this.displayProgress = 1;
     this.energy = 1;
     this.waves.push({ radius: 0, life: 1, strong: true });
     for (const node of this.nodes) node.glow = Math.max(node.glow, .5);
+    this.dirty = true;
+    this.syncRenderState();
+    this.requestRender();
   }
 
   rgba(alpha, shift = 0) {
@@ -225,10 +318,20 @@ export class AutoPlanVisualizer {
   }
 
   draw(time) {
+    this.frame = null;
     if (!this.active) return;
-    const delta = this.lastFrame ? Math.min(.05, (time - this.lastFrame) / 1000) : .016;
+    const policy = this.syncRenderState();
+    if (!this.documentVisible || !this.intersecting) return;
+    if (policy.continuous && this.lastPaint && time - this.lastPaint < policy.frameIntervalMs) {
+      this.requestRender();
+      return;
+    }
+
+    const delta = this.lastPaint ? Math.min(.08, (time - this.lastPaint) / 1000) : .016;
     this.lastFrame = time;
+    this.lastPaint = time;
     const seconds = time / 1000;
+    const renderStarted = globalThis.performance?.now?.() ?? Date.now();
 
     for (let channel = 0; channel < 3; channel += 1) {
       this.color[channel] += (this.targetColor[channel] - this.color[channel]) * Math.min(1, delta * 3);
@@ -239,7 +342,7 @@ export class AutoPlanVisualizer {
 
     const { width, height } = this;
     if (!width || !height) {
-      this.frame = requestAnimationFrame(this.draw);
+      this.requestRender();
       return;
     }
     const centerX = width / 2;
@@ -258,8 +361,14 @@ export class AutoPlanVisualizer {
     this.paintSparks(context, delta);
     this.paintCore(context, centerX, centerY, size, seconds);
     this.paintHistory(context, width, height);
-
-    this.frame = requestAnimationFrame(this.draw);
+    const renderDuration = Math.max(0, (globalThis.performance?.now?.() ?? Date.now()) - renderStarted);
+    this.averageFrameMs = this.paintCount
+      ? this.averageFrameMs * .88 + renderDuration * .12
+      : renderDuration;
+    this.paintCount += 1;
+    this.dirty = false;
+    this.syncRenderState();
+    this.requestRender();
   }
 
   paintAtmosphere(context, centerX, centerY, size, seconds) {
@@ -275,7 +384,8 @@ export class AutoPlanVisualizer {
     if (this.reduced) return;
     // Langsam wandernde Schleier geben der Fläche Tiefe, ohne vom Geschehen
     // abzulenken.
-    for (let layer = 0; layer < 3; layer += 1) {
+    const layers = Math.max(1, Math.ceil(3 * (this.policy?.detail ?? 1)));
+    for (let layer = 0; layer < layers; layer += 1) {
       const angle = seconds * (.06 + layer * .035) + layer * 2.1;
       const radius = size * (1.05 + layer * .22);
       const x = centerX + Math.cos(angle) * size * .3;
@@ -292,7 +402,8 @@ export class AutoPlanVisualizer {
 
   paintRings(context, centerX, centerY, size, seconds) {
     context.save();
-    for (let ring = 0; ring < 5; ring += 1) {
+    const ringCount = (this.policy?.detail ?? 1) < .6 ? 3 : 5;
+    for (let ring = 0; ring < ringCount; ring += 1) {
       const radius = size * (.28 + ring * .16);
       const spin = this.reduced ? 0 : seconds * (ring % 2 ? .05 : -.038) * (1 + this.activity);
       context.save();
@@ -348,7 +459,7 @@ export class AutoPlanVisualizer {
   }
 
   paintLinks(context, seconds) {
-    const visible = Math.round(Math.max(this.displayProgress, .12) * this.links.length);
+    const visible = Math.round(Math.max(this.displayProgress, .12) * this.links.length * (this.policy?.detail ?? 1));
     context.lineWidth = .7;
     for (let index = 0; index < visible; index += 1) {
       const link = this.links[index];
@@ -414,12 +525,14 @@ export class AutoPlanVisualizer {
 
   burst(x, y, count) {
     if (this.reduced) return;
-    for (let index = 0; index < count; index += 1) {
+    const limit = this.policy?.sparkLimit ?? 160;
+    const available = Math.max(0, limit - this.sparks.length);
+    for (let index = 0; index < Math.min(count, available); index += 1) {
       const angle = (index / count) * TAU + Math.random() * .4;
       const speed = 22 + Math.random() * 46;
       this.sparks.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: 1 });
     }
-    if (this.sparks.length > 320) this.sparks.splice(0, this.sparks.length - 320);
+    if (this.sparks.length > limit) this.sparks.splice(0, this.sparks.length - limit);
   }
 
   paintSparks(context, delta) {
@@ -442,9 +555,8 @@ export class AutoPlanVisualizer {
   }
 
   paintNodes(context, delta) {
-    const visible = Math.round(this.displayProgress * this.nodes.length);
-    this.nodes.forEach((node, index) => {
-      const done = node.settled || index < visible;
+    this.nodes.forEach(node => {
+      const done = node.settled;
       const radius = done ? 2.4 + node.pulse * 4.8 : 1.5;
       context.fillStyle = node.fixed
         ? `rgba(122,136,152,${.42 + node.glow * .3})`
@@ -545,6 +657,12 @@ export class AutoPlanVisualizer {
   stop() {
     this.active = false;
     this.observer?.disconnect();
+    this.intersectionObserver?.disconnect();
+    globalThis.document?.removeEventListener?.('visibilitychange', this.onVisibilityChange);
+    globalThis.window?.removeEventListener?.('appsettingschange', this.onMotionChange);
+    this.motionQuery?.removeEventListener?.('change', this.onMotionChange);
     if (this.frame) cancelAnimationFrame(this.frame);
+    this.frame = null;
+    this.syncRenderState();
   }
 }

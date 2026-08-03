@@ -18,8 +18,8 @@ import {
   applyAutoPlanProposal,
   createDefaultAutoPlanConfig,
   validateAutoPlanConfig
-} from './auto-planner.js?v=20260803.3';
-import { createAutoPlanExecutionPlan, runAutoPlan, workersAvailable } from './auto-plan-runner.js?v=20260803.3';
+} from './auto-planner.js?v=20260803.4';
+import { createAutoPlanExecutionPlan, runAutoPlan, workersAvailable } from './auto-plan-runner.js?v=20260803.4';
 import {
   getMonthData,
   getMonthLabel,
@@ -27,7 +27,7 @@ import {
   persistMonth,
   setMonthData,
   state
-} from './state.js?v=20260803.3';
+} from './state.js?v=20260803.4';
 import {
   assignmentLabel,
   computeWeekendEquivalent,
@@ -38,12 +38,14 @@ import {
   parseIso,
   roleLabelForMonth,
   weekdayLabel
-} from './rules.js?v=20260803.3';
-import { holidayName } from './holidays.js?v=20260803.3';
-import { AlgorithmCommentary } from './auto-plan-commentary.js?v=20260803.3';
-import { AutoPlanVisualizer } from './auto-plan-visualizer.js?v=20260803.3';
+} from './rules.js?v=20260803.4';
+import { holidayName } from './holidays.js?v=20260803.4';
+import { AlgorithmCommentary, commentaryParts } from './auto-plan-commentary.js?v=20260803.4';
+import { AutoPlanVisualizer } from './auto-plan-visualizer.js?v=20260803.4';
+import { AutoPlanProgressModel } from './auto-plan-progress.js?v=20260803.4';
+import { AutoPlanRunEpoch, abortableDelay } from './auto-plan-lifecycle.js?v=20260803.4';
 
-const RELEASE = '20260803.3';
+const RELEASE = '20260803.4';
 const STYLESHEETS = ['/auto-plan-studio.css'];
 
 const PHASES = Object.freeze([
@@ -97,6 +99,8 @@ let installed = false;
 let activeMonth;
 let triggerFocus;
 let clockTimer;
+const progressModel = new AutoPlanProgressModel();
+const runEpoch = new AutoPlanRunEpoch();
 
 /**
  * Die verstrichene Zeit läuft in der Oberfläche selbst weiter.
@@ -126,7 +130,7 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, character => ({
 
 const numberOrNull = value => value === '' || value === null || value === undefined
   ? null
-  : Number.isInteger(Number(value)) && Number(value) >= 0 ? Number(value) : null;
+  : Number(value);
 
 const formatNumber = value => Number(value || 0).toLocaleString('de-DE');
 
@@ -294,9 +298,14 @@ function template() {
         <section class="auto-plan-stage" id="autoPlanStage" hidden>
           <div class="auto-plan-visual">
             <canvas id="autoPlanCanvas" aria-hidden="true"></canvas>
-            <div class="auto-plan-core">
+            <div class="auto-plan-core" id="autoPlanProgressMeter" role="progressbar" aria-label="Fortschritt der Auto-Plan-Optimierung" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="Analyse, 0 Prozent">
               <strong id="autoPlanPercent">0</strong><span>%</span>
               <small id="autoPlanCoreLabel">Analyse</small>
+            </div>
+            <div class="auto-plan-truth-strip" aria-label="Tatsächlich beobachteter Arbeitsstand">
+              <div><span>Arbeitsmenge</span><strong id="autoPlanTruthWorkload">0 Felder</strong></div>
+              <div><span>Portfolio</span><strong id="autoPlanTruthPortfolio">Inline</strong></div>
+              <div><span>Qualitätsgewinn</span><strong id="autoPlanTruthQuality">0 Verbesserungen</strong></div>
             </div>
             <div class="auto-plan-orbit-legend" aria-hidden="true">
               <span class="auto-plan-orbit-label auto-plan-orbit-label--bd">BD innen</span>
@@ -555,13 +564,13 @@ function syncConfigValidation() {
   const config = readConfig();
   const validation = validateAutoPlanConfig(state, activeMonth, config);
   const extra = [];
-  if (config.repairIterations < 0 || config.repairIterations > 30) {
+  if (!Number.isInteger(config.repairIterations) || config.repairIterations < 0 || config.repairIterations > 30) {
     extra.push('Iterative Reparaturrunden müssen zwischen 0 und 30 liegen.');
   }
-  if (config.localRebuildBudget < 200 || config.localRebuildBudget > 12000) {
+  if (!Number.isInteger(config.localRebuildBudget) || config.localRebuildBudget < 200 || config.localRebuildBudget > 12000) {
     extra.push('Das lokale Neuplanungsbudget muss zwischen 200 und 12.000 liegen.');
   }
-  if (config.lateAcceptanceSize < 10 || config.lateAcceptanceSize > 5000) {
+  if (!Number.isInteger(config.lateAcceptanceSize) || config.lateAcceptanceSize < 10 || config.lateAcceptanceSize > 5000) {
     extra.push('Das Late-Acceptance-Fenster muss zwischen 10 und 5.000 liegen.');
   }
   const errors = [...validation.errors, ...extra];
@@ -593,8 +602,20 @@ function appendLogEntry({ kind, text, time }) {
   const stream = byId('autoPlanLog');
   if (!stream) return;
   const entry = document.createElement('p');
-  entry.className = `auto-plan-log-entry is-${kind}`;
-  entry.innerHTML = `<time>${esc(time)}</time><i></i><span>${text}</span>`;
+  entry.className = `auto-plan-log-entry is-${String(kind || 'work').replace(/[^a-z-]/gi, '')}`;
+  const timestamp = document.createElement('time');
+  timestamp.textContent = String(time || '');
+  const marker = document.createElement('i');
+  marker.setAttribute('aria-hidden', 'true');
+  const content = document.createElement('span');
+  const parts = commentaryParts(text);
+  if (parts.emphasis) {
+    const emphasis = document.createElement('b');
+    emphasis.textContent = parts.emphasis;
+    content.append(emphasis);
+  }
+  content.append(document.createTextNode(parts.detail));
+  entry.append(timestamp, marker, content);
   stream.append(entry);
   while (stream.childElementCount > MAX_LOG_ENTRIES) stream.firstElementChild.remove();
   byId('autoPlanLogCount').textContent = `${stream.childElementCount} Meldungen`;
@@ -641,11 +662,11 @@ function renderPhases(phase) {
 const searchProgress = new Map();
 let searchStage = '';
 
-function mergeSearchProgress(update) {
+function mergeSearchTelemetry(update, normalizedStage) {
   // Beim Wechsel von Aufbau auf Perfektion beginnen neue Läufe mit eigenen
   // Zählwerten. Ohne Zurücksetzen summierten sich die Stände beider Phasen.
-  if (update.stage && update.stage !== searchStage) {
-    searchStage = update.stage;
+  if (normalizedStage && normalizedStage !== searchStage) {
+    searchStage = normalizedStage;
     searchProgress.clear();
   }
   const index = Number.isInteger(update.searchIndex) ? update.searchIndex : 0;
@@ -663,14 +684,30 @@ function mergeSearchProgress(update) {
 }
 
 function updateProgress(rawUpdate) {
-  const update = mergeSearchProgress(rawUpdate);
-  const percent = Math.round(Math.max(0, Math.min(1, Number(update.progress) || 0)) * 100);
+  const truth = progressModel.observe(rawUpdate);
+  const telemetry = mergeSearchTelemetry(rawUpdate, truth.stage);
+  const update = { ...telemetry, ...truth, progress: truth.progress };
+  const percent = truth.percent;
   dialog.dataset.phase = update.phase || 'search';
+  dialog.dataset.progressStage = truth.stage;
   byId('autoPlanPercent').textContent = String(percent);
   byId('autoPlanCoreLabel').textContent = update.phase === 'search' && update.subphase
     ? update.subphase.toUpperCase()
     : CORE_LABELS[update.phase] || 'Optimierung';
   byId('autoPlanMessage').textContent = update.message || 'Optimierung läuft …';
+  const meter = byId('autoPlanProgressMeter');
+  meter?.setAttribute('aria-valuenow', String(percent));
+  meter?.setAttribute('aria-valuetext', `${byId('autoPlanCoreLabel').textContent}, ${percent} Prozent`);
+
+  const workload = truth.workload.total > 0
+    ? `${truth.workload.processed}/${truth.workload.total} Felder`
+    : `${Number(rawUpdate.fixed) || 0} Fixpunkte`;
+  const portfolio = truth.portfolio.total > 1
+    ? `${truth.portfolio.completed + truth.portfolio.failed + truth.portfolio.cancelled}/${truth.portfolio.total} Läufe${truth.portfolio.failed ? ` · ${truth.portfolio.failed} fehlgeschlagen` : ''}${truth.portfolio.cancelled ? ` · ${truth.portfolio.cancelled} beendet` : ''}`
+    : 'Inline · 1 Lauf';
+  byId('autoPlanTruthWorkload').textContent = workload;
+  byId('autoPlanTruthPortfolio').textContent = portfolio;
+  byId('autoPlanTruthQuality').textContent = `${truth.improvements} Verbesserung${truth.improvements === 1 ? '' : 'en'}`;
 
   const setMetric = (id, value) => {
     if (value !== undefined) byId(id).textContent = formatNumber(value);
@@ -690,8 +727,8 @@ function updateProgress(rawUpdate) {
   document.querySelector('.auto-plan-shell')?.style.setProperty('--auto-progress', `${percent}%`);
   renderPhases(update.phase);
 
-  commentary?.observe(update);
-  visualizer?.update(update);
+  commentary?.observe({ ...rawUpdate, ...update });
+  visualizer?.update({ ...rawUpdate, ...update });
 }
 
 function staffLabel(staffId) {
@@ -988,6 +1025,11 @@ function resetProgress(monthData) {
   byId('autoPlanApplyBtn').hidden = true;
   byId('autoPlanCancelBtn').textContent = 'Abbrechen';
   byId('autoPlanPercent').textContent = '0';
+  byId('autoPlanProgressMeter')?.setAttribute('aria-valuenow', '0');
+  byId('autoPlanProgressMeter')?.setAttribute('aria-valuetext', 'Analyse, 0 Prozent');
+  byId('autoPlanTruthWorkload').textContent = '0 Felder';
+  byId('autoPlanTruthPortfolio').textContent = 'Inline';
+  byId('autoPlanTruthQuality').textContent = '0 Verbesserungen';
   byId('autoPlanMessage').textContent = 'Monatszustand wird vorbereitet …';
   byId('autoPlanElapsed').textContent = '0 s';
   byId('autoPlanRemaining').textContent = '';
@@ -998,6 +1040,7 @@ function resetProgress(monthData) {
   stopClock();
   searchProgress.clear();
   searchStage = '';
+  progressModel.reset();
   highestPhase = 0;
   renderPhases('analysis');
   resetLog();
@@ -1017,6 +1060,7 @@ function openStudio() {
 
 async function startPlanner() {
   if (!syncConfigValidation()) return;
+  const runToken = runEpoch.begin();
   const runConfig = readConfig();
   const open = Object.values(activeMonth.days || {}).reduce((sum, day) => sum + Number(!day.bd) + Number(!day.hg), 0);
   const execution = createAutoPlanExecutionPlan({
@@ -1033,15 +1077,17 @@ async function startPlanner() {
   byId('autoPlanConfig').hidden = true;
   byId('autoPlanStage').hidden = false;
   byId('autoPlanSubtitle').textContent = workersAvailable()
-    ? `${getMonthLabel(activeMonth.year, activeMonth.month)} · v7 Portfolio ${execution.constructionWorkers}/${execution.perfectionWorkers} Worker · ${execution.reserveCores} UI-Reserve`
+    ? `${getMonthLabel(activeMonth.year, activeMonth.month)} · v7.5 Portfolio ${execution.constructionWorkers}/${execution.perfectionWorkers} Worker · ${execution.reserveCores} UI-Reserve`
     : `${getMonthLabel(activeMonth.year, activeMonth.month)} · Optimierung läuft`;
   byId('autoPlanStartBtn').hidden = true;
   byId('autoPlanBody').scrollTop = 0;
   trigger.disabled = true;
   controller?.abort();
-  controller = new AbortController();
+  const localController = new AbortController();
+  controller = localController;
   visualizer?.stop();
-  visualizer = new AutoPlanVisualizer(byId('autoPlanCanvas'), activeMonth);
+  const localVisualizer = new AutoPlanVisualizer(byId('autoPlanCanvas'), activeMonth);
+  visualizer = localVisualizer;
   startClock();
 
   resetLog();
@@ -1056,16 +1102,23 @@ async function startPlanner() {
       year: activeMonth.year,
       month: activeMonth.month,
       runConfig,
-      signal: controller.signal,
-      onProgress: update => updateProgress(update)
+      signal: localController.signal,
+      onProgress: update => {
+        if (runEpoch.isCurrent(runToken)) updateProgress(update);
+      }
     });
+    runEpoch.assertCurrent(runToken);
     // Kurz stehen lassen: Der Balken erreicht sichtbar hundert Prozent, bevor
     // die Ansicht auf das Ergebnis wechselt.
     commentary?.finish(proposal);
-    await new Promise(resolve => setTimeout(resolve, 620));
+    localVisualizer.finish();
+    await abortableDelay(620, localController.signal);
+    runEpoch.assertCurrent(runToken);
+    if (!dialog.open) return;
     renderResult(proposal);
   } catch (error) {
     if (error?.name === 'AbortError') return;
+    if (!runEpoch.isCurrent(runToken)) return;
     proposal = {
       success: false, complete: false, requiresConfirmation: false, status: 'blocked',
       changes: [], redViolations: [], baseline: activeMonth, plannedMonth: activeMonth, audit: [],
@@ -1082,7 +1135,9 @@ async function startPlanner() {
   } finally {
     trigger.disabled = false;
     stopClock();
-    visualizer?.finish();
+    localVisualizer.stop();
+    if (visualizer === localVisualizer) visualizer = null;
+    if (controller === localController) controller = null;
     document.body.classList.remove('auto-plan-running');
   }
 }
@@ -1119,12 +1174,13 @@ async function applyProposal() {
 }
 
 function closeStudio() {
+  runEpoch.invalidate();
   controller?.abort();
   controller = null;
   stopClock();
   visualizer?.stop();
   visualizer = null;
-  dialog.close('cancel');
+  if (dialog.open) dialog.close('cancel');
 }
 
 function bind() {
@@ -1174,6 +1230,7 @@ function bind() {
     closeStudio();
   });
   dialog.addEventListener('close', () => {
+    runEpoch.invalidate();
     controller?.abort();
     controller = null;
     stopClock();
@@ -1186,15 +1243,18 @@ function bind() {
 function initialize() {
   if (installed) return;
   installStylesheets();
+  let attempts = 0;
   const attempt = () => {
     trigger = createTrigger();
     if (!trigger) {
-      setTimeout(attempt, 80);
+      attempts += 1;
+      if (attempts < 125) setTimeout(attempt, 80);
       return;
     }
     dialog = createDialog();
     bind();
     installed = true;
+    window.dispatchEvent(new CustomEvent('autoplanstudioready', { detail: { dialog } }));
   };
   requestAnimationFrame(attempt);
 }

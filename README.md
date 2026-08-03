@@ -6,9 +6,9 @@
 
 <p align="center"><strong>Regelgestützte Monatsplanung für Bereitschaftsdienst, Hintergrunddienst und neuroradiologische Rufbereitschaft</strong></p>
 
-> **Paketversion:** `0.6.0`<br>
+> **Paketversion:** `0.6.5`<br>
 > **Regelwerk:** Eignungsregeln `v4.9`  
-> **Auto-Plan:** Algorithmus `v7` mit globaler Engpasssuche, inkrementellem Last-Ledger, adaptivem Worker-Portfolio, cost-aware ALNS, Null-Rot-Guardrail und Zertifizierung<br>
+> **Auto-Plan:** Algorithmus `v7.5` mit globaler Engpasssuche, wahrheitsgetreuem Portfoliofortschritt, inkrementellem Last-Ledger, adaptivem Worker-Portfolio, cost-aware ALNS, Null-Rot-Guardrail und Zertifizierung<br>
 > **Feiertagsregion:** Sachsen (`SN`)  
 > **Betrieb:** Cloudflare Pages · Pages Functions · Cloudflare KV · lokale Browser-Sicherung
 
@@ -80,7 +80,7 @@ Die Einstellungen verwenden Schema `v3`, werden lokal offlinefest gesichert, üb
 
 ---
 
-## 3. Null-Rot-Guardrail v7
+## 3. Null-Rot-Guardrail v7.5
 
 ### 3.1 Eskalationsfolge
 
@@ -136,14 +136,16 @@ Der Suchprofiltext weist die Rescue ebenfalls aus.
 
 ---
 
-## 4. Algorithmusarchitektur v7
+## 4. Algorithmusarchitektur v7.5
+
+v7.5 bewahrt die fachliche Such- und Zielarchitektur von v7, härtet aber deren Ausführung, Fortschrittsmodell, Fehlerpfade und Beobachtbarkeit. Die Anzeige leitet ihren Stand ausschließlich aus echten Solver- und Portfolioereignissen ab; sie beeinflusst die fachliche Bewertung nicht.
 
 ### 4.1 Pipeline
 
 ```text
 Ausgangsmonat
     │
-    ├─ Constraint-Konstruktion v7
+    ├─ Constraint-Konstruktion (v7-Suchkern in v7.5)
     │   globale BD/HG-MRV · Beam Search · Forward Checking
     │   inkrementelles Belegungs-Ledger · strikte Profile
     │
@@ -153,7 +155,7 @@ Ausgangsmonat
     ├─ iterative Tauschreparatur
     │   Einzelumsetzung · Paartausch · Dreierkette · Tagespaket · lokale Neuplanung
     │
-    ├─ Perfektionsphase v7
+    ├─ Perfektionsphase (v7-Suchkern in v7.5)
     │   Adaptive Large Neighborhood Search
     │   cost-aware UCB-Operatorwahl · Ruin-and-Recreate
     │   Late Acceptance · absteigende Nachbarschaften
@@ -245,7 +247,7 @@ Fixpunkte sind mehrfach abgesichert:
 
 ---
 
-## 5. Adaptive Mehrkern-Ausführung
+## 5. Adaptive Mehrkern-Ausführung und Lebenszyklus
 
 Der Auto-Plan läuft in Modul-Web-Workern.
 
@@ -259,13 +261,31 @@ Der Auto-Plan läuft in Modul-Web-Workern.
 - je nach Gerät bleiben ein oder zwei Kerne für Anzeige, Eingabe und Animation frei;
 - ohne Worker-Unterstützung fällt die Anwendung auf den Anzeigestrang zurück.
 
+v7.5 ergänzt einen expliziten Portfolio- und Dialoglebenszyklus:
+
+- Aufbau und Perfektion besitzen getrennte Zähler für Gesamtzahl, aktive, abgeschlossene, abgebrochene und fehlgeschlagene Läufe;
+- ein einzelner schneller Worker kann nicht mehr vorzeitig 100 Prozent für das Gesamtportfolio melden;
+- genau ein terminales Gesamtereignis folgt erst, nachdem das relevante Portfolio beendet ist;
+- interne Worker-Abbrüche, unbekannte Antworten, Laufzeitfehler und synchrone Übertragungsfehler werden beendet oder auf den sicheren Inline-Pfad zurückgeführt, statt einen Lauf offen zu lassen;
+- die getesteten Terminalpfade für Erfolg, Dialogabbruch, Workerfehler und Übertragungsfehler räumen Worker, Abbruchlistener, Überleitungszeitgeber und Visualizer zuverlässig auf;
+- eine Lauf-Epoche verhindert, dass ein verspätetes Ergebnis nach Abbruch oder Neustart in den Dialog geschrieben wird;
+- die 620-ms-Ergebnisüberleitung ist abbrechbar und kann keinen geschlossenen Dialog wieder mit Inhalt befüllen.
+
 Die produktive Regelengine wird nicht dupliziert. Worker und Hauptthread importieren dieselben Module.
 
 Die Profile `Responsiv`, `Adaptiv` und `Power` begrenzen das Portfolio auf zwei, vier beziehungsweise sechs Worker. Diese Obergrenzen werden weiter durch Speicher und Problemgröße reduziert; `navigator.hardwareConcurrency` wird ausdrücklich nicht als absolute Freigabe interpretiert. Ein explizites Parallelitätslimit begrenzt die Perfektionsläufe zusätzlich.
 
 ---
 
-## 6. Laufansicht und Animation
+## 6. Truthful Constraint Observatory und Animation
+
+Die v7.5-Laufansicht trennt drei messbare Größen, die frühere Versionen zu einem scheinpräzisen Prozentwert vermischt haben:
+
+1. **Arbeitsmenge:** tatsächlich bearbeitete Dienstfelder;
+2. **Portfolio:** erfolgreiche, fehlgeschlagene und regelbedingt beendete Arbeitsstränge;
+3. **Qualitätsgewinn:** tatsächlich übernommene Verbesserungen.
+
+Der Gesamtfortschritt aggregiert alle bekannten Portfolioanteile innerhalb fester Phasenfenster. Er bleibt monoton, erreicht vor einem terminalen Gesamtereignis höchstens 99 Prozent und springt nicht auf den Stand des schnellsten Workers. Bei einem Wechsel von Aufbau zu Perfektion beginnen die Portfoliozähler neu, ohne dass der sichtbare Gesamtfortschritt zurückfällt. Eine Restzeit erscheint nur innerhalb einer zeitbudgetierten Phase, die selbst ein belastbares Restbudget liefert.
 
 Die Canvas-Visualisierung bildet den tatsächlichen Lauf ab:
 
@@ -275,12 +295,39 @@ Die Canvas-Visualisierung bildet den tatsächlichen Lauf ab:
 - Kopplungsfäden stellen zeitliche und rollenbezogene Beziehungen dar;
 - Aktivität, Verbesserungen und Fortschritt steuern Energie und Bewegung;
 - die Farbwelt wird aus der aktuellen Monatskontrastfarbe abgeleitet;
+- der zentrale Fortschrittsring entspricht dem aggregierten, beobachteten Portfoliofortschritt;
+- Knoten werden ausschließlich durch reale Feldereignisse gezündet und niemals aus dem Prozentwert als vermeintlich erledigt markiert;
 - ein Phasenkommentar erklärt die aktuelle Rechenstufe;
 - die Verlaufslinie visualisiert Qualitätsverbesserungen;
-- `prefers-reduced-motion` wird respektiert.
+- `prefers-reduced-motion` wird respektiert;
 - die App-Einstellung „Bewegung reduziert“ wirkt auch dann, wenn das Betriebssystem keine reduzierte Bewegung meldet;
-- ein v7-Orbit und eine monatlich eingefärbte Portfolio-Leiste visualisieren Engine, Worker-Plan und aktuelle Architektur;
+- das Observatory, der Orbit und die monatlich eingefärbte Portfolio-Leiste visualisieren Engine, Worker-Plan und aktuelle Architektur;
 - Ledger-Treffer, Worker-Aufteilung und lernende Operatoren erscheinen im Ergebnisbericht.
+
+Die Zeichenlast passt sich der Umgebung an:
+
+- volle Darstellung: maximal etwa 30 Bilder pro Sekunde;
+- bei erhöhten gemessenen Framekosten: 20 Bilder pro Sekunde und höchstens 80 Partikel statt 160;
+- bei hoher Belastung: 15 Bilder pro Sekunde, vereinfachte Details und höchstens 24 Partikel;
+- außerhalb des sichtbaren Bereichs oder in einem Hintergrundtab: keine dauerhafte Bildfolge;
+- bei Reduced Motion, nach Abschluss und im Ergebniszustand: nur eine ereignisgesteuerte Schlusszeichnung;
+- bei nicht verfügbarem Canvas-2D-Kontext: inerte Zusatzdarstellung, während der Solver unverändert weiterarbeitet.
+
+`ResizeObserver`, `IntersectionObserver`, Page Visibility, Media-Query- und Anwendungseinstellungs-Listener werden beim Beenden vollständig gelöst. Die begleitende CSS-Atmosphäre übernimmt dasselbe Voll-/Ausgewogen-/Sparbudget und stoppt gemeinsam mit der Canvas.
+
+### Differenzierte Algorithmuskommentare
+
+Die Klartextspur beschreibt nicht nur eine Phase, sondern die jeweils belegbaren Fakten:
+
+- Analyse: Zahl der Aufbau- und Perfektionsstränge, UI-Kernreserve und Grund der Lastverteilung;
+- Constraint-Suche: Rolle, Datum, Kandidatenzahl, Suchstrahl, geprüfte Zustände und bearbeitete Felder;
+- Rescue und Minimal-Rot-Fallback: tatsächlicher Auslöser und Eskalationsgrund;
+- Perfektion: Runde, Nachbarschaft, geprüfte Züge, Vollbewertungen, angenommene Züge und Restbudget;
+- Verbesserung: kumulierter Zugewinn, Zugart, betroffene Tage und Rechenaufwand;
+- Zertifizierung: vollständig geprüfte Nachbarschaft und Zugzahl;
+- Abschluss: Belegung, Rot/Orange/Gelb, Fairness, Wunschquote, Suchzustände, Bewertungen, Laufzeit und Zertifizierungsstand.
+
+Gleichartige Meldungen werden gedrosselt, Meilensteine und Portfolioabschlüsse entdoppelt. Kommentarbestandteile werden als Textknoten aufgebaut; Workertexte können daher kein HTML in die Oberfläche einschleusen.
 
 Der v7-Guardrail macht zusätzlich sichtbar, dass der Minimal-Rot-Fallback erst nach der verbreiterten Strict-Rescue erreicht werden kann.
 
@@ -306,6 +353,7 @@ Das Icon enthält keine Schrift. Die zentrale Metapher bleibt auch bei 32 Pixeln
 - sichtbare Fokusindikatoren;
 - semantische Tabellenköpfe;
 - ARIA-Live-Bereiche für Status und Algorithmuskommentar;
+- programmatische Fortschrittssemantik mit `role="progressbar"`, `aria-valuemin`, `aria-valuemax`, `aria-valuenow` und phasenbezogenem `aria-valuetext`;
 - Tooltip-Container mit `role="tooltip"` und `aria-describedby`;
 - Tooltips auf Hover und Fokus;
 - Tooltip-Schließen mit `Escape`;
@@ -354,6 +402,7 @@ transitions.css
 auto-plan-studio.css
 auto-plan-studio-v6.css
 auto-plan-studio-v7.css
+auto-plan-studio-v7-5.css
 app-settings.css
 
 icons/
@@ -382,6 +431,7 @@ js/
   auto-planner-v5.js
   auto-planner-v6.js
   auto-planner-v7.js
+  auto-planner-v7-5.js
   auto-planner-optimizer.js
 
   auto-plan-runner.js
@@ -390,9 +440,13 @@ js/
   auto-plan-studio-v5.js
   auto-plan-studio-v6.js
   auto-plan-studio-v7.js
+  auto-plan-studio-v7-5.js
   auto-plan-guardrail.js
   auto-plan-tooltip.js
   auto-plan-visualizer.js
+  auto-plan-animation-policy.js
+  auto-plan-progress.js
+  auto-plan-lifecycle.js
   auto-plan-commentary.js
 
 functions/
@@ -407,7 +461,9 @@ tests/
 docs/
   AUTO-PLAN-V6-RESEARCH-20260803.md
   AUTO-PLAN-V7-RESEARCH-20260803.md
+  AUTO-PLAN-V7-5-RESEARCH-20260803.md
   auto-plan-v7-test-strategy.yml
+  auto-plan-v7-5-test-strategy.yml
 ```
 
 ---
@@ -489,7 +545,7 @@ Die CI führt aus:
 3. Node-Test-Suite
 4. Playwright-Browsertests
 
-Neue v7-Regressionstests prüfen insbesondere:
+Neue v7.5-Regressionstests prüfen zusätzlich zu den v7-Gates insbesondere:
 
 - vollständige, migrationssichere Settings-Defaults und strikte Validierung;
 - adaptives Worker-Budget bei kleinem Speicher, großen Geräten und explizitem Limit;
@@ -501,6 +557,16 @@ Neue v7-Regressionstests prüfen insbesondere:
 - bewusste Aufhebung durch explizites `null`;
 - ausschließlich strikte Profile in der Rescue;
 - protokollierte Rescue vor einem Minimal-Rot-Fallback.
+- monotonen, endlichen und nicht voreilenden Portfoliofortschritt über generierte Ereignisfolgen;
+- den Phasenwechsel von Aufbau zu Perfektion ohne übernommene Portfoliozähler;
+- exakt ein terminales Gesamtereignis nach Abschluss aller relevanten Arbeitsstränge;
+- Worker-Abort, unbekannte Antworten, Übertragungsfehler und vollständige Listenerbereinigung;
+- Abbruch vor und während der Ergebnisüberleitung sowie Schutz gegen verspätete Ergebnisse;
+- Canvas-Budgets für volle, ausbalancierte, belastete, unsichtbare, reduzierte und beendete Zustände;
+- fehlenden Canvas-Kontext als rein visuelles, nicht fachliches Degradationsszenario;
+- differenzierte, kennzahlenbasierte und HTML-sichere Algorithmuskommentare;
+- negative, gebrochene, nichtnumerische und unter Fixpunkten liegende Rohgrenzen;
+- Fortschrittssemantik, Reduced Motion und Tooltip-Lebenszyklus im Browser;
 - plattformneutrale Syntax-Gate-Pfade unter Windows und POSIX;
 - identische Quelltextprüfungen bei LF- und CRLF-Zeilenenden.
 
@@ -520,8 +586,10 @@ Ein Merge nach `main` ist nur nach erfolgreicher CI vorgesehen.
 
 ## 14. Recherche und Entscheidungsprotokoll
 
-Die fachliche und technische Begründung der v7-Architektur einschließlich Constraint-Programming-, ALNS-, Browser- und Accessibility-Quellen steht in:
+Die fachliche und technische Begründung der v7.5-Architektur einschließlich Suchfortschritt, Constraint-Programming, Rendering, Browser-Lebenszyklus und Accessibility steht in:
 
+- [`docs/AUTO-PLAN-V7-5-RESEARCH-20260803.md`](docs/AUTO-PLAN-V7-5-RESEARCH-20260803.md)
+- [`docs/auto-plan-v7-5-test-strategy.yml`](docs/auto-plan-v7-5-test-strategy.yml)
 - [`docs/AUTO-PLAN-V7-RESEARCH-20260803.md`](docs/AUTO-PLAN-V7-RESEARCH-20260803.md)
 - [`docs/auto-plan-v7-test-strategy.yml`](docs/auto-plan-v7-test-strategy.yml)
 - [`docs/AUTO-PLAN-V6-RESEARCH-20260803.md`](docs/AUTO-PLAN-V6-RESEARCH-20260803.md)
@@ -530,7 +598,26 @@ Die fachliche und technische Begründung der v7-Architektur einschließlich Cons
 
 ---
 
-## 15. Release 0.6.0 / Auto-Plan v7
+## 15. Release 0.6.5 / Auto-Plan v7.5
+
+- neues **Truthful Constraint Observatory** mit Fortschrittsring, Arbeitsmenge, Portfoliozustand und Qualitätsgewinnen;
+- monotones, portfolioaggregiertes Fortschrittsmodell mit 99-Prozent-Schranke bis zum echten Gesamtabschluss;
+- Canvas-Animation mit 30/20/15-fps-Budgets, adaptiver Detail- und Partikeldichte sowie vollständiger Sichtbarkeits- und Reduced-Motion-Steuerung;
+- explizites Stoppen der Canvas- und CSS-Animation nach Abschluss oder Dialogabbruch;
+- ausschließlich ereignisbasierte Knotenzustände ohne aus Prozentwerten erfundene Felder;
+- differenzierte Algorithmuskommentare für Kernverteilung, Engpässe, Perfektionsrunden, Bewertungen, Restbudget, Verbesserungen und Schlussqualität;
+- HTML-sichere Kommentarwiedergabe über DOM-Textknoten;
+- sicher abbrechbare Ergebnisüberleitung und Lauf-Epochen gegen späte Ergebniszustände;
+- gehärtetes Workerprotokoll für interne Abbrüche, unbekannte Antworten, Laufzeit- und strukturierte Klonfehler;
+- vollständiges Aufräumen von Workern, Zeitgebern, Frames, Beobachtern und Abbruchlistenern;
+- strikt validierte negative, gebrochene und nichtnumerische Laufobergrenzen;
+- sichere Standardgrenzen auch bei partieller Engine-Konfiguration;
+- sofortiges Schließen sichtbarer Rich Tooltips nach Deaktivierung;
+- v7.5-Identität in Planner, Studio, Einstellungen, Paketversion und vollständigem Browser-Modulgraphen;
+- einheitlicher v7.5-Release-Token `20260803.4` im ausgelieferten Browser-Modulgraphen;
+- neue Unit-, Integrations-, Property- und Browserregressionen sowie ein dokumentiertes v7.5-Risikomodell.
+
+### Historie 0.6.0 / Auto-Plan v7
 
 - globale MRV-/Fail-first-Auswahl über BD und HG statt rollenweiser Konstruktion;
 - inkrementelles Assignment Ledger für Obergrenzen und Lastanteile;
@@ -541,6 +628,7 @@ Die fachliche und technische Begründung der v7-Architektur einschließlich Cons
 - v7-Portfolio-Leiste und monatlich eingefärbte, Reduced-Motion-sichere Orbit-Animation;
 - neue App-Gruppe in der Action Bar mit Zahnrad und barrierearmem Einstellungsmodal;
 - persistentes Settings-Schema v3 für Darstellung und Auto-Plan-Voreinstellungen;
+- einheitlicher v7-Release-Token `20260803.3` im damaligen Browser-Modulgraphen;
 - lokale v6/v7-Stressmessung: etwa `22,7 s → 1,7 s` sowie `45.288 → 9.738` Kandidatenbewertungen im dokumentierten strikten Leermonatsfall;
 - vollständige Forschungs-, Architektur-, Test- und Betriebsdokumentation.
 
@@ -559,5 +647,5 @@ Die fachliche und technische Begründung der v7-Architektur einschließlich Cons
 - vollständige 32/180/192/512-Pixel-Ableitungen und separates Maskable-PWA-Icon;
 - plattformneutrale Qualitätsgates für Windows-, macOS- und Linux-Arbeitskopien;
 - deterministische E2E-Synchronisation des Monatsfarbverlaufs über echte Start- und Abschlusszustände statt fester Wartezeit;
-- einheitlicher Release-Token `20260803.3` im vollständigen Browser-Modulgraphen und ein Gate gegen künftige Teilversionen;
+- einheitlicher Release-Token `20260803.2` im vollständigen Browser-Modulgraphen und ein Gate gegen künftige Teilversionen;
 - GitHub-CI-Actions mit nativer Node-24-Laufzeit ohne Node-20-Abkündigungswarnung.

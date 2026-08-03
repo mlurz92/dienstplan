@@ -37,10 +37,10 @@
  * Anzeigestrang weiter.
  */
 
-import { buildAutoPlan } from './auto-planner.js?v=20260803.3';
-import { planProfileIds } from './auto-planner-engine.js?v=20260803.3';
+import { buildAutoPlan } from './auto-planner.js?v=20260803.4';
+import { planProfileIds } from './auto-planner-engine.js?v=20260803.4';
 
-const WORKER_URL = '/js/auto-plan-worker.js?v=20260803.3';
+const WORKER_URL = '/js/auto-plan-worker.js?v=20260803.4';
 
 /**
  * Wie viele Perfektionsläufe parallel starten.
@@ -181,7 +181,7 @@ export async function runAutoPlan({ state, monthData, year, month, runConfig, on
   onProgress?.({
     phase: 'analysis',
     progress: .035,
-    message: `v7 Worker-Portfolio · ${executionPlan.constructionWorkers} Aufbau · ${executionPlan.perfectionWorkers} Perfektion · ${executionPlan.reserveCores} UI-Reserve`,
+    message: `v7.5 Worker-Portfolio · ${executionPlan.constructionWorkers} Aufbau · ${executionPlan.perfectionWorkers} Perfektion · ${executionPlan.reserveCores} UI-Reserve`,
     executionPlan
   });
 
@@ -212,16 +212,49 @@ export async function runAutoPlan({ state, monthData, year, month, runConfig, on
       let firstError = null;
       let closed = false;
       let nextConstruction = 0;
+      let portfolioCompleted = 0;
+      let portfolioCancelled = 0;
+      let portfolioFailed = 0;
+      let detachAbort = () => {};
+
+      const reportPortfolio = () => {
+        const total = phase === 'construct' ? profileIds.length : perfectionCount;
+        const unfinished = Math.max(0, total - portfolioCompleted - portfolioCancelled - portfolioFailed);
+        onProgress?.({
+          phase: phase === 'construct' ? 'search' : 'perfect',
+          stage: phase === 'construct' ? 'aufbau' : 'perfektion',
+          progress: phase === 'construct' ? .03 : .55,
+          portfolioEvent: true,
+          portfolioCompleted,
+          portfolioCancelled,
+          portfolioFailed,
+          portfolioActive: Math.min(unfinished, pool.filter(Boolean).length),
+          portfolioTotal: total,
+          searchCount: total
+        });
+      };
 
       const fail = error => {
         if (closed) return;
         closed = true;
+        detachAbort();
         cleanup();
         reject(error);
       };
       const succeed = result => {
         if (closed) return;
+        onProgress?.({
+          phase: result?.complete ? 'complete' : 'blocked',
+          stage: 'abschluss',
+          progress: 1,
+          message: result?.complete
+            ? `${result.changes?.length || 0} Vorschläge · ${result.metrics?.red || 0} rote Konflikte · Portfolio abgeschlossen`
+            : `Keine vollständige technisch wählbare Belegung · ${result?.metrics?.unfilled || 0} Felder offen`,
+          improvements: result?.metrics?.optimizer?.improvements,
+          result
+        });
         closed = true;
+        detachAbort();
         result.metrics ||= {};
         result.metrics.executionPlan = executionPlan;
         cleanup();
@@ -230,6 +263,7 @@ export async function runAutoPlan({ state, monthData, year, month, runConfig, on
       const fallback = () => {
         if (closed) return;
         closed = true;
+        detachAbort();
         cleanup();
         resolve(inline());
       };
@@ -241,6 +275,7 @@ export async function runAutoPlan({ state, monthData, year, month, runConfig, on
       };
       if (signal?.aborted) return onAbort();
       signal?.addEventListener('abort', onAbort, { once: true });
+      detachAbort = () => signal?.removeEventListener?.('abort', onAbort);
 
       const send = (index, message) => {
         let worker = pool[index];
@@ -261,11 +296,19 @@ export async function runAutoPlan({ state, monthData, year, month, runConfig, on
             // bei Bedarf an derselben Position einen frischen Modul-Worker.
             worker.terminate();
             if (pool[index] === worker) pool[index] = null;
-            settle(index);
+            settle(index, { failed: true });
           });
         }
-        worker.postMessage(message);
-        return true;
+        try {
+          worker.postMessage(message);
+          return true;
+        } catch (error) {
+          // Strukturierte Klonfehler (etwa durch unerwartete Fremddaten im
+          // Zustand) passieren synchron. Sie müssen denselben Abschlussweg wie
+          // asynchrone Workerfehler nehmen, damit Listener und Pool frei werden.
+          fail(error);
+          return false;
+        }
       };
 
       const startConstruction = workerIndex => {
@@ -287,6 +330,9 @@ export async function runAutoPlan({ state, monthData, year, month, runConfig, on
       const startPerfection = () => {
         phase = 'perfect';
         pending = perfectionCount;
+        portfolioCompleted = 0;
+        portfolioCancelled = 0;
+        portfolioFailed = 0;
         for (let index = 0; index < perfectionCount; index += 1) {
           const started = send(index, {
             type: 'perfect',
@@ -301,12 +347,16 @@ export async function runAutoPlan({ state, monthData, year, month, runConfig, on
         // Überzählige Stränge aus der Aufbauphase werden nicht mehr gebraucht.
         for (let index = perfectionCount; index < pool.length; index += 1) pool[index]?.terminate();
         pool.length = Math.min(pool.length, perfectionCount);
+        reportPortfolio();
       };
 
-      const settle = workerIndex => {
+      const settle = (workerIndex, { failed = false } = {}) => {
         if (closed) return;
+        if (failed) portfolioFailed += 1;
+        else portfolioCompleted += 1;
         pending -= 1;
         if (phase === 'construct' && nextConstruction < profileIds.length) startConstruction(workerIndex);
+        reportPortfolio();
         if (pending > 0) return;
         if (phase === 'construct') {
           if (!bestConstruction) return fallback();
@@ -320,8 +370,19 @@ export async function runAutoPlan({ state, monthData, year, month, runConfig, on
       const handleMessage = (message, workerIndex) => {
         if (!message || closed) return;
         if (message.type === 'progress') {
+          const workerTerminal = message.update?.phase === 'complete' || message.update?.phase === 'blocked';
+          const forwarded = workerTerminal
+            ? {
+                ...message.update,
+                phase: phase === 'construct' ? 'polish' : 'perfect',
+                stage: phase === 'construct' ? 'aufbau' : 'perfektion',
+                progress: phase === 'construct' ? .54 : .96,
+                workerTerminal: true,
+                message: `Arbeitsstrang ${Number(message.runId) + 1} hat seinen ${phase === 'construct' ? 'Aufbau' : 'Perfektionslauf'} beendet`
+              }
+            : message.update;
           onProgress?.({
-            ...message.update,
+            ...forwarded,
             searchIndex: Number(message.runId) || 0,
             searchCount: phase === 'construct' ? profileIds.length : perfectionCount
           });
@@ -340,6 +401,7 @@ export async function runAutoPlan({ state, monthData, year, month, runConfig, on
            * sich aus, dass die anderen längst mitgelaufen sind.
            */
           if (Number(message.runId) === 0 && message.result?.complete && !(message.result.metrics?.red > 0)) {
+            portfolioCancelled += Math.max(0, pending - 1);
             for (let index = 1; index < pool.length; index += 1) pool[index]?.terminate();
             pool.length = 1;
             nextConstruction = profileIds.length;
@@ -354,10 +416,18 @@ export async function runAutoPlan({ state, monthData, year, month, runConfig, on
           return;
         }
         if (message.type === 'error') {
-          if (message.name === 'AbortError') return;
+          // Ein AbortError aus einem Worker ist kein Abbruchsignal des
+          // Dialogs: Worker erhalten bewusst kein übertragbares Signal. Er ist
+          // daher ein beendeter, fehlgeschlagener Auftrag und muss die
+          // Portfoliozählung fortsetzen; andernfalls wartet der Lauf endlos.
           if (!firstError) firstError = new Error(message.message);
-          settle(workerIndex);
+          settle(workerIndex, { failed: true });
+          return;
         }
+        if (!firstError) firstError = new Error(`Unbekannte Worker-Antwort: ${String(message.type || 'ohne Typ')}`);
+        pool[workerIndex]?.terminate();
+        pool[workerIndex] = null;
+        settle(workerIndex, { failed: true });
       };
 
       for (let index = 0; index < executionPlan.constructionWorkers; index += 1) {

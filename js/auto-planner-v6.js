@@ -15,9 +15,9 @@
  * Konfigurationen erhalten.
  */
 
-import * as V5 from './auto-planner-v5.js?v=20260803.3';
+import * as V5 from './auto-planner-v5.js?v=20260803.4';
 
-export * from './auto-planner-v5.js?v=20260803.3';
+export * from './auto-planner-v5.js?v=20260803.4';
 
 const STRICT_PROFILES = Object.freeze(['strict-balanced', 'strict-coverage']);
 const CONFIRMABLE_PROFILE = 'confirmable-balanced';

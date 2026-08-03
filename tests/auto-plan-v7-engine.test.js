@@ -5,6 +5,7 @@ process.env.TZ = 'Europe/Berlin';
 
 const { DEFAULT_STAFF } = await import('../js/defaults.js');
 const { constructAutoPlan } = await import('../js/auto-planner.js');
+const { perfectAutoPlan } = await import('../js/auto-planner-v7-5.js');
 
 function miniMonth(dates) {
   return {
@@ -29,7 +30,7 @@ function stateWith(monthData) {
   };
 }
 
-test('v7 global fail-first selection starts with the tighter role domain', async () => {
+test('v7.5 global fail-first selection starts with the tighter role domain', async () => {
   const monthData = miniMonth(['2026-07-13', '2026-07-14']);
   const plannerState = stateWith(monthData);
   const progress = [];
@@ -55,7 +56,44 @@ test('v7 global fail-first selection starts with the tighter role domain', async
 
   const firstSearch = progress.find(update => update.phase === 'search');
   assert.equal(firstSearch?.role, 'hg');
-  assert.equal(result.algorithmRevision, 7);
+  assert.equal(result.algorithmRevision, 7.5);
   assert.ok(result.metrics.assignmentLedgerHits > 0);
   assert.ok(result.metrics.assignmentLedgerMisses > 0);
+});
+
+test('v7.5 kennzeichnet auch den direkten Perfektionspfad konsistent', async () => {
+  const monthData = miniMonth(['2026-07-13']);
+  const plannerState = stateWith(monthData);
+  const runConfig = {
+    searchIntensity: 'standard',
+    allowRedFallback: false,
+    zeroRedRescue: false,
+    profileFilter: ['strict-balanced'],
+    repairIterations: 0,
+    perfectionEnabled: false
+  };
+  const constructed = await constructAutoPlan({
+    state: plannerState,
+    monthData,
+    year: monthData.year,
+    month: monthData.month,
+    runConfig,
+    beamWidth: 8,
+    branchLimit: 4,
+    exactBudget: 800
+  });
+  constructed.algorithmRevision = 7;
+  constructed.metrics.engine = 'v7-constraint-portfolio';
+
+  const result = await perfectAutoPlan({
+    state: plannerState,
+    monthData,
+    year: monthData.year,
+    month: monthData.month,
+    runConfig,
+    constructed
+  });
+
+  assert.equal(result.algorithmRevision, 7.5);
+  assert.equal(result.metrics.engine, 'v7.5-constraint-portfolio');
 });
