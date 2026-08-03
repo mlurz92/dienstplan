@@ -70,8 +70,10 @@ async function openJuly(page) {
 async function openStudio(page) {
   await page.locator('#autoPlanBtn').click();
   await expect(page.locator('#autoPlanDialog')).toBeVisible();
-  await expect(page.locator('#autoPlanDialog')).toHaveAttribute('data-algorithm-revision', '7.5');
-  await expect(page.locator('#autoPlanV75Ribbon')).toContainText('Truthful Constraint Observatory');
+  await expect(page.locator('#autoPlanDialog')).toHaveAttribute('data-algorithm-revision', '8');
+  await expect(page.locator('#autoPlanV8Ribbon')).toContainText('Incremental Constraint Observatory');
+  // Die Stufenliste stammt aus der Engine selbst, nicht aus einem zweiten Text.
+  await expect(page.locator('#autoPlanV8Ribbon .auto-plan-v8-stages li')).toHaveCount(6);
   await expect(page.locator('#autoPlanPerformanceProfile')).toHaveValue('adaptive');
   await expect(page.locator('#autoPlanConfig')).toBeVisible();
   await expect(page.locator('#autoPlanStage')).toBeHidden();

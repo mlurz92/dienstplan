@@ -97,9 +97,12 @@ test('Werkzeugleiste ist semantisch gruppiert und das Farbbadge bleibt frei vom 
 
   const toolbar = page.locator('.toolbar.toolbar-organized');
   await expect(toolbar).toBeVisible();
-  await expect(toolbar.locator('.toolbar-section')).toHaveCount(4);
-  await expect(toolbar.locator('.toolbar-section-label')).toHaveText(['Planung', 'Daten', 'Ausgabe', 'App']);
-  await expect(toolbar.locator('.toolbar-section .tool-action')).toHaveCount(12);
+  // Die Einstellungen bilden keine Gruppe mehr: Sie sitzen als fixiertes
+  // Zahnrad unmittelbar in der Leiste, damit sie in jeder Dichtestufe an
+  // derselben Stelle erreichbar bleiben.
+  await expect(toolbar.locator('.toolbar-section')).toHaveCount(3);
+  await expect(toolbar.locator('.toolbar-section-label')).toHaveText(['Planung', 'Daten', 'Ausgabe']);
+  await expect(toolbar.locator('.toolbar-section .tool-action')).toHaveCount(11);
   await expect(toolbar.locator('#autoPlanBtn')).toBeVisible();
   await expect(toolbar.locator('#autoPlanBtn .tool-icon')).toHaveCount(1);
   // Die Überlauf-Schaltfläche gehört zur Leiste, aber zu keiner Gruppe.
@@ -107,7 +110,14 @@ test('Werkzeugleiste ist semantisch gruppiert und das Farbbadge bleibt frei vom 
   await expect(page.locator('#todayBtn .tool-icon')).toHaveCount(1);
   await expect(page.locator('#clearMonthBtn')).toHaveClass(/tool-action--danger/);
   await expect(page.locator('#excelImportInput').locator('xpath=..')).toHaveAttribute('aria-label', 'Excel-Datei importieren');
-  await expect(page.locator('#settingsBtn .tool-icon')).toHaveCount(1);
+  const gear = toolbar.locator('#settingsBtn');
+  await expect(gear).toBeVisible();
+  await expect(gear).toHaveClass(/tool-action--pinned/);
+  await expect(gear).toHaveClass(/tool-action--icon-only/);
+  await expect(gear.locator('.tool-icon')).toHaveCount(1);
+  await expect(gear).toHaveAttribute('aria-label', 'Einstellungen der Anwendung öffnen');
+  // Das Zahnrad gehört zu keiner Gruppe und liegt hinter der Überlauf-Schaltfläche.
+  await expect(toolbar.locator('.toolbar-section #settingsBtn')).toHaveCount(0);
 
   await expect(page.locator('html')).toHaveAttribute('data-spectrum-key', '2026-01');
   const badge = page.locator('#monthPaletteLabel');
@@ -136,6 +146,9 @@ test('Einstellungen öffnen fokussiert, validiert, speichert und stellt Fokus wi
 
   await page.locator('#settingsDensity').selectOption('compact');
   await page.locator('#settingsMotion').selectOption('reduced');
+  // Die Auto-Plan-Werte liegen in einem eigenen Reiter.
+  await page.locator('#settingsTabAutoPlan').click();
+  await expect(page.locator('#settingsPanelAutoPlan')).toBeVisible();
   await page.locator('#settingsPerformanceProfile').selectOption('responsive');
   await page.locator('#settingsSearchIntensity').selectOption('standard');
   await page.locator('#settingsTimeBudget').fill('45');
@@ -148,6 +161,7 @@ test('Einstellungen öffnen fokussiert, validiert, speichert und stellt Fokus wi
   await expect(page.locator('html')).toHaveAttribute('data-motion', 'reduced');
 
   await trigger.click();
+  await expect(page.locator('#settingsPanelAppearance')).toBeVisible();
   await expect(page.locator('#settingsPerformanceProfile')).toHaveValue('responsive');
   await expect(page.locator('#settingsSearchIntensity')).toHaveValue('standard');
   await expect(page.locator('#settingsTimeBudget')).toHaveValue('45');

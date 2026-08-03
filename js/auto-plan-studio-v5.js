@@ -660,6 +660,7 @@ function renderPhases(phase) {
  * eintreffenden Ereignis zwischen den Läufen hin und her.
  */
 const searchProgress = new Map();
+const finishedSearches = new Set();
 let searchStage = '';
 
 function mergeSearchTelemetry(update, normalizedStage) {
@@ -668,9 +669,21 @@ function mergeSearchTelemetry(update, normalizedStage) {
   if (normalizedStage && normalizedStage !== searchStage) {
     searchStage = normalizedStage;
     searchProgress.clear();
+    finishedSearches.clear();
   }
   const index = Number.isInteger(update.searchIndex) ? update.searchIndex : 0;
-  searchProgress.set(index, update);
+  /**
+   * Ein beendeter Arbeitsstrang zählt mit seinem Endstand weiter, aber er darf
+   * nicht mehr *wachsen*.
+   *
+   * Zuvor blieb jeder Strang mit seiner letzten Meldung in der Summenbildung.
+   * Traf danach von einem anderen Strang eine Meldung ein, wurde erneut über
+   * alle Einträge summiert – die Zählwerte stiegen dadurch sichtbar weiter,
+   * obwohl der beendete Strang längst nichts mehr rechnete. Sein Endstand wird
+   * deshalb einmal festgeschrieben und danach nicht mehr überschrieben.
+   */
+  if (update.workerTerminal) finishedSearches.add(index);
+  if (!finishedSearches.has(index) || !searchProgress.has(index)) searchProgress.set(index, update);
   if (searchProgress.size <= 1) return update;
   let leader = update;
   let explored = 0;
@@ -729,6 +742,15 @@ function updateProgress(rawUpdate) {
 
   commentary?.observe({ ...rawUpdate, ...update });
   visualizer?.update({ ...rawUpdate, ...update });
+  /**
+   * Ereignis für aufsetzende Studio-Schichten.
+   *
+   * Weitergereicht wird die *rohe* Meldung des Laufs, nicht die für die Anzeige
+   * geglättete: Eine Schicht, die einzelne Arbeitsstränge darstellen will,
+   * braucht deren tatsächliche Kennung und deren tatsächlichen Stand, nicht den
+   * zusammengefassten Spitzenwert.
+   */
+  window.dispatchEvent(new CustomEvent('autoplanprogress', { detail: rawUpdate }));
 }
 
 function staffLabel(staffId) {
@@ -1010,6 +1032,7 @@ function renderResult(result) {
     ? 'Es wurde nichts geschrieben.'
     : 'Der Monatsplan bleibt bis zur ausdrücklichen Übernahme unverändert.';
   if (warning) syncRed();
+  window.dispatchEvent(new CustomEvent('autoplanresult', { detail: result }));
   requestAnimationFrame(() => byId('autoPlanResultTitle').focus({ preventScroll: true }));
 }
 
@@ -1039,6 +1062,7 @@ function resetProgress(monthData) {
   byId('autoPlanBody').scrollTop = 0;
   stopClock();
   searchProgress.clear();
+  finishedSearches.clear();
   searchStage = '';
   progressModel.reset();
   highestPhase = 0;
@@ -1086,12 +1110,25 @@ async function startPlanner() {
   const localController = new AbortController();
   controller = localController;
   visualizer?.stop();
-  const localVisualizer = new AutoPlanVisualizer(byId('autoPlanCanvas'), activeMonth);
+  const localVisualizer = state.settings?.workflow?.studioVisualizer === false
+    ? null
+    : new AutoPlanVisualizer(byId('autoPlanCanvas'), activeMonth);
   visualizer = localVisualizer;
+  dialog.dataset.visualizer = localVisualizer ? 'on' : 'off';
   startClock();
 
   resetLog();
-  commentary = new AlgorithmCommentary({ onEntry: appendLogEntry });
+  /**
+   * Kommentar und Visualisierung sind abschaltbar.
+   *
+   * Beide kosten Rechenzeit im Anzeigestrang. Wer den Lauf so schnell wie
+   * möglich will – oder auf schwacher Grafik arbeitet –, schaltet sie in den
+   * Einstellungen ab; der Fortschritt und die Kennzahlen bleiben vollständig.
+   */
+  const preferences = state.settings?.workflow || {};
+  commentary = preferences.algorithmCommentary === false
+    ? null
+    : new AlgorithmCommentary({ onEntry: appendLogEntry });
   const fixed = Object.values(activeMonth.days || {}).reduce((sum, day) => sum + Number(Boolean(day.bd)) + Number(Boolean(day.hg)), 0);
   commentary.begin({ open, fixed, searches: workersAvailable() ? execution.perfectionWorkers : 1 });
 
@@ -1111,7 +1148,7 @@ async function startPlanner() {
     // Kurz stehen lassen: Der Balken erreicht sichtbar hundert Prozent, bevor
     // die Ansicht auf das Ergebnis wechselt.
     commentary?.finish(proposal);
-    localVisualizer.finish();
+    localVisualizer?.finish();
     await abortableDelay(620, localController.signal);
     runEpoch.assertCurrent(runToken);
     if (!dialog.open) return;
@@ -1135,10 +1172,9 @@ async function startPlanner() {
   } finally {
     trigger.disabled = false;
     stopClock();
-    localVisualizer.stop();
+    localVisualizer?.stop();
     if (visualizer === localVisualizer) visualizer = null;
     if (controller === localController) controller = null;
-    document.body.classList.remove('auto-plan-running');
   }
 }
 

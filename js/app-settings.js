@@ -306,6 +306,10 @@ function settingsTrigger() {
 export function openSettings() {
   const dialog = ensureDialog();
   populate(state.settings);
+  // Immer im ersten Bereich beginnen. Ein Modal, das dort wieder aufgeht, wo
+  // man es zuletzt verlassen hat, wirkt beim nächsten Öffnen wie ein anderes
+  // Modal — der Einstiegspunkt bleibt deshalb fest.
+  selectTab(dialog, 'appearance');
   if (!dialog.open) dialog.showModal();
   requestAnimationFrame(() => byId('settingsTitle')?.focus({ preventScroll: true }));
 }
