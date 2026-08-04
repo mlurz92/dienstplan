@@ -47,6 +47,12 @@ export const V9_SOLVER_STATUSES = Object.freeze({
   UNKNOWN: 'UNKNOWN'
 });
 
+// Kanonischer Solvername der exakten v9-Tiefensuche. Der rohe Solver (dieses
+// Modul) und der normalisierende Wrapper (auto-planner-v9.js) müssen exakt
+// denselben Wert berichten, damit raw.search.solver und der normalisierte
+// Wert niemals voneinander abweichen.
+export const NATIVE_JS_EXACT_MRV_DFS_SOLVER_NAME = 'native-js-exact-mrv-dfs';
+
 const LEVEL_RANK = Object.freeze({ green: 0, yellow: 1, orange: 2, red: 3, gray: 4 });
 const ROLE_RANK = Object.freeze({ bd: 0, hg: 1 });
 const DEFAULT_TIME_MS = 30_000;
@@ -439,7 +445,7 @@ export async function solveExactly({
     ? bestMonth ? V9_SOLVER_STATUSES.OPTIMAL : V9_SOLVER_STATUSES.INFEASIBLE
     : bestMonth ? V9_SOLVER_STATUSES.FEASIBLE : V9_SOLVER_STATUSES.UNKNOWN;
   const search = {
-    solver: 'native-js-constraint-dfs',
+    solver: NATIVE_JS_EXACT_MRV_DFS_SOLVER_NAME,
     solverStatus,
     mode: stopAtFirstZeroRed
       ? 'first-zero-red'

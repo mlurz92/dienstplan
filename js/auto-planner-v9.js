@@ -15,12 +15,16 @@ import {
   normalizeAutoPlanConfig
 } from './auto-planner-engine.js?v=20260804.9';
 import {
+  NATIVE_JS_EXACT_MRV_DFS_SOLVER_NAME,
   solveExactly as enumerateExactSearch,
   V9_SOLVER_STATUSES
 } from './auto-planner-v9-exact.js?v=20260804.9';
 
 export * from './auto-planner-v8-5.js?v=20260804.9';
-export { V9_SOLVER_STATUSES } from './auto-planner-v9-exact.js?v=20260804.9';
+export {
+  NATIVE_JS_EXACT_MRV_DFS_SOLVER_NAME,
+  V9_SOLVER_STATUSES
+} from './auto-planner-v9-exact.js?v=20260804.9';
 
 export const AUTO_PLAN_REVISION = 9;
 export const AUTO_PLAN_ENGINE_ID = 'v9-free-hybrid-exact-browser';
@@ -150,7 +154,7 @@ function betterResult(candidate, incumbent, state, config) {
 function normalizeSearchIdentity(search, overrides = {}) {
   return {
     ...(search || {}),
-    solver: 'native-js-exact-mrv-dfs',
+    solver: NATIVE_JS_EXACT_MRV_DFS_SOLVER_NAME,
     ...overrides
   };
 }
