@@ -15,7 +15,7 @@ function addStylesheet() {
 function markRevision() {
   document.documentElement.dataset.appRevision = '9';
   const toolbar = document.querySelector('.toolbar');
-  if (toolbar) toolbar.dataset.commandBarRevision = '9';
+  if (toolbar) toolbar.dataset.commandBarGeneration = '9';
 }
 
 export function installUiV9() {
