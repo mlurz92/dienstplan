@@ -44,6 +44,7 @@ export function sealV9ProposalIntegrity(result, incumbent, state, requestedRunCo
     result.elapsedMs = Number(incumbent.elapsedMs || 0) + Number(result.elapsedMs || 0);
   }
 
+  if (!state) return result;
   const runConfig = V9.normalizeAutoPlanConfig(
     state,
     result.baseline,
