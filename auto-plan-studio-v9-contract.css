@@ -1,0 +1,128 @@
+/* v9 layout selectors for the additive layered studio contract. */
+
+.auto-plan-dialog[data-v9-engine-revision="9"] {
+  inline-size: min(1480px, calc(100vw - 16px));
+  block-size: min(1000px, calc(100dvh - 16px));
+  max-block-size: calc(100dvh - 16px);
+  margin: auto;
+  overflow: hidden;
+}
+.auto-plan-dialog[data-v9-engine-revision="9"] .auto-plan-shell {
+  min-inline-size: 0;
+  min-block-size: 0;
+  overflow: hidden;
+}
+.auto-plan-dialog[data-v9-engine-revision="9"] .auto-plan-body {
+  min-inline-size: 0;
+  min-block-size: 0;
+  overflow: auto;
+  scrollbar-gutter: stable both-edges;
+  padding: clamp(10px, 1.4vw, 18px);
+}
+.auto-plan-dialog[data-v9-engine-revision="9"] .auto-plan-stage {
+  flex: 1 0 auto;
+  min-inline-size: 0;
+  min-block-size: min(700px, calc(100dvh - 150px));
+  grid-template-columns: minmax(300px, .72fr) minmax(0, 1.28fr);
+  grid-auto-rows: minmax(0, 1fr);
+  align-items: stretch;
+}
+.auto-plan-dialog[data-v9-engine-revision="9"] .auto-plan-visual,
+.auto-plan-dialog[data-v9-engine-revision="9"] .auto-plan-console {
+  min-inline-size: 0;
+  min-block-size: 0;
+}
+.auto-plan-dialog[data-v9-engine-revision="9"] .auto-plan-console {
+  grid-template-rows: auto auto auto minmax(190px, 1fr) auto;
+  align-content: stretch;
+  overflow: hidden;
+}
+.auto-plan-dialog[data-v9-engine-revision="9"] .auto-plan-v8-lanes,
+.auto-plan-dialog[data-v9-engine-revision="9"] .auto-plan-v85-theatre,
+.auto-plan-dialog[data-v9-engine-revision="9"] .auto-plan-log,
+.auto-plan-dialog[data-v9-engine-revision="9"] .auto-plan-live-metrics {
+  min-inline-size: 0;
+  min-block-size: 0;
+}
+.auto-plan-dialog[data-v9-engine-revision="9"] .auto-plan-v85-theatre {
+  overflow: visible;
+  padding: 10px;
+  border-radius: 14px;
+}
+.auto-plan-dialog[data-v9-engine-revision="9"] .auto-plan-v85-theatre ol {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+.auto-plan-dialog[data-v9-engine-revision="9"] .auto-plan-v85-theatre li {
+  min-block-size: 66px;
+  padding: 8px;
+  grid-template-columns: 11px minmax(0, 1fr) auto;
+}
+.auto-plan-dialog[data-v9-engine-revision="9"] .auto-plan-v85-theatre li b {
+  font-size: .72rem;
+  line-height: 1.2;
+}
+.auto-plan-dialog[data-v9-engine-revision="9"] .auto-plan-v85-theatre li small {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: .6rem;
+  line-height: 1.3;
+}
+.auto-plan-dialog[data-v9-engine-revision="9"] [data-tooltip]:not(input):not(select):not(button):not(output) {
+  position: relative;
+}
+.auto-plan-dialog[data-v9-engine-revision="9"] [data-tooltip]:not(input):not(select):not(button):not(output):hover::after,
+.auto-plan-dialog[data-v9-engine-revision="9"] [data-tooltip]:not(input):not(select):not(button):not(output):focus-visible::after {
+  content: "?";
+  position: absolute;
+  inset: 3px 4px auto auto;
+  display: grid;
+  place-items: center;
+  inline-size: 15px;
+  block-size: 15px;
+  border-radius: 50%;
+  color: var(--month-accent-strong);
+  background: color-mix(in oklab, var(--month-accent) 14%, var(--v85-surface-strong, #fff));
+  font-size: .56rem;
+  font-weight: 850;
+  pointer-events: none;
+}
+html[data-color-scheme="dark"] .auto-plan-dialog[data-v9-engine-revision="9"] .auto-plan-card,
+html[data-color-scheme="dark"] .auto-plan-dialog[data-v9-engine-revision="9"] .auto-plan-visual,
+html[data-color-scheme="dark"] .auto-plan-dialog[data-v9-engine-revision="9"] .auto-plan-console,
+html[data-color-scheme="dark"] .auto-plan-dialog[data-v9-engine-revision="9"] .auto-plan-log,
+html[data-color-scheme="dark"] .auto-plan-dialog[data-v9-engine-revision="9"] .auto-plan-live-metrics > div {
+  color: var(--v85-text);
+  background: linear-gradient(180deg,
+    color-mix(in oklab, var(--v85-surface-strong) 95%, var(--month-accent) 5%),
+    color-mix(in oklab, var(--v85-surface) 97%, black 3%));
+}
+
+@media (max-width: 1180px) {
+  .auto-plan-dialog[data-v9-engine-revision="9"] .auto-plan-stage {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(360px, 44vh) auto;
+    min-block-size: auto;
+  }
+  .auto-plan-dialog[data-v9-engine-revision="9"] .auto-plan-console { min-block-size: 650px; }
+  .auto-plan-dialog[data-v9-engine-revision="9"] .auto-plan-v85-theatre ol { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 820px) {
+  .auto-plan-dialog[data-v9-engine-revision="9"] {
+    inline-size: calc(100vw - 8px);
+    block-size: calc(100dvh - 8px);
+    max-block-size: calc(100dvh - 8px);
+  }
+  .auto-plan-dialog[data-v9-engine-revision="9"] .auto-plan-body { padding: 9px; }
+  .auto-plan-dialog[data-v9-engine-revision="9"] .auto-plan-console { min-block-size: 720px; padding: 9px; }
+  .auto-plan-dialog[data-v9-engine-revision="9"] .auto-plan-phase-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .auto-plan-dialog[data-v9-engine-revision="9"] .auto-plan-v85-theatre ol { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 520px) {
+  .auto-plan-dialog[data-v9-engine-revision="9"] .auto-plan-phase-list,
+  .auto-plan-dialog[data-v9-engine-revision="9"] .auto-plan-v85-theatre ol { grid-template-columns: 1fr; }
+  .auto-plan-dialog[data-v9-engine-revision="9"] .auto-plan-console { min-block-size: 980px; }
+  .auto-plan-dialog[data-v9-engine-revision="9"] .auto-plan-live-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
