@@ -212,7 +212,7 @@ def first_solution_ms(events: list[dict[str, object]]) -> int | None:
         status = str(event.get("solverStatus") or event.get("status") or "").upper()
         if status in SOLUTION_STATUSES:
             value = event.get("wallTimeMs")
-            if isinstance(value, (int, float)):
+            if isinstance(value, int | float):
                 return max(0, round(value))
     return None
 
