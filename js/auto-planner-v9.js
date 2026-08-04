@@ -177,7 +177,16 @@ function attachSearch(result, search, allowRed) {
  */
 export async function solveExactly(parameters) {
   const requireZeroRed = parameters?.allowRed !== true;
-  const raw = await enumerateExactSearch({ ...parameters, allowRed: true });
+  const firstTargetRequested = Boolean(parameters?.stopAtFirstFeasible);
+  const raw = await enumerateExactSearch({
+    ...parameters,
+    allowRed: true,
+    // Bei einem strikten Lauf ist eine rote Komplettbelegung noch nicht das
+    // angeforderte Ziel. Der rohe Enumerator stoppt dann ausschließlich bei der
+    // ersten vollständig auditierten Null-Rot-Lösung.
+    stopAtFirstFeasible: !requireZeroRed && firstTargetRequested,
+    stopAtFirstZeroRed: requireZeroRed && firstTargetRequested
+  });
   const relaxedSearch = normalizeSearchIdentity(raw.search, { allowRed: true });
   const relaxedResult = attachSearch(raw.result, relaxedSearch, true);
 
