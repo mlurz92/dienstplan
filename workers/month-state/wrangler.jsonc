@@ -28,6 +28,14 @@
   "env": {
     "preview": {
       "name": "dienstplanrad-month-state-preview",
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "MONTHS",
+            "class_name": "MonthState"
+          }
+        ]
+      },
       "vars": {
         "ENVIRONMENT": "preview"
       }
