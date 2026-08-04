@@ -161,7 +161,7 @@ test('Dunkelmodus bleibt auch in Picker und Auto-Plan Studio kontrastfest', asyn
   await page.locator('#autoPlanBtn').click();
   await expect(page.locator('#autoPlanDialog')).toBeVisible();
   await expect(page.locator('#autoPlanDialog')).toHaveAttribute('data-v9-engine-revision', '9');
-  await expectReadableDarkSurface(page.locator('#autoPlanDialog .dialog-card'), 'Auto-Plan Studio');
+  await expectReadableDarkSurface(page.locator('#autoPlanDialog .auto-plan-shell'), 'Auto-Plan Studio');
   await expectReadableDarkSurface(page.locator('#autoPlanV9SolverMode'), 'Solvermodus');
   await expectReadableDarkSurface(page.locator('#autoPlanV9ProofTarget'), 'Nachweisziel');
 });
