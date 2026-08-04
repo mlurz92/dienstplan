@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openApp } from './open-app.js';
 
 function emptyMonth(year, month) {
   const days = {};
@@ -49,7 +50,7 @@ test('native Monatsanimation bleibt durchgehend gefüllt und lädt den Zielmonat
   await mockApi(page, (year, month) => {
     if (year === 2026 && month === 11) novemberRequests += 1;
   });
-  await page.goto('/');
+  await openApp(page);
 
   expect(await page.evaluate(() => typeof document.startViewTransition)).toBe('function');
 

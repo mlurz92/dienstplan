@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openApp } from './open-app.js';
 
 const staff = [
   { id: 'lurz', name: 'Dr. Lurz', short: 'Lurz', category: 'fa', roleLabel: 'FA/OA', activeFrom: '2025-01-01', activeUntil: null, includeInPlanning: true, includeInAbsenceList: true, bdTarget: 4, maxBd: null, canHg: true, canSaturdayBd: true },
@@ -82,7 +83,7 @@ async function mockApi(page, initialMonth = monthWithTwoOpenSlots(2026, 7)) {
 }
 
 async function openJuly(page) {
-  await page.goto('/');
+  await openApp(page);
   await page.selectOption('#yearSelect', '2026');
   await page.selectOption('#monthSelect', '7');
   await expect(page.locator('#monthTitle')).toContainText('Juli 2026');

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openApp } from './open-app.js';
 
 function emptyMonth(year, month) {
   const days = {};
@@ -43,7 +44,7 @@ async function mockApi(page) {
 
 test.beforeEach(async ({ page }) => {
   await mockApi(page);
-  await page.goto('/');
+  await openApp(page);
   await expect(page.locator('.toolbar[data-command-bar-revision="8.5"]')).toBeVisible();
 });
 

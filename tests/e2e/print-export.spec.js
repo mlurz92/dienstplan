@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openApp } from './open-app.js';
 
 function emptyMonth(year, month) {
   const days = {};
@@ -36,7 +37,7 @@ const readSurface = page => page.evaluate(() => ({
 
 test('PDF-Export lässt den Monatskontrast unverändert und kräftig', async ({ page }) => {
   await mockApi(page);
-  await page.goto('/');
+  await openApp(page);
   await page.evaluate(() => { window.print = () => {}; });
   await page.selectOption('#yearSelect', '2026');
   await page.selectOption('#monthSelect', '7');
@@ -78,7 +79,7 @@ test('PDF-Export lässt den Monatskontrast unverändert und kräftig', async ({ 
 test('Druck während des Farbverlaufs friert die Zielfarbe ein, nicht einen Zwischenton', async ({ page }) => {
   await mockApi(page);
   await page.emulateMedia({ reducedMotion: 'no-preference' });
-  await page.goto('/');
+  await openApp(page);
   await page.evaluate(() => { window.print = () => {}; });
   await page.selectOption('#yearSelect', '2026');
   await page.selectOption('#monthSelect', '7');

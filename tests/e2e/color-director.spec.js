@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openApp } from './open-app.js';
 
 function emptyMonth(year, month) {
   const days = {};
@@ -26,7 +27,7 @@ async function mockApi(page) {
 test('Seasonal Spectrum Director controls the visible application palette', async ({ page }) => {
   await mockApi(page);
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto('/');
+  await openApp(page);
   await page.selectOption('#yearSelect', '2026');
 
   const accents = [];
@@ -55,7 +56,7 @@ test('Seasonal Spectrum Director controls the visible application palette', asyn
 test('the same month changes strongly with the year while the 24-year cycle stays deterministic', async ({ page }) => {
   await mockApi(page);
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto('/');
+  await openApp(page);
   await page.selectOption('#monthSelect', '1');
 
   const samples = [];

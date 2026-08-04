@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openApp } from './open-app.js';
 
 function emptyMonth(year, month) {
   const days = {};
@@ -45,7 +46,7 @@ async function mockApi(page) {
 test('Monatswechsel bleibt sichtbar und läuft als flüssiger Farbverlauf', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await mockApi(page);
-  await page.goto('/');
+  await openApp(page);
   await page.selectOption('#yearSelect', '2026');
   await page.selectOption('#monthSelect', '1');
   await expect(page.locator('html')).toHaveAttribute('data-spectrum-key', '2026-01');

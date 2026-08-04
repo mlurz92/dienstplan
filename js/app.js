@@ -65,7 +65,34 @@ function monthOrdinal(year, month) {
   return year * 12 + (month - 1);
 }
 
-window.addEventListener('DOMContentLoaded', init);
+let startupPromise = null;
+
+/**
+ * Startet die Hauptanwendung genau einmal – unabhängig davon, ob dieses Modul
+ * vor oder nach DOMContentLoaded ausgewertet wird. Statische ES-Module können
+ * durch ihren Abhängigkeitsgraphen später als erwartet zur Ausführung kommen;
+ * ein ausschließlich registrierter Event-Listener würde das bereits
+ * abgeschlossene Ereignis dann verpassen und die Oberfläche bei „Lädt …“
+ * belassen.
+ */
+function startApplication() {
+  if (startupPromise) return startupPromise;
+  startupPromise = Promise.resolve()
+    .then(() => init())
+    .catch(error => {
+      const health = window.__dienstplanStartupHealth;
+      if (health?.report) health.report(error, 'app-init');
+      else setTimeout(() => { throw error; }, 0);
+    });
+  return startupPromise;
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', startApplication, { once: true });
+} else {
+  startApplication();
+}
+
 window.addEventListener('beforeunload', () => {
   // Die gebündelte lokale Sicherung muss vor dem Verlassen der Seite auf die
   // Platte, sonst ginge die jüngste Änderung ohne Serververbindung verloren.

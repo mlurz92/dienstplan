@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openApp } from './open-app.js';
 
 const STAFF = [
   { id: 'lurz', name: 'Dr. Lurz', short: 'Lurz', category: 'fa', roleLabel: 'FA/OA', activeFrom: '2025-01-01', activeUntil: null, includeInPlanning: true, includeInAbsenceList: true, bdTarget: 4, maxBd: null, canHg: true, canSaturdayBd: true },
@@ -57,7 +58,7 @@ async function mockApi(page, staff = STAFF) {
 
 async function openJuly(page, staff) {
   await mockApi(page, staff);
-  await page.goto('/');
+  await openApp(page);
   await page.selectOption('#yearSelect', '2026');
   await page.selectOption('#monthSelect', '7');
   await expect(page.locator('#monthTitle')).toContainText('Juli 2026');
@@ -177,7 +178,7 @@ test('ein aus einem Import übernommener Name wird im Kopf des Pickers benannt',
     payload.days['2026-07-05'].bd = 'extern:Dr. Fremd';
     return route.fulfill({ json: { ok: true, month: payload } });
   });
-  await page.goto('/');
+  await openApp(page);
   await page.selectOption('#yearSelect', '2026');
   await page.selectOption('#monthSelect', '7');
   await expect(page.locator('#monthTitle')).toContainText('Juli 2026');

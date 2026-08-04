@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openApp } from './open-app.js';
 
 function emptyMonth(year, month) {
   const days = {};
@@ -36,7 +37,7 @@ async function installApi(page, { holdFirstPut = false } = {}) {
 
 test('schnelle Doppelnavigation speichert nur den tatsächlich geänderten Ausgangsmonat', async ({ page }) => {
   const api = await installApi(page, { holdFirstPut: true });
-  await page.goto('/');
+  await openApp(page);
   await page.selectOption('#yearSelect', '2026');
   await page.selectOption('#monthSelect', '7');
   await page.locator('#planTableBody .assignment-btn').first().click();
@@ -53,7 +54,7 @@ test('schnelle Doppelnavigation speichert nur den tatsächlich geänderten Ausga
 
 test('Monatsnavigation ergänzt Jahre außerhalb der anfänglichen Auswahlliste ohne leeren Jahreswert', async ({ page }) => {
   await installApi(page);
-  await page.goto('/');
+  await openApp(page);
   await page.selectOption('#yearSelect', '2031');
   await page.selectOption('#monthSelect', '12');
   await page.locator('#nextMonthBtn').click();

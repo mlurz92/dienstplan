@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openApp } from './open-app.js';
 
 function emptyMonth(year, month) {
   const days = {};
@@ -61,7 +62,7 @@ const inspectToolbar = page => page.evaluate(() => {
 
 test('die Werkzeugleiste überlagert sich bei keiner Fensterbreite', async ({ page }) => {
   await mockApi(page);
-  await page.goto('/');
+  await openApp(page);
   await expect(page.locator('.toolbar.toolbar-organized')).toBeVisible();
 
   const densities = new Set();
@@ -83,7 +84,7 @@ test('die Werkzeugleiste überlagert sich bei keiner Fensterbreite', async ({ pa
 
 test('die Dichte folgt dem Platz und nicht festen Schwellen', async ({ page }) => {
   await mockApi(page);
-  await page.goto('/');
+  await openApp(page);
 
   const densityAt = async width => {
     await page.setViewportSize({ width, height: 900 });
@@ -110,7 +111,7 @@ test('die Dichte folgt dem Platz und nicht festen Schwellen', async ({ page }) =
 
 test('das Überlaufmenü zeigt die ausgelagerten Aktionen vollständig beschriftet', async ({ page }) => {
   await mockApi(page);
-  await page.goto('/');
+  await openApp(page);
   await page.setViewportSize({ width: 360, height: 800 });
   await expect.poll(async () => (await inspectToolbar(page)).density).toBe('overflow');
 

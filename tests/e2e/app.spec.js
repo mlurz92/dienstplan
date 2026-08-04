@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openApp } from './open-app.js';
 
 function emptyMonth(year, month) {
   const days = {};
@@ -41,7 +42,7 @@ async function mockApi(page, month) {
 test('Anwendung lädt im Browser und öffnet den BD-Picker', async ({ page }) => {
   const month = emptyMonth(2026, 7);
   await mockApi(page, month);
-  await page.goto('/');
+  await openApp(page);
   await page.selectOption('#yearSelect', '2026');
   await page.selectOption('#monthSelect', '7');
   await expect(page.locator('#monthTitle')).toContainText('Juli 2026');
@@ -54,7 +55,7 @@ test('Becker-FZA nach Samstags-BD blockiert auch HG', async ({ page }) => {
   const month = emptyMonth(2026, 8);
   month.days['2026-08-01'].bd = 'becker';
   await mockApi(page, month);
-  await page.goto('/');
+  await openApp(page);
   await page.selectOption('#yearSelect', '2026');
   await page.selectOption('#monthSelect', '8');
   const monday = page.locator('tr').filter({ has: page.locator('td.date-cell', { hasText: /^3$/ }) });
@@ -68,7 +69,7 @@ test('Belegte Dienstfelder zeigen keinen Badge, der Picker aber weiterhin die Be
   const month = emptyMonth(2026, 7);
   month.days['2026-07-01'].bd = 'lurz';
   await mockApi(page, month);
-  await page.goto('/');
+  await openApp(page);
   await page.selectOption('#yearSelect', '2026');
   await page.selectOption('#monthSelect', '7');
 
@@ -91,7 +92,7 @@ test('Werkzeugleiste ist semantisch gruppiert und das Farbbadge bleibt frei vom 
   const month = emptyMonth(2026, 1);
   await mockApi(page, month);
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto('/');
+  await openApp(page);
   await page.selectOption('#yearSelect', '2026');
   await page.selectOption('#monthSelect', '1');
 
@@ -128,7 +129,7 @@ test('Werkzeugleiste ist semantisch gruppiert und das Farbbadge bleibt frei vom 
 test('Einstellungen öffnen fokussiert, validiert, speichert und stellt Fokus wieder her', async ({ page }) => {
   const month = emptyMonth(2026, 7);
   await mockApi(page, month);
-  await page.goto('/');
+  await openApp(page);
 
   const trigger = page.locator('#settingsBtn');
   await trigger.click();
