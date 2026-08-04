@@ -14,7 +14,7 @@ import * as V9 from './auto-planner-v9.js?v=20260804.9';
  * Explizite Re-Export-Liste statt `export *`.
  *
  * `export *` würde bei ES-Modulen von lokal definierten Exporten desselben
- * Namens überschattet – lautlos und ohne Warnung. Da dieses Modul weiter
+ * Namens überschattet werden – lautlos und ohne Warnung. Da dieses Modul weiter
  * unten eigene Implementierungen von `buildAutoPlan`, `constructAutoPlan`
  * und `perfectAutoPlan` definiert, wird die v9-Fassung von `buildAutoPlan`
  * hier bewusst nicht unter ihrem Originalnamen weitergereicht, sondern unter
