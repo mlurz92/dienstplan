@@ -3,7 +3,7 @@ import { createThemeToggle, installThemeController } from './app-theme-v8-5.js?v
 import { installRichTooltips, setRichTooltip } from './rich-tooltip-v8-5.js?v=20260803.4';
 import { state } from './state.js?v=20260803.4';
 
-const RELEASE = '20260803.4';
+const RELEASE = '20260804.2';
 const STYLESHEETS = Object.freeze(['/app-v8-5.css', '/toolbar-v8-5.css']);
 const NAV_ICONS = Object.freeze({
   prevMonthBtn: '<svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg>',
@@ -21,8 +21,28 @@ const ACTION_COPY = Object.freeze({
   exportPdfBtn: ['PDF', 'Die druckoptimierte Monatsansicht öffnen und als PDF ausgeben.'],
   exportJsonBtn: ['Sichern', 'Eine vollständige, wieder einlesbare JSON-Sicherung aller Plandaten erstellen.'],
   settingsBtn: ['Einstellungen', 'Darstellung, Arbeitsweise und Auto-Plan-Voreinstellungen öffnen.'],
-  autoPlanBtn: ['Auto-Plan', 'Auto-Plan Studio v8.5 öffnen, Null-Rot-Suche parametrieren und den vollständigen Monatsvorschlag prüfen.']
+  autoPlanBtn: ['Auto-Plan', 'Auto-Plan Studio v9 öffnen, CP-SAT-/Exact-LNS-Suche parametrieren und den vollständigen Monatsvorschlag prüfen.']
 });
+
+function reportEnhancementFailure(step, error) {
+  const detail = {
+    source: 'ui-v8-5',
+    step,
+    name: error?.name || 'Error',
+    message: error?.message || String(error),
+    stack: error?.stack || ''
+  };
+  console.error('[DienstplanRAD] UI-Erweiterung fehlgeschlagen', detail);
+  window.dispatchEvent(new CustomEvent('dienstplanstartuperror', { detail }));
+}
+
+function safeStep(step, action) {
+  try { return action(); }
+  catch (error) {
+    reportEnhancementFailure(step, error);
+    return false;
+  }
+}
 
 function addStylesheets() {
   for (const href of STYLESHEETS) {
@@ -46,8 +66,6 @@ function upgradeActions(root = document) {
     if (!element || !root.contains(element)) continue;
     const label = element.querySelector('.tool-label');
     if (label) label.textContent = shortLabel;
-    // Der zugängliche Name bleibt kurz und stabil. Die ausführliche Erklärung
-    // gehört in den Tooltip und wird über aria-describedby verknüpft.
     if (!element.hasAttribute('aria-label')) element.setAttribute('aria-label', shortLabel);
     setRichTooltip(element, tooltip);
   }
@@ -65,34 +83,42 @@ function upgradeMonthNavigation() {
   }
 }
 
+/**
+ * Setzt den Theme-Schalter unmittelbar vor das Zahnrad.
+ *
+ * Root Cause des Startabsturzes: In der nicht oder noch nicht reorganisierten
+ * Toolbar liegt `settingsBtn` innerhalb einer `.toolbar-group`. Der frühere
+ * Aufruf `toolbar.insertBefore(toggle, settings)` verlangt jedoch, dass der
+ * Referenzknoten ein *direktes* Kind von `toolbar` ist und wirft andernfalls
+ * synchron `NotFoundError`. Je nach Modul-/DOMContentLoaded-Reihenfolge blieb
+ * die Anwendung danach bei „Lädt …“ stehen. Der tatsächliche Elternknoten ist
+ * deshalb die Einfügefläche; als letzter Fallback wird sicher angehängt.
+ */
 function installThemeButton() {
   const toolbar = document.querySelector('.toolbar.toolbar-organized, .toolbar');
   const settings = document.getElementById('settingsBtn');
-  if (!toolbar || !settings) return false;
+  if (!toolbar || !settings || !toolbar.contains(settings)) return false;
   const toggle = createThemeToggle();
-  if (toggle.parentElement !== toolbar || toggle.nextElementSibling !== settings) {
-    toolbar.insertBefore(toggle, settings);
-    requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
-  }
+  const host = settings.parentElement && toolbar.contains(settings.parentElement)
+    ? settings.parentElement
+    : toolbar;
+  if (toggle.parentElement === host && toggle.nextElementSibling === settings) return true;
+  if (settings.parentElement === host) host.insertBefore(toggle, settings);
+  else host.append(toggle);
+  requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
   return true;
 }
 
 function markToolbarReady() {
   const toolbar = document.querySelector('.toolbar');
   if (!toolbar) return false;
-  toolbar.dataset.commandBarRevision = '8.5';
+  toolbar.dataset.commandBarRevision = '9';
   toolbar.setAttribute('aria-label', 'DienstplanRAD Befehlsleiste');
   upgradeActions(toolbar);
   installThemeButton();
   return true;
 }
 
-/**
- * Entfernt den früheren anwendungsspezifischen Modus vollständig aus dem
- * wirksamen Zustand. Das alte Schema wird beim Einlesen weiterhin toleriert,
- * damit vorhandene Profile migrationsfest bleiben; gespeichert und angewendet
- * wird der Wert ab v8.5 nicht mehr.
- */
 function removeLegacyMotionMode(root = document) {
   const select = root.querySelector?.('#settingsMotion') || document.getElementById('settingsMotion');
   if (select) {
@@ -128,35 +154,36 @@ function installScrollPerformancePolicy() {
 }
 
 function observeLateControls() {
-  if (typeof MutationObserver !== 'function') return;
+  if (typeof MutationObserver !== 'function' || !document.body) return;
   const observer = new MutationObserver(records => {
     for (const record of records) {
       for (const node of record.addedNodes) {
         if (!(node instanceof Element)) continue;
-        upgradeActions(node);
-        removeLegacyMotionMode(node);
+        safeStep('upgrade-late-actions', () => upgradeActions(node));
+        safeStep('remove-late-motion', () => removeLegacyMotionMode(node));
       }
     }
-    markToolbarReady();
+    safeStep('mark-late-toolbar', markToolbarReady);
   });
   observer.observe(document.body, { childList: true, subtree: true });
 }
 
 export function installUiV85() {
-  addStylesheets();
-  installThemeController();
-  installRichTooltips();
-  removeLegacyMotionMode();
-  upgradeMonthNavigation();
-  markToolbarReady();
-  observeLateControls();
-  installScrollPerformancePolicy();
-  window.addEventListener('appsettingschange', () => removeLegacyMotionMode());
+  safeStep('stylesheets', addStylesheets);
+  safeStep('theme-controller', installThemeController);
+  safeStep('rich-tooltips', installRichTooltips);
+  safeStep('legacy-motion', removeLegacyMotionMode);
+  safeStep('month-navigation', upgradeMonthNavigation);
+  safeStep('toolbar', markToolbarReady);
+  safeStep('late-controls', observeLateControls);
+  safeStep('scroll-policy', installScrollPerformancePolicy);
+  window.addEventListener('appsettingschange', () => safeStep('settings-motion', removeLegacyMotionMode));
   requestAnimationFrame(() => {
-    removeLegacyMotionMode();
-    upgradeMonthNavigation();
-    markToolbarReady();
+    safeStep('raf-motion', removeLegacyMotionMode);
+    safeStep('raf-navigation', upgradeMonthNavigation);
+    safeStep('raf-toolbar', markToolbarReady);
   });
+  document.documentElement.dataset.uiShellReady = 'true';
 }
 
 if (typeof document !== 'undefined') {
