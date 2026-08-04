@@ -17,10 +17,11 @@ import * as V9 from './auto-planner-v9.js?v=20260804.9';
  * Namens überschattet werden – lautlos und ohne Warnung. Da dieses Modul weiter
  * unten eigene Implementierungen von `buildAutoPlan`, `constructAutoPlan`
  * und `perfectAutoPlan` definiert, wird die v9-Fassung von `buildAutoPlan`
- * hier bewusst nicht unter ihrem Originalnamen weitergereicht, sondern unter
- * `_v9BuildAutoPlan`. Ändert sich die Exportliste von auto-planner-v9.js,
- * fällt das dank der expliziten Liste sofort auf (Bezugsfehler statt
- * stillschweigendem Shadowing).
+ * hier bewusst nicht weitergereicht. Wird sie intern benötigt, steht sie über
+ * `V9.buildAutoPlan` zur Verfügung, ohne die Integritätsversiegelung
+ * (`sealV9ProposalIntegrity`) zu umgehen. Ändert sich die Exportliste von
+ * auto-planner-v9.js, fällt das dank der expliziten Liste sofort auf
+ * (Bezugsfehler statt stillschweigendem Shadowing).
  */
 export {
   AUTO_PLAN_ENGINE_ID,
@@ -43,7 +44,6 @@ export {
   solveExactly,
   validateAutoPlanConfig,
   zeroRedRescueProfiles,
-  buildAutoPlan as _v9BuildAutoPlan,
 } from './auto-planner-v9.js?v=20260804.9';
 
 const clone = value => typeof structuredClone === 'function'
