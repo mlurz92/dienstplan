@@ -47,6 +47,28 @@ test.beforeEach(async ({ page }) => {
   await expect(page.locator('.toolbar[data-command-bar-revision="8.5"]')).toBeVisible();
 });
 
+test('Bootstrap beendet load und bleibt nach späten DOM-Einbauten responsiv', async ({ page }) => {
+  await expect.poll(() => page.evaluate(() => document.readyState)).toBe('complete');
+
+  const readyState = await page.evaluate(async () => {
+    const probe = document.createElement('div');
+    probe.dataset.startupRegressionProbe = 'true';
+    document.body.append(probe);
+    await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 0)));
+    probe.remove();
+    await new Promise(resolve => requestAnimationFrame(resolve));
+    return document.readyState;
+  });
+
+  expect(readyState).toBe('complete');
+  await expect(page.locator('#todayBtn .tool-label')).toHaveText('Heute');
+
+  const toggle = page.locator('#themeModeBtn');
+  const before = await page.locator('html').getAttribute('data-color-scheme');
+  await toggle.click();
+  await expect(page.locator('html')).toHaveAttribute('data-color-scheme', before === 'dark' ? 'light' : 'dark');
+});
+
 test('Hell-/Dunkelmodus wechselt atomar und bleibt nach Reload erhalten', async ({ page }) => {
   const toggle = page.locator('#themeModeBtn');
   await expect(toggle).toBeVisible();
