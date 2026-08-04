@@ -118,7 +118,8 @@ test('Werkzeugleiste ist semantisch gruppiert und das Farbbadge bleibt frei vom 
   const badge = page.locator('#monthPaletteLabel');
   await expect(badge).toHaveText(/^Monatskontrast · \S.+$/);
   await expect(badge).not.toContainText('Cloud Veil');
-  await expect(badge).toHaveAttribute('title', /^Winter · Eis · Polarlicht · \S.+ · \S.+ · \S.+ · 2026$/);
+  await expect(badge).toHaveAttribute('data-tooltip', /^Winter · Eis · Polarlicht · \S.+ · \S.+ · \S.+ · 2026$/);
+  await expect(badge).not.toHaveAttribute('title');
   await expect.poll(() => page.evaluate(() => {
     const name = document.documentElement.dataset.spectrumPalette || '';
     return document.getElementById('monthPaletteLabel')?.textContent === `Monatskontrast · ${name}`;
