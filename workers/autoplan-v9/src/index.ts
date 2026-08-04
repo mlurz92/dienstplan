@@ -1,5 +1,10 @@
 import { Container, getContainer } from '@cloudflare/containers';
-import { DurableObject } from 'cloudflare:workers';
+import {
+  DurableObject,
+  WorkflowEntrypoint,
+  type WorkflowEvent,
+  type WorkflowStep
+} from 'cloudflare:workers';
 
 interface SolverSnapshot {
   schemaVersion: 9;
@@ -44,6 +49,16 @@ interface StreamMessage {
   error?: string;
 }
 
+export interface AutoPlanWorkflowParams {
+  runId: string;
+}
+
+interface WorkflowOutput {
+  runId: string;
+  status: RunStatus;
+  sequence: number;
+}
+
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
     status,
@@ -56,7 +71,8 @@ function json(data: unknown, status = 200): Response {
 }
 
 function safeRunId(value: string): string {
-  return `v9-${value.replace(/[^a-zA-Z0-9_-]/g, '-').slice(0, 140)}`;
+  // Cloudflare Workflow instance IDs are limited to 100 characters.
+  return `v9-${value.replace(/[^a-zA-Z0-9_-]/g, '-').slice(0, 96)}`;
 }
 
 function solverContainerKey(requestFingerprint: string): string {
@@ -78,6 +94,10 @@ function isSnapshot(value: unknown): value is SolverSnapshot {
     && Array.isArray(snapshot.slots);
 }
 
+function jobStub(env: Env, runId: string): DurableObjectStub<AutoPlanJob> {
+  return env.AUTO_PLAN_JOBS.get(env.AUTO_PLAN_JOBS.idFromName(runId));
+}
+
 export class AutoPlanContainer extends Container<Env> {
   defaultPort = 8080;
   sleepAfter = '5m';
@@ -95,6 +115,65 @@ export class AutoPlanContainer extends Container<Env> {
   override onError(error: unknown): void {
     const message = error instanceof Error ? error.message : String(error);
     console.error(JSON.stringify({ event: 'container-error', service: 'autoplan-v9', message }));
+  }
+}
+
+export class AutoPlanWorkflow extends WorkflowEntrypoint<Env, AutoPlanWorkflowParams> {
+  async run(
+    event: WorkflowEvent<AutoPlanWorkflowParams>,
+    step: WorkflowStep
+  ): Promise<WorkflowOutput> {
+    const runId = event.payload.runId;
+    const execution = await step.do(
+      'execute-native-cp-sat-run',
+      {
+        retries: {
+          limit: 3,
+          delay: '5 seconds',
+          backoff: 'exponential'
+        },
+        timeout: '20 minutes'
+      },
+      async () => {
+        const response = await jobStub(this.env, runId).fetch(
+          new Request('https://job.internal/workflow-execute', { method: 'POST' })
+        );
+        const body = await response.json<WorkflowOutput & { error?: { message?: string } }>();
+        if (!response.ok) {
+          throw new Error(body.error?.message || `Jobausführung HTTP ${response.status}`);
+        }
+        return body;
+      }
+    );
+
+    return step.do(
+      'verify-persisted-solver-result',
+      {
+        retries: {
+          limit: 2,
+          delay: '2 seconds',
+          backoff: 'exponential'
+        },
+        timeout: '2 minutes'
+      },
+      async () => {
+        const response = await jobStub(this.env, runId).fetch(
+          new Request('https://job.internal/status?after=0', { method: 'GET' })
+        );
+        const body = await response.json<WorkflowOutput & { error?: { message?: string } }>();
+        if (!response.ok) {
+          throw new Error(body.error?.message || `Jobstatus HTTP ${response.status}`);
+        }
+        if (body.status !== 'completed' && body.status !== 'cancelled') {
+          throw new Error(`Solverlauf endete unerwartet mit Status ${body.status}.`);
+        }
+        return {
+          runId: execution.runId,
+          status: body.status,
+          sequence: body.sequence
+        };
+      }
+    );
   }
 }
 
@@ -158,15 +237,11 @@ export class AutoPlanJob extends DurableObject<Env> {
     });
   }
 
-  private ensureExecution(snapshot: SolverSnapshot): void {
-    if (this.execution) return;
-    this.execution = this.execute(snapshot)
-      .catch(error => console.error(JSON.stringify({
-        event: 'solver-controller-unhandled',
-        requestFingerprint: snapshot.requestFingerprint,
-        message: error instanceof Error ? error.message : String(error)
-      })))
-      .finally(() => { this.execution = null; });
+  private executionPromise(snapshot: SolverSnapshot): Promise<void> {
+    if (!this.execution) {
+      this.execution = this.execute(snapshot).finally(() => { this.execution = null; });
+    }
+    return this.execution;
   }
 
   private async start(snapshot: SolverSnapshot): Promise<Response> {
@@ -174,10 +249,6 @@ export class AutoPlanJob extends DurableObject<Env> {
     const existing = await this.runState();
     if (existing) {
       const result = await this.ctx.storage.get<unknown>('result');
-      if (result === undefined && (existing.status === 'created' || existing.status === 'running')) {
-        const storedSnapshot = await this.ctx.storage.get<SolverSnapshot>('snapshot');
-        if (storedSnapshot && isSnapshot(storedSnapshot)) this.ensureExecution(storedSnapshot);
-      }
       return json({
         ok: true,
         runId: existing.runId,
@@ -208,7 +279,32 @@ export class AutoPlanJob extends DurableObject<Env> {
       status: 'created',
       message: 'Versionierter Solver-Snapshot gespeichert.'
     });
-    this.ensureExecution(snapshot);
+
+    try {
+      await this.env.AUTO_PLAN_WORKFLOW.create({
+        id: runId,
+        params: { runId },
+        retention: {
+          successRetention: '3 days',
+          errorRetention: '7 days'
+        }
+      });
+    } catch (error) {
+      state.status = 'failed';
+      state.error = {
+        code: 'WORKFLOW_START_FAILED',
+        message: error instanceof Error ? error.message : String(error)
+      };
+      await this.putState(state);
+      await this.appendEvent({
+        stage: 'compile',
+        phase: 'blocked',
+        status: 'failed',
+        message: 'Dauerhafte Solver-Orchestrierung konnte nicht gestartet werden.'
+      });
+      throw error;
+    }
+
     return json({ ok: true, runId, status: 'running', sequence: 1 }, 202);
   }
 
@@ -216,6 +312,7 @@ export class AutoPlanJob extends DurableObject<Env> {
     const state = await this.runState();
     if (!state || state.status === 'cancelled' || state.status === 'completed') return;
     state.status = 'running';
+    delete state.error;
     await this.putState(state);
     await this.appendEvent({
       stage: 'compile',
@@ -298,23 +395,53 @@ export class AutoPlanJob extends DurableObject<Env> {
         stage: 'explain',
         phase: 'blocked',
         status: 'failed',
-        message: 'Nativer Solverlauf fehlgeschlagen.'
+        message: 'Nativer Solverlauf fehlgeschlagen; Workflow-Retry wird geprüft.'
       });
       console.error(JSON.stringify({
         event: 'solver-run-failed',
         runId: failed.runId,
         message: failed.error.message
       }));
+      throw error;
     }
+  }
+
+  private async executeFromWorkflow(): Promise<Response> {
+    const state = await this.runState();
+    if (!state) {
+      return json({ ok: false, error: { code: 'RUN_NOT_FOUND', message: 'Lauf nicht gefunden.' } }, 404);
+    }
+    if (state.status === 'completed' || state.status === 'cancelled') {
+      return json({ runId: state.runId, status: state.status, sequence: state.sequence });
+    }
+    const snapshot = await this.ctx.storage.get<SolverSnapshot>('snapshot');
+    if (!snapshot || !isSnapshot(snapshot)) {
+      return json({
+        ok: false,
+        error: { code: 'SNAPSHOT_MISSING', message: 'Persistierter Solver-Snapshot fehlt.' }
+      }, 500);
+    }
+    try {
+      await this.executionPromise(snapshot);
+    } catch (error) {
+      return json({
+        ok: false,
+        error: {
+          code: 'SOLVER_EXECUTION_FAILED',
+          message: error instanceof Error ? error.message : String(error)
+        }
+      }, 503);
+    }
+    const current = await this.runState();
+    if (!current) {
+      return json({ ok: false, error: { code: 'RUN_NOT_FOUND', message: 'Lauf nicht gefunden.' } }, 404);
+    }
+    return json({ runId: current.runId, status: current.status, sequence: current.sequence });
   }
 
   private async status(request: Request): Promise<Response> {
     const state = await this.runState();
     if (!state) return json({ ok: false, error: { code: 'RUN_NOT_FOUND', message: 'Lauf nicht gefunden.' } }, 404);
-    if (state.status === 'created' || state.status === 'running') {
-      const snapshot = await this.ctx.storage.get<SolverSnapshot>('snapshot');
-      if (snapshot && isSnapshot(snapshot)) this.ensureExecution(snapshot);
-    }
     const after = Math.max(0, Math.round(Number(new URL(request.url).searchParams.get('after')) || 0));
     const result = state.status === 'completed'
       ? await this.ctx.storage.get<unknown>('result')
@@ -366,6 +493,9 @@ export class AutoPlanJob extends DurableObject<Env> {
       }
       return this.start(snapshot);
     }
+    if (url.pathname.endsWith('/workflow-execute') && request.method === 'POST') {
+      return this.executeFromWorkflow();
+    }
     if (url.pathname.endsWith('/status') && request.method === 'GET') return this.status(request);
     if (url.pathname.endsWith('/cancel') && request.method === 'POST') return this.cancel();
     return json({ ok: false, error: { code: 'NOT_FOUND', message: 'Unbekannter Jobendpunkt.' } }, 404);
@@ -386,7 +516,7 @@ async function routeToJob(
   request: Request,
   body?: string
 ): Promise<Response> {
-  const stub = env.AUTO_PLAN_JOBS.get(env.AUTO_PLAN_JOBS.idFromName(runId));
+  const stub = jobStub(env, runId);
   const source = new URL(request.url);
   const suffix = path === 'status'
     ? `?after=${Math.max(0, Math.round(Number(source.searchParams.get('after')) || 0))}`
@@ -415,18 +545,35 @@ export default {
         return json({ ok: false, error: { code: 'INVALID_SCHEMA', message: 'Ungültiger Auto-Plan-v9-Snapshot.' } }, 400);
       }
       const runId = safeRunId(snapshot.requestFingerprint);
-      return routeToJob(env, runId, 'start', request, body);
+      try {
+        return await routeToJob(env, runId, 'start', request, body);
+      } catch (error) {
+        console.error(JSON.stringify({
+          event: 'workflow-start-failed',
+          runId,
+          message: error instanceof Error ? error.message : String(error)
+        }));
+        return json({
+          ok: false,
+          error: {
+            code: 'WORKFLOW_START_FAILED',
+            message: 'Der dauerhafte Solverlauf konnte nicht gestartet werden.'
+          }
+        }, 503);
+      }
     }
 
     const runId = parts[2] || '';
-    if (!/^v9-[a-zA-Z0-9_-]{4,150}$/.test(runId)) {
+    if (!/^v9-[a-zA-Z0-9_-]{4,96}$/.test(runId)) {
       return json({ ok: false, error: { code: 'INVALID_RUN_ID', message: 'Ungültige Laufkennung.' } }, 400);
     }
     if (parts.length === 3 && request.method === 'GET') {
       return routeToJob(env, runId, 'status', request);
     }
     if (parts.length === 4 && parts[3] === 'cancel' && request.method === 'POST') {
-      return routeToJob(env, runId, 'cancel', request);
+      const response = await routeToJob(env, runId, 'cancel', request);
+      await env.AUTO_PLAN_WORKFLOW.get(runId).terminate().catch(() => undefined);
+      return response;
     }
     return json({ ok: false, error: { code: 'NOT_FOUND', message: 'Unbekannter Solverendpunkt.' } }, 404);
   }
