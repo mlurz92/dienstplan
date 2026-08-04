@@ -39,10 +39,21 @@ function remember(element) {
   syncNativeTitle(element);
 }
 
+/**
+ * Synchronisiert das native title-Attribut ohne eine neue identische
+ * Mutation zu erzeugen. Der MutationObserver dieses Moduls beobachtet genau
+ * diese Attribute; bedingungslose Schreibzugriffe würden sich daher bei
+ * deaktivierten Rich-Tooltips selbst erneut auslösen.
+ */
 function syncNativeTitle(element) {
   if (!(element instanceof Element) || !element.dataset.tooltip) return;
-  if (enabled()) element.removeAttribute('title');
-  else element.setAttribute('title', element.dataset.tooltip);
+  if (enabled()) {
+    if (element.hasAttribute('title')) element.removeAttribute('title');
+    return;
+  }
+  if (element.getAttribute('title') !== element.dataset.tooltip) {
+    element.setAttribute('title', element.dataset.tooltip);
+  }
 }
 
 function scan(root = document) {
@@ -139,7 +150,8 @@ function bindDelegates() {
 
 export function setRichTooltip(element, text) {
   if (!(element instanceof Element)) return element;
-  element.dataset.tooltip = String(text || '').trim();
+  const tooltip = String(text || '').trim();
+  if (element.dataset.tooltip !== tooltip) element.dataset.tooltip = tooltip;
   remember(element);
   return element;
 }
