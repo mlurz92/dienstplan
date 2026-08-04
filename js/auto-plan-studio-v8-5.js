@@ -2,11 +2,11 @@
  * Auto-Plan Studio v8.5 – clean-search controls and truthful phase theatre.
  */
 import './auto-plan-studio-v8.js?v=20260803.4';
-import { AUTO_PLAN_STAGES } from './auto-planner-v8-5.js?v=20260804.1';
+import { AUTO_PLAN_STAGES } from './auto-planner-v8-5.js?v=20260803.4';
 import { state } from './state.js?v=20260803.4';
-import { setRichTooltip } from './rich-tooltip-v8-5.js?v=20260804.1';
+import { setRichTooltip } from './rich-tooltip-v8-5.js?v=20260803.4';
 
-const RELEASE = '20260804.1';
+const RELEASE = '20260803.4';
 const STORAGE_KEY = 'dienstplanrad:autoplan-v85-studio';
 
 const CLEAN_PROFILES = Object.freeze({
