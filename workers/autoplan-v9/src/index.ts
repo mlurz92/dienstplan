@@ -572,7 +572,8 @@ export default {
     }
     if (parts.length === 4 && parts[3] === 'cancel' && request.method === 'POST') {
       const response = await routeToJob(env, runId, 'cancel', request);
-      await env.AUTO_PLAN_WORKFLOW.get(runId).terminate().catch(() => undefined);
+      const workflow = await env.AUTO_PLAN_WORKFLOW.get(runId);
+      await workflow.terminate().catch(() => undefined);
       return response;
     }
     return json({ ok: false, error: { code: 'NOT_FOUND', message: 'Unbekannter Solverendpunkt.' } }, 404);

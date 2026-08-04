@@ -114,7 +114,7 @@ function markup() {
       <label class="auto-plan-field"><span>Laufmodus</span><select id="autoPlanV9Mode"><option value="quick">Schnell</option><option value="balanced">Ausgewogen · empfohlen</option><option value="intensive">Intensiv</option><option value="proof">Nachweis</option></select><small>Verbindlicher Phasen- und Budgetvertrag</small></label>
       <label class="auto-plan-field"><span>Planungsziel</span><select id="autoPlanV9Goal"><option value="new-plan">Offene Felder neu planen</option><option value="repair">Plan reparieren</option><option value="minimal-change">Änderungen minimieren</option></select><small>Priorität der Planstabilität</small></label>
       <label class="auto-plan-field"><span>Varianten</span><select id="autoPlanV9Alternatives">${[1,2,3,4,5].map(value => `<option>${value}</option>`).join('')}</select><small>Qualitätsgebundene Alternativen</small></label>
-      <label class="auto-plan-field"><span>Ziel-Gap</span><select id="autoPlanV9Gap"><option value="100">10 %</option><option value="50">5 %</option><option value="20">2 %</option><option value="10">1 %</option><option value="0">0 % · Optimum beweisen</option></select><small>Abstand zur mathematischen Schranke</small></label>
+      <label class="auto-plan-field"><span>Ziel-Gap</span><select id="autoPlanV9Gap"><option value="100">10 %</option><option value="50">5 %</option><option value="20">2 %</option><option value="10">1 %</option><option value="0">0 % · Modelloptimum beweisen</option></select><small>Abstand zur mathematischen Schranke</small></label>
       <label class="auto-plan-field"><span>Variantendistanz</span><select id="autoPlanV9Distance"><option value="2">2 Zellen</option><option value="5">5 Zellen</option><option value="10">10 Zellen</option><option value="15">15 Zellen</option></select><small>Mindest-Hamming-Distanz</small></label>
       <label class="auto-plan-field"><span>Maximale Änderungen</span><input id="autoPlanV9MaxChanges" type="number" min="0" max="62" placeholder="unbegrenzt"><small>Für Reparatur und Minimaländerung</small></label>
     </div>
@@ -263,7 +263,7 @@ function renderProof(value) {
   const core = metrics.conflictCore || [];
   const suggestions = metrics.relaxationSuggestions || [];
   panel.hidden = false;
-  panel.innerHTML = `<header><div><span>v9 Nachweisprotokoll</span><h4>${esc(status === 'OPTIMAL' ? 'Globaler Nachweis abgeschlossen' : status === 'INFEASIBLE' ? 'Unlösbarkeit nachgewiesen' : status === 'FEASIBLE' ? 'Beste gefundene Lösung' : 'Lokaler, vollständig auditierter Fallback')}</h4></div><strong>${esc(status)}</strong></header>
+  panel.innerHTML = `<header><div><span>v9 Nachweisprotokoll</span><h4>${esc(status === 'OPTIMAL' ? 'Optimum im kompilierten v9-Modell bewiesen' : status === 'INFEASIBLE' ? 'Unlösbarkeit im kompilierten v9-Modell bewiesen' : status === 'FEASIBLE' ? 'Beste gefundene Modelllösung' : 'Lokaler, vollständig auditierter Fallback')}</h4></div><strong>${esc(status)}</strong></header>
     <div class="auto-plan-v9-result-grid"><div><span>Zielfunktionswert</span><b>${Number.isFinite(metrics.objectiveValue) ? esc(metrics.objectiveValue) : '—'}</b></div><div><span>Beste Schranke</span><b>${Number.isFinite(metrics.bestBound) ? esc(metrics.bestBound) : '—'}</b></div><div><span>Gap</span><b>${Number.isFinite(metrics.relativeGap) ? `${(metrics.relativeGap * 100).toLocaleString('de-DE', { maximumFractionDigits: 2 })} %` : '—'}</b></div><div><span>Branches</span><b>${Number(metrics.branches || 0).toLocaleString('de-DE')}</b></div></div>
     ${stages.length ? `<details open><summary>Lexikografische Zielstufen</summary><ol>${stages.map(stage => `<li><span>${esc(stage.title || stage.id)}</span><b>${esc(stage.status)}</b><small>${stage.value === undefined ? '' : `Wert ${esc(stage.value)}`}</small></li>`).join('')}</ol></details>` : ''}
     ${core.length ? `<details id="autoPlanV9ConflictCore" open data-v9-tooltip="autoPlanV9ConflictCore"><summary>Reduzierter Konfliktkern · ${core.length}</summary><ul>${core.map(item => `<li><b>${esc(item.title || item.id)}</b>${item.detail ? ` · ${esc(item.detail)}` : ''}</li>`).join('')}</ul></details>` : ''}
@@ -318,7 +318,7 @@ function upgradeIdentity(dialog) {
   if (ribbon) {
     ribbon.classList.add('auto-plan-v9-ribbon');
     ribbon.querySelector('b').textContent = 'CP-SAT Guided Adaptive Exact-LNS · v9';
-    ribbon.querySelector('small').textContent = 'Mathematische Machbarkeit · lexikografische Zielstufen · adaptive exakte Teilneuplanung · Varianten · Konfliktkerne · unabhängiger Audit';
+    ribbon.querySelector('small').textContent = 'Modell-Machbarkeit · lexikografische Zielstufen · adaptive exakte Teilneuplanung · Varianten · Konfliktkerne · unabhängiger Audit';
     ribbon.querySelector(':scope > strong').textContent = 'ENGINE v9';
   }
 }

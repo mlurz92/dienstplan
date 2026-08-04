@@ -41,7 +41,7 @@ DienstplanRAD verbindet kontrollierbare manuelle Monatsplanung mit einer mathema
 7. Rote Abweichungen werden erst nach nachgewiesen erfolgloser strikter Machbarkeitssuche betrachtet.
 8. Bis zur bewussten Übernahme erfolgt keine Mutation des Monatsplans.
 9. Vor der Übernahme werden Fingerprints, Fixpunkte und der vollständige Endzustand erneut auditiert.
-10. Ein nativer Solvernachweis wird ausschließlich als Nachweis für das kompilierten v9-Modell bezeichnet; die fachliche Freigabe erfolgt erst nach dem unabhängigen JavaScript-Endaudit.
+10. Ein nativer Solvernachweis wird ausschließlich als Nachweis für das kompilierte v9-Modell bezeichnet; die fachliche Freigabe erfolgt erst nach dem unabhängigen JavaScript-Endaudit.
 
 ## 3. Auto-Plan v9
 
@@ -355,7 +355,7 @@ tests/e2e/startup-v9.spec.js           Startup-Regression
 ## 14. Bewusste Grenzen
 
 - Ein Status `FEASIBLE` ist kein Optimalitätsbeweis.
-- `OPTIMAL` und `INFEASIBLE` beziehen sich auf das kompilierten v9-Modell; der fachliche JavaScript-Audit bleibt separat verbindlich.
+- `OPTIMAL` und `INFEASIBLE` beziehen sich auf das kompilierte v9-Modell; der fachliche JavaScript-Audit bleibt separat verbindlich.
 - Ein CP-SAT-Assumption-Core ist hinreichend, aber nicht zwingend global minimal; v9 reduziert ihn zeitgebunden weiter.
 - Hints können die Suche beschleunigen, werden vom Solver jedoch nicht garantiert befolgt.
 - Der Browserfallback ist fachlich auditiert, liefert aber keinen globalen CP-SAT-Nachweis.

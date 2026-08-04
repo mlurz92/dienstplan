@@ -186,3 +186,12 @@ test('v9-Monatspersistenz ist revisionsgebunden und degradiert kontrolliert auf 
   assert.match(job, /solverContainerKey/);
   assert.doesNotMatch(job, /ctx\.waitUntil\(this\.execute/);
 });
+
+
+test('Studio grenzt CP-SAT-Nachweise auf das kompilierte v9-Modell ein', async () => {
+  const studio = await source('../js/auto-plan-studio-v9.js');
+  assert.match(studio, /Modelloptimum beweisen/);
+  assert.match(studio, /Optimum im kompilierten v9-Modell bewiesen/);
+  assert.match(studio, /Unlösbarkeit im kompilierten v9-Modell bewiesen/);
+  assert.doesNotMatch(studio, /Globaler Nachweis abgeschlossen/);
+});
