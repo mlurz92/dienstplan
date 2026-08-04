@@ -1,0 +1,42 @@
+name: Patch v9 hard maximum once
+
+on:
+  push:
+    branches: [agent/auto-plan-v9-cpsat]
+    paths:
+      - .github/patch_hard_max_v9.py
+
+permissions:
+  contents: write
+
+concurrency:
+  group: patch-v9-hard-maximum
+  cancel-in-progress: false
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: agent/auto-plan-v9-cpsat
+          fetch-depth: 0
+      - id: patch
+        name: Patch anwenden
+        run: |
+          if [[ -f .github/patch_hard_max_v9.py ]]; then
+            python .github/patch_hard_max_v9.py
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Diff prüfen und committen
+        if: steps.patch.outputs.changed == 'true'
+        run: |
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(v9): honor explicit hard-maximum relaxation [hard-max-patch]"
+          git push origin HEAD:agent/auto-plan-v9-cpsat
