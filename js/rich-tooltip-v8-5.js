@@ -2,6 +2,9 @@
 
 const TOOLTIP_ID = 'appRichTooltip';
 const SELECTOR = '[data-tooltip], .toolbar [title], .topbar [title], .auto-plan-dialog [title], .settings-dialog [title]';
+const HOST_BOUND_ATTRIBUTE = 'richTooltipHostBound';
+const DELEGATES_BOUND_ATTRIBUTE = 'richTooltipDelegatesBound';
+const OBSERVER_BOUND_ATTRIBUTE = 'richTooltipObserverBound';
 const registry = new WeakMap();
 let host = null;
 let active = null;
@@ -14,16 +17,34 @@ function enabled() {
   return document.documentElement.dataset.richTooltips !== 'false';
 }
 
+/**
+ * Liefert dokumentweit genau einen Tooltip-Host.
+ *
+ * Das Modul kann während eines atomaren Releasewechsels unter zwei
+ * Query-String-Versionen ausgewertet werden. Diese URLs sind eigenständige
+ * Modulinstanzen und besitzen getrennte Modulvariablen. Der Host wird deshalb
+ * nicht nur über die lokale Variable, sondern über das DOM koordiniert.
+ */
 function ensureHost() {
   if (host?.isConnected) return host;
-  host = document.createElement('div');
+
+  const matches = [...document.querySelectorAll(`[id="${TOOLTIP_ID}"]`)];
+  host = matches.shift() || document.createElement('div');
+  for (const duplicate of matches) duplicate.remove();
+
   host.id = TOOLTIP_ID;
   host.className = 'app-rich-tooltip';
   host.setAttribute('role', 'tooltip');
-  host.hidden = true;
-  document.body.append(host);
-  host.addEventListener('pointerenter', () => clearTimeout(hideTimer));
-  host.addEventListener('pointerleave', scheduleHide);
+  if (!host.isConnected) {
+    host.hidden = true;
+    document.body.append(host);
+  }
+
+  if (host.dataset[HOST_BOUND_ATTRIBUTE] !== 'true') {
+    host.dataset[HOST_BOUND_ATTRIBUTE] = 'true';
+    host.addEventListener('pointerenter', () => clearTimeout(hideTimer));
+    host.addEventListener('pointerleave', scheduleHide);
+  }
   return host;
 }
 
@@ -112,9 +133,20 @@ function triggerFrom(target) {
   return target instanceof Element ? target.closest(SELECTOR) : null;
 }
 
+/**
+ * Delegierte Ereignisse werden dokumentweit nur einmal installiert.
+ * Eine zweite Modulinstanz darf weder doppelte Timer noch konkurrierende
+ * aria-describedby-Aktualisierungen erzeugen.
+ */
 function bindDelegates() {
-  if (delegatesBound) return;
+  const root = document.documentElement;
+  if (delegatesBound || root.dataset[DELEGATES_BOUND_ATTRIBUTE] === 'true') {
+    delegatesBound = true;
+    return;
+  }
   delegatesBound = true;
+  root.dataset[DELEGATES_BOUND_ATTRIBUTE] = 'true';
+
   document.addEventListener('pointerover', event => {
     const trigger = triggerFrom(event.target);
     if (trigger && !trigger.contains(event.relatedTarget)) scheduleShow(trigger, false);
@@ -156,7 +188,12 @@ export function installRichTooltips() {
   ensureHost();
   scan();
   bindDelegates();
-  if (typeof MutationObserver === 'function' && !observer) {
+
+  const root = document.documentElement;
+  if (typeof MutationObserver === 'function'
+    && !observer
+    && root.dataset[OBSERVER_BOUND_ATTRIBUTE] !== 'true') {
+    root.dataset[OBSERVER_BOUND_ATTRIBUTE] = 'true';
     observer = new MutationObserver(records => {
       for (const record of records) {
         if (record.type === 'attributes') remember(record.target);
