@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
 from threading import Event
-from typing import Any
+from typing import Any, Literal
 
 from app.schemas import (
     Assignment,
@@ -31,6 +31,7 @@ VALID_STATUSES: frozenset[SolverStatus] = frozenset(
     {"OPTIMAL", "FEASIBLE", "INFEASIBLE", "MODEL_INVALID", "UNKNOWN"}
 )
 SOLUTION_STATUSES: frozenset[SolverStatus] = frozenset({"OPTIMAL", "FEASIBLE"})
+Goal = Literal["new-plan", "repair", "minimal-change"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,10 +44,7 @@ class BenchmarkCase:
 
 def month_dates(year: int = 2026, month: int = 2) -> list[str]:
     start = date(year, month, 1)
-    if month == 12:
-        next_month = date(year + 1, 1, 1)
-    else:
-        next_month = date(year, month + 1, 1)
+    next_month = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
     return [
         (start + timedelta(days=offset)).isoformat()
         for offset in range((next_month - start).days)
@@ -65,13 +63,24 @@ def benchmark_candidate(staff_id: str, level: Level = "green") -> Candidate:
     )
 
 
-def deterministic_warm_start(dates: Iterable[str], staff_ids: tuple[str, ...]) -> WarmStart:
+def deterministic_warm_start(
+    dates: Iterable[str],
+    staff_ids: tuple[str, ...],
+) -> WarmStart:
     assignments: list[Assignment] = []
     for index, date_iso in enumerate(dates):
         assignments.extend(
             (
-                Assignment(dateIso=date_iso, role="bd", staffId=staff_ids[index % len(staff_ids)]),
-                Assignment(dateIso=date_iso, role="hg", staffId=staff_ids[(index + 2) % len(staff_ids)]),
+                Assignment(
+                    dateIso=date_iso,
+                    role="bd",
+                    staffId=staff_ids[index % len(staff_ids)],
+                ),
+                Assignment(
+                    dateIso=date_iso,
+                    role="hg",
+                    staffId=staff_ids[(index + 2) % len(staff_ids)],
+                ),
             )
         )
     return WarmStart(source="benchmark-baseline", assignments=assignments)
@@ -83,7 +92,7 @@ def synthetic_snapshot(
     staff_ids: tuple[str, ...],
     allow_red: bool = False,
     red_first_hg: bool = False,
-    goal: str = "new-plan",
+    goal: Goal = "new-plan",
     warm_start: bool = False,
 ) -> SolverSnapshot:
     dates = month_dates()
@@ -95,12 +104,16 @@ def synthetic_snapshot(
     slots: list[Slot] = []
     for day_index, date_iso in enumerate(dates):
         for role in ("bd", "hg"):
-            level: Level = "red" if red_first_hg and day_index == 0 and role == "hg" else "green"
+            level: Level = (
+                "red" if red_first_hg and day_index == 0 and role == "hg" else "green"
+            )
             slots.append(
                 Slot(
                     dateIso=date_iso,
                     role=role,
-                    candidates=[benchmark_candidate(staff_id, level) for staff_id in staff_ids],
+                    candidates=[
+                        benchmark_candidate(staff_id, level) for staff_id in staff_ids
+                    ],
                 )
             )
     warm_starts = (
@@ -123,7 +136,7 @@ def synthetic_snapshot(
         baseline={"year": 2026, "month": 2, "days": {}},
         config=SolverConfig(
             mode="quick",
-            goal=goal,  # type: ignore[arg-type]
+            goal=goal,
             timeBudgetMs=10_000,
             allowRedFallback=allow_red,
             alternatives=1,
@@ -142,7 +155,10 @@ def synthetic_cases() -> list[BenchmarkCase]:
     return [
         BenchmarkCase(
             name="strict-feasible",
-            snapshot=synthetic_snapshot(name="strict-feasible", staff_ids=("a", "b", "c")),
+            snapshot=synthetic_snapshot(
+                name="strict-feasible",
+                staff_ids=("a", "b", "c"),
+            ),
             expected_statuses=SOLUTION_STATUSES,
             expected_assignments=56,
         ),
@@ -159,7 +175,10 @@ def synthetic_cases() -> list[BenchmarkCase]:
         ),
         BenchmarkCase(
             name="provably-infeasible",
-            snapshot=synthetic_snapshot(name="provably-infeasible", staff_ids=("only",)),
+            snapshot=synthetic_snapshot(
+                name="provably-infeasible",
+                staff_ids=("only",),
+            ),
             expected_statuses=frozenset({"INFEASIBLE"}),
             expected_assignments=0,
         ),
@@ -180,7 +199,10 @@ def synthetic_cases() -> list[BenchmarkCase]:
 def assignment_fingerprint(assignments: Iterable[Assignment]) -> str:
     payload = "\n".join(
         f"{item.dateIso}|{item.role}|{item.staffId}"
-        for item in sorted(assignments, key=lambda value: (value.dateIso, value.role, value.staffId))
+        for item in sorted(
+            assignments,
+            key=lambda value: (value.dateIso, value.role, value.staffId),
+        )
     )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
@@ -220,7 +242,10 @@ def run_once(case: BenchmarkCase) -> dict[str, object]:
         raise AssertionError(
             f"{case.name}: expected {sorted(case.expected_statuses)}, got {result.status}"
         )
-    if case.expected_assignments is not None and len(result.assignments) != case.expected_assignments:
+    if (
+        case.expected_assignments is not None
+        and len(result.assignments) != case.expected_assignments
+    ):
         raise AssertionError(
             f"{case.name}: expected {case.expected_assignments} assignments, "
             f"got {len(result.assignments)}"
@@ -334,7 +359,10 @@ def main() -> int:
     }
     report["totalElapsedMs"] = round((time.perf_counter() - started) * 1000)
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
+    args.output.write_text(
+        json.dumps(report, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0
 
