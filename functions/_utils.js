@@ -3,28 +3,58 @@ import {
   normalizeRbnNames, normalizeSettings, normalizeStaffList
 } from '../js/defaults.js';
 
-export function json(data, status = 200) {
+export function json(data, status = 200, headers = {}) {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
       'Content-Type': 'application/json; charset=utf-8',
-      'Cache-Control': 'no-store'
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
+      ...headers
     }
   });
 }
 
-export function invalid(message) {
-  return json({ ok: false, error: message }, 400);
+export function invalid(message, code = 'INVALID_REQUEST') {
+  return json({ ok: false, error: { code, message } }, 400);
 }
 
-export function serverError(error) {
-  return json({ ok: false, error: error?.message || 'Interner Serverfehler' }, 500);
+export function serverError(error, metadata = {}) {
+  const traceId = metadata.traceId || crypto.randomUUID();
+  console.error(JSON.stringify({
+    event: 'api-error',
+    traceId,
+    route: metadata.route || null,
+    method: metadata.method || null,
+    name: error?.name || 'Error',
+    message: error?.message || String(error || 'Interner Serverfehler'),
+    stack: error?.stack || null
+  }));
+  return json({
+    ok: false,
+    error: {
+      code: 'INTERNAL_ERROR',
+      message: 'Die Anfrage konnte nicht verarbeitet werden.',
+      traceId
+    }
+  }, 500);
 }
 
-export async function readJsonRequest(request) {
+export async function readJsonRequest(request, { maxBytes = 2_000_000 } = {}) {
+  const type = request.headers.get('content-type') || '';
+  if (!type.toLowerCase().includes('application/json')) {
+    throw new Error('Content-Type application/json erforderlich.');
+  }
+  const declared = Number(request.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    throw new Error('JSON-Anfrage überschreitet die zulässige Größe.');
+  }
   try {
-    return await request.json();
-  } catch {
+    const text = await request.text();
+    if (text.length > maxBytes) throw new Error('JSON-Anfrage überschreitet die zulässige Größe.');
+    return JSON.parse(text);
+  } catch (error) {
+    if (error?.message?.includes('überschreitet')) throw error;
     throw new Error('Ungültiges JSON.');
   }
 }
