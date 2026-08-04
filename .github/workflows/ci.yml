@@ -27,11 +27,10 @@ jobs:
         with:
           python-version: '3.13.7'
       - name: Finalisierung anwenden
-        run: python .github/finalize_v9.py
-      - name: Endgültiges CI-Gate einsetzen
         run: |
-          cp .github/final-ci.yml.template .github/workflows/ci.yml
-          rm -f .github/final-ci.yml.template
+          python .github/finalize_v9.py
+          git restore --source=HEAD -- .github/workflows/ci.yml .github/workflows/finalize-v9.yml
+          rm -f .github/final-ci.yml.template .github/finalize_v9.py
           sed -i 's/[[:space:]]\+$//' README.md
       - name: Diff prüfen und pushen
         run: |
