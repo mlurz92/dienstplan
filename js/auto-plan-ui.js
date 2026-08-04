@@ -5,5 +5,5 @@
  * danach ergänzen die additiven v8.5-Schichten Command Bar, Farbschema,
  * Tooltips, Solver-Parameter und Lauftelemetrie.
  */
-import './ui-v8-5.js?v=20260804.1';
-import './auto-plan-studio-v8-5.js?v=20260804.1';
+import './ui-v8-5.js?v=20260803.4';
+import './auto-plan-studio-v8-5.js?v=20260803.4';
