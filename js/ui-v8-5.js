@@ -24,6 +24,10 @@ const ACTION_COPY = Object.freeze({
   autoPlanBtn: ['Auto-Plan', 'Auto-Plan Studio v8.5 öffnen, Null-Rot-Suche parametrieren und den vollständigen Monatsvorschlag prüfen.']
 });
 
+let lateControlsObserver = null;
+let scrollPolicyInstalled = false;
+let uiInstalled = false;
+
 function addStylesheets() {
   for (const href of STYLESHEETS) {
     if (document.querySelector(`link[data-v85-shell-style="${href}"]`)) continue;
@@ -45,7 +49,11 @@ function upgradeActions(root = document) {
     const element = actionHost(id);
     if (!element || !root.contains(element)) continue;
     const label = element.querySelector('.tool-label');
-    if (label) label.textContent = shortLabel;
+    // `textContent` ersetzt immer alle Kindknoten. Die Wertprüfung ist deshalb
+    // funktional notwendig: Ohne sie erzeugt der Body-MutationObserver seine
+    // eigene nächste Benachrichtigung und hält den Bootstrap in einer
+    // endlosen Microtask-Schleife fest.
+    if (label && label.textContent !== shortLabel) label.textContent = shortLabel;
     // Der zugängliche Name bleibt kurz und stabil. Die ausführliche Erklärung
     // gehört in den Tooltip und wird über aria-describedby verknüpft.
     if (!element.hasAttribute('aria-label')) element.setAttribute('aria-label', shortLabel);
@@ -80,8 +88,10 @@ function installThemeButton() {
 function markToolbarReady() {
   const toolbar = document.querySelector('.toolbar');
   if (!toolbar) return false;
-  toolbar.dataset.commandBarRevision = '8.5';
-  toolbar.setAttribute('aria-label', 'DienstplanRAD Befehlsleiste');
+  if (toolbar.dataset.commandBarRevision !== '8.5') toolbar.dataset.commandBarRevision = '8.5';
+  if (toolbar.getAttribute('aria-label') !== 'DienstplanRAD Befehlsleiste') {
+    toolbar.setAttribute('aria-label', 'DienstplanRAD Befehlsleiste');
+  }
   upgradeActions(toolbar);
   installThemeButton();
   return true;
@@ -96,11 +106,11 @@ function markToolbarReady() {
 function removeLegacyMotionMode(root = document) {
   const select = root.querySelector?.('#settingsMotion') || document.getElementById('settingsMotion');
   if (select) {
-    select.value = 'system';
+    if (select.value !== 'system') select.value = 'system';
     const field = select.closest('label');
     if (field) {
-      field.hidden = true;
-      field.setAttribute('aria-hidden', 'true');
+      if (!field.hidden) field.hidden = true;
+      if (field.getAttribute('aria-hidden') !== 'true') field.setAttribute('aria-hidden', 'true');
     }
   }
   if (state.settings?.appearance && Object.hasOwn(state.settings.appearance, 'motion')) {
@@ -112,6 +122,8 @@ function removeLegacyMotionMode(root = document) {
 }
 
 function installScrollPerformancePolicy() {
+  if (scrollPolicyInstalled) return;
+  scrollPolicyInstalled = true;
   let timer = 0;
   let scheduled = false;
   const update = () => {
@@ -127,22 +139,35 @@ function installScrollPerformancePolicy() {
   }, { passive: true, capture: true });
 }
 
+function mayAffectToolbar(node) {
+  if (!(node instanceof Element)) return false;
+  const selector = '.toolbar, #autoPlanBtn, #settingsBtn, #themeModeBtn';
+  return node.matches(selector) || Boolean(node.querySelector(selector));
+}
+
 function observeLateControls() {
-  if (typeof MutationObserver !== 'function') return;
-  const observer = new MutationObserver(records => {
+  if (typeof MutationObserver !== 'function' || lateControlsObserver) return;
+  lateControlsObserver = new MutationObserver(records => {
+    let toolbarChanged = false;
     for (const record of records) {
       for (const node of record.addedNodes) {
         if (!(node instanceof Element)) continue;
         upgradeActions(node);
         removeLegacyMotionMode(node);
+        toolbarChanged ||= mayAffectToolbar(node);
       }
     }
-    markToolbarReady();
+    // Nur tatsächlich relevante Einbauten dürfen die globale Command Bar
+    // erneut synchronisieren. Unabhängige Dialog-/Tabellenmutationen bleiben
+    // vollständig quieszent.
+    if (toolbarChanged) markToolbarReady();
   });
-  observer.observe(document.body, { childList: true, subtree: true });
+  lateControlsObserver.observe(document.body, { childList: true, subtree: true });
 }
 
 export function installUiV85() {
+  if (uiInstalled) return;
+  uiInstalled = true;
   addStylesheets();
   installThemeController();
   installRichTooltips();
