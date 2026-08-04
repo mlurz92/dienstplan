@@ -41,8 +41,11 @@ function remember(element) {
 
 function syncNativeTitle(element) {
   if (!(element instanceof Element) || !element.dataset.tooltip) return;
-  if (enabled()) element.removeAttribute('title');
-  else element.setAttribute('title', element.dataset.tooltip);
+  if (enabled()) {
+    if (element.hasAttribute('title')) element.removeAttribute('title');
+  } else if (element.getAttribute('title') !== element.dataset.tooltip) {
+    element.setAttribute('title', element.dataset.tooltip);
+  }
 }
 
 function scan(root = document) {
@@ -139,7 +142,10 @@ function bindDelegates() {
 
 export function setRichTooltip(element, text) {
   if (!(element instanceof Element)) return element;
-  element.dataset.tooltip = String(text || '').trim();
+  const normalized = String(text || '').trim();
+  // Der Tooltip-Observer beobachtet dieses Attribut selbst. Nur echte
+  // Wertänderungen dürfen deshalb eine neue Mutation erzeugen.
+  if (element.dataset.tooltip !== normalized) element.dataset.tooltip = normalized;
   remember(element);
   return element;
 }
