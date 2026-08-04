@@ -54,14 +54,14 @@ function installAutoPlanV9LayoutGuards() {
         overflow: hidden;
       }
 
-      .auto-plan-dialog[data-engine-revision="9"].is-running .auto-plan-log {
+      .auto-plan-dialog[data-v9-engine-revision="9"].is-running .auto-plan-log {
         min-block-size: 0;
         max-block-size: 100%;
         block-size: 100%;
         overflow: hidden;
       }
 
-      .auto-plan-dialog[data-engine-revision="9"].is-running #autoPlanLog {
+      .auto-plan-dialog[data-v9-engine-revision="9"].is-running #autoPlanLog {
         min-block-size: 0;
         max-block-size: 100%;
         overflow: hidden auto;
@@ -69,59 +69,59 @@ function installAutoPlanV9LayoutGuards() {
         scrollbar-gutter: stable;
       }
 
-      .auto-plan-dialog[data-engine-revision="9"].is-running .auto-plan-v85-theatre ol {
+      .auto-plan-dialog[data-v9-engine-revision="9"].is-running .auto-plan-v85-theatre ol {
         grid-template-columns: repeat(4, minmax(0, 1fr));
       }
     }
 
     @media (min-width: 821px) and (max-height: 700px) {
-      .auto-plan-dialog[data-engine-revision="9"].is-running .auto-plan-console {
+      .auto-plan-dialog[data-v9-engine-revision="9"].is-running .auto-plan-console {
         gap: 6px;
         padding: 8px;
         grid-template-rows: auto auto auto clamp(84px, 16dvh, 112px) auto;
       }
 
-      .auto-plan-dialog[data-engine-revision="9"].is-running .auto-plan-phase {
+      .auto-plan-dialog[data-v9-engine-revision="9"].is-running .auto-plan-phase {
         padding: 4px 5px;
       }
 
-      .auto-plan-dialog[data-engine-revision="9"].is-running .auto-plan-v8-lanes {
+      .auto-plan-dialog[data-v9-engine-revision="9"].is-running .auto-plan-v8-lanes {
         gap: 2px;
         margin-block: 2px 0;
       }
 
-      .auto-plan-dialog[data-engine-revision="9"].is-running .auto-plan-v85-theatre {
+      .auto-plan-dialog[data-v9-engine-revision="9"].is-running .auto-plan-v85-theatre {
         padding: 6px;
       }
 
-      .auto-plan-dialog[data-engine-revision="9"].is-running .auto-plan-v85-theatre ol {
+      .auto-plan-dialog[data-v9-engine-revision="9"].is-running .auto-plan-v85-theatre ol {
         gap: 5px;
       }
 
-      .auto-plan-dialog[data-engine-revision="9"].is-running .auto-plan-v85-theatre li {
+      .auto-plan-dialog[data-v9-engine-revision="9"].is-running .auto-plan-v85-theatre li {
         min-block-size: 46px;
         padding: 5px 6px;
       }
 
-      .auto-plan-dialog[data-engine-revision="9"].is-running .auto-plan-v85-theatre li small {
+      .auto-plan-dialog[data-v9-engine-revision="9"].is-running .auto-plan-v85-theatre li small {
         -webkit-line-clamp: 1;
       }
 
-      .auto-plan-dialog[data-engine-revision="9"].is-running .auto-plan-v9-exact-meter {
+      .auto-plan-dialog[data-v9-engine-revision="9"].is-running .auto-plan-v9-exact-meter {
         gap: 4px;
         margin-top: 5px;
         padding: 5px 6px;
       }
 
-      .auto-plan-dialog[data-engine-revision="9"].is-running .auto-plan-live-metrics {
+      .auto-plan-dialog[data-v9-engine-revision="9"].is-running .auto-plan-live-metrics {
         gap: 4px;
       }
 
-      .auto-plan-dialog[data-engine-revision="9"].is-running .auto-plan-live-metrics > div {
+      .auto-plan-dialog[data-v9-engine-revision="9"].is-running .auto-plan-live-metrics > div {
         padding: 4px 6px;
       }
 
-      .auto-plan-dialog[data-engine-revision="9"].is-running .auto-plan-live-metrics strong {
+      .auto-plan-dialog[data-v9-engine-revision="9"].is-running .auto-plan-live-metrics strong {
         font-size: .82rem;
       }
     }

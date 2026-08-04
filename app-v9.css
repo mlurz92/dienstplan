@@ -166,7 +166,7 @@ html[data-color-scheme="dark"] .plan-table .picker-trigger:hover {
 }
 
 html[data-color-scheme="dark"] .plan-table :is(button, input, select, textarea, summary):focus-visible,
-.auto-plan-dialog[data-engine-revision="9"] :is(button, input, select, textarea, [tabindex]):focus-visible {
+.auto-plan-dialog[data-v9-engine-revision="9"] :is(button, input, select, textarea, [tabindex]):focus-visible {
   outline: 2px solid var(--v9-focus-ring) !important;
   outline-offset: 2px;
   box-shadow: 0 0 0 4px color-mix(in oklab, var(--v9-focus-ring) 28%, transparent) !important;
