@@ -1,19 +1,13 @@
-/**
- * DienstplanRAD v8.5 – command-bar, theme and Chrome/Windows shell layer.
- *
- * This layer is additive: it upgrades the already organised toolbar instead of
- * duplicating any application actions or event handlers.
- */
+/** DienstplanRAD v8.5 – Command Bar, Theme, Tooltips und Chrome-Shell. */
 import { createThemeToggle, installThemeController } from './app-theme-v8-5.js?v=20260804.1';
 import { installRichTooltips, setRichTooltip } from './rich-tooltip-v8-5.js?v=20260804.1';
 
 const RELEASE = '20260804.1';
-
+const STYLESHEETS = Object.freeze(['/app-v8-5.css', '/toolbar-v8-5.css']);
 const NAV_ICONS = Object.freeze({
   prevMonthBtn: '<svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg>',
   nextMonthBtn: '<svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>'
 });
-
 const ACTION_COPY = Object.freeze({
   todayBtn: ['Heute', 'Zum aktuellen Kalendermonat wechseln.'],
   absenceManagerBtn: ['Abwesenheiten', 'Urlaub, FZA und weitere Abwesenheiten für mehrere Tage verwalten.'],
@@ -29,19 +23,20 @@ const ACTION_COPY = Object.freeze({
   autoPlanBtn: ['Auto-Plan', 'Auto-Plan Studio v8.5 öffnen, Null-Rot-Suche parametrieren und den vollständigen Monatsvorschlag prüfen.']
 });
 
-function addStylesheet() {
-  if (document.querySelector('link[data-v85-shell-style]')) return;
-  const link = document.createElement('link');
-  link.rel = 'stylesheet';
-  link.href = `/app-v8-5.css?v=${RELEASE}`;
-  link.dataset.v85ShellStyle = 'true';
-  document.head.append(link);
+function addStylesheets() {
+  for (const href of STYLESHEETS) {
+    if (document.querySelector(`link[data-v85-shell-style="${href}"]`)) continue;
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = `${href}?v=${RELEASE}`;
+    link.dataset.v85ShellStyle = href;
+    document.head.append(link);
+  }
 }
 
 function actionHost(id) {
   const element = document.getElementById(id);
-  if (!element) return null;
-  return element.matches('input[type="file"]') ? element.closest('label') : element;
+  return element?.matches('input[type="file"]') ? element.closest('label') : element;
 }
 
 function upgradeActions(root = document) {
@@ -72,7 +67,10 @@ function installThemeButton() {
   const settings = document.getElementById('settingsBtn');
   if (!toolbar || !settings) return false;
   const toggle = createThemeToggle();
-  if (toggle.parentElement !== toolbar) toolbar.insertBefore(toggle, settings);
+  if (toggle.parentElement !== toolbar || toggle.nextElementSibling !== settings) {
+    toolbar.insertBefore(toggle, settings);
+    requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+  }
   return true;
 }
 
@@ -86,12 +84,7 @@ function markToolbarReady() {
   return true;
 }
 
-/**
- * v8.5 no longer exposes an application-specific reduced-motion mode.
- * Existing profiles are migrated by fixing the legacy select to "system" and
- * removing it visually. The application root is kept out of the old class-based
- * reduced mode after every settings application.
- */
+/** Entfernt den früheren, anwendungsspezifischen Modus „Reduzierte Bewegung“. */
 function removeLegacyMotionMode(root = document) {
   const select = root.querySelector?.('#settingsMotion') || document.getElementById('settingsMotion');
   if (select) {
@@ -102,9 +95,8 @@ function removeLegacyMotionMode(root = document) {
       field.setAttribute('aria-hidden', 'true');
     }
   }
-  const html = document.documentElement;
-  html.classList.remove('reduce-motion');
-  html.dataset.motion = 'system';
+  document.documentElement.classList.remove('reduce-motion');
+  document.documentElement.dataset.motion = 'system';
 }
 
 function installScrollPerformancePolicy() {
@@ -139,7 +131,7 @@ function observeLateControls() {
 }
 
 export function installUiV85() {
-  addStylesheet();
+  addStylesheets();
   installThemeController();
   installRichTooltips();
   removeLegacyMotionMode();
