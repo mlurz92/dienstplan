@@ -133,11 +133,13 @@ test('exakter Browser-Solver verwendet die produktive Regelengine und ehrliche S
 
 test('strikte v9-Suche enumeriert rote Zwischenzweige verlustfrei und öffnet Rot nur nach Beweis', async () => {
   const hybrid = await source('../js/auto-planner-v9.js');
-  const enumeration = hybrid.indexOf('enumerateExactSearch({ ...parameters, allowRed: true })');
+  const enumerationMatch = /const raw = await enumerateExactSearch\(\{[\s\S]*?allowRed:\s*true,[\s\S]*?\n\s*\}\);/.exec(hybrid);
+  assert.ok(enumerationMatch, 'die strikte Wrapper-Suche muss den rohen Enumerator mit roten Zwischenzweigen starten');
+  const enumeration = enumerationMatch.index;
   const strictDerivation = hybrid.indexOf('const bestRed = Number(raw.bestObjective?.audit?.red || 0)');
   const proof = hybrid.indexOf('exact.solverStatus === V9_SOLVER_STATUSES.INFEASIBLE');
   const reuse = hybrid.indexOf('reusedFromStrictEnumeration: true');
-  assert.ok(enumeration >= 0 && strictDerivation > enumeration && proof > strictDerivation && reuse > proof);
+  assert.ok(strictDerivation > enumeration && proof > strictDerivation && reuse > proof);
   assert.match(hybrid, /allowRedFallback: tuning\.exactEnabled \|\| tuning\.forceStrict/);
   assert.match(hybrid, /Globales Minimal-Rot-Optimum bewiesen/);
   assert.doesNotMatch(hybrid, /fallbackExact = await solveExactly/);
