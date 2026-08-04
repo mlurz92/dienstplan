@@ -42,9 +42,9 @@ jobs:
           retention-days: 7
 
   native-solver:
-    name: Python CP-SAT und Container
+    name: Python CP-SAT, Benchmark und Container
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
@@ -56,8 +56,10 @@ jobs:
       - run: python -m pip install -e './solver[dev]'
       - run: ruff check solver
       - run: mypy solver/app
-      - run: python -m compileall -q solver/app solver/tests
+      - run: python -m compileall -q solver/app solver/tests solver/benchmarks
       - run: pytest solver
+      - name: Deterministischer v9-Smoke-Benchmark
+        run: python solver/benchmarks/benchmark_v9.py --smoke --repetitions 2 --output solver/benchmark-results/v9-smoke.json
       - uses: docker/setup-buildx-action@v3
       - name: Solvercontainer bauen
         uses: docker/build-push-action@v7
