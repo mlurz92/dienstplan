@@ -474,6 +474,13 @@ html[data-color-scheme="dark"] .auto-plan-dialog {
   --auto-plan-line: var(--v9-border-soft);
   --auto-plan-ink: var(--v9-text);
   --auto-plan-muted: var(--v9-muted);
+  --v85-surface: var(--v9-surface-1);
+  --v85-surface-strong: var(--v9-surface-2);
+  --v85-text: var(--v9-text);
+  --v85-muted: var(--v9-muted);
+  --v85-ink: var(--v9-text);
+  --v85-border: var(--v9-border-soft);
+  --ap-hairline: var(--v9-border-soft);
   color: var(--v9-text);
 }
 
