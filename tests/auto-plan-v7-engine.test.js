@@ -56,9 +56,9 @@ test('v7.5 global fail-first selection starts with the tighter role domain', asy
 
   const firstSearch = progress.find(update => update.phase === 'search');
   assert.equal(firstSearch?.role, 'hg');
-  // Der öffentliche Einstiegspunkt trägt die jeweils aktuelle Revision; die
-  // Prüfung der v7.5-Schicht selbst steht im Test darunter.
-  assert.equal(result.algorithmRevision, 8.5);
+  // Der öffentliche Einstiegspunkt trägt die jeweils aktuelle Revision (v9);
+  // die Prüfung der v7.5-Schicht selbst steht im Test darunter.
+  assert.equal(result.algorithmRevision, 9);
   assert.ok(result.metrics.assignmentLedgerHits > 0);
   assert.ok(result.metrics.assignmentLedgerMisses > 0);
 });

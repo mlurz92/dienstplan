@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-const planner = await import('../js/auto-planner.js');
+const planner = await import('../js/auto-planner-v8-5.js');
 const source = async path => readFile(new URL(path, import.meta.url), 'utf8');
 
 test('produktiver Auto-Plan exportiert Revision 8.5 und alle Pflichtphasen', () => {

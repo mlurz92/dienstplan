@@ -22,7 +22,9 @@ function readStoredMode() {
   } catch {
     // Storage can be unavailable in hardened/private contexts.
   }
-  return globalThis.matchMedia?.('(prefers-color-scheme: dark)')?.matches ? 'dark' : 'light';
+  // v9: Die Anwendung startet standardmäßig im hellen Erscheinungsbild.
+  // Ein ausdrücklich gespeicherter Wunsch bleibt selbstverständlich erhalten.
+  return 'light';
 }
 
 function storeMode(value) {
@@ -57,7 +59,9 @@ function paintButton() {
   button.setAttribute('aria-pressed', String(mode === 'dark'));
   button.setAttribute('aria-label', targetLabel(mode));
   button.dataset.tooltip = targetLabel(mode);
-  button.innerHTML = `${icon(mode)}<span class="tool-label">${mode === 'dark' ? 'Dunkel' : 'Hell'}</span><span class="visually-hidden">${label(mode)}</span>`;
+  // v9: Der Umschalter trägt ausschließlich das Sonnen- bzw. Mondpiktogramm.
+  // Die Beschriftung bleibt für Vorlesewerkzeuge unsichtbar erhalten.
+  button.innerHTML = `${icon(mode)}<span class="visually-hidden">${label(mode)}</span>`;
 }
 
 function syncSettingsControl() {
