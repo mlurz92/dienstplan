@@ -44,10 +44,11 @@ test('produktiver Auto-Plan exportiert Revision 9 und den vollständigen Hybridv
   assert.ok(planner.AUTO_PLAN_STAGES.every(stage => stage.title && stage.detail));
 });
 
-test('v9 leitet Solvermodus und Nachweisziel verlustfrei aus dem Studiovertrag ab', () => {
+test('v9 leitet Solvermodus und Nachweisziel verlustfrei und wirksam aus dem Studiovertrag ab', () => {
   const direct = planner.deriveV9Tuning({});
   assert.equal(direct.solverMode, 'fast');
   assert.equal(direct.exactEnabled, false, 'ältere direkte API-Aufrufe bleiben schnell und kompatibel');
+  assert.equal(direct.hasExplicitTimeBudget, false);
 
   const hybrid = planner.deriveV9Tuning({
     performanceProfile: 'v9:hybrid:best-within-budget',
@@ -63,6 +64,14 @@ test('v9 leitet Solvermodus und Nachweisziel verlustfrei aus dem Studiovertrag a
   const fast = planner.deriveV9Tuning({ performanceProfile: 'v9:fast:first-feasible', timeBudgetMs: 30_000 });
   assert.equal(fast.exactEnabled, false);
   assert.equal(fast.stopAtFirstFeasible, true);
+
+  const highQuality = planner.deriveV9Tuning({ performanceProfile: 'v9:hybrid:high-quality', timeBudgetMs: 120_000 });
+  const bestWithinBudget = planner.deriveV9Tuning({ performanceProfile: 'v9:hybrid:best-within-budget', timeBudgetMs: 120_000 });
+  const proveOptimal = planner.deriveV9Tuning({ performanceProfile: 'v9:hybrid:prove-optimal', timeBudgetMs: 120_000 });
+  assert.ok(highQuality.exactTimeBudgetMs < bestWithinBudget.exactTimeBudgetMs);
+  assert.ok(bestWithinBudget.exactTimeBudgetMs < proveOptimal.exactTimeBudgetMs);
+  assert.ok(highQuality.exactNodeLimit < bestWithinBudget.exactNodeLimit);
+  assert.ok(bestWithinBudget.exactNodeLimit < proveOptimal.exactNodeLimit);
 
   const diagnose = planner.deriveV9Tuning({ performanceProfile: 'v9:diagnose:prove-optimal', timeBudgetMs: 300_000 });
   assert.equal(diagnose.forceStrict, true);
@@ -101,6 +110,8 @@ test('exakte MRV-Suche schließt einen kleinen realen Regelraum global ab', asyn
   assert.equal(exact.completeSearch, true);
   assert.equal(exact.result.complete, true);
   assert.equal(exact.result.metrics.red, 0);
+  assert.equal(exact.search.solver, 'native-js-exact-mrv-dfs');
+  assert.equal(exact.search.allowRed, false);
   assert.ok(exact.result.plannedMonth.days['2026-07-06'].hg);
   assert.notEqual(exact.result.plannedMonth.days['2026-07-06'].hg, 'lurz');
 });
@@ -120,13 +131,16 @@ test('exakter Browser-Solver verwendet die produktive Regelengine und ehrliche S
   assert.doesNotMatch(exact, /DurableObject|Container|Workers AI|Gurobi|CPLEX/);
 });
 
-test('Minimal-Rot-Exaktsuche beginnt nur nach bewiesener strikter Unlösbarkeit', async () => {
+test('strikte v9-Suche enumeriert rote Zwischenzweige verlustfrei und öffnet Rot nur nach Beweis', async () => {
   const hybrid = await source('../js/auto-planner-v9.js');
-  const strict = hybrid.indexOf('const exact = await solveExactly');
+  const enumeration = hybrid.indexOf('enumerateExactSearch({ ...parameters, allowRed: true })');
+  const strictDerivation = hybrid.indexOf('const bestRed = Number(raw.bestObjective?.audit?.red || 0)');
   const proof = hybrid.indexOf('exact.solverStatus === V9_SOLVER_STATUSES.INFEASIBLE');
-  const fallback = hybrid.indexOf('fallbackExact = await solveExactly');
-  assert.ok(strict >= 0 && proof > strict && fallback > proof);
-  assert.match(hybrid, /UNKNOWN ist ausdrücklich kein/);
+  const reuse = hybrid.indexOf('reusedFromStrictEnumeration: true');
+  assert.ok(enumeration >= 0 && strictDerivation > enumeration && proof > strictDerivation && reuse > proof);
+  assert.match(hybrid, /allowRedFallback: tuning\.exactEnabled \|\| tuning\.forceStrict/);
+  assert.match(hybrid, /Globales Minimal-Rot-Optimum bewiesen/);
+  assert.doesNotMatch(hybrid, /fallbackExact = await solveExactly/);
 });
 
 test('Studio v9 enthält Solversteuerung, Beweisstatus und flächendeckende Tooltips', async () => {
