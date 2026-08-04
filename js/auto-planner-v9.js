@@ -14,10 +14,13 @@ import {
   evaluatePlanObjective,
   normalizeAutoPlanConfig
 } from './auto-planner-engine.js?v=20260804.9';
-import { solveExactly, V9_SOLVER_STATUSES } from './auto-planner-v9-exact.js?v=20260804.9';
+import {
+  solveExactly as enumerateExactSearch,
+  V9_SOLVER_STATUSES
+} from './auto-planner-v9-exact.js?v=20260804.9';
 
 export * from './auto-planner-v8-5.js?v=20260804.9';
-export { solveExactly, V9_SOLVER_STATUSES } from './auto-planner-v9-exact.js?v=20260804.9';
+export { V9_SOLVER_STATUSES } from './auto-planner-v9-exact.js?v=20260804.9';
 
 export const AUTO_PLAN_REVISION = 9;
 export const AUTO_PLAN_ENGINE_ID = 'v9-free-hybrid-exact-browser';
@@ -33,6 +36,13 @@ export const AUTO_PLAN_STAGES = Object.freeze([
 
 const MODES = new Set(['fast', 'hybrid', 'exact', 'diagnose']);
 const TARGETS = new Set(['first-feasible', 'high-quality', 'best-within-budget', 'prove-optimal']);
+const TARGET_NODE_FACTOR = Object.freeze({
+  'first-feasible': .25,
+  'high-quality': .65,
+  'best-within-budget': 1,
+  'prove-optimal': 2
+});
+
 const clamp = (value, min, max, fallback) => {
   const number = Number(value);
   return Number.isFinite(number) ? Math.max(min, Math.min(max, Math.round(number))) : fallback;
@@ -47,6 +57,19 @@ function hasFiniteValue(value) {
   return value !== undefined && value !== null && value !== '' && Number.isFinite(Number(value));
 }
 
+function exactBudgetShare(solverMode, proofTarget) {
+  if (solverMode === 'fast') return 0;
+  const base = solverMode === 'exact' ? .68 : solverMode === 'diagnose' ? .82 : .38;
+  if (proofTarget === 'first-feasible') return Math.min(base, .32);
+  if (proofTarget === 'high-quality') return Math.max(.20, base * .72);
+  if (proofTarget === 'prove-optimal') {
+    if (solverMode === 'diagnose') return .90;
+    if (solverMode === 'exact') return .84;
+    return Math.max(base, .62);
+  }
+  return base;
+}
+
 export function deriveV9Tuning(source = {}) {
   const bridged = bridgedPreferences(source);
   // Direkte/ältere API-Aufrufe ohne expliziten v9-Vertrag behalten das schnelle
@@ -56,10 +79,7 @@ export function deriveV9Tuning(source = {}) {
   const proofTarget = TARGETS.has(source.proofTarget) ? source.proofTarget : bridged.proofTarget || 'best-within-budget';
   const hasExplicitTimeBudget = hasFiniteValue(source.timeBudgetMs);
   const totalBudgetMs = clamp(source.timeBudgetMs, 10_000, 900_000, 120_000);
-  const exactShare = solverMode === 'fast' ? 0
-    : solverMode === 'exact' ? .68
-      : solverMode === 'diagnose' ? .82
-        : .38;
+  const exactShare = exactBudgetShare(solverMode, proofTarget);
   const explicitExactMs = Number(source.exactTimeBudgetMs);
   const exactTimeBudgetMs = exactShare === 0 ? 0 : clamp(
     Number.isFinite(explicitExactMs) ? explicitExactMs : totalBudgetMs * exactShare,
@@ -68,8 +88,9 @@ export function deriveV9Tuning(source = {}) {
     Math.round(totalBudgetMs * exactShare)
   );
   const heuristicTimeBudgetMs = Math.max(2_000, totalBudgetMs - exactTimeBudgetMs);
-  const exactNodeLimit = clamp(source.exactNodeLimit, 10_000, 20_000_000,
-    solverMode === 'exact' || solverMode === 'diagnose' ? 3_000_000 : 1_200_000);
+  const baseNodeLimit = solverMode === 'exact' || solverMode === 'diagnose' ? 3_000_000 : 1_200_000;
+  const targetNodeLimit = Math.round(baseNodeLimit * TARGET_NODE_FACTOR[proofTarget]);
+  const exactNodeLimit = clamp(source.exactNodeLimit, 10_000, 20_000_000, targetNodeLimit);
   return {
     solverMode,
     proofTarget,
@@ -78,6 +99,7 @@ export function deriveV9Tuning(source = {}) {
     exactTimeBudgetMs,
     exactNodeLimit,
     exactEnabled: exactShare > 0,
+    exactShare,
     hasExplicitTimeBudget,
     stopAtFirstFeasible: proofTarget === 'first-feasible',
     forceStrict: solverMode === 'diagnose'
@@ -94,7 +116,11 @@ function settingsOf(parameters) {
 function heuristicConfigFor(parameters, tuning) {
   const config = {
     ...(parameters.runConfig || {}),
-    allowRedFallback: tuning.forceStrict ? false : parameters.runConfig?.allowRedFallback
+    // Solange die exakte Suche die strikte Unlösbarkeit nicht bewiesen hat,
+    // darf auch der Heuristik-Incumbent keinen roten Fallback vorwegnehmen.
+    allowRedFallback: tuning.exactEnabled || tuning.forceStrict
+      ? false
+      : parameters.runConfig?.allowRedFallback
   };
   // Die bloße Existenz der v9-Schicht darf den deterministischen
   // Konvergenzmodus älterer direkter API-Aufrufe nicht in einen zeitabhängigen
@@ -119,6 +145,80 @@ function betterResult(candidate, incumbent, state, config) {
   if (!left) return incumbent;
   if (!right) return candidate;
   return compareObjectiveKeys(left.key, right.key) < 0 ? candidate : incumbent;
+}
+
+function normalizeSearchIdentity(search, overrides = {}) {
+  return {
+    ...(search || {}),
+    solver: 'native-js-exact-mrv-dfs',
+    ...overrides
+  };
+}
+
+function attachSearch(result, search, allowRed) {
+  if (!result) return null;
+  result.searchProfile = `v9-${search.mode}-${allowRed ? 'minimal-red' : 'strict'}`;
+  result.metrics ||= {};
+  result.metrics.exactSearch = { ...search };
+  return result;
+}
+
+/**
+ * Verlustfreier strikter Suchvertrag.
+ *
+ * Rote Bewertungen können von noch offenen, später erfüllbaren Kopplungen
+ * abhängen. Würden solche Kandidaten bereits im Teilzustand entfernt, wäre ein
+ * späterer INFEASIBLE- oder OPTIMAL-Nachweis nicht global belastbar. Die rohe
+ * Tiefensuche enumeriert deshalb auch rote Zwischenzweige. Da Rot in der
+ * lexikografischen Zielfunktion vor allen weichen Zielen steht, ist ihr global
+ * bestes vollständiges Ergebnis automatisch Null-Rot, sofern ein solches
+ * existiert. Erst an dieser vollständigen Lösung wird der strikte Status
+ * abgeleitet.
+ */
+export async function solveExactly(parameters) {
+  const requireZeroRed = parameters?.allowRed !== true;
+  const raw = await enumerateExactSearch({ ...parameters, allowRed: true });
+  const relaxedSearch = normalizeSearchIdentity(raw.search, { allowRed: true });
+  const relaxedResult = attachSearch(raw.result, relaxedSearch, true);
+
+  if (!requireZeroRed) {
+    return {
+      ...raw,
+      search: relaxedSearch,
+      result: relaxedResult
+    };
+  }
+
+  const bestRed = Number(raw.bestObjective?.audit?.red || 0);
+  if (raw.bestMonth && bestRed === 0) {
+    const strictSearch = normalizeSearchIdentity(raw.search, { allowRed: false });
+    return {
+      ...raw,
+      search: strictSearch,
+      result: attachSearch(raw.result, strictSearch, false)
+    };
+  }
+
+  const solverStatus = raw.completeSearch
+    ? V9_SOLVER_STATUSES.INFEASIBLE
+    : V9_SOLVER_STATUSES.UNKNOWN;
+  const strictSearch = normalizeSearchIdentity(raw.search, {
+    solverStatus,
+    allowRed: false,
+    relaxedCandidateAvailable: Boolean(relaxedResult),
+    relaxedCandidateRed: relaxedResult ? Number(relaxedResult.metrics?.red || 0) : null
+  });
+  return {
+    ...raw,
+    solverStatus,
+    search: strictSearch,
+    result: null,
+    bestMonth: null,
+    bestObjective: null,
+    relaxedResult,
+    relaxedObjective: raw.bestObjective,
+    relaxedSearch
+  };
 }
 
 /**
@@ -167,10 +267,12 @@ function annotate(result, parameters, tuning, exact = null) {
     totalMs: tuning.exactEnabled || tuning.hasExplicitTimeBudget ? tuning.totalBudgetMs : null,
     heuristicMs: tuning.exactEnabled || tuning.hasExplicitTimeBudget ? tuning.heuristicTimeBudgetMs : null,
     exactMs: tuning.exactTimeBudgetMs,
+    exactShare: tuning.exactShare,
     exactNodeLimit: tuning.exactNodeLimit
   };
 
   const exactStatus = exact?.solverStatus || null;
+  const relaxedProof = Boolean(exact?.search?.allowRed);
   const overallStatus = exactStatus === V9_SOLVER_STATUSES.OPTIMAL
     ? V9_SOLVER_STATUSES.OPTIMAL
     : exactStatus === V9_SOLVER_STATUSES.INFEASIBLE && !result.complete
@@ -184,9 +286,12 @@ function annotate(result, parameters, tuning, exact = null) {
     status: overallStatus,
     exactAttempted: Boolean(exact),
     globalSearchComplete: Boolean(exact?.completeSearch),
-    scope: exact?.completeSearch ? 'global' : result.complete ? 'feasible-incumbent' : 'unresolved',
+    relaxed: relaxedProof,
+    scope: exact?.completeSearch
+      ? relaxedProof ? 'global-relaxed' : 'global-strict'
+      : result.complete ? 'feasible-incumbent' : 'unresolved',
     truthfulLabel: overallStatus === V9_SOLVER_STATUSES.OPTIMAL
-      ? 'Globales Optimum bewiesen'
+      ? relaxedProof ? 'Globales Minimal-Rot-Optimum bewiesen' : 'Globales Null-Rot-Optimum bewiesen'
       : overallStatus === V9_SOLVER_STATUSES.INFEASIBLE
         ? 'Unlösbarkeit bewiesen'
         : overallStatus === V9_SOLVER_STATUSES.FEASIBLE
@@ -234,10 +339,16 @@ export async function perfectAutoPlan(parameters) {
   const portfolioVariant = Number(parameters.runConfig?.portfolioVariant || 0);
   if (!tuning.exactEnabled || portfolioVariant > 0 || !incumbent?.baseline) return incumbent;
 
+  // „Erste gültige Lösung“ endet ohne zusätzlichen globalen Suchlauf, wenn der
+  // strikt konstruierte Incumbent bereits vollständig und Null-Rot ist.
+  if (tuning.stopAtFirstFeasible && incumbent.complete && !incumbent.requiresConfirmation) {
+    return annotate(incumbent, parameters, tuning);
+  }
+
   const exact = await solveExactly({
     state: parameters.state,
     monthData: incumbent.baseline,
-    runConfig: { ...parameters.runConfig, allowRedFallback: tuning.forceStrict ? false : parameters.runConfig?.allowRedFallback },
+    runConfig: { ...parameters.runConfig, allowRedFallback: false },
     incumbent,
     allowRed: false,
     stopAtFirstFeasible: tuning.stopAtFirstFeasible,
@@ -248,31 +359,28 @@ export async function perfectAutoPlan(parameters) {
   });
 
   let selected = betterResult(exact.result, incumbent, parameters.state, parameters.runConfig);
+  let proof = exact;
 
-  // Ein bestätigungspflichtiger exakter Lauf wird nur nach einem echten
-  // strikten INFEASIBLE-Nachweis begonnen. UNKNOWN ist ausdrücklich kein
-  // Unmöglichkeitsbeweis und darf den Null-Rot-Anspruch nicht abkürzen.
-  let fallbackExact = null;
+  // Die verlustfreie strikte Suche hat rote Zweige bereits vollständig
+  // mituntersucht. Ist ihr global bestes Resultat rot, beweist derselbe Lauf
+  // gleichzeitig die Null-Rot-Unlösbarkeit und das Minimal-Rot-Optimum. Ein
+  // zweiter identischer Suchlauf wäre reine Doppelarbeit.
   if (exact.solverStatus === V9_SOLVER_STATUSES.INFEASIBLE
-    && (incumbent.requiresConfirmation || !incumbent.complete)
+    && exact.relaxedResult
     && parameters.runConfig?.allowRedFallback !== false
     && !tuning.forceStrict) {
-    fallbackExact = await solveExactly({
-      state: parameters.state,
-      monthData: incumbent.baseline,
-      runConfig: parameters.runConfig,
-      incumbent,
-      allowRed: true,
-      stopAtFirstFeasible: tuning.stopAtFirstFeasible,
-      timeLimitMs: Math.max(2_000, Math.round(tuning.exactTimeBudgetMs * .45)),
-      nodeLimit: Math.max(10_000, Math.round(tuning.exactNodeLimit * .45)),
-      onProgress: parameters.onProgress,
-      signal: parameters.signal
-    });
-    selected = betterResult(fallbackExact.result, selected, parameters.state, parameters.runConfig);
+    selected = betterResult(exact.relaxedResult, selected, parameters.state, parameters.runConfig);
+    proof = {
+      solverStatus: V9_SOLVER_STATUSES.OPTIMAL,
+      completeSearch: true,
+      search: normalizeSearchIdentity(exact.relaxedSearch, {
+        solverStatus: V9_SOLVER_STATUSES.OPTIMAL,
+        allowRed: true,
+        reusedFromStrictEnumeration: true
+      })
+    };
   }
 
-  const proof = fallbackExact || exact;
   return annotate(selected || incumbent, parameters, tuning, proof);
 }
 
