@@ -61,7 +61,7 @@ test('Factory-Bindungen werden vor dem allgemeinen Konstruktorzweig normalisiert
           status: 'OPTIMAL',
           objectiveValue: 1,
           bestObjectiveBound: 1,
-          value: variable => variable.value
+          value: () => 1
         };
       },
       delete() {}
@@ -83,7 +83,7 @@ test('Konstruktor-Bindungen bleiben als zweiter kompatibler API-Pfad verfügbar'
     statusName(status) { return status; }
     objectiveValue() { return 1; }
     bestObjectiveBound() { return 1; }
-    value(variable) { return variable.value; }
+    value() { return 1; }
     delete() {}
   }
   const api = loader.normalizeV95SolverApi({ CpModel: FakeModel, CpSolver: ConstructorSolver }, 'constructor');
