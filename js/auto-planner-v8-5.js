@@ -34,14 +34,32 @@ function settingsOf(parameters) {
   return { ...saved, ...supplied };
 }
 
+/**
+ * The three v8.5 tuning values are deliberately derivable from fields already
+ * carried in the worker message. This keeps the worker protocol stable while
+ * the Studio can expose meaningful presets immediately:
+ *
+ * - repair rounds determine the number of strict escalation waves;
+ * - local rebuild budget determines rescue breadth;
+ * - their combination determines repair aggressiveness.
+ */
 function tuning(parameters) {
   const source = settingsOf(parameters);
+  const repairIterations = clamp(source.repairIterations, 0, 30, 6);
+  const localBudget = clamp(source.localRebuildBudget, 200, 12000, 6000);
+  const derivedRounds = clamp(Math.ceil(Math.max(2, repairIterations) / 2), 1, 4, 3);
+  const derivedStrength = clamp(100 + (localBudget - 200) / 11800 * 150, 100, 250, 160);
+  const derivedAggressiveness = repairIterations >= 8 || localBudget >= 8500
+    ? 'exhaustive'
+    : repairIterations >= 6 || localBudget >= 5200
+      ? 'intensive'
+      : 'balanced';
   return {
-    strictEscalationRounds: clamp(source.strictEscalationRounds, 1, 4, 3),
-    rescueStrength: clamp(source.rescueStrength, 100, 250, 160),
+    strictEscalationRounds: clamp(source.strictEscalationRounds, 1, 4, derivedRounds),
+    rescueStrength: clamp(source.rescueStrength, 100, 250, derivedStrength),
     repairAggressiveness: ['balanced', 'intensive', 'exhaustive'].includes(source.repairAggressiveness)
       ? source.repairAggressiveness
-      : 'intensive'
+      : derivedAggressiveness
   };
 }
 
