@@ -40,11 +40,13 @@ DienstplanRAD verbindet kontrollierbare manuelle Monatsplanung mit einer bestät
 5. Personengebundene BD-, HG- und Gesamtobergrenzen gelten in Konstruktion, Reparatur, ALNS und exakter Suche.
 6. Null-Rot wird immer vor einem bestätigungspflichtigen Fallback verfolgt.
 7. `UNKNOWN` bedeutet nur Zeit-/Knotenlimit und niemals Unlösbarkeit.
-8. Rote Vorschläge werden nur nach echtem striktem `INFEASIBLE`-Nachweis der exakten Suche zusätzlich zugelassen.
+8. Rote Vorschläge werden nur nach echtem striktem `INFEASIBLE`-Nachweis zusätzlich angeboten.
 9. Bis zur bewussten Übernahme erfolgt keine Mutation des Monatsplans.
 10. Vor der Übernahme wird der vollständige Vorschlag erneut mit derselben Regelengine auditiert.
 11. Ein v9-Ergebnis darf unter derselben lexikografischen Zielordnung nicht absichtlich schlechter als sein v8.5-Incumbent gewählt werden.
 12. Globale Optimalität wird ausschließlich bei vollständig abgeschlossenem Suchraum als `OPTIMAL` bezeichnet.
+13. Lokale v8.5-Nachbarschaftsstabilität wird niemals als globaler Beweis ausgegeben.
+14. Solverfortschritt und Zwischenzustände werden nicht in KV geschrieben.
 
 ---
 
@@ -68,7 +70,7 @@ Pages Functions / bestehender KV-Worker
 Workers KV
 ```
 
-Die kombinatorische Suche läuft im Browser. Der Worker führt weiterhin nur kleine API-Aufgaben, Validierung und KV-Zugriffe aus. Es werden keine Cloudflare Containers, Durable Objects, D1, R2, Workflows, Workers AI oder externe Solver-APIs benötigt.
+Die kombinatorische Suche läuft im Browser. Pages Functions und der KV-Worker übernehmen weiterhin nur kleine API-Aufgaben, Validierung und Persistenz. Es werden keine Cloudflare Containers, Durable Objects, D1, R2, Workflows, Workers AI oder externen Solver-APIs benötigt.
 
 ### 3.2 Weshalb die exakte Suche im Browser läuft
 
@@ -76,18 +78,22 @@ Die Anwendung bleibt bewusst innerhalb der kostenlosen Cloudflare-Kontingente. S
 
 ### 3.3 Entscheidung gegen einen produktiven Community-WASM-Port
 
-Für v9 wurde die Integration eines OR-Tools-/CP-SAT-WebAssembly-Ports geprüft. Der verfügbare Browser-Port ist noch jung, nicht offizieller Bestandteil der Google-OR-Tools-Distribution und hätte für die bestehende ungebündelte Pages-Anwendung zusätzliche Binär-, Thread-, Cross-Origin- und Supply-Chain-Risiken eingeführt.
+Für v9 wurde ein OR-Tools-/CP-SAT-WebAssembly-Port gegen die Projektanforderungen bewertet. Der verfügbare Browser-Port ist jung, nicht offizieller Bestandteil der Google-OR-Tools-Distribution und hätte für die bestehende ungebündelte Pages-Anwendung zusätzliche Binär-, Thread-, Cross-Origin- und Supply-Chain-Risiken eingeführt.
 
-Der Produktionspfad verwendet deshalb den im Architekturplan vorgesehenen kostenfreien Fallback:
+Der Produktionspfad verwendet deshalb den kostenlosen, kontrollierbaren Browserpfad:
 
 - dieselbe JavaScript-Regelengine wie die manuelle Planung;
-- v8.5 als schneller Incumbent;
+- v8.5 als schneller Incumbent und Fallback;
 - verlustfreie MRV-Constraint-Tiefensuche für globale Nachweise bei beherrschbarer Problemgröße;
 - keine native Binärabhängigkeit;
 - keine externe Laufzeitverbindung;
 - reproduzierbare statische Auslieferung.
 
 Die Solvergrenze ist bewusst ehrlich dokumentiert: Bei großen vollständigen Monatsräumen endet die exakte Suche häufig mit `FEASIBLE` oder `UNKNOWN`, nicht mit einem behaupteten Optimalitätsbeweis.
+
+### 3.4 Additive Auslieferungsgeneration
+
+Der bestehende v8.5-Modulgraph bleibt als stabile Basisschicht erhalten. v9 wird als additive, separat versionierte Modulschicht geladen. Dadurch bleiben bestehende Integrationsverträge funktionsfähig, während die produktive Engine eindeutig als Generation 9 markiert wird. Ein Delivery-Test lässt genau den bisherigen Shell-/v8.5-Token und den v9-Token zu und verhindert vermischte Modulstände innerhalb einer Datei.
 
 ---
 
@@ -129,7 +135,7 @@ Die bewährte v8.5-Schicht bleibt vollständig erhalten:
 - parallele Portfolio-Worker;
 - lokaler Nachbarschaftsaudit.
 
-v8.5 erzeugt einen starken vollständigen Startplan. Fällt die exakte v9-Schicht aus oder ist im Modus **Schnell** deaktiviert, bleibt die Anwendung vollständig funktionsfähig.
+v8.5 erzeugt einen starken Startplan. Fällt die exakte v9-Schicht aus oder ist im Modus **Schnell** deaktiviert, bleibt die Anwendung vollständig funktionsfähig.
 
 ### 4.3 Exakte v9-Suche
 
@@ -137,7 +143,7 @@ v8.5 erzeugt einen starken vollständigen Startplan. Fällt die exakte v9-Schich
 
 - Minimum-Remaining-Values-Auswahl des nächsten Feldes;
 - Domänenbildung ausschließlich über `evaluateCandidate()`;
-- Ausschluss grauer und nicht wählbarer Kandidaten;
+- Ausschluss grauer und technisch nicht wählbarer Kandidaten;
 - Laufgrenzen über `planRespectsLimits()`;
 - v8.5-Incumbent als bevorzugte Verzweigungsreihenfolge;
 - verlustfreies Forward Checking gegen leere Folgedomänen;
@@ -147,7 +153,9 @@ v8.5 erzeugt einen starken vollständigen Startplan. Fällt die exakte v9-Schich
 - gedrosselte Live-Telemetrie;
 - unabhängige Materialisierung und Schlussprüfung.
 
-Die Suche schneidet keine Kandidaten aus Qualitätsgründen ab. Wird der gesamte relevante Suchraum beendet, ist das Ergebnis ein globaler Nachweis innerhalb des implementierten Regel- und Zielmodells.
+Rote Bewertungen können in einem Teilzustand von noch offenen, später erfüllbaren Kopplungen abhängen. Die produktive strikte v9-Suche entfernt solche Zwischenzweige deshalb **nicht** vorzeitig. Sie enumeriert technisch wählbare rote Zwischenzustände mit, bewertet aber ausschließlich vollständige Monatspläne. Da Rot in der Zielfunktion vor allen weichen Zielen steht, ist das global beste vollständige Ergebnis automatisch Null-Rot, sofern eine Null-Rot-Belegung existiert.
+
+Wird der gesamte relevante Suchraum abgeschlossen, ist das Ergebnis ein globaler Nachweis innerhalb des implementierten Regel- und Zielmodells.
 
 ### 4.4 Solverstatus
 
@@ -155,21 +163,20 @@ Die Suche schneidet keine Kandidaten aus Qualitätsgründen ab. Wird der gesamte
 | --- | --- |
 | `OPTIMAL` | Zulässige beste Lösung gefunden und vollständiger Suchraum abgeschlossen. |
 | `FEASIBLE` | Zulässige Lösung vorhanden; Zeit-, Knoten- oder First-Feasible-Limit vor vollständigem Nachweis erreicht. |
-| `INFEASIBLE` | Vollständiger Suchraum abgeschlossen; keine zulässige Lösung im betrachteten Modell. |
+| `INFEASIBLE` | Vollständiger strikter Suchraum abgeschlossen; keine Null-Rot-Lösung vorhanden. |
 | `UNKNOWN` | Limit erreicht, bevor eine Lösung oder ein Unmöglichkeitsnachweis vorlag. |
 
-Lokale v8.5-Nachbarschaftsstabilität wird nicht als globale Zertifizierung bezeichnet.
+Der sichtbare Ergebnistext und die Nachweiskarte werden nach jedem Ergebnis aus `metrics.proof` erzeugt. Veraltete Formulierungen wie „global zertifiziert“ werden entfernt, wenn lediglich `FEASIBLE` oder `UNKNOWN` vorliegt.
 
 ### 4.5 Strikter Lauf und Minimal-Rot-Fallback
 
-Die exakte Suche beginnt immer mit `allowRed = false`. Ein zusätzlicher bestätigungspflichtiger exakter Lauf ist nur zulässig, wenn:
+Die produktive Suche verfolgt zuerst Null-Rot. Der exakte Enumerator untersucht dabei verlustfrei alle technisch wählbaren Zwischenzweige und leitet den strikten Status erst aus dem global besten vollständigen Ergebnis ab:
 
-1. die strikte exakte Suche `INFEASIBLE` geliefert hat;
-2. die vorhandene Lösung rot beziehungsweise unvollständig ist;
-3. der Benutzer rote Fallbacks erlaubt hat;
-4. nicht der Diagnosemodus aktiv ist.
+- global bestes vollständiges Ergebnis hat `0` Rot: striktes `OPTIMAL`;
+- Suchraum vollständig, global bestes Ergebnis bleibt rot: striktes `INFEASIBLE`;
+- Suchraum nicht vollständig: `FEASIBLE` oder `UNKNOWN`, aber kein Unmöglichkeitsnachweis.
 
-`UNKNOWN` öffnet keinen automatischen Rot-Fallback.
+Nur nach einem vollständigen strikten `INFEASIBLE`-Nachweis darf der bereits im selben Suchlauf gefundene globale Minimal-Rot-Plan angeboten werden. Ein identischer zweiter Exaktlauf ist nicht erforderlich. Im Diagnosemodus bleibt der rote Fallback gesperrt. `UNKNOWN` öffnet keinen automatischen Rot-Fallback.
 
 ### 4.6 Lexikografische Zielordnung
 
@@ -191,6 +198,15 @@ Die Qualitätsreihenfolge bleibt hart priorisiert:
 
 Eine bessere Fairness darf niemals einen zusätzlichen harten, roten, orangefarbenen oder gelben Konflikt erkaufen.
 
+### 4.7 Fortschritts- und Gewinnervertrag
+
+- v8.5-Aufbau und -Perfektion werden in den reservierten Bereich bis 80 Prozent abgebildet;
+- interne v8.5-Endereignisse werden in der v9-Pipeline nicht als terminal weitergereicht;
+- der Runner klemmt den Gesamtfortschritt monoton, sodass die Prozentanzeige nicht zurückspringt;
+- die exakte Suche übernimmt den Schlussbereich;
+- bei objektiv identischen Plänen gewinnt der stärkere Nachweis;
+- ein `OPTIMAL`-Ergebnis kann dadurch nicht von einem später eintreffenden, lediglich heuristischen Gleichstand verdrängt werden.
+
 ---
 
 ## 5. Solvermodi und Studioparameter
@@ -202,14 +218,20 @@ Eine bessere Fairness darf niemals einen zusätzlichen harten, roten, orangefarb
 | **Schnell · v8.5 lokal** | Beam-/ALNS-Portfolio ohne globale v9-Tiefensuche. |
 | **Hybrid · empfohlen** | v8.5-Incumbent plus ausgewogene exakte Prüfung und Verbesserung. |
 | **Exakt · maximales Budget** | Größter Zeitanteil für die vollständige Tiefensuche. |
-| **Diagnose · strikt Null-Rot** | Kein roter Fallback; untersucht nur strikte Belegungen. |
+| **Diagnose · strikt Null-Rot** | Kein roter Fallback; untersucht ausschließlich den strikten Null-Rot-Anspruch. |
+
+Direkte ältere API-Aufrufe ohne v9-Vertrag bleiben aus Kompatibilitätsgründen im schnellen v8.5-Modus. Das Studio überträgt seinen gewählten v9-Vertrag vor dem Start ausdrücklich an Worker und Inline-Fallback.
 
 ### 5.2 Nachweisziel
 
-- **Erste gültige Lösung:** beendet die exakte Suche nach dem ersten zulässigen Zustand;
-- **Hohe Qualität:** ausgewogene Verbesserung innerhalb des Zeitrahmens;
-- **Bestmöglich im Zeitrahmen:** sucht bis Zeit- oder Knotenlimit;
-- **Optimum beweisen:** versucht den vollständigen Suchraum abzuschließen.
+| Ziel | Wirkung |
+| --- | --- |
+| **Erste gültige Lösung** | Stoppt nach dem ersten zulässigen Ergebnis beziehungsweise übernimmt einen bereits sauberen Incumbent; geringster Exaktanteil. |
+| **Hohe Qualität** | Nutzt einen moderaten Anteil des Zeit- und Knotenbudgets für exakte Verbesserung. |
+| **Bestmöglich im Zeitrahmen** | Verwendet das ausgewogene Standardbudget bis Zeit- oder Knotenlimit. |
+| **Optimum beweisen** | Reserviert deutlich mehr Zeit und Knoten für den Versuch, den Suchraum vollständig abzuschließen. |
+
+Die Ziele sind nicht nur Beschriftungen: Sie verändern Exaktanteil, Knotenlimit und gegebenenfalls das Abbruchverhalten.
 
 ### 5.3 Weitere Parameter
 
@@ -224,7 +246,7 @@ Eine bessere Fairness darf niemals einen zusätzlichen harten, roten, orangefarb
 - personenspezifische BD-/HG-/Gesamtobergrenzen;
 - parallele Portfolio-Worker und UI-Reserve.
 
-Die v9-Schicht überträgt Solvermodus und Nachweisziel über einen versionierten Laufvertrag in Worker- und Inline-Fallback. Alte v8.5-Integrationsmarker bleiben für bestehende Browserregressionen additiv erhalten.
+Alte v8.5-Integrationsmarker bleiben additiv erhalten, die produktive Generation steht separat als v9 bereit.
 
 ---
 
@@ -235,16 +257,16 @@ Die v9-Schicht überträgt Solvermodus und Nachweisziel über einen versionierte
 Das Studio verwendet:
 
 - `100dvh` statt einer starren Fensterhöhe;
-- einen gemeinsam scrollbareren Inhaltsbereich zwischen Kopf und Fuß;
+- einen gemeinsam scrollbaren Inhaltsbereich zwischen Kopf und Fuß;
 - explizite Grid-Zeilen für Phasen, Worker, Phasentheater, Log und Metriken;
 - `min-width: 0` und `min-height: 0` an verschachtelten Grid-/Flex-Elementen;
 - stabile Scrollbarflächen;
 - einspaltige Umordnung bei kleineren Fenstern;
 - zwei- beziehungsweise einspaltige Phasenkarten auf schmalen Ansichten.
 
-Damit bleiben Phasenkarten, Protokoll, Kennzahlen, Vorschlagstabelle, Statistik, Bestätigung und Übernahmebutton erreichbar.
+Damit bleiben Phasenkarten, Protokoll, Kennzahlen, Vorschlagstabelle, Statistik, Bestätigung und Übernahmebutton erreichbar. Eine Browserregression prüft die Dialoggrenzen, Grid-Zeilen und die letzte Phasenkarte bei 1375 × 760 Pixeln.
 
-### 6.2 Wahrheitsgetreue Animation
+### 6.2 Wahrheitsgetreue, dauerhaft aktive Animation
 
 Die Visualisierung basiert ausschließlich auf echten Fortschrittsereignissen:
 
@@ -256,7 +278,7 @@ Die Visualisierung basiert ausschließlich auf echten Fortschrittsereignissen:
 - Zeitanteilsanzeige;
 - finaler Beweisstatus.
 
-Die Animation verändert keine Solverentscheidung. Systemseitiges `prefers-reduced-motion: reduce` deaktiviert rein dekorative Daueranimationen, ohne einen separaten Anwendungsschalter einzuführen.
+Die Animation verändert keine Solverentscheidung. Entsprechend der Produktvorgabe existiert kein Modus für reduzierte Bewegung. Eine zuletzt geladene v9-Motionsschicht hält die vollständige Algorithmusanimation auch dann aktiv, wenn das Betriebssystem `prefers-reduced-motion: reduce` meldet.
 
 ### 6.3 Tooltips und Tastaturbedienung
 
@@ -268,7 +290,8 @@ Jedes relevante Konfigurations-, Status- und Ergebnisfeld erhält einen Rich Too
 - Schließen mit `Escape`;
 - automatische Positionierung;
 - Tooltips für Solvermodus, Nachweisziel, Zeitrahmen, Limits, Phasen, Worker, Metriken, Protokoll und Übernahme;
-- generierte Erklärungen für dynamisch eingefügte Tabellen- und Kennzahlenfelder.
+- generierte Erklärungen für dynamisch eingefügte Tabellen- und Kennzahlenfelder;
+- MutationObserver für nachträglich gerenderte Elemente.
 
 ### 6.4 Ergebnisnachweis
 
@@ -276,11 +299,14 @@ Die Ergebnisansicht zeigt getrennt:
 
 - Solverstatus;
 - global vollständig oder zeitbegrenzt;
+- Null-Rot- oder Minimal-Rot-Nachweis;
 - Abbruchursache;
 - untersuchte Knoten;
 - gefundene vollständige Lösungen;
 - Kostenmodell `0 €`;
 - Regel-Audit und rote Einzelbestätigung.
+
+`js/auto-plan-v9-truth.js` ersetzt mehrdeutige v8.5-Kurztexte durch die tatsächlich belegte v9-Semantik. `FEASIBLE` wird als zulässige, aber nicht global bewiesene Lösung bezeichnet; `UNKNOWN` bleibt ein offener Zeit-/Knotenabbruch.
 
 ---
 
@@ -319,6 +345,7 @@ Die Browserregression misst für eine normale Tabellenzelle mindestens ein Kontr
 - weitere Stränge liefern diversifizierte ALNS-Incumbents;
 - UI-Kerne bleiben reserviert;
 - gedrosselte Fortschrittsnachrichten;
+- monotoner Gesamtfortschritt;
 - Abbruch durch Workerbeendigung beziehungsweise Abort-Signal;
 - `requestAnimationFrame()` für visuelle Aktualisierungen;
 - passive Scroll-Listener;
@@ -326,7 +353,8 @@ Die Browserregression misst für eine normale Tabellenzelle mindestens ein Kontr
 - compositorfreundliche Animationen;
 - keine Mutation des produktiven Monats während der Suche;
 - idempotente UI-, Observer- und Tooltipinstallation;
-- vollständiger Inline-Fallback, falls Web Worker nicht verfügbar ist.
+- vollständiger Inline-Fallback, falls Web Worker nicht verfügbar ist;
+- stärkerer Nachweis als Tiebreak bei identischem Zielvektor.
 
 ---
 
@@ -352,6 +380,7 @@ Ein v9-Ergebnis enthält zusätzlich:
 - Ausgangsfingerprint;
 - normalisierte Laufkonfiguration;
 - Solverstatus und Beweisumfang;
+- Kennzeichnung `global-strict`, `global-relaxed`, `feasible-incumbent` oder `unresolved`;
 - exakte Suchmetriken;
 - vollständigen Zielvektor;
 - geplanten Monat;
@@ -440,6 +469,8 @@ python3 -m http.server 4173
 - v9-Orchestrierung;
 - v9-Studio;
 - Schichtenvertrag;
+- eindeutige Ergebnis- und Nachweissprache;
+- Always-Motion-Lader;
 - Shellintegration;
 - v9-Unit- und Browsertests.
 
@@ -452,10 +483,14 @@ python3 -m http.server 4173
 - v8.5-Regressionen;
 - v9-Revisions- und Phasenvertrag;
 - Solvermodus-/Nachweiszielableitung;
+- voneinander verschiedene Zeit-/Knotenbudgets der Nachweisziele;
 - Statussemantik;
+- funktionaler globaler Kleinproblemnachweis;
+- verlustfreie Behandlung roter Zwischenzweige;
 - strikte Fallbackreihenfolge;
+- monotone Fortschrittsabbildung;
 - Nullkostenarchitektur;
-- Studio-, Kontrast- und Layoutverträge.
+- Studio-, Kontrast-, Layout-, Wahrheits- und Animationsverträge.
 
 ### 12.3 Browsertests
 
@@ -470,7 +505,8 @@ python3 -m http.server 4173
 - Rich Tooltips per Fokus und `Escape`;
 - vollständige Tooltipabdeckung sichtbarer Studiofelder;
 - gemessener Dunkelmoduskontrast;
-- Systempräferenz für reduzierte Bewegung;
+- eindeutige `FEASIBLE`-Ergebnissprache ohne falsche Zertifizierung;
+- dauerhaft aktive Animation auch unter emulierter OS-Reduktionspräferenz;
 - Legacy-v8.5-Integrationsvertrag.
 
 ### 12.4 CI
@@ -525,24 +561,27 @@ Die v9-Engine erzeugt keine serverseitige Solverlast. Für die vorhandene Größ
 ## 14. Projektstruktur v9
 
 ```text
-js/auto-planner.js                    produktiver Export auf v9
-js/auto-planner-v9.js                 Hybrid-Orchestrierung und Solverstatus
-js/auto-planner-v9-exact.js           exakte MRV-Constraint-Tiefensuche
-js/auto-planner-v8-5.js               Incumbent, Eskalation und Fallback
-js/auto-planner-v8.js                 ALNS-/VNS-Perfektionsbasis
-js/auto-planner-engine.js             gemeinsames Modell, Zielordnung und Audit
-js/auto-plan-runner.js                Workerportfolio und UI-Reserve
-js/auto-plan-worker.js                Modul-Worker-Einstieg
-js/auto-plan-studio-v9.js             v9-Steuerung, Telemetrie und Tooltips
-js/auto-plan-studio-v9-contract.js    additiver v8.5/v9-Integrationsvertrag
-js/auto-plan-studio-v8-5.js           bewährte Studio-Basisschicht
-js/rich-tooltip-v8-5.js               zentrale ARIA-Tooltips
-js/ui-v9.js                           additive v9-Shellintegration
-auto-plan-studio-v9.css               v9-Animation und Ergebnisdarstellung
-auto-plan-studio-v9-contract.css      viewportfestes Schichtenlayout
-app-v9.css                             Dunkelmodus- und Fokuskontrast
-tests/auto-plan-v9.test.js            v9-Solver- und Architekturverträge
-tests/e2e/auto-plan-v9.spec.js        Layout-, Tooltip- und Kontrastregressionen
+js/auto-planner.js                       produktiver Export auf v9
+js/auto-planner-v9.js                    Hybrid-Orchestrierung, strikter Suchvertrag und Solverstatus
+js/auto-planner-v9-exact.js              rohe exakte MRV-Constraint-Tiefensuche
+js/auto-planner-v8-5.js                  Incumbent, Eskalation und Fallback
+js/auto-planner-v8.js                    ALNS-/VNS-Perfektionsbasis
+js/auto-planner-engine.js                gemeinsames Modell, Zielordnung und Audit
+js/auto-plan-runner.js                   Workerportfolio, Fortschritt und Nachweis-Tiebreak
+js/auto-plan-worker.js                   Modul-Worker-Einstieg
+js/auto-plan-studio-v9.js                v9-Steuerung, Telemetrie und Tooltips
+js/auto-plan-studio-v9-contract.js       additiver v8.5/v9-Integrationsvertrag
+js/auto-plan-v9-truth.js                 eindeutige sichtbare Nachweissprache
+js/auto-plan-v9-motion.js                Lader der dauerhaft aktiven Animation
+js/auto-plan-studio-v8-5.js              bewährte Studio-Basisschicht
+js/rich-tooltip-v8-5.js                  zentrale ARIA-Tooltips
+js/ui-v9.js                              additive v9-Shellintegration
+auto-plan-studio-v9.css                  v9-HUD, Telemetrie und Ergebnisdarstellung
+auto-plan-studio-v9-contract.css         viewportfestes Schichtenlayout
+auto-plan-studio-v9-always-motion.css    vollständige Animation ohne Reduktionsmodus
+app-v9.css                                Dunkelmodus- und Fokuskontrast
+tests/auto-plan-v9.test.js               v9-Solver- und Architekturverträge
+tests/e2e/auto-plan-v9.spec.js           Layout-, Tooltip-, Wahrheits-, Animations- und Kontrastregressionen
 ```
 
 ---
@@ -554,8 +593,12 @@ tests/e2e/auto-plan-v9.spec.js        Layout-, Tooltip- und Kontrastregressionen
 - produktiver Export auf Auto-Plan v9;
 - v8.5 als schneller Incumbent und vollständiger Fallback;
 - exakte zeit-/knotenbegrenzte MRV-Tiefensuche im Browser;
+- verlustfreie strikte Suche über technisch wählbare Zwischenzustände;
 - ehrliche Statuswerte `OPTIMAL`, `FEASIBLE`, `INFEASIBLE`, `UNKNOWN`;
-- strikter exakter Lauf vor bestätigungspflichtigem Rot;
+- Minimal-Rot-Ausgabe nur nach vollständigem Null-Rot-Unlösbarkeitsnachweis;
+- unterschiedliche Budgets für alle Nachweisziele;
+- monotone Fortschrittsabbildung;
+- stärkerer Nachweis als Gleichstandsentscheidung;
 - globale Nachweiskennzeichnung nur bei vollständig beendetem Suchraum;
 - keine kostenpflichtige Solver- oder Cloudkomponente.
 
@@ -564,8 +607,9 @@ tests/e2e/auto-plan-v9.spec.js        Layout-, Tooltip- und Kontrastregressionen
 - Solvermodus und Nachweisziel;
 - sieben reale Phasen;
 - exakte Knoten-, Lösungs- und Sackgassentelemetrie;
-- finaler Beweisstatus;
+- finaler wahrheitsgetreuer Beweisstatus;
 - überarbeitete energie- und qualitätsabhängige Animation;
+- vollständige Animation ohne Reduktionsmodus;
 - flächendeckende Rich Tooltips;
 - korrektes Scroll- und Responsive-Verhalten;
 - keine abgeschnittenen Phasenkarten oder Ergebnisbereiche.
@@ -576,15 +620,17 @@ tests/e2e/auto-plan-v9.spec.js        Layout-, Tooltip- und Kontrastregressionen
 - klare Wochenend- und Feiertagsabstufungen;
 - sichtbare Fokusindikatoren;
 - Forced-Colors-Fallback;
-- systemseitige Reduzierung dekorativer Bewegung.
+- eindeutige Ergebnis- und Nachweissprache.
 
 ### Qualität
 
 - Paketversion `0.9.0`;
 - separates `check:v9`;
+- funktionaler Exakt-Solver-Test;
 - neue Unit- und Playwright-Regressionen;
 - CI mit Node 24, Chromium und Diagnoseartefakten;
-- v8.5-Kompatibilitätstests bleiben erhalten.
+- v8.5-Kompatibilitätstests bleiben erhalten;
+- Delivery-Test für atomare v8.5-/v9-Modulgenerationen.
 
 ---
 
@@ -594,8 +640,9 @@ tests/e2e/auto-plan-v9.spec.js        Layout-, Tooltip- und Kontrastregressionen
 - Die exakte Suche kann bei großen Monatsproblemen ihr Zeit- oder Knotenlimit erreichen.
 - `FEASIBLE` ist eine gültige Lösung, aber kein globaler Optimalitätsbeweis.
 - `UNKNOWN` ist weder ein Machbarkeits- noch ein Unmöglichkeitsnachweis.
-- Die JavaScript-Tiefensuche ist bei sehr großen Suchräumen langsamer als ein nativer CP-SAT-Prozess; sie wurde zugunsten der kostenlosen, statischen und wartbaren Zielarchitektur gewählt.
+- Die JavaScript-Tiefensuche ist bei sehr großen Suchräumen langsamer als ein nativer CP-SAT-Prozess; sie wurde zugunsten der kostenlosen, statischen und kontrollierbaren Zielarchitektur gewählt.
 - v8.5-Zertifizierung bleibt ein lokaler Nachbarschaftsnachweis.
 - Workers KV ist eventual consistent und nicht für globale atomare Konkurrenzkoordination geeignet.
 - RBN und zweite RBN bleiben manuell.
 - Browserleistung, Kernzahl und Speicherdruck beeinflussen die erreichbare Suchtiefe.
+- Die vollständige Animation bleibt gemäß Produktvorgabe auch bei einer Betriebssystempräferenz für reduzierte Bewegung aktiv.
