@@ -1,9 +1,12 @@
 /**
- * Auto-Plan v9.5 – CP-SAT-Adapter, strikte lexikografische Suche und LNS.
+ * Auto-Plan v9.5 – strikte lexikografische Suche und Constraint-LNS.
  *
  * Die Solverbibliothek sieht ausschließlich das solverunabhängige Modell aus
  * `auto-plan-model-v9-5.js`. Alle Statuswerte werden konservativ behandelt:
  * FEASIBLE ist eine verwendbare Lösung, aber niemals ein Optimalitätsnachweis.
+ * Der eigentliche WASM-Lader liegt getrennt in
+ * `auto-plan-solver-loader-v9-5.js`, damit Browserfenster und Modul-Worker
+ * denselben geprüften Adapter verwenden.
  */
 
 import {
@@ -11,103 +14,30 @@ import {
   materializeBooleanSolution,
   objectiveValueForComponent
 } from './auto-plan-model-v9-5.js?v=20260805.1';
+import {
+  V95_SOLVER_LOAD_ORDER,
+  loadV95Solver,
+  normalizeV95SolverApi,
+  resetV95SolverLoaderForTests,
+  selfTestV95Solver,
+  v95SolverEnvironment,
+  v95SolverLoadState
+} from './auto-plan-solver-loader-v9-5.js?v=20260805.1';
+
+export {
+  V95_SOLVER_LOAD_ORDER,
+  loadV95Solver,
+  normalizeV95SolverApi,
+  resetV95SolverLoaderForTests,
+  selfTestV95Solver,
+  v95SolverEnvironment,
+  v95SolverLoadState
+};
 
 export const AUTO_PLAN_SOLVER_REVISION = 95;
 export const AUTO_PLAN_SOLVER_ID = 'v9.5-cp-sat-lexicographic-lns';
 
-export const V95_SOLVER_LOAD_ORDER = Object.freeze([
-  Object.freeze({ id: 'or-tools-wasm', source: 'local', url: '/vendor/or-tools-wasm/cp-sat/index.js', version: '0.9.1' }),
-  Object.freeze({ id: 'or-tools-wasm', source: 'cdn', url: 'https://cdn.jsdelivr.net/npm/or-tools-wasm@0.9.1/cp-sat/+esm', version: '0.9.1' }),
-  Object.freeze({ id: 'cpsat-js', source: 'cdn', url: 'https://cdn.jsdelivr.net/npm/cpsat-js@1.0.0/+esm', version: '1.0.0' })
-]);
-
 const MAX_BOUND = 1_000_000;
-let solverPromise = null;
-let solverState = 'idle';
-let solverFailure = null;
-
-function normalizeSolverApi(module, id) {
-  try {
-    if (module?.CpModel && module?.CpSolver) {
-      return {
-        id,
-        createModel() { return new module.CpModel(); },
-        newIntVar(model, lb, ub, name) { return model.newIntVar(lb, ub, name); },
-        addLinear(model, terms, lb, ub) {
-          const expression = terms.reduce((accumulator, [variable, coefficient]) => {
-            const term = variable.times(coefficient);
-            return accumulator === null ? term : accumulator.plus(term);
-          }, null);
-          if (!expression) return null;
-          return model.addLinearConstraint(expression, lb, ub);
-        },
-        minimize(model, terms) {
-          const expression = terms.reduce((accumulator, [variable, coefficient]) => {
-            const term = variable.times(coefficient);
-            return accumulator === null ? term : accumulator.plus(term);
-          }, null);
-          if (expression && typeof model.minimize === 'function') model.minimize(expression);
-        },
-        addHint(model, variable, value) {
-          if (typeof model.addHint === 'function') model.addHint(variable, value);
-        },
-        async solve(model, parameters) {
-          const solver = new module.CpSolver();
-          const status = await solver.solve(model, parameters);
-          return {
-            status,
-            statusName: String(solver.statusName?.(status) || status || 'UNKNOWN'),
-            objectiveValue: () => Number(solver.objectiveValue?.() ?? 0),
-            bestBound: () => {
-              const value = solver.bestObjectiveBound?.();
-              return Number.isFinite(Number(value)) ? Number(value) : null;
-            },
-            value: variable => Number(solver.value(variable) ?? 0)
-          };
-        }
-      };
-    }
-    if (module?.CpModel && module?.CpSolver?.create) {
-      return {
-        id,
-        createModel() { return new module.CpModel(); },
-        newIntVar(model, lb, ub, name) { return model.newIntVar(lb, ub, name); },
-        addLinear(model, terms, lb, ub) {
-          const expression = terms.reduce((accumulator, [variable, coefficient]) => {
-            const term = variable.times(coefficient);
-            return accumulator === null ? term : accumulator.plus(term);
-          }, null);
-          if (!expression) return null;
-          return model.addLinearConstraint(expression, lb, ub);
-        },
-        minimize(model, terms) {
-          const expression = terms.reduce((accumulator, [variable, coefficient]) => {
-            const term = variable.times(coefficient);
-            return accumulator === null ? term : accumulator.plus(term);
-          }, null);
-          if (expression && typeof model.minimize === 'function') model.minimize(expression);
-        },
-        addHint(model, variable, value) {
-          if (typeof model.addHint === 'function') model.addHint(variable, value);
-        },
-        async solve(model, parameters) {
-          const solver = await module.CpSolver.create();
-          const result = await solver.solve(model, parameters);
-          return {
-            status: result.status,
-            statusName: String(result.status || 'UNKNOWN'),
-            objectiveValue: () => Number(result.objectiveValue ?? 0),
-            bestBound: () => Number.isFinite(Number(result.bestObjectiveBound)) ? Number(result.bestObjectiveBound) : null,
-            value: variable => Number(result.value(variable) ?? 0)
-          };
-        }
-      };
-    }
-  } catch {
-    return null;
-  }
-  return null;
-}
 
 function normalizeStatus(value) {
   const upper = String(value || 'UNKNOWN').toUpperCase();
@@ -116,63 +46,6 @@ function normalizeStatus(value) {
   if (upper.includes('INFEASIBLE')) return 'INFEASIBLE';
   if (upper.includes('MODEL_INVALID')) return 'MODEL_INVALID';
   return 'UNKNOWN';
-}
-
-async function selfTestSolver(api) {
-  const model = api.createModel();
-  const variable = api.newIntVar(model, 0, 1, 'v95_self_test');
-  api.addLinear(model, [[variable, 1]], 1, 1);
-  api.minimize(model, [[variable, 1]]);
-  const result = await api.solve(model, {
-    max_time_in_seconds: 2,
-    random_seed: 95,
-    num_search_workers: 1,
-    log_search_progress: false
-  });
-  const status = normalizeStatus(result.statusName);
-  if (!['OPTIMAL', 'FEASIBLE'].includes(status) || result.value(variable) !== 1) {
-    throw new Error(`CP-SAT-Selbsttest fehlgeschlagen (${status}).`);
-  }
-  return true;
-}
-
-export async function loadV95Solver({ signal = null } = {}) {
-  if (solverPromise) return solverPromise;
-  solverState = 'loading';
-  solverPromise = (async () => {
-    if (typeof globalThis === 'undefined' || typeof globalThis.document === 'undefined') {
-      solverState = 'unavailable';
-      return null;
-    }
-    for (const candidate of V95_SOLVER_LOAD_ORDER) {
-      if (signal?.aborted) return null;
-      try {
-        const module = await import(/* webpackIgnore: true */ candidate.url);
-        const api = normalizeSolverApi(module, candidate.id);
-        if (!api) continue;
-        await selfTestSolver(api);
-        api.loadedFrom = candidate;
-        solverState = 'ready';
-        solverFailure = null;
-        return api;
-      } catch (error) {
-        solverFailure = error?.message || String(error);
-      }
-    }
-    solverState = 'unavailable';
-    return null;
-  })();
-  return solverPromise;
-}
-
-export function v95SolverLoadState() {
-  return { state: solverState, failure: solverFailure };
-}
-
-export function resetV95SolverForTests() {
-  solverPromise = null;
-  solverState = 'idle';
-  solverFailure = null;
 }
 
 export function cpSatParametersV95({
@@ -278,7 +151,9 @@ export async function solveBooleanPhase(model, api, {
         && !['lexicographic-fix', 'lns-fix'].includes(constraint.group)) return;
       const terms = constraint.terms.map(([index, coefficient]) => [boundVariables[index], coefficient]);
       if (!terms.length) {
-        if (!(constraint.lb <= 0 && constraint.ub >= 0)) throw new Error(`Konstante Nebenbedingung ${constraint.id} ist unzulässig.`);
+        if (!(constraint.lb <= 0 && constraint.ub >= 0)) {
+          throw new Error(`Konstante Nebenbedingung ${constraint.id} ist unzulässig.`);
+        }
         return;
       }
       api.addLinear(boundModel, terms, constraint.lb, constraint.ub);
@@ -364,10 +239,15 @@ export function phaseOrderForConfig(model, config = {}, variant = 'balanced') {
   const patterns = ['splitWeekend'];
   const wishes = ['wishes', 'recommendations'];
   let ordered;
-  if (variant === 'wishes' || config.optimizationFocus === 'wishes') ordered = [...safety, ...wishes, ...fairness, ...patterns];
-  else if (variant === 'weekends' || config.optimizationFocus === 'weekends') ordered = [...safety, ...patterns, 'weekendSpread', 'fairnessMax', 'targetDeviation', 'combinedSpread', ...wishes];
-  else if (variant === 'workload' || config.optimizationFocus === 'workload') ordered = [...safety, ...fairness, ...patterns, ...wishes];
-  else ordered = [...safety, 'fairnessMax', 'targetDeviation', ...patterns, 'combinedSpread', 'weekendSpread', ...wishes];
+  if (variant === 'wishes' || config.optimizationFocus === 'wishes') {
+    ordered = [...safety, ...wishes, ...fairness, ...patterns];
+  } else if (variant === 'weekends' || config.optimizationFocus === 'weekends') {
+    ordered = [...safety, ...patterns, 'weekendSpread', 'fairnessMax', 'targetDeviation', 'combinedSpread', ...wishes];
+  } else if (variant === 'workload' || config.optimizationFocus === 'workload') {
+    ordered = [...safety, ...fairness, ...patterns, ...wishes];
+  } else {
+    ordered = [...safety, 'fairnessMax', 'targetDeviation', ...patterns, 'combinedSpread', 'weekendSpread', ...wishes];
+  }
   return ordered.filter((id, index) => model.components?.[id] && ordered.indexOf(id) === index);
 }
 
@@ -465,7 +345,13 @@ export async function solveLexicographicV95(model, api, {
       stoppedByLimit = true;
       if (strictCertification) break;
     }
-    if (componentId) fixedObjectives.push({ componentId, value: result.objectiveValue, proven: result.status === 'OPTIMAL' });
+    if (componentId) {
+      fixedObjectives.push({
+        componentId,
+        value: result.objectiveValue,
+        proven: result.status === 'OPTIMAL'
+      });
+    }
   }
 
   return {
@@ -520,8 +406,11 @@ function splitWeekendSlots(model, solution) {
 
 function loadFocusedSlots(model, solution) {
   const counts = new Map();
-  for (const staffId of Object.values(solution || {})) counts.set(staffId, (counts.get(staffId) || 0) + 1);
-  const ordered = [...counts.entries()].sort((left, right) => right[1] - left[1] || String(left[0]).localeCompare(String(right[0])));
+  for (const staffId of Object.values(solution || {})) {
+    counts.set(staffId, (counts.get(staffId) || 0) + 1);
+  }
+  const ordered = [...counts.entries()]
+    .sort((left, right) => right[1] - left[1] || String(left[0]).localeCompare(String(right[0])));
   const focus = new Set(ordered.slice(0, 2).map(([staffId]) => staffId));
   return new Set(model.openSlots.filter(slot => focus.has(solution[slot.key])).map(slot => slot.key));
 }
@@ -549,10 +438,11 @@ function weekendBlockSlots(model, round) {
 function randomSlots(model, round, config, random) {
   const percentage = Math.max(10, Math.min(60, Number(config.v95NeighborhoodPercent || 28)));
   const count = Math.max(4, Math.round(model.openSlots.length * percentage / 100));
-  const ranked = model.openSlots.map(slot => ({ slot, value: random() + round * 1e-9 }))
+  return new Set(model.openSlots
+    .map(slot => ({ slot, value: random() + round * 1e-9 }))
     .sort((left, right) => left.value - right.value)
-    .slice(0, count);
-  return new Set(ranked.map(entry => entry.slot.key));
+    .slice(0, count)
+    .map(entry => entry.slot.key));
 }
 
 function relaxedSlotsForRound(model, solution, round, config, random) {
@@ -599,7 +489,10 @@ export async function runConstraintLnsV95({
   let incumbentSolution = solutionFromMonth(model, incumbentMonth);
   let improvements = 0;
   const rounds = [];
-  const totalBudget = Math.max(500, Number(config.v95LnsBudgetMs || Math.round(Number(config.cpSatTimeBudgetSeconds || 10) * 350)));
+  const totalBudget = Math.max(
+    500,
+    Number(config.v95LnsBudgetMs || Math.round(Number(config.cpSatTimeBudgetSeconds || 10) * 350))
+  );
   const perRoundBudget = Math.max(150, Math.floor(totalBudget / Math.max(1, roundsTarget)));
 
   for (let round = 0; round < roundsTarget; round += 1) {
@@ -671,7 +564,9 @@ export async function diagnoseConflictGroupsV95(model, api, {
       detail: 'Das Modell enthält bereits ohne Suche widersprüchliche konstante Nebenbedingungen.'
     };
   }
-  if (!model || !api) return { infeasible: true, exact: false, groups: [], detail: 'Solver nicht verfügbar.' };
+  if (!model || !api) {
+    return { infeasible: true, exact: false, groups: [], detail: 'Solver nicht verfügbar.' };
+  }
   const allGroups = [...new Set(model.constraints.map(constraint => constraint.group))];
   const base = await solveBooleanPhase(model, api, {
     activeGroups: allGroups,
@@ -680,7 +575,12 @@ export async function diagnoseConflictGroupsV95(model, api, {
     randomSeed
   });
   if (base.status !== 'INFEASIBLE') {
-    return { infeasible: false, exact: base.status === 'OPTIMAL', groups: [], detail: 'Keine nachgewiesene Unzulässigkeit.' };
+    return {
+      infeasible: false,
+      exact: base.status === 'OPTIMAL',
+      groups: [],
+      detail: 'Keine nachgewiesene Unzulässigkeit.'
+    };
   }
   const necessary = [];
   for (let index = 0; index < allGroups.length; index += 1) {
@@ -698,11 +598,9 @@ export async function diagnoseConflictGroupsV95(model, api, {
     infeasible: true,
     exact: false,
     groups: necessary,
-    constraints: model.constraints.filter(constraint => necessary.includes(constraint.group)).map(constraint => ({
-      id: constraint.id,
-      group: constraint.group,
-      detail: constraint.detail
-    })),
+    constraints: model.constraints
+      .filter(constraint => necessary.includes(constraint.group))
+      .map(constraint => ({ id: constraint.id, group: constraint.group, detail: constraint.detail })),
     detail: necessary.length
       ? `Konfliktkern-Annäherung: ${necessary.join(', ')}.`
       : 'Die Unzulässigkeit entsteht aus einer Kombination mehrerer Regelgruppen; keine einzelne Gruppe löst sie allein auf.'
