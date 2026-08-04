@@ -90,10 +90,10 @@ Der frühere anwendungsspezifische Modus **„Reduzierte Bewegung“** ist aus E
 Fixpunkte/Domänen
   → striktes Konstruktionsportfolio
   → profilabhängige Null-Rot-Intensivierung
+  → optionaler Minimal-Rot-Fallback nur nach ausgeschöpfter strikter Suche
   → iterative Tausch- und lokale Reparatur
   → diversifizierte ALNS-Perfektion
   → vollständige Zertifizierung
-  → optionaler Minimal-Rot-Fallback nur nach ausgeschöpfter strikter Suche
 ```
 
 Perfektion und Zertifizierung sind in v8.5 verbindlich. Ein Lauf kann sie nicht mehr über eine Studio-Checkbox deaktivieren.
