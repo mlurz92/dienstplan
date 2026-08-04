@@ -648,7 +648,7 @@ def raw_score(context: ModelContext, assignments: Sequence[Assignment]) -> tuple
     red = orange = yellow = recommendation = stability = 0
     warm = warm_start_map(context.snapshot)
     bd_counts: defaultdict[str, int] = defaultdict(int)
-    total_counts: defaultdict[str, int] = defaultdict(int)
+    weighted_loads: defaultdict[str, int] = defaultdict(int)
     weekend_counts: defaultdict[str, int] = defaultdict(int)
     for key, staff_id in selected.items():
         level = context.candidate_level.get((key[0], key[1], staff_id), "green")
@@ -658,11 +658,14 @@ def raw_score(context: ModelContext, assignments: Sequence[Assignment]) -> tuple
         recommendation -= context.candidate_score.get((key[0], key[1], staff_id), 0)
         stability += int(warm.get(key) not in (None, staff_id))
     for (date_iso, role), staff_id in {**context.fixed, **selected}.items():
-        total_counts[staff_id] += 1
+        is_weekend = date.fromisoformat(date_iso).isoweekday() in {5, 6, 7}
+        weighted_loads[staff_id] += LOAD_WEIGHT[role] + (
+            WEEKEND_EXTRA[role] if is_weekend else 0
+        )
         bd_counts[staff_id] += int(role == "bd")
-        weekend_counts[staff_id] += int(date.fromisoformat(date_iso).isoweekday() in {5, 6, 7})
+        weekend_counts[staff_id] += int(is_weekend)
     deviations = [abs(bd_counts[item.id] - item.bdTarget) for item in context.snapshot.staff]
-    totals = [total_counts[item.id] for item in context.snapshot.staff]
+    loads = [weighted_loads[item.id] for item in context.snapshot.staff]
     weekends = [weekend_counts[item.id] for item in context.snapshot.staff]
     return (
         red,
@@ -671,7 +674,7 @@ def raw_score(context: ModelContext, assignments: Sequence[Assignment]) -> tuple
         recommendation,
         max(deviations, default=0),
         sum(deviations),
-        max(totals, default=0) - min(totals, default=0),
+        max(loads, default=0) - min(loads, default=0),
         max(weekends, default=0) - min(weekends, default=0),
         stability,
     )

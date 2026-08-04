@@ -16,6 +16,7 @@ from app.schemas import (
     Staff,
 )
 from app.solver import solve_snapshot
+from app.solver_core import build_model, raw_score
 
 
 def dates_for_february() -> list[str]:
@@ -164,3 +165,14 @@ def test_hard_maximum_is_relaxed_only_by_explicit_policy() -> None:
     assert_schedule_invariants(relaxed.assignments)
     assert relaxed.metadata.lexicographicStages[0].id == "minimal-relaxation"
     assert (relaxed.metadata.lexicographicStages[0].value or 0) > 0
+
+
+def test_exact_lns_acceptance_uses_the_same_weighted_load_as_the_cp_sat_model() -> None:
+    context = build_model(snapshot(), allow_red=False)
+    assignments = [
+        Assignment(dateIso="2026-02-07", role="bd", staffId="a"),
+        Assignment(dateIso="2026-02-02", role="hg", staffId="b"),
+    ]
+    score = raw_score(context, assignments)
+    assert score[6] == 135
+    assert score[7] == 1
