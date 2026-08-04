@@ -11,9 +11,36 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
+  finalize-v9:
+    name: Einmalige v9-Finalisierung
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: agent/auto-plan-v9-cpsat
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13.7'
+      - name: Finalisierung anwenden
+        run: python .github/finalize_v9.py
+      - name: Endgültiges CI-Gate einsetzen
+        run: |
+          cp .github/final-ci.yml.template .github/workflows/ci.yml
+          rm -f .github/final-ci.yml.template
+      - name: Diff prüfen und pushen
+        run: |
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore(v9): finalize production integration [finalize-v9]"
+          git push origin HEAD:agent/auto-plan-v9-cpsat
+
   frontend:
     name: Frontend, Regeln und Browser
     runs-on: ubuntu-latest
