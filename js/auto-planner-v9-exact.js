@@ -275,6 +275,7 @@ export async function solveExactly({
   incumbent = null,
   allowRed = false,
   stopAtFirstFeasible = false,
+  stopAtFirstZeroRed = false,
   timeLimitMs = DEFAULT_TIME_MS,
   nodeLimit = DEFAULT_NODE_LIMIT,
   onProgress = null,
@@ -375,10 +376,13 @@ export async function solveExactly({
           exactSolutions: counters.solutions
         });
       }
-      if (stopAtFirstFeasible) {
+      const zeroRedTargetReached = stopAtFirstZeroRed && Number(objective.audit?.red || 0) === 0;
+      if (stopAtFirstFeasible || zeroRedTargetReached) {
         stopRequested = true;
         counters.completeSearch = false;
-        counters.stoppedBy = 'first-feasible';
+        counters.stoppedBy = zeroRedTargetReached && !stopAtFirstFeasible
+          ? 'first-zero-red'
+          : 'first-feasible';
       }
       return;
     }
@@ -435,9 +439,13 @@ export async function solveExactly({
     ? bestMonth ? V9_SOLVER_STATUSES.OPTIMAL : V9_SOLVER_STATUSES.INFEASIBLE
     : bestMonth ? V9_SOLVER_STATUSES.FEASIBLE : V9_SOLVER_STATUSES.UNKNOWN;
   const search = {
-    solver: 'native-js-constraint-bnb',
+    solver: 'native-js-constraint-dfs',
     solverStatus,
-    mode: stopAtFirstFeasible ? 'first-feasible' : 'lexicographic-optimize',
+    mode: stopAtFirstZeroRed
+      ? 'first-zero-red'
+      : stopAtFirstFeasible
+        ? 'first-feasible'
+        : 'lexicographic-optimize',
     allowRed,
     completeSearch: counters.completeSearch,
     stoppedBy: counters.stoppedBy,
