@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { openApp } from './open-app.js';
 
 const staff = [
   {
@@ -62,7 +63,7 @@ test('Anwendungsstart endet ohne JavaScript-Fehler und ohne endlosen Ladezustand
   const errors = [];
   page.on('pageerror', error => errors.push(error));
   await mockBootstrap(page);
-  await page.goto('/');
+  await openApp(page);
 
   await expect(page.locator('#planTableBody tr')).toHaveCount(new Date(2026, 8, 0).getDate(), { timeout: 20_000 });
   await expect(page.locator('#saveStatus')).not.toHaveText('Lädt …');
@@ -84,7 +85,7 @@ test('Theme-Schalter startet auch vor Toolbar-Reorganisation ohne NotFoundError'
     contentType: 'application/javascript',
     body: 'export {};'
   }));
-  await page.goto('/');
+  await openApp(page);
 
   await expect(page.locator('#planTableBody tr')).toHaveCount(new Date(2026, 8, 0).getDate(), { timeout: 20_000 });
   await expect(page.locator('#themeModeBtn')).toBeVisible();
