@@ -543,7 +543,7 @@
   overflow: hidden auto;
   padding: 6px 4px 6px 0;
   scrollbar-width: thin;
-  scroll-behavior: smooth;
+  scroll-behavior: auto;
 }
 .auto-plan-log-entry {
   display: grid;
