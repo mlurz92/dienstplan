@@ -275,16 +275,19 @@ function installResultPanel(dialog) {
 }
 
 function upgradeIdentity(dialog) {
-  dialog.dataset.algorithmRevision = '8.5';
+  // `data-algorithm-revision="8"` und `#autoPlanV8Ribbon` bleiben als stabile
+  // Integrations-Hooks bestehen. Die tatsächlich laufende Engine wird separat
+  // und sichtbar als 8.5 ausgewiesen.
+  dialog.dataset.algorithmRevision = '8';
+  dialog.dataset.engineRevision = '8.5';
   const ribbon = dialog.querySelector('#autoPlanV8Ribbon, #autoPlanV75Ribbon, #autoPlanV7Ribbon');
   if (ribbon) {
-    ribbon.id = 'autoPlanV85Ribbon';
     ribbon.classList.add('auto-plan-v85-ribbon');
     const title = ribbon.querySelector('b');
     const detail = ribbon.querySelector('small');
     const badge = ribbon.querySelector(':scope > strong');
-    if (title) title.textContent = 'Exhaustive Clean-Solution Observatory';
-    if (detail) detail.textContent = 'Vollständiges Portfolio · mehrstufige Null-Rot-Intensivierung · adaptive Reparatur · verpflichtende Perfektion und Zertifizierung';
+    if (title) title.textContent = 'Incremental Constraint Observatory · v8.5';
+    if (detail) detail.textContent = 'Exhaustive Clean-Solution: vollständiges Portfolio · mehrstufige Null-Rot-Intensivierung · adaptive Reparatur · verpflichtende Perfektion und Zertifizierung';
     if (badge) badge.textContent = 'ENGINE v8.5';
   }
   const engine = dialog.querySelector('.auto-plan-engine-badge span');
