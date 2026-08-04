@@ -27,7 +27,7 @@ export const AUTO_PLAN_STAGES = Object.freeze([
   Object.freeze({ id: 'rescue', title: 'Null-Rot-Intensivierung', detail: 'Strikte Eskalationswellen verbreitern Suchstrahl, Kandidatenfächer und Restbacktracking vor jedem Rot-Fallback.' }),
   Object.freeze({ id: 'repair', title: 'Iterative Tauschreparatur', detail: 'Einzelzüge, Paare, Dreierketten, Tagespakete und lokale Neuplanung beseitigen strukturelle Schwächen.' }),
   Object.freeze({ id: 'perfect', title: 'Adaptive ALNS-Perfektion', detail: 'Diversifizierte Ruin-and-Recreate-Stränge lernen geeignete Zerstörungs- und Reparaturoperatoren.' }),
-  Object.freeze({ id: 'exact', title: 'Exakte Branch-and-Bound-Suche', detail: 'Eine verlustfreie MRV-Tiefensuche prüft den globalen Suchraum bis zum Zeit- oder Knotenlimit.' }),
+  Object.freeze({ id: 'exact', title: 'Exakte Constraint-Tiefensuche', detail: 'Eine verlustfreie MRV-Tiefensuche prüft den globalen Suchraum bis zum Zeit- oder Knotenlimit.' }),
   Object.freeze({ id: 'certify', title: 'Unabhängiger Schlussaudit', detail: 'Regelengine, Laufgrenzen, Fixpunkte und Solverstatus werden vor der Vorschau vollständig und wahrheitsgetreu geprüft.' })
 ]);
 
@@ -96,6 +96,37 @@ function betterResult(candidate, incumbent, state, config) {
   if (!left) return incumbent;
   if (!right) return candidate;
   return compareObjectiveKeys(left.key, right.key) < 0 ? candidate : incumbent;
+}
+
+/**
+ * Die v8.5-Perfektion betrachtet ihren Incumbent zu Recht als eigenes
+ * Endergebnis und meldet deshalb intern `complete` oder `blocked`. Innerhalb der
+ * v9-Pipeline folgt danach jedoch noch die exakte Suche. Die Ereignisse werden
+ * daher in den reservierten Perfektionsbereich 55–80 % abgebildet und als
+ * nichtterminal markiert. So kann weder die sichtbare Prozentanzeige noch ihr
+ * ARIA-Wert von 96 % auf 82 % zurückspringen.
+ */
+export function mapHeuristicProgress(onProgress, { floor = .55, ceiling = .80 } = {}) {
+  if (typeof onProgress !== 'function') return undefined;
+  const lower = Math.max(0, Math.min(1, Number(floor) || 0));
+  const upper = Math.max(lower, Math.min(1, Number(ceiling) || lower));
+  let lastProgress = lower;
+  return update => {
+    const raw = Math.max(0, Math.min(1, Number(update?.progress) || 0));
+    const terminal = update?.phase === 'complete' || update?.phase === 'blocked';
+    const mapped = terminal ? upper : lower + raw * (upper - lower);
+    lastProgress = Math.max(lastProgress, Math.min(upper, mapped));
+    return onProgress({
+      ...update,
+      phase: terminal ? 'perfect' : update?.phase,
+      stage: terminal ? 'incumbent-ready' : update?.stage,
+      progress: lastProgress,
+      heuristicTerminal: terminal,
+      message: terminal
+        ? `v8.5-Incumbent abgeschlossen · exakte v9-Prüfung folgt`
+        : update?.message
+    });
+  };
 }
 
 function annotate(result, parameters, tuning, exact = null) {
@@ -172,7 +203,14 @@ export async function perfectAutoPlan(parameters) {
     allowRedFallback: tuning.forceStrict ? false : parameters.runConfig?.allowRedFallback,
     timeBudgetMs: tuning.heuristicTimeBudgetMs
   };
-  let incumbent = await V85.perfectAutoPlan({ ...parameters, runConfig: heuristicConfig });
+  const heuristicProgress = tuning.exactEnabled && Number(parameters.runConfig?.portfolioVariant || 0) === 0
+    ? mapHeuristicProgress(parameters.onProgress)
+    : parameters.onProgress;
+  let incumbent = await V85.perfectAutoPlan({
+    ...parameters,
+    runConfig: heuristicConfig,
+    onProgress: heuristicProgress
+  });
   incumbent = annotate(incumbent, { ...parameters, runConfig: heuristicConfig }, tuning);
 
   // Nur der erste Perfektionsstrang führt die exakte Suche aus. Weitere
