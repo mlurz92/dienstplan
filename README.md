@@ -6,8 +6,8 @@
 
 <p align="center"><strong>Regelgestützte Monatsplanung für Bereitschaftsdienst, Hintergrunddienst und neuroradiologische Rufbereitschaft</strong></p>
 
-> **Paketversion:** `0.9.0`  
-> **Regelwerk:** Eignungsregeln `v4.9`  
+> **Paketversion:** `0.9.1`  
+> **Regelwerk:** Eignungsregeln `v4.10`  
 > **Auto-Plan:** Algorithmus `v9` — *Hybrid Exact Observatory* (CP-SAT-Kern, Heuristik-Fallback)  
 > **Feiertagsregion:** Sachsen (`SN`)  
 > **Betrieb:** Cloudflare Pages · Pages Functions · Workers KV · lokale Browser-Sicherung
@@ -57,7 +57,14 @@ Die Dichte wird anhand der realen Containerbreite bestimmt, nicht anhand starrer
 
 ### 3.2 Hell-/Dunkelmodus
 
-Der Schalter wechselt direkt zwischen `light` und `dark`. Die Auswahl wird lokal gespeichert und vor Abschluss des Anwendungs-Bootstraps angewendet, damit kein Farbblitz entsteht.
+Der Schalter wechselt direkt zwischen `light` und `dark` und trägt ausschließlich das
+Sonnen- beziehungsweise Mondpiktogramm – ohne sichtbare Beschriftung. Die Anwendung
+startet standardmäßig im hellen Erscheinungsbild; eine ausdrücklich gespeicherte
+Auswahl bleibt erhalten. Die Auswahl wird lokal gespeichert und vor Abschluss des
+Anwendungs-Bootstraps angewendet, damit kein Farbblitz entsteht. Im Dunkelmodus
+werden die Farbtoken der gesamten Anwendung kohärent auf die dunkle Palette
+abgebildet – Tabellen, Badges, Picker, Dialoge, Einstellungen und Formulare
+besitzen damit durchgehend lesbare Kontraste.
 
 Die Monatskontrastfarbe bleibt in beiden Modi die Akzentquelle für:
 
@@ -326,7 +333,56 @@ tests/e2e/v8-5-shell.spec.js  Browser-, Bootstrap- und Observer-Regressionen
 
 ---
 
-## 11. Release 0.9.0
+## 11. Release 0.9.1
+
+### Regelwerk v4.10
+
+- **Neue Regel Fr-BD · Sa frei · So-BD:** Hat dieselbe Person am Freitag BD,
+  ist sie am Samstag vollständig frei (kein BD, kein HG, kein RBN) und trägt
+  am Sonntag erneut BD, sind beide BD-Zellen rot und **besonders
+  bestätigungspflichtig** (spezieller Bestätigungstyp mit begründendem
+  Kommentar). Die Prüfung erfolgt symmetrisch; graue Sperren bleiben absolut.
+
+### Personal
+
+- **Prof. Schäfer entfernt:** Der ausschließlich in der Abwesenheitsliste
+  geführte, in keiner Rolle setzbare Eintrag ist aus dem Standard-Personalstamm
+  entfernt. Gespeicherte Stände, Server-Bootstraps und Sicherungen werden beim
+  Einlesen bereinigt (`RETIRED_STAFF_IDS`); historische Monatseinträge bleiben
+  als externe Fixpunkte lesbar.
+
+### Einstellungsmenü
+
+- Der Auto-Plan-Reiter heißt jetzt **„Auto-Plan v9“** und bietet zusätzlich:
+  Solver-Backend, CP-SAT-Zeitbudget, CP-SAT-Worker, Warmstart, Fairness-Profil,
+  Infeasibility-Modus, Erklärungstiefe, Determinismus und
+  Reparatur-nach-Änderung – alle Werte fließen in die Laufkonfiguration.
+
+### Oberfläche und UX
+
+- **Sichtbare v9-Bezeichnungen überall:** Ribbon, Engine-Badge, Guardrail,
+  Phasentheater und Tooltips heben die Engine vollständig auf v9.
+- **Studio-Layout neu:** Die Konfiguration ist zweispaltig (Parameter links,
+  Obergrenzen rechts mit eigenem Scrollbereich); das Phasentheater zeigt alle
+  **acht** Stufen vollständig; das Modal passt ohne eigenen Scroll in den
+  Viewport; nur innere Bereiche scrollen.
+- **Dunkelmodus-Kohärenz:** Farbtoken werden global auf die dunkle Palette
+  abgebildet; Tabellen, Chips, Picker, Dialoge, Einstellungen, Formulare und
+  die Command Bar sind durchgehend kontraststark lesbar.
+- **Theme-Umschalter rein bildlich** (Sonne/Mond ohne Text).
+- **Beruhigte Animationen:** Kometen, Wellen, Funken, Drift und Phasenpuls
+  laufen langsamer und weicher; bei „Bewegung reduzieren“ werden sie
+  vollständig angehalten.
+- **Exakte Phasen sichtbar:** CP-SAT läuft auch in den Modul-Workern; die
+  Laufansicht durchläuft alle acht Phasen mit sichtbarem Pacing und meldet
+  Perfektionsbeweis beziehungsweise Zertifizierung.
+
+### BugHunt
+
+- 402 Modultests und 41 Browsertests grün; E2E-Verträge auf den v9-Stand
+  gehoben (Revision, Ribbon-Identität, Scroll-Vertrag des Studios).
+
+## 12. Release 0.9.0
 
 ### Neu
 

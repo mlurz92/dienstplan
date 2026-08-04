@@ -1,0 +1,212 @@
+/**
+ * DienstplanRAD v9 – globale Oberflächenkohärenz.
+ *
+ * Diese Datei wird von der Command-Bar-Schicht immer geladen und stellt drei
+ * Dinge sicher:
+ *
+ * 1. **Dunkelmodus-Kohärenz über alle Teile der Anwendung.** Die Legacy-Token
+ *    (--text, --muted, --panel, --surface, --border, --month-ink) werden im
+ *    Dunkelmodus auf die v8.5-Token abgebildet, damit Tabellen, Picker,
+ *    Dialoge, Einstellungen, Badges und Formulare dieselbe dunkle Fläche mit
+ *    lesbaren hellen Texten verwenden – statt einzelner heller Inseln.
+ * 2. **Theme-Umschalter als reines Piktogramm.** Der Schalter trägt nur das
+ *    Sonnen- bzw. Mondzeichen; eine Beschriftung wird unabhängig von der
+ *    Dichtestufe niemals eingeblendet.
+ * 3. **Ruhige, eindrucksvolle Animationen.** Die Suchstrahl-Glanzwelle, der
+ *    Phasenpuls und die Logzeilen laufen langsamer und weicher; bei
+ *    Systemvorgabe „Bewegung reduzieren“ werden sie vollständig angehalten.
+ */
+
+/* ------------------------------------------------- Theme-Umschalter (icon-only) */
+
+.toolbar .tool-action--theme .tool-label,
+.toolbar .tool-action--theme .tool-action__label {
+  display: none !important;
+}
+.toolbar .tool-action--theme {
+  min-inline-size: 38px;
+  inline-size: 38px;
+  padding-inline: 0;
+}
+
+/* ------------------------------------------------- Dunkelmodus: Token-Kohärenz */
+
+html[data-color-scheme="dark"] {
+  --text: var(--v85-text);
+  --muted: var(--v85-muted);
+  --panel: color-mix(in oklab, var(--v85-surface) 90%, black 10%);
+  --surface: color-mix(in oklab, var(--v85-surface-strong) 94%, black 6%);
+  --border: var(--v85-border);
+  --month-ink: var(--v85-text);
+  --ksg-text-black: var(--v85-text);
+  --ksg-secondary-text: var(--v85-muted);
+  --green: #6fd49a;
+  --yellow: #f0c75e;
+  --orange: #ffab6b;
+  --red: #ff9292;
+}
+
+/* Formularelemente überall auf dunkle Flächen heben. */
+html[data-color-scheme="dark"] select,
+html[data-color-scheme="dark"] input[type="number"],
+html[data-color-scheme="dark"] input[type="text"],
+html[data-color-scheme="dark"] input[type="search"],
+html[data-color-scheme="dark"] input[type="date"],
+html[data-color-scheme="dark"] textarea {
+  background: var(--v85-surface-strong);
+  color: var(--v85-text);
+  border-color: color-mix(in oklab, var(--v85-border) 72%, transparent);
+}
+html[data-color-scheme="dark"] select option { background: var(--v85-surface-strong); color: var(--v85-text); }
+
+/* Monatsauswahl, Status, Legenden. */
+html[data-color-scheme="dark"] .month-selector select { background: var(--v85-surface); color: var(--v85-text); }
+html[data-color-scheme="dark"] .status-wrap { color: var(--v85-muted); }
+html[data-color-scheme="dark"] .subline,
+html[data-color-scheme="dark"] .calendar-legend,
+html[data-color-scheme="dark"] .rule-legend,
+html[data-color-scheme="dark"] .section-note { color: var(--v85-muted); }
+
+/* Monatstabelle: Zellen und Datumsfelder. */
+html[data-color-scheme="dark"] .plan-table td.date-cell {
+  background: color-mix(in oklab, var(--v85-surface-strong) 96%, var(--month-accent) 4%);
+  color: var(--v85-text);
+}
+html[data-color-scheme="dark"] .plan-table td.weekday-cell {
+  background: color-mix(in oklab, var(--v85-surface) 92%, var(--month-accent) 8%);
+  color: var(--v85-text);
+}
+html[data-color-scheme="dark"] .plan-table tbody tr:hover td { filter: brightness(1.18); }
+html[data-color-scheme="dark"] .assignment-btn:hover,
+html[data-color-scheme="dark"] .cell-summary-button:hover {
+  background: rgba(255, 255, 255, .08);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .16);
+}
+html[data-color-scheme="dark"] .cell-summary-button { color: var(--v85-text); }
+html[data-color-scheme="dark"] .rbn-input { color: var(--v85-text); }
+html[data-color-scheme="dark"] .rbn-input:focus { background: var(--v85-surface-strong); }
+html[data-color-scheme="dark"] .rbn2-inactive-note { color: var(--v85-muted); }
+
+/* Badges und Chips: dunkle Tönungen mit hellen Texten. */
+html[data-color-scheme="dark"] .small-chip {
+  color: var(--v85-text);
+  border-color: color-mix(in oklab, var(--v85-border) 65%, transparent);
+  background: color-mix(in oklab, var(--v85-surface) 88%, white 12%);
+  box-shadow: none;
+}
+html[data-color-scheme="dark"] .small-chip.green { color: #8fe6b1; border-color: color-mix(in srgb, #6fd49a 55%, transparent); background: color-mix(in srgb, #1d3a2a 78%, transparent); }
+html[data-color-scheme="dark"] .small-chip.yellow { color: #ffd97a; border-color: color-mix(in srgb, #f0c75e 55%, transparent); background: color-mix(in srgb, #3d3312 78%, transparent); }
+html[data-color-scheme="dark"] .small-chip.orange { color: #ffb97e; border-color: color-mix(in srgb, #ffab6b 55%, transparent); background: color-mix(in srgb, #3d2410 78%, transparent); }
+html[data-color-scheme="dark"] .small-chip.red { color: #ffa4a4; border-color: color-mix(in srgb, #ff9292 55%, transparent); background: color-mix(in srgb, #3d1416 78%, transparent); }
+html[data-color-scheme="dark"] .small-chip.gray { color: #c6cfd8; border-color: color-mix(in srgb, #8fa0ae 55%, transparent); background: color-mix(in srgb, #232c35 78%, transparent); }
+
+/* Zusammenfassungs-Einträge und Abwesenheiten. */
+html[data-color-scheme="dark"] .summary-entry {
+  background: color-mix(in oklab, var(--v85-surface) 86%, white 14%);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--v85-border) 45%, transparent);
+}
+html[data-color-scheme="dark"] .absence-summary-detail { color: var(--v85-muted); }
+
+/* Verteilungs-/Statistiktabellen. */
+html[data-color-scheme="dark"] .distribution-table th,
+html[data-color-scheme="dark"] .distribution-table td {
+  background: color-mix(in oklab, var(--v85-surface) 92%, var(--month-accent) 8%);
+  border-color: color-mix(in oklab, var(--v85-border) 55%, transparent);
+}
+html[data-color-scheme="dark"] .distribution-table th {
+  background: linear-gradient(180deg, color-mix(in oklab, var(--v85-surface-muted) 90%, white 10%), color-mix(in oklab, var(--v85-surface) 85%, var(--month-accent) 15%));
+}
+html[data-color-scheme="dark"] .distribution-table .open-row,
+html[data-color-scheme="dark"] .distribution-table .open-row td { background: color-mix(in srgb, #7c2c33 55%, var(--v85-surface-strong)); }
+html[data-color-scheme="dark"] .excel-stats { color: var(--v85-text); }
+
+/* Picker und Tages-Detailmodals. */
+html[data-color-scheme="dark"] .picker-item { background: color-mix(in oklab, var(--v85-surface) 90%, var(--month-accent) 10%); color: var(--v85-text); }
+html[data-color-scheme="dark"] .picker-item:hover:not(:disabled) { background: color-mix(in oklab, var(--v85-surface-muted) 80%, var(--month-accent) 20%); }
+html[data-color-scheme="dark"] .picker-item.is-active:not(:disabled) { background: color-mix(in oklab, var(--month-accent) 24%, var(--v85-surface-strong)); }
+html[data-color-scheme="dark"] .picker-search input { background: var(--v85-surface-strong); color: var(--v85-text); }
+html[data-color-scheme="dark"] .picker-detail-reason { background: var(--v85-surface); border-color: color-mix(in oklab, var(--v85-border) 60%, transparent); }
+html[data-color-scheme="dark"] .picker-load.is-exceeded { background: color-mix(in srgb, #6b2326 55%, var(--v85-surface-strong)); color: #ffb3b3; }
+html[data-color-scheme="dark"] .picker-group-label { color: var(--v85-muted); }
+html[data-color-scheme="dark"] .picker-function,
+html[data-color-scheme="dark"] .picker-current,
+html[data-color-scheme="dark"] .picker-note,
+html[data-color-scheme="dark"] .picker-keys { color: var(--v85-muted); }
+html[data-color-scheme="dark"] .picker-current strong { color: var(--v85-text); }
+
+html[data-color-scheme="dark"] .day-meta-row {
+  background: color-mix(in oklab, var(--v85-surface) 88%, var(--month-accent) 12%);
+  border-color: color-mix(in oklab, var(--v85-border) 55%, transparent);
+  box-shadow: none;
+}
+html[data-color-scheme="dark"] .meta-chip { background: var(--v85-surface); border-color: color-mix(in oklab, var(--v85-border) 60%, transparent); color: var(--v85-muted); }
+html[data-color-scheme="dark"] .meta-chip.active { color: var(--v85-text); border-color: var(--month-accent); background: color-mix(in oklab, var(--month-accent) 22%, var(--v85-surface-strong)); }
+html[data-color-scheme="dark"] .batch-day {
+  background: color-mix(in oklab, var(--v85-surface) 88%, var(--month-accent) 12%);
+  border-color: color-mix(in oklab, var(--v85-border) 55%, transparent);
+}
+html[data-color-scheme="dark"] .batch-day.selected {
+  background: color-mix(in oklab, var(--month-accent) 22%, var(--v85-surface-strong));
+  border-color: var(--month-accent-strong);
+}
+
+/* Command-Bar-Aktionen und Überlaufmenü. */
+html[data-color-scheme="dark"] .toolbar .tool-action,
+html[data-color-scheme="dark"] .toolbar-overflow-panel .tool-action,
+html[data-color-scheme="dark"] .toolbar .file-btn.tool-action,
+html[data-color-scheme="dark"] .toolbar-overflow-panel .file-btn.tool-action {
+  color: var(--v85-text);
+  background: linear-gradient(180deg, color-mix(in oklab, var(--v85-surface-strong) 88%, white 12%), color-mix(in oklab, var(--v85-surface) 90%, var(--month-accent) 10%));
+  border-color: color-mix(in oklab, var(--v85-border) 60%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05), 0 1px 2px rgba(0, 0, 0, .35);
+}
+html[data-color-scheme="dark"] .toolbar .tool-action:hover,
+html[data-color-scheme="dark"] .toolbar-overflow-panel .tool-action:hover { background: color-mix(in oklab, var(--v85-surface-muted) 82%, var(--month-accent) 18%); }
+html[data-color-scheme="dark"] .toolbar .tool-action--quiet { color: var(--v85-muted); }
+html[data-color-scheme="dark"] .toolbar-section-label { color: var(--v85-muted); }
+
+/* Einstellungsdialog: Flächen auf die dunkle Palette. */
+html[data-color-scheme="dark"] .settings-section {
+  background: color-mix(in oklab, var(--v85-surface) 88%, var(--month-accent) 12%);
+  border-color: color-mix(in oklab, var(--v85-border) 55%, transparent);
+  box-shadow: none;
+}
+html[data-color-scheme="dark"] .settings-section--accent {
+  background: linear-gradient(145deg, color-mix(in oklab, var(--month-accent) 14%, var(--v85-surface)), color-mix(in oklab, var(--v85-surface) 92%, var(--month-accent) 8%));
+}
+html[data-color-scheme="dark"] .settings-grid > label {
+  background: color-mix(in oklab, var(--v85-surface-strong) 88%, var(--month-accent) 12%);
+  border: 1px solid color-mix(in oklab, var(--v85-border) 45%, transparent);
+}
+html[data-color-scheme="dark"] .settings-section-heading p,
+html[data-color-scheme="dark"] .settings-grid label small,
+html[data-color-scheme="dark"] .settings-number b,
+html[data-color-scheme="dark"] .settings-header p { color: var(--v85-muted); }
+html[data-color-scheme="dark"] .settings-status { color: #ffd08a; }
+
+/* --------------- Ruhige, eindrucksvolle Animationen --------------- */
+
+.auto-plan-v85-wave::after {
+  animation-duration: 2.6s;
+}
+.auto-plan-phase[data-state="active"] {
+  animation-duration: 2.4s;
+}
+.auto-plan-log-entry {
+  animation-duration: .5s;
+}
+.auto-plan-v85-theatre li {
+  transition-duration: .32s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auto-plan-v85-wave::after,
+  .auto-plan-phase[data-state="active"],
+  .auto-plan-log-entry,
+  .auto-plan-v85-theatre li,
+  .auto-plan-v85-ribbon:after,
+  .auto-plan-v85-constellation i {
+    animation: none !important;
+    transition: none !important;
+  }
+}

@@ -442,21 +442,27 @@ function updateV9RunStrip(dialog, update) {
 }
 
 /**
- * v8.5-Phasentheater auf die v9-Stufen heben.
+ * v8.5-Phasentheater auf die acht v9-Stufen heben.
+ *
+ * Das v8.5-Theater kannte nur sechs Stufen. v9 ersetzt die Karten vollständig
+ * durch den achtstufigen Phasenvertrag (analysis, model, exact, rescue,
+ * repair, perfect, audit, certify), damit keine Stufe abgeschnitten bleibt
+ * und die exakten Phasen sichtbar durchlaufen.
  */
 function upgradeTheatre(dialog) {
-  const theatre = dialog.querySelector('#autoPlanV85Theatre ol');
-  if (!theatre) return;
-  const items = theatre.querySelectorAll('li');
-  AUTO_PLAN_STAGES.forEach((stage, index) => {
-    const item = items[index];
-    if (!item) return;
-    item.dataset.stage = stage.id;
-    const title = item.querySelector('b');
-    const detail = item.querySelector('small');
-    if (title) title.textContent = stage.title;
-    if (detail) detail.textContent = stage.detail;
-  });
+  const theatre = dialog.querySelector('#autoPlanV85Theatre');
+  const ol = theatre?.querySelector('ol');
+  if (ol) {
+    ol.innerHTML = AUTO_PLAN_STAGES.map((stage, index) =>
+      `<li data-index="${index}" data-stage="${stage.id}"><i></i><div><b>${stage.title}</b><small>${stage.detail}</small></div><span>offen</span></li>`).join('');
+  }
+  // Die Stufenliste im Kopfband (Ribbon) stammt aus der v8-Ära und trägt noch
+  // die alten Stufentitel. Sie wird auf denselben achtstufigen Vertrag gehoben.
+  const ribbonStages = dialog.querySelector('#autoPlanV8Ribbon .auto-plan-v8-stages');
+  if (ribbonStages) {
+    ribbonStages.innerHTML = AUTO_PLAN_STAGES.map(stage =>
+      `<li data-stage="${stage.id}"><b>${stage.title}</b><small>${stage.detail}</small></li>`).join('');
+  }
 }
 
 function upgradeIdentity(dialog) {

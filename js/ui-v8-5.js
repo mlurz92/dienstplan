@@ -4,7 +4,7 @@ import { installRichTooltips, setRichTooltip } from './rich-tooltip-v8-5.js?v=20
 import { state } from './state.js?v=20260803.4';
 
 const RELEASE = '20260803.4';
-const STYLESHEETS = Object.freeze(['/app-v8-5.css', '/toolbar-v8-5.css']);
+const STYLESHEETS = Object.freeze(['/app-v8-5.css', '/toolbar-v8-5.css', '/app-v9.css']);
 const NAV_ICONS = Object.freeze({
   prevMonthBtn: '<svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg>',
   nextMonthBtn: '<svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>'
@@ -21,7 +21,7 @@ const ACTION_COPY = Object.freeze({
   exportPdfBtn: ['PDF', 'Die druckoptimierte Monatsansicht öffnen und als PDF ausgeben.'],
   exportJsonBtn: ['Sichern', 'Eine vollständige, wieder einlesbare JSON-Sicherung aller Plandaten erstellen.'],
   settingsBtn: ['Einstellungen', 'Darstellung, Arbeitsweise und Auto-Plan-Voreinstellungen öffnen.'],
-  autoPlanBtn: ['Auto-Plan', 'Auto-Plan Studio v8.5 öffnen, Null-Rot-Suche parametrieren und den vollständigen Monatsvorschlag prüfen.']
+  autoPlanBtn: ['Auto-Plan', 'Auto-Plan Studio v9 öffnen, die hybride exakte Suche (CP-SAT) parametrieren und den vollständigen Monatsvorschlag prüfen.']
 });
 
 let lateControlsObserver = null;

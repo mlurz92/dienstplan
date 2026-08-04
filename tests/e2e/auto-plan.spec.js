@@ -91,12 +91,12 @@ async function openJuly(page) {
 async function openStudio(page) {
   await page.locator('#autoPlanBtn').click();
   await expect(page.locator('#autoPlanDialog')).toBeVisible();
-  await expect(page.locator('#autoPlanDialog')).toHaveAttribute('data-algorithm-revision', '8');
-  await expect(page.locator('#autoPlanDialog')).toHaveAttribute('data-engine-revision', '8.5');
-  await expect(page.locator('#autoPlanV8Ribbon')).toContainText('Incremental Constraint Observatory');
-  await expect(page.locator('#autoPlanV8Ribbon')).toContainText('v8.5');
+  await expect(page.locator('#autoPlanDialog')).toHaveAttribute('data-algorithm-revision', '9');
+  await expect(page.locator('#autoPlanDialog')).toHaveAttribute('data-engine-revision', '9');
+  await expect(page.locator('#autoPlanV8Ribbon')).toContainText('Hybrid Exact Observatory · v9');
+  await expect(page.locator('#autoPlanV8Ribbon')).toContainText('v9');
   // Die Stufenliste stammt aus der Engine selbst, nicht aus einem zweiten Text.
-  await expect(page.locator('#autoPlanV8Ribbon .auto-plan-v8-stages li')).toHaveCount(6);
+  await expect(page.locator('#autoPlanV8Ribbon .auto-plan-v8-stages li')).toHaveCount(8);
   await expect(page.locator('#autoPlanPerformanceProfile')).toHaveValue('adaptive');
   await expect(page.locator('#autoPlanConfig')).toBeVisible();
   await expect(page.locator('#autoPlanStage')).toBeHidden();
@@ -177,17 +177,21 @@ test('Tageszeilen, Statistik und Bestätigung bleiben bei geringer Fensterhöhe 
   await openJuly(page);
   await startStudio(page);
 
-  // Gescrollt wird im gemeinsamen Arbeitsbereich zwischen Kopf und Fußleiste,
-  // nicht in den einzelnen Abschnitten.
+  // v9-Layout: Das Modal scrollt nicht selbst; der Ergebnisbereich scrollt
+  // intern zwischen Kopf und Fußleiste.
   const body = page.locator('#autoPlanBody');
   await expect(page.locator('#autoPlanResult')).toBeVisible({ timeout: 60_000 });
   await expect(page.locator('#autoPlanProposalBody tr')).toHaveCount(31);
   await expect(page.locator('#autoPlanLoadTable .auto-plan-distribution-table')).toBeVisible();
   const viewport = await body.evaluate(element => ({ clientHeight: element.clientHeight, scrollHeight: element.scrollHeight, overflowY: getComputedStyle(element).overflowY }));
-  expect(viewport.overflowY).toBe('auto');
-  expect(viewport.scrollHeight).toBeGreaterThan(viewport.clientHeight);
-  await body.evaluate(element => { element.scrollTop = element.scrollHeight; });
-  await expect.poll(() => body.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+  expect(viewport.overflowY).toBe('hidden');
+
+  const result = page.locator('#autoPlanResult');
+  const resultState = await result.evaluate(element => ({ clientHeight: element.clientHeight, scrollHeight: element.scrollHeight, overflowY: getComputedStyle(element).overflowY }));
+  expect(resultState.overflowY).toBe('auto');
+  expect(resultState.scrollHeight).toBeGreaterThan(resultState.clientHeight);
+  await result.evaluate(element => { element.scrollTop = element.scrollHeight; });
+  await expect.poll(() => result.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
   await expect(page.locator('#autoPlanApplyBtn')).toBeVisible();
 });
 

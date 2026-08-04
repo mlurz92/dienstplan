@@ -116,16 +116,25 @@ test('Auto-Plan präsentiert BD und HG jedes Tages gemeinsam wie die Diensttabel
   await expect(page.locator('#autoPlanRunConfig')).toContainText('Reparaturrunden: 4');
   await expect(page.locator('#autoPlanLoadTable .auto-plan-distribution-table')).toBeVisible();
 
+  // v9-Layout: Das Modal scrollt nicht selbst; nur innere Bereiche scrollen.
   const body = page.locator('#autoPlanBody');
-  const scrollState = await body.evaluate(element => ({
+  const bodyState = await body.evaluate(element => ({
     scrollHeight: element.scrollHeight,
     clientHeight: element.clientHeight,
     overflowY: getComputedStyle(element).overflowY
   }));
-  expect(scrollState.overflowY).toBe('auto');
-  expect(scrollState.scrollHeight).toBeGreaterThan(scrollState.clientHeight);
-  await body.evaluate(element => { element.scrollTop = element.scrollHeight; });
-  await expect.poll(() => body.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+  expect(bodyState.overflowY).toBe('hidden');
+
+  const result = page.locator('#autoPlanResult');
+  const resultState = await result.evaluate(element => ({
+    scrollHeight: element.scrollHeight,
+    clientHeight: element.clientHeight,
+    overflowY: getComputedStyle(element).overflowY
+  }));
+  expect(resultState.overflowY).toBe('auto');
+  expect(resultState.scrollHeight).toBeGreaterThan(resultState.clientHeight);
+  await result.evaluate(element => { element.scrollTop = element.scrollHeight; });
+  await expect.poll(() => result.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
   await expect(page.locator('#autoPlanConfirmNote')).toBeInViewport();
 
   const sticky = await table.locator('thead th').first().evaluate(element => getComputedStyle(element).position);

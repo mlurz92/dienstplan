@@ -63,9 +63,81 @@ function withWeekdayHgBeforeBdConflict(evaluation) {
  * Wochenendkopplungen. Bereits nicht wählbare Bewertungen werden niemals durch
  * diese Policy wieder freigeschaltet oder in eine bestätigbare Auswahl verwandelt.
  */
+
+const GAP_REASON = 'Fr-BD · Sa frei · So-BD (Wochenend-BD mit freiem Samstag)';
+const GAP_LEGACY_REASONS = new Set([
+  'Fr-BD · Sa frei · So-BD',
+  'BD am Freitag mit freiem Samstag vor BD am Sonntag',
+  'Wochenend-BD mit freiem Samstag (Fr-BD, Sa frei, So-BD)',
+  `${GAP_REASON}: rote Wochenendkette mit freiem Samstag.`
+]);
+
+function isStaffFreeOn(state, dateIso, staffId) {
+  return ['bd', 'hg', 'rbn1', 'rbn2'].every(role => getAssignment(state, dateIso, role) !== staffId);
+}
+
+/**
+ * Fr-BD · Sa frei · So-BD: Hat eine Person am Freitag BD, ist sie am Samstag
+ * vollständig frei (kein BD, kein HG, kein RBN, keine zweite RBN) und trägt
+ * am Sonntag erneut BD, ist diese Wochenendkette mit freiem Samstag rot und
+ * besonders bestätigungspflichtig. Die Prüfung erfolgt symmetrisch bei Auswahl
+ * des Freitags- und des Sonntags-BD, damit die Farbe nicht von der
+ * Eingabereihenfolge abhängt.
+ */
+function weekendGapBdConflict({ state, dateIso, role, staffId }) {
+  if (role !== 'bd') return false;
+  const date = parseIso(dateIso);
+  const weekday = date.getDay();
+  if (weekday === 5) {
+    const saturday = toLocalIso(addDays(date, 1));
+    const sunday = toLocalIso(addDays(date, 2));
+    if (getAssignment(state, sunday, 'bd') !== staffId) return false;
+    return isStaffFreeOn(state, saturday, staffId);
+  }
+  if (weekday === 0) {
+    const saturday = toLocalIso(addDays(date, -1));
+    const friday = toLocalIso(addDays(date, -2));
+    if (getAssignment(state, friday, 'bd') !== staffId) return false;
+    return isStaffFreeOn(state, saturday, staffId);
+  }
+  return false;
+}
+
+function withWeekendGapConflict(evaluation) {
+  if (!evaluation || evaluation.canSelect === false) return evaluation;
+  if (evaluation.meta?.weekendGap) return evaluation;
+  const reasonDetails = (Array.isArray(evaluation.reasonDetails) ? evaluation.reasonDetails : [])
+    .filter(item => !GAP_LEGACY_REASONS.has(item?.text));
+  reasonDetails.unshift({
+    text: `${GAP_REASON}: rote Wochenendkette, speziell bestätigungspflichtig`,
+    kind: 'conflict',
+    level: 'red',
+    lane: null,
+    selection: 'special'
+  });
+  const priorType = evaluation.meta?.confirmationType;
+  return {
+    ...evaluation,
+    level: 'red',
+    canSelect: true,
+    reasons: reasonDetails.map(item => item.text).filter(Boolean),
+    reasonDetails,
+    meta: {
+      ...(evaluation.meta || {}),
+      confirmationType: 'special',
+      selectionPolicy: 'special',
+      weekendGap: true,
+      priorConfirmationType: priorType || null
+    }
+  };
+}
+
 export function evaluateCandidate(parameters) {
   const evaluation = evaluateCandidateBase(parameters);
-  return weekdayHgBeforeBdConflict(parameters)
+  const withWeekday = weekdayHgBeforeBdConflict(parameters)
     ? withWeekdayHgBeforeBdConflict(evaluation)
     : evaluation;
+  return weekendGapBdConflict(parameters)
+    ? withWeekendGapConflict(withWeekday)
+    : withWeekday;
 }

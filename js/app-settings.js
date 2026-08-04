@@ -48,7 +48,7 @@ function dialogMarkup() {
       <nav class="settings-tabs" role="tablist" aria-label="Einstellungsbereiche">
         <button type="button" role="tab" id="settingsTabAppearance" aria-controls="settingsPanelAppearance" aria-selected="true" data-settings-tab="appearance">Darstellung</button>
         <button type="button" role="tab" id="settingsTabWorkflow" aria-controls="settingsPanelWorkflow" aria-selected="false" tabindex="-1" data-settings-tab="workflow">Arbeitsweise</button>
-        <button type="button" role="tab" id="settingsTabAutoPlan" aria-controls="settingsPanelAutoPlan" aria-selected="false" tabindex="-1" data-settings-tab="autoplan">Auto-Plan v8</button>
+        <button type="button" role="tab" id="settingsTabAutoPlan" aria-controls="settingsPanelAutoPlan" aria-selected="false" tabindex="-1" data-settings-tab="autoplan">Auto-Plan v9</button>
       </nav>
 
       <div class="settings-body">
@@ -97,8 +97,8 @@ function dialogMarkup() {
 
         <section class="settings-section settings-section--accent" role="tabpanel" id="settingsPanelAutoPlan" aria-labelledby="settingsTabAutoPlan" data-settings-panel="autoplan" hidden>
           <div class="settings-section-heading">
-            <span class="settings-section-icon" aria-hidden="true">v8</span>
-            <div><h3>Auto-Plan Engine</h3><p>Sichere Voreinstellungen für neue Läufe; im Studio bleibt jeder Wert pro Lauf änderbar.</p></div>
+            <span class="settings-section-icon" aria-hidden="true">v9</span>
+            <div><h3>Auto-Plan Engine v9</h3><p>Sichere Voreinstellungen für neue Läufe; im Studio bleibt jeder Wert pro Lauf änderbar.</p></div>
           </div>
           <div class="settings-grid settings-grid--three">
             <label><span>Leistungsprofil</span><small>Steuert das geräteabhängige Worker-Budget und die für die Oberfläche reservierten Kerne.</small>
@@ -127,6 +127,56 @@ function dialogMarkup() {
             ${toggle('settingsPerfection', 'Perfektionsphase', 'Ruin-and-Recreate, absteigende Nachbarschaften und Optimalitätsnachweis ausführen.')}
             ${toggle('settingsPortfolioDiversity', 'Portfolio-Diversität', 'Die parallelen Perfektionsläufe unterscheiden sich zusätzlich in Late-Acceptance-Fenster und Abstiegsfrequenz, nicht nur im Startwert.')}
             ${toggle('settingsAllowRed', 'Minimal-Rot-Fallback erlauben', 'Erst nach erfolgloser strikter Suche und ausgeschöpfter Null-Rot-Rescue.')}
+          </div>
+
+          <div class="settings-section-heading" style="margin-top:20px">
+            <span class="settings-section-icon" aria-hidden="true">≈</span>
+            <div><h3>Exakte Suche (v9)</h3><p>CP-SAT löst den Monat im Browser; ohne verfügbares WebAssembly übernimmt die Heuristik vollständig.</p></div>
+          </div>
+          <div class="settings-grid settings-grid--three">
+            <label><span>Solver-Backend</span><small>Automatisch versucht CP-SAT und fällt bei Nichtverfügbarkeit auf die Heuristik zurück.</small>
+              <select id="settingsSolverBackend">
+                <option value="auto">Automatisch · empfohlen</option>
+                <option value="cp-sat-exact">CP-SAT exakt</option>
+                <option value="cp-sat-lns">CP-SAT + LNS</option>
+                <option value="heuristic-alns">Heuristik v8.5</option>
+              </select>
+            </label>
+            <label><span>CP-SAT-Zeitbudget</span><small>1 bis 60 Sekunden für die lexikografischen Phasen; bei 62 Feldern ist OPTIMAL meist in unter einer Sekunde erreicht.</small>
+              <span class="settings-number"><input id="settingsCpSatBudget" type="number" min="1" max="60" step="1"><b>s</b></span>
+            </label>
+            <label><span>CP-SAT-Worker</span><small>Parallele Such-Threads; benötigt Cross-Origin-Isolation (COOP/COEP) und freie Kerne.</small>
+              <select id="settingsCpSatWorkers"><option value="">Automatisch</option>${Array.from({ length: 8 }, (_, index) => `<option value="${index + 1}">${index + 1}</option>`).join('')}</select>
+            </label>
+            <label><span>Warmstart</span><small>Die Heuristik-Startbelegung prunt die exakte Suche als Lösungshinweis.</small>
+              <select id="settingsCpSatWarmStart"><option value="heuristic">Heuristik-Hinweis</option><option value="none">Ohne Hinweis</option></select>
+            </label>
+            <label><span>Fairness-Profil</span><small>Leximin maximiert zuerst die am schwächsten gestellte Person – das robusteste Maß gegen Ausreißer.</small>
+              <select id="settingsFairnessProfile">
+                <option value="leximin">Leximin (Maximin zuerst)</option>
+                <option value="spread">Spannweite</option>
+                <option value="variance">Varianz</option>
+                <option value="owa">OWA</option>
+              </select>
+            </label>
+            <label><span>Bei Unzulässigkeit</span><small>Ursachenanalyse benennt die kleinste Konfliktgruppe; Relaxierung weicht Gruppen schrittweise auf.</small>
+              <select id="settingsInfeasibilityMode">
+                <option value="mus">Ursachenanalyse</option>
+                <option value="relax">Ursachen + Relaxierung</option>
+                <option value="report">Nur melden</option>
+              </select>
+            </label>
+            <label><span>Erklärungstiefe</span><small>Kurz, ausführlich mit Regel-Kennungen oder optional LLM-gestützt.</small>
+              <select id="settingsExplanationDepth">
+                <option value="short">Kurz</option>
+                <option value="detailed">Ausführlich · empfohlen</option>
+                <option value="llm">LLM-gestützt</option>
+              </select>
+            </label>
+          </div>
+          <div class="settings-grid">
+            ${toggle('settingsDeterministic', 'Deterministische Läufe', 'Alle Zufallsströme leiten sich aus Konfiguration und Monatszustand ab; identische Eingaben ergeben identische Pläne.')}
+            ${toggle('settingsRepairOnEdit', 'Reparatur nach Änderung', 'Nach manuellen Änderungen beim nächsten Lauf nur den betroffenen Bereich exakt neu lösen.')}
           </div>
         </section>
       </div>
@@ -178,6 +228,15 @@ function populate(settings) {
   byId('settingsPerfection').checked = normalized.autoPlan.perfectionEnabled;
   byId('settingsPortfolioDiversity').checked = normalized.autoPlan.portfolioDiversity;
   byId('settingsAllowRed').checked = normalized.autoPlan.allowRedFallback;
+  byId('settingsSolverBackend').value = normalized.autoPlan.solverBackend;
+  byId('settingsCpSatBudget').value = String(normalized.autoPlan.cpSatTimeBudgetSeconds);
+  byId('settingsCpSatWorkers').value = normalized.autoPlan.cpSatWorkers ?? '';
+  byId('settingsCpSatWarmStart').value = normalized.autoPlan.cpSatWarmStart;
+  byId('settingsFairnessProfile').value = normalized.autoPlan.fairnessProfile;
+  byId('settingsInfeasibilityMode').value = normalized.autoPlan.infeasibilityMode;
+  byId('settingsExplanationDepth').value = normalized.autoPlan.explanationDepth;
+  byId('settingsDeterministic').checked = normalized.autoPlan.deterministic;
+  byId('settingsRepairOnEdit').checked = normalized.autoPlan.repairOnEdit;
   byId('settingsStatus').textContent = '';
 }
 
@@ -207,7 +266,16 @@ function readForm() {
       certificationRounds: Number(byId('settingsCertificationRounds').value),
       perfectionEnabled: byId('settingsPerfection').checked,
       portfolioDiversity: byId('settingsPortfolioDiversity').checked,
-      allowRedFallback: byId('settingsAllowRed').checked
+      allowRedFallback: byId('settingsAllowRed').checked,
+      solverBackend: byId('settingsSolverBackend').value,
+      cpSatTimeBudgetSeconds: Number(byId('settingsCpSatBudget').value),
+      cpSatWorkers: valueOrNull(byId('settingsCpSatWorkers').value),
+      cpSatWarmStart: byId('settingsCpSatWarmStart').value,
+      fairnessProfile: byId('settingsFairnessProfile').value,
+      infeasibilityMode: byId('settingsInfeasibilityMode').value,
+      explanationDepth: byId('settingsExplanationDepth').value,
+      deterministic: byId('settingsDeterministic').checked,
+      repairOnEdit: byId('settingsRepairOnEdit').checked
     }
   }, { strict: true });
 }
