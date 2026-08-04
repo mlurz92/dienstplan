@@ -46,7 +46,7 @@ function installAutoPlanV9LayoutGuards() {
         align-items: stretch;
       }
 
-      .auto-plan-dialog[data-engine-revision="9"].is-running .auto-plan-console {
+      .auto-plan-dialog[data-v9-engine-revision="9"].is-running .auto-plan-console {
         min-block-size: 0;
         max-block-size: 100%;
         grid-template-rows: auto auto auto clamp(112px, 20dvh, 168px) auto;
