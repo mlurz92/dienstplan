@@ -55,7 +55,9 @@ function enrichedRunConfig(parameters) {
   const localFloor = tuning.repairAggressiveness === 'exhaustive' ? 9000 : tuning.repairAggressiveness === 'intensive' ? 6000 : 3200;
   return {
     ...source,
-    perfectionEnabled: true,
+    // Das Studio hält diesen Wert unveränderlich auf true. Explizite verkürzte
+    // Test-/API-Verträge dürfen ihre bewusste Abschaltung weiter verwenden.
+    perfectionEnabled: source.perfectionEnabled !== false,
     certificationRounds: Math.max(2, clamp(source.certificationRounds, 1, 8, 4)),
     repairIterations: Math.max(repairFloor, clamp(source.repairIterations, 0, 30, repairFloor)),
     localRebuildBudget: Math.max(localFloor, clamp(source.localRebuildBudget, 200, 12000, localFloor)),
@@ -118,10 +120,11 @@ function annotate(result, telemetry) {
   result.algorithmRevision = AUTO_PLAN_REVISION;
   result.metrics ||= {};
   result.metrics.engine = AUTO_PLAN_ENGINE_ID;
+  const perfectionEnabled = result.optimizerConfig?.perfectionEnabled !== false;
   result.metrics.phaseContract = {
     mandatory: AUTO_PLAN_STAGES.map(stage => stage.id),
-    perfectionEnabled: true,
-    certificationEnabled: true
+    perfectionEnabled,
+    certificationEnabled: perfectionEnabled
   };
   if (telemetry) result.metrics.strictEscalation = telemetry;
   return result;
