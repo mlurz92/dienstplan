@@ -103,6 +103,77 @@ test('v9-Studio bleibt vollständig im Viewport und schneidet Phasentheater nich
   expect(geometry.bodyScrollHeight).toBeGreaterThanOrEqual(geometry.bodyClientHeight);
 });
 
+test('Algorithmus-Kommentar bleibt höhenstabil und scrollt intern statt das Modal zu vergrößern', async ({ page }) => {
+  await page.setViewportSize({ width: 900, height: 620 });
+  const dialog = await openStudio(page);
+
+  const geometry = await dialog.evaluate(element => {
+    element.classList.remove('is-configuring', 'show-result');
+    element.classList.add('is-running');
+    const config = element.querySelector('#autoPlanConfig');
+    const stage = element.querySelector('#autoPlanStage');
+    const result = element.querySelector('#autoPlanResult');
+    const stream = element.querySelector('#autoPlanLog');
+    if (config) config.hidden = true;
+    if (result) result.hidden = true;
+    if (stage) stage.hidden = false;
+    if (!stream) throw new Error('Algorithmus-Kommentar fehlt');
+
+    const append = index => {
+      const entry = document.createElement('div');
+      entry.className = 'auto-plan-log-entry';
+      entry.innerHTML = `<time>00:${String(index).padStart(2, '0')}</time><i></i><span>Suchmeldung ${index}: Kandidaten und Regelgründe werden vollständig ausgewertet.</span>`;
+      stream.append(entry);
+    };
+
+    stream.replaceChildren();
+    append(1);
+    const heightWithOneEntry = stream.clientHeight;
+    for (let index = 2; index <= 120; index += 1) append(index);
+    stream.scrollTop = stream.scrollHeight;
+
+    const body = element.querySelector('#autoPlanBody');
+    const consoleElement = element.querySelector('.auto-plan-console');
+    const metrics = element.querySelector('.auto-plan-live-metrics');
+    const footer = element.querySelector('.auto-plan-footer');
+    const bodyBox = body?.getBoundingClientRect();
+    const stageBox = stage?.getBoundingClientRect();
+    const consoleBox = consoleElement?.getBoundingClientRect();
+    const metricsBox = metrics?.getBoundingClientRect();
+    const footerBox = footer?.getBoundingClientRect();
+
+    return {
+      bodyOverflow: body ? getComputedStyle(body).overflowY : '',
+      bodyClientHeight: body?.clientHeight || 0,
+      bodyScrollHeight: body?.scrollHeight || 0,
+      heightWithOneEntry,
+      heightWithManyEntries: stream.clientHeight,
+      logOverflow: getComputedStyle(stream).overflowY,
+      logClientHeight: stream.clientHeight,
+      logScrollHeight: stream.scrollHeight,
+      logScrollTop: stream.scrollTop,
+      bodyBottom: bodyBox?.bottom || 0,
+      stageBottom: stageBox?.bottom || 0,
+      consoleBottom: consoleBox?.bottom || 0,
+      metricsBottom: metricsBox?.bottom || 0,
+      footerBottom: footerBox?.bottom || 0,
+      viewportHeight: innerHeight
+    };
+  });
+
+  await expect(page.locator('#autoPlanStage')).toBeVisible();
+  expect(geometry.bodyOverflow).toBe('hidden');
+  expect(geometry.bodyScrollHeight).toBeLessThanOrEqual(geometry.bodyClientHeight + 2);
+  expect(Math.abs(geometry.heightWithManyEntries - geometry.heightWithOneEntry)).toBeLessThanOrEqual(1);
+  expect(geometry.logOverflow).toBe('auto');
+  expect(geometry.logScrollHeight).toBeGreaterThan(geometry.logClientHeight);
+  expect(geometry.logScrollTop).toBeGreaterThan(0);
+  expect(geometry.stageBottom).toBeLessThanOrEqual(geometry.bodyBottom + 1);
+  expect(geometry.consoleBottom).toBeLessThanOrEqual(geometry.bodyBottom + 1);
+  expect(geometry.metricsBottom).toBeLessThanOrEqual(geometry.bodyBottom + 1);
+  expect(geometry.footerBottom).toBeLessThanOrEqual(geometry.viewportHeight + 1);
+});
+
 test('v9 erklärt alle sichtbaren Studiofelder per tastaturfähigem Rich Tooltip', async ({ page }) => {
   await openStudio(page);
   const mode = page.locator('#autoPlanV9SolverMode');
