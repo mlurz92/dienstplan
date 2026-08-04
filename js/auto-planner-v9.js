@@ -43,6 +43,10 @@ function bridgedPreferences(source) {
   return match ? { solverMode: match[1], proofTarget: match[2] } : {};
 }
 
+function hasFiniteValue(value) {
+  return value !== undefined && value !== null && value !== '' && Number.isFinite(Number(value));
+}
+
 export function deriveV9Tuning(source = {}) {
   const bridged = bridgedPreferences(source);
   // Direkte/ältere API-Aufrufe ohne expliziten v9-Vertrag behalten das schnelle
@@ -50,6 +54,7 @@ export function deriveV9Tuning(source = {}) {
   // standardmäßigen Hybridvertrag in `performanceProfile`.
   const solverMode = MODES.has(source.solverMode) ? source.solverMode : bridged.solverMode || 'fast';
   const proofTarget = TARGETS.has(source.proofTarget) ? source.proofTarget : bridged.proofTarget || 'best-within-budget';
+  const hasExplicitTimeBudget = hasFiniteValue(source.timeBudgetMs);
   const totalBudgetMs = clamp(source.timeBudgetMs, 10_000, 900_000, 120_000);
   const exactShare = solverMode === 'fast' ? 0
     : solverMode === 'exact' ? .68
@@ -73,6 +78,7 @@ export function deriveV9Tuning(source = {}) {
     exactTimeBudgetMs,
     exactNodeLimit,
     exactEnabled: exactShare > 0,
+    hasExplicitTimeBudget,
     stopAtFirstFeasible: proofTarget === 'first-feasible',
     forceStrict: solverMode === 'diagnose'
   };
@@ -83,6 +89,20 @@ function settingsOf(parameters) {
     ...(parameters?.state?.settings?.autoPlan || {}),
     ...(parameters?.runConfig || {})
   };
+}
+
+function heuristicConfigFor(parameters, tuning) {
+  const config = {
+    ...(parameters.runConfig || {}),
+    allowRedFallback: tuning.forceStrict ? false : parameters.runConfig?.allowRedFallback
+  };
+  // Die bloße Existenz der v9-Schicht darf den deterministischen
+  // Konvergenzmodus älterer direkter API-Aufrufe nicht in einen zeitabhängigen
+  // Budgetmodus verwandeln. Nur ein ausdrücklich geliefertes Budget oder ein
+  // tatsächlich aktiver exakter v9-Lauf teilt den Zeitrahmen auf.
+  if (tuning.exactEnabled || tuning.hasExplicitTimeBudget) config.timeBudgetMs = tuning.heuristicTimeBudgetMs;
+  else delete config.timeBudgetMs;
+  return config;
 }
 
 function objectiveFor(result, state, config) {
@@ -144,8 +164,8 @@ function annotate(result, parameters, tuning, exact = null) {
   result.metrics.solverMode = tuning.solverMode;
   result.metrics.proofTarget = tuning.proofTarget;
   result.metrics.v9Budget = {
-    totalMs: tuning.totalBudgetMs,
-    heuristicMs: tuning.heuristicTimeBudgetMs,
+    totalMs: tuning.exactEnabled || tuning.hasExplicitTimeBudget ? tuning.totalBudgetMs : null,
+    heuristicMs: tuning.exactEnabled || tuning.hasExplicitTimeBudget ? tuning.heuristicTimeBudgetMs : null,
     exactMs: tuning.exactTimeBudgetMs,
     exactNodeLimit: tuning.exactNodeLimit
   };
@@ -190,22 +210,14 @@ function annotate(result, parameters, tuning, exact = null) {
 
 export async function constructAutoPlan(parameters) {
   const tuning = deriveV9Tuning(settingsOf(parameters));
-  const runConfig = {
-    ...(parameters.runConfig || {}),
-    allowRedFallback: tuning.forceStrict ? false : parameters.runConfig?.allowRedFallback,
-    timeBudgetMs: tuning.heuristicTimeBudgetMs
-  };
+  const runConfig = heuristicConfigFor(parameters, tuning);
   const result = await V85.constructAutoPlan({ ...parameters, runConfig });
   return annotate(result, { ...parameters, runConfig }, tuning);
 }
 
 export async function perfectAutoPlan(parameters) {
   const tuning = deriveV9Tuning(settingsOf(parameters));
-  const heuristicConfig = {
-    ...(parameters.runConfig || {}),
-    allowRedFallback: tuning.forceStrict ? false : parameters.runConfig?.allowRedFallback,
-    timeBudgetMs: tuning.heuristicTimeBudgetMs
-  };
+  const heuristicConfig = heuristicConfigFor(parameters, tuning);
   const heuristicProgress = tuning.exactEnabled && Number(parameters.runConfig?.portfolioVariant || 0) === 0
     ? mapHeuristicProgress(parameters.onProgress)
     : parameters.onProgress;
