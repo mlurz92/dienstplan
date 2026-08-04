@@ -88,7 +88,7 @@ test('Auto-Plan präsentiert BD und HG jedes Tages gemeinsam wie die Diensttabel
   await page.locator('#autoPlanBtn').click();
   await expect(page.locator('#autoPlanConfig')).toBeVisible();
   await expect(page.locator('#autoPlanLimitBody tr')).toHaveCount(staff.length);
-  await page.locator('#autoPlanSearchIntensity').selectOption('standard');
+  await expect(page.locator('#autoPlanSearchIntensity')).toHaveValue('standard');
   await page.locator('#autoPlanV85CleanProfile').selectOption('balanced');
   await expect(page.locator('#autoPlanRepairIterations')).toHaveValue('4');
   await expect(page.locator('#autoPlanTimeBudget')).toHaveValue('10');
