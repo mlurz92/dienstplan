@@ -27,7 +27,7 @@ function installAutoPlanV9LayoutGuards() {
   const style = document.createElement('style');
   style.id = 'autoPlanV9LayoutGuards';
   style.textContent = `
-    .auto-plan-dialog[data-engine-revision="9"] #autoPlanProposalTable thead th {
+    .auto-plan-dialog[data-v9-engine-revision="9"] #autoPlanProposalTable thead th {
       position: sticky;
       inset-block-start: 0;
     }
