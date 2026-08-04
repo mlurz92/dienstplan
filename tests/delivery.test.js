@@ -79,34 +79,19 @@ test('the application ships without any service worker and never registers one',
  * sonst nichts. Keine Zwischenspeicherung, kein Eingriff in Anfragen.
  */
 test('the /sw.js route is a Function, not an asset, and only unregisters and purges', async () => {
-  // Keine Worker-Datei im Auslieferungsstand – das ist die eigentliche Zusage.
   assert.equal(await exists('sw.js'), false, 'sw.js darf nicht als Asset zurückkehren');
 
-  // Der Endpunkt ist eine Pages Function. Nur so umgeht er den Asset-Cache, der
-  // die gelöschte Datei nachweislich bis zu sieben Tage weiter ausgeliefert hat.
   const fn = await read('functions/sw.js.js');
 
   assert.match(fn, /export const onRequestGet/, '/sw.js muss von einer Function bedient werden');
   assert.match(fn, /self\.registration\.unregister\(\)/, 'das Skript muss sich selbst abmelden');
   assert.match(fn, /caches\.delete\(/, 'und die Caches des Altbestands löschen');
-
-  // Korrekter MIME-Typ: Ein falscher bricht die Updateprüfung mit einem
-  // MIME-Fehler ab, OHNE die Registrierung zu lösen – genau der Fehler, den der
-  // SPA-Rückfall verursacht hat.
   assert.match(fn, /application\/javascript/, 'ohne korrekten MIME-Typ greift die Updateprüfung nicht');
-
-  // Nirgends zwischenspeichern, sonst prüft der Browser das Skript nicht neu
-  // und der Edge legt erneut etwas an, das uns später im Weg steht.
   assert.match(fn, /'Cache-Control': 'no-store/);
   assert.match(fn, /'CDN-Cache-Control': 'no-store'/);
-
-  // Die harte Sperre: nichts, womit ein Worker Auslieferung übernehmen könnte.
   assert.doesNotMatch(fn, /addEventListener\(\s*\\?['"]fetch\\?['"]/, 'kein fetch-Handler');
   assert.doesNotMatch(fn, /respondWith/, 'das Skript darf keine Anfrage beantworten');
   assert.doesNotMatch(fn, /cache\.addAll|caches\.match|cache\.put/, 'keine Zwischenspeicherung');
-
-  // Und `_headers` darf keine Regel für /sw.js mehr enthalten: Eine Regel dort
-  // gilt nur für Assets und würde suggerieren, es gäbe noch eines.
   assert.doesNotMatch(await read('_headers'), /^\/sw\.js/m, 'kein Asset-Header für einen Function-Pfad');
 });
 
@@ -134,19 +119,70 @@ test('legacy service workers are neutralized before versioned application assets
   assert.match(app, /caches\.delete\(/);
 });
 
-test('all release-critical shell and module assets share one cache-busting token', async () => {
+/**
+ * v9 ist eine additive Generation über dem unveränderten v8.5-Modulgraphen.
+ * Beide Generationen besitzen deshalb einen eigenen atomaren Release-Token.
+ * Vermischte Tokens innerhalb einer Datei wären dagegen gefährlich: Ein Client
+ * könnte dann neue Orchestrierung mit alten Teilmodulen kombinieren.
+ *
+ * Cloudflare Pages liefert statische Assets mit Revalidierung aus; zusätzlich
+ * erzwingt `_headers` für `/js/*` `no-cache, must-revalidate`. Der Test erlaubt
+ * daher exakt die beiden bewusst versionierten Generationen und keine dritte.
+ */
+test('release-critical assets use one coherent cache token per module generation', async () => {
   const { readdir } = await import('node:fs/promises');
   const files = ['index.html', 'js/app.js', 'js/state.js', 'js/rules.js'];
   const sources = await Promise.all(files.map(read));
   const moduleFiles = (await readdir(new URL('../js/', import.meta.url), { withFileTypes: true }))
     .filter(entry => entry.isFile() && entry.name.endsWith('.js'))
     .map(entry => `js/${entry.name}`);
-  const releaseSources = [sources[0], ...await Promise.all(moduleFiles.map(read))];
-  const tokens = releaseSources.flatMap(source =>
-    [...source.matchAll(/\?v=([a-z0-9.-]+)/gi)].map(match => match[1]));
+  const sourceByPath = new Map([
+    ['index.html', sources[0]],
+    ...await Promise.all(moduleFiles.map(async path => [path, await read(path)]))
+  ]);
 
+  const shellToken = sources[0].match(/\?v=([a-z0-9.-]+)/i)?.[1];
+  const v9Entry = sourceByPath.get('js/auto-planner.js');
+  const v9Token = v9Entry?.match(/auto-planner-v9\.js\?v=([a-z0-9.-]+)/i)?.[1];
+  assert.ok(shellToken, 'der App-Shell braucht einen Release-Token');
+  assert.ok(v9Token, 'der produktive v9-Einstieg braucht einen eigenen Release-Token');
+  assert.notEqual(v9Token, shellToken, 'die additive v9-Generation muss vom unveränderten v8.5-Graph unterscheidbar sein');
+
+  const tokens = [...sourceByPath.values()].flatMap(source =>
+    [...source.matchAll(/\?v=([a-z0-9.-]+)/gi)].map(match => match[1]));
   assert.ok(tokens.length >= 50, 'entry assets and the full module graph need version tokens');
-  assert.equal(new Set(tokens).size, 1, 'one release must use one asset version everywhere');
+  assert.deepEqual(
+    [...new Set(tokens)].sort(),
+    [shellToken, v9Token].sort(),
+    'es sind exakt Shell/v8.5 und die additive v9-Generation zulässig'
+  );
+
+  const v9LiteralTokenFiles = new Set([
+    'js/auto-planner.js',
+    'js/auto-planner-v9.js',
+    'js/auto-planner-v9-exact.js',
+    'js/auto-plan-ui.js',
+    'js/auto-plan-studio-v9.js',
+    'js/ui-v9.js'
+  ]);
+
+  for (const [path, source] of sourceByPath) {
+    const fileTokens = [...new Set(
+      [...source.matchAll(/\?v=([a-z0-9.-]+)/gi)].map(match => match[1])
+    )];
+    if (!fileTokens.length || path === 'index.html') continue;
+    assert.equal(fileTokens.length, 1, `${path} darf keine Modulgenerationen mischen`);
+    assert.equal(
+      fileTokens[0],
+      v9LiteralTokenFiles.has(path) ? v9Token : shellToken,
+      `${path} verwendet den falschen Generationstoken`
+    );
+  }
+
+  for (const dynamicV9File of ['js/auto-plan-studio-v9-contract.js']) {
+    const source = sourceByPath.get(dynamicV9File);
+    assert.match(source, new RegExp(`const RELEASE = ['"]${v9Token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}['"]`));
+  }
 
   for (let index = 1; index < files.length; index += 1) {
     const localImports = [...sources[index].matchAll(/from\s+['"](\.\/[^'"]+)['"]/g)].map(match => match[1]);
@@ -265,15 +301,9 @@ test('the legacy cleanup is scoped to the own worker and reloads at most once pe
     );
   }
 
-  // Der Neustart hängt an einem tatsächlich vorhandenen Controller – nur dann
-  // wird der Tab überhaupt noch von einem Worker bedient.
   assert.match(html, /serviceWorker\.controller !== null/);
-  // Und er ist einmalig: Die Marke wird gesetzt, bevor neu geladen wird.
   const markePosition = html.indexOf("sessionStorage.setItem(reloadKey");
   const reloadPosition = html.indexOf('location.reload()');
   assert.ok(markePosition > 0 && reloadPosition > markePosition, 'die Neustartmarke muss vor dem Neuladen gesetzt werden');
-
-  // Und der Anwendungsstart bricht ab, statt in einen Neustart hinein Anfragen
-  // abzusetzen.
   assert.match(app, /if \(await legacyNeustartAngekuendigt\(\)\) return;/);
 });
