@@ -34,7 +34,9 @@ function textFor(element) {
 function remember(element) {
   if (!(element instanceof Element)) return;
   const title = element.getAttribute('title');
-  if (title && !element.dataset.tooltip) element.dataset.tooltip = title;
+  // Ein später aktualisierter nativer Titel ist die aktuelle Wahrheitsquelle.
+  // Ohne Wertabgleich blieb data-tooltip auf der ersten Monatspalette stehen.
+  if (title && element.dataset.tooltip !== title) element.dataset.tooltip = title;
   if (element.dataset.tooltip && !registry.has(element)) registry.set(element, title || '');
   syncNativeTitle(element);
 }
