@@ -1,0 +1,23 @@
+name: V9 Source Snapshot
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - name: Repository snapshot
+        uses: actions/upload-artifact@v7
+        with:
+          name: repository-snapshot
+          path: .
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
