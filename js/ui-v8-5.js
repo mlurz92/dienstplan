@@ -1,6 +1,7 @@
 /** DienstplanRAD v8.5 – Command Bar, Theme, Tooltips und Chrome-Shell. */
 import { createThemeToggle, installThemeController } from './app-theme-v8-5.js?v=20260804.1';
 import { installRichTooltips, setRichTooltip } from './rich-tooltip-v8-5.js?v=20260804.1';
+import { state } from './state.js?v=20260803.4';
 
 const RELEASE = '20260804.1';
 const STYLESHEETS = Object.freeze(['/app-v8-5.css', '/toolbar-v8-5.css']);
@@ -84,7 +85,12 @@ function markToolbarReady() {
   return true;
 }
 
-/** Entfernt den früheren, anwendungsspezifischen Modus „Reduzierte Bewegung“. */
+/**
+ * Entfernt den früheren anwendungsspezifischen Modus vollständig aus dem
+ * wirksamen Zustand. Das alte Schema wird beim Einlesen weiterhin toleriert,
+ * damit vorhandene Profile migrationsfest bleiben; gespeichert und angewendet
+ * wird der Wert ab v8.5 nicht mehr.
+ */
 function removeLegacyMotionMode(root = document) {
   const select = root.querySelector?.('#settingsMotion') || document.getElementById('settingsMotion');
   if (select) {
@@ -95,8 +101,12 @@ function removeLegacyMotionMode(root = document) {
       field.setAttribute('aria-hidden', 'true');
     }
   }
-  document.documentElement.classList.remove('reduce-motion');
-  document.documentElement.dataset.motion = 'system';
+  if (state.settings?.appearance && Object.hasOwn(state.settings.appearance, 'motion')) {
+    delete state.settings.appearance.motion;
+  }
+  const html = document.documentElement;
+  html.classList.remove('reduce-motion');
+  delete html.dataset.motion;
 }
 
 function installScrollPerformancePolicy() {
