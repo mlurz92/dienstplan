@@ -1,0 +1,22 @@
+/* Rechter Befehlsblock der v8.5-Command-Bar. */
+.toolbar .tool-action--theme {
+  margin-inline-start: auto;
+}
+
+.toolbar .tool-action--theme + .tool-action--pinned {
+  margin-inline-start: 0;
+}
+
+.toolbar .tool-action--theme,
+.toolbar #settingsBtn {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 760px) {
+  .toolbar .tool-action--theme,
+  .toolbar #settingsBtn {
+    inline-size: 38px;
+    min-inline-size: 38px;
+    padding-inline: 0;
+  }
+}

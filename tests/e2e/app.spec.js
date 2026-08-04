@@ -97,15 +97,11 @@ test('Werkzeugleiste ist semantisch gruppiert und das Farbbadge bleibt frei vom 
 
   const toolbar = page.locator('.toolbar.toolbar-organized');
   await expect(toolbar).toBeVisible();
-  // Die Einstellungen bilden keine Gruppe mehr: Sie sitzen als fixiertes
-  // Zahnrad unmittelbar in der Leiste, damit sie in jeder Dichtestufe an
-  // derselben Stelle erreichbar bleiben.
   await expect(toolbar.locator('.toolbar-section')).toHaveCount(3);
   await expect(toolbar.locator('.toolbar-section-label')).toHaveText(['Planung', 'Daten', 'Ausgabe']);
   await expect(toolbar.locator('.toolbar-section .tool-action')).toHaveCount(11);
   await expect(toolbar.locator('#autoPlanBtn')).toBeVisible();
   await expect(toolbar.locator('#autoPlanBtn .tool-icon')).toHaveCount(1);
-  // Die Überlauf-Schaltfläche gehört zur Leiste, aber zu keiner Gruppe.
   await expect(toolbar.locator('#toolbarOverflowBtn')).toHaveCount(1);
   await expect(page.locator('#todayBtn .tool-icon')).toHaveCount(1);
   await expect(page.locator('#clearMonthBtn')).toHaveClass(/tool-action--danger/);
@@ -116,7 +112,6 @@ test('Werkzeugleiste ist semantisch gruppiert und das Farbbadge bleibt frei vom 
   await expect(gear).toHaveClass(/tool-action--icon-only/);
   await expect(gear.locator('.tool-icon')).toHaveCount(1);
   await expect(gear).toHaveAttribute('aria-label', 'Einstellungen der Anwendung öffnen');
-  // Das Zahnrad gehört zu keiner Gruppe und liegt hinter der Überlauf-Schaltfläche.
   await expect(toolbar.locator('.toolbar-section #settingsBtn')).toHaveCount(0);
 
   await expect(page.locator('html')).toHaveAttribute('data-spectrum-key', '2026-01');
@@ -143,10 +138,9 @@ test('Einstellungen öffnen fokussiert, validiert, speichert und stellt Fokus wi
   await expect(page.locator('#settingsPerformanceProfile')).toHaveValue('adaptive');
   await expect(page.locator('#settingsSearchIntensity')).toHaveValue('deep');
   await expect(page.locator('#settingsTimeBudget')).toHaveValue('120');
+  await expect(page.locator('#settingsMotion').locator('..')).toBeHidden();
 
   await page.locator('#settingsDensity').selectOption('compact');
-  await page.locator('#settingsMotion').selectOption('reduced');
-  // Die Auto-Plan-Werte liegen in einem eigenen Reiter.
   await page.locator('#settingsTabAutoPlan').click();
   await expect(page.locator('#settingsPanelAutoPlan')).toBeVisible();
   await page.locator('#settingsPerformanceProfile').selectOption('responsive');
@@ -158,7 +152,8 @@ test('Einstellungen öffnen fokussiert, validiert, speichert und stellt Fokus wi
   await expect(dialog).toBeHidden();
   await expect(trigger).toBeFocused();
   await expect(page.locator('html')).toHaveAttribute('data-app-density', 'compact');
-  await expect(page.locator('html')).toHaveAttribute('data-motion', 'reduced');
+  await expect(page.locator('html')).not.toHaveAttribute('data-motion');
+  await expect(page.locator('html')).not.toHaveClass(/reduce-motion/);
 
   await trigger.click();
   await expect(page.locator('#settingsPanelAppearance')).toBeVisible();

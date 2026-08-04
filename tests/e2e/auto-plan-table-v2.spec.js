@@ -36,7 +36,28 @@ async function mockApi(page) {
   let currentMonth = preparedMonth(2026, 7);
   let putCount = 0;
   await page.route('https://cdn.sheetjs.com/**', route => route.fulfill({ status: 200, contentType: 'application/javascript', body: 'window.XLSX = undefined;' }));
-  await page.route('**/api/bootstrap', route => route.fulfill({ json: { ok: true, settings: { schemaVersion: 2 }, staff, rbnNames: [] } }));
+  await page.route('**/api/bootstrap', route => route.fulfill({
+    json: {
+      ok: true,
+      settings: {
+        schemaVersion: 4,
+        appearance: { density: 'comfortable', richTooltips: true },
+        workflow: { algorithmCommentary: true, studioVisualizer: true },
+        autoPlan: {
+          performanceProfile: 'adaptive',
+          searchIntensity: 'standard',
+          optimizationFocus: 'balanced',
+          timeBudgetSeconds: 10,
+          allowRedFallback: true,
+          perfectionEnabled: true,
+          certificationRounds: 2,
+          portfolioDiversity: true
+        }
+      },
+      staff,
+      rbnNames: []
+    }
+  }));
   await page.route('**/api/month/**', async route => {
     const parts = new URL(route.request().url()).pathname.split('/');
     const year = Number(parts.at(-2));
@@ -59,7 +80,7 @@ async function openJuly(page) {
 }
 
 test('Auto-Plan präsentiert BD und HG jedes Tages gemeinsam wie die Diensttabelle', async ({ page }) => {
-  test.setTimeout(150_000);
+  test.setTimeout(90_000);
   await page.setViewportSize({ width: 920, height: 520 });
   const api = await mockApi(page);
   await openJuly(page);
@@ -68,9 +89,11 @@ test('Auto-Plan präsentiert BD und HG jedes Tages gemeinsam wie die Diensttabel
   await expect(page.locator('#autoPlanConfig')).toBeVisible();
   await expect(page.locator('#autoPlanLimitBody tr')).toHaveCount(staff.length);
   await page.locator('#autoPlanSearchIntensity').selectOption('standard');
-  await page.locator('#autoPlanRepairIterations').fill('3');
+  await page.locator('#autoPlanV85CleanProfile').selectOption('balanced');
+  await expect(page.locator('#autoPlanRepairIterations')).toHaveValue('4');
+  await expect(page.locator('#autoPlanTimeBudget')).toHaveValue('10');
   await page.locator('#autoPlanStartBtn').click();
-  await expect(page.locator('#autoPlanResult')).toBeVisible({ timeout: 120_000 });
+  await expect(page.locator('#autoPlanResult')).toBeVisible({ timeout: 60_000 });
   await expect(page.locator('#autoPlanResultTitle')).toHaveText('Regelkonformer Vorschlag bereit');
 
   const table = page.locator('#autoPlanProposalTable');
@@ -90,11 +113,9 @@ test('Auto-Plan präsentiert BD und HG jedes Tages gemeinsam wie die Diensttabel
   await expect(page.locator('#autoPlanSearchMetrics')).toContainText('Varianten geprüft');
   await expect(page.locator('#autoPlanSearchMetrics')).toContainText('Sackgassen');
   await expect(page.locator('#autoPlanSearchMetrics')).toContainText('Nachbarschaften');
-  await expect(page.locator('#autoPlanRunConfig')).toContainText('Reparaturrunden: 3');
+  await expect(page.locator('#autoPlanRunConfig')).toContainText('Reparaturrunden: 4');
   await expect(page.locator('#autoPlanLoadTable .auto-plan-distribution-table')).toBeVisible();
 
-  // Der Dialog hat genau einen Scrollbereich zwischen Kopf- und Fußleiste;
-  // die Abschnitte darin wachsen frei und scrollen nicht für sich.
   const body = page.locator('#autoPlanBody');
   const scrollState = await body.evaluate(element => ({
     scrollHeight: element.scrollHeight,
