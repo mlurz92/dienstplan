@@ -60,12 +60,20 @@ function actionHost(id) {
   return element?.matches('input[type="file"]') ? element.closest('label') : element;
 }
 
+/**
+ * Wertet die sichtbaren Aktionen idempotent auf.
+ *
+ * Die Funktion wird auch aus einem MutationObserver aufgerufen. Ein
+ * bedingungsloses Schreiben von `textContent` erzeugt selbst eine neue
+ * `childList`-Mutation und führte deshalb zu einer endlosen Microtask-Kette,
+ * obwohl die Oberfläche optisch bereits fertig gerendert war.
+ */
 function upgradeActions(root = document) {
   for (const [id, [shortLabel, tooltip]] of Object.entries(ACTION_COPY)) {
     const element = actionHost(id);
     if (!element || !root.contains(element)) continue;
     const label = element.querySelector('.tool-label');
-    if (label) label.textContent = shortLabel;
+    if (label && label.textContent !== shortLabel) label.textContent = shortLabel;
     if (!element.hasAttribute('aria-label')) element.setAttribute('aria-label', shortLabel);
     setRichTooltip(element, tooltip);
   }
@@ -154,17 +162,33 @@ function installScrollPerformancePolicy() {
   }, { passive: true, capture: true });
 }
 
+/**
+ * Beobachtet ausschließlich tatsächlich neu hinzugefügte Steuerelemente.
+ * Toolbar-Nacharbeit wird auf einen Frame zusammengefasst. Dadurch kann eine
+ * vom Upgrade selbst ausgelöste Mutation weder rekursiv noch unbegrenzt die
+ * gesamte Toolbar erneut schreiben.
+ */
 function observeLateControls() {
   if (typeof MutationObserver !== 'function' || !document.body) return;
+  let toolbarRefreshHandle = 0;
+  const scheduleToolbarRefresh = () => {
+    if (toolbarRefreshHandle) return;
+    toolbarRefreshHandle = requestAnimationFrame(() => {
+      toolbarRefreshHandle = 0;
+      safeStep('mark-late-toolbar', markToolbarReady);
+    });
+  };
   const observer = new MutationObserver(records => {
+    let toolbarTouched = false;
     for (const record of records) {
       for (const node of record.addedNodes) {
         if (!(node instanceof Element)) continue;
         safeStep('upgrade-late-actions', () => upgradeActions(node));
         safeStep('remove-late-motion', () => removeLegacyMotionMode(node));
+        if (node.matches('.toolbar, .toolbar *') || node.querySelector?.('.toolbar')) toolbarTouched = true;
       }
     }
-    safeStep('mark-late-toolbar', markToolbarReady);
+    if (toolbarTouched) scheduleToolbarRefresh();
   });
   observer.observe(document.body, { childList: true, subtree: true });
 }
