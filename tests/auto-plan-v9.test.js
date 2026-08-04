@@ -3,7 +3,37 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 const planner = await import('../js/auto-planner.js');
+const { DEFAULT_STAFF } = await import('../js/defaults.js');
+const { setAssignment } = await import('../js/rules.js');
 const source = async path => readFile(new URL(path, import.meta.url), 'utf8');
+
+function oneDayMonth(dateIso) {
+  return {
+    schemaVersion: 1,
+    year: Number(dateIso.slice(0, 4)),
+    month: Number(dateIso.slice(5, 7)),
+    revision: 0,
+    updatedAt: null,
+    days: { [dateIso]: { bd: '', hg: '', rbn1: '', rbn2: '', notes: '' } },
+    absences: {},
+    absenceSources: {},
+    preferences: {},
+    options: {},
+    overrideLog: [],
+    importLog: []
+  };
+}
+
+function stateWith(monthData) {
+  const key = `${monthData.year}-${String(monthData.month).padStart(2, '0')}`;
+  return {
+    months: new Map([[key, monthData]]),
+    staff: structuredClone(DEFAULT_STAFF),
+    currentYear: monthData.year,
+    currentMonth: monthData.month,
+    monthSources: new Map([[key, 'server']])
+  };
+}
 
 test('produktiver Auto-Plan exportiert Revision 9 und den vollständigen Hybridvertrag', () => {
   assert.equal(planner.AUTO_PLAN_REVISION, 9);
@@ -15,6 +45,10 @@ test('produktiver Auto-Plan exportiert Revision 9 und den vollständigen Hybridv
 });
 
 test('v9 leitet Solvermodus und Nachweisziel verlustfrei aus dem Studiovertrag ab', () => {
+  const direct = planner.deriveV9Tuning({});
+  assert.equal(direct.solverMode, 'fast');
+  assert.equal(direct.exactEnabled, false, 'ältere direkte API-Aufrufe bleiben schnell und kompatibel');
+
   const hybrid = planner.deriveV9Tuning({
     performanceProfile: 'v9:hybrid:best-within-budget',
     timeBudgetMs: 120_000
@@ -34,6 +68,41 @@ test('v9 leitet Solvermodus und Nachweisziel verlustfrei aus dem Studiovertrag a
   assert.equal(diagnose.forceStrict, true);
   assert.equal(diagnose.proofTarget, 'prove-optimal');
   assert.ok(diagnose.exactTimeBudgetMs > diagnose.heuristicTimeBudgetMs);
+});
+
+test('Heuristikfortschritt bleibt vor der exakten Suche monoton und nichtterminal', () => {
+  const updates = [];
+  const forward = planner.mapHeuristicProgress(update => updates.push(update));
+  forward({ phase: 'perfect', progress: .2, message: 'früh' });
+  forward({ phase: 'perfect', progress: .95, message: 'spät' });
+  forward({ phase: 'complete', progress: 1, message: 'intern fertig' });
+
+  assert.deepEqual(updates.map(update => update.progress), [...updates.map(update => update.progress)].sort((a, b) => a - b));
+  assert.ok(updates.every(update => update.progress >= .55 && update.progress <= .80));
+  assert.equal(updates.at(-1).phase, 'perfect');
+  assert.equal(updates.at(-1).stage, 'incumbent-ready');
+  assert.equal(updates.at(-1).heuristicTerminal, true);
+});
+
+test('exakte MRV-Suche schließt einen kleinen realen Regelraum global ab', async () => {
+  const monthData = oneDayMonth('2026-07-06');
+  setAssignment(monthData, '2026-07-06', 'bd', 'lurz');
+  const state = stateWith(monthData);
+  const exact = await planner.solveExactly({
+    state,
+    monthData,
+    runConfig: { allowRedFallback: false },
+    allowRed: false,
+    timeLimitMs: 2_000,
+    nodeLimit: 100_000
+  });
+
+  assert.equal(exact.solverStatus, planner.V9_SOLVER_STATUSES.OPTIMAL);
+  assert.equal(exact.completeSearch, true);
+  assert.equal(exact.result.complete, true);
+  assert.equal(exact.result.metrics.red, 0);
+  assert.ok(exact.result.plannedMonth.days['2026-07-06'].hg);
+  assert.notEqual(exact.result.plannedMonth.days['2026-07-06'].hg, 'lurz');
 });
 
 test('exakter Browser-Solver verwendet die produktive Regelengine und ehrliche Statussemantik', async () => {
