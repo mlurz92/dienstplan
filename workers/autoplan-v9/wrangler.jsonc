@@ -8,6 +8,17 @@
     "enabled": true,
     "head_sampling_rate": 1
   },
+  "limits": {
+    "cpu_ms": 300000,
+    "subrequests": 100000
+  },
+  "workflows": [
+    {
+      "binding": "AUTO_PLAN_WORKFLOW",
+      "name": "dienstplanrad-autoplan-v9-workflow",
+      "class_name": "AutoPlanWorkflow"
+    }
+  ],
   "containers": [
     {
       "class_name": "AutoPlanContainer",
@@ -45,6 +56,33 @@
   "env": {
     "preview": {
       "name": "dienstplanrad-autoplan-v9-preview",
+      "workflows": [
+        {
+          "binding": "AUTO_PLAN_WORKFLOW",
+          "name": "dienstplanrad-autoplan-v9-preview-workflow",
+          "class_name": "AutoPlanWorkflow"
+        }
+      ],
+      "containers": [
+        {
+          "class_name": "AutoPlanContainer",
+          "image": "../../solver/Dockerfile",
+          "instance_type": "standard-2",
+          "max_instances": 2
+        }
+      ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "AUTO_PLAN_JOBS",
+            "class_name": "AutoPlanJob"
+          },
+          {
+            "name": "AUTO_PLAN_CONTAINER",
+            "class_name": "AutoPlanContainer"
+          }
+        ]
+      },
       "vars": {
         "ENVIRONMENT": "preview",
         "SOLVER_TIMEOUT_SECONDS": "300"
