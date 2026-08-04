@@ -1,0 +1,54 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "dienstplanrad-autoplan-v9",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-24",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "containers": [
+    {
+      "class_name": "AutoPlanContainer",
+      "image": "../../solver/Dockerfile",
+      "instance_type": "standard-2",
+      "max_instances": 4
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "AUTO_PLAN_JOBS",
+        "class_name": "AutoPlanJob"
+      },
+      {
+        "name": "AUTO_PLAN_CONTAINER",
+        "class_name": "AutoPlanContainer"
+      }
+    ]
+  },
+  "exports": {
+    "AutoPlanJob": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    },
+    "AutoPlanContainer": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    }
+  },
+  "vars": {
+    "ENVIRONMENT": "production",
+    "SOLVER_TIMEOUT_SECONDS": "900"
+  },
+  "env": {
+    "preview": {
+      "name": "dienstplanrad-autoplan-v9-preview",
+      "vars": {
+        "ENVIRONMENT": "preview",
+        "SOLVER_TIMEOUT_SECONDS": "300"
+      }
+    }
+  }
+}
