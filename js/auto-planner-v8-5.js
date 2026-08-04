@@ -1,108 +1,84 @@
-/**
- * Auto-Plan v8.5 – exhaustive clean-solution escalation.
- *
- * v8.5 keeps the productive rule engine and the full v8 portfolio intact. It
- * strengthens the orchestration around it: every construction strand receives
- * an explicit, bounded sequence of increasingly wide strict searches before a
- * red fallback may remain the winning result. No phase is silently disabled;
- * perfection and certification are mandatory whenever open slots exist.
- */
 import * as V8 from './auto-planner-v8.js?v=20260803.4';
 
 export * from './auto-planner-v8.js?v=20260803.4';
 
 export const AUTO_PLAN_REVISION = 8.5;
 export const AUTO_PLAN_ENGINE_ID = 'v8.5-exhaustive-clean-escalation';
-
 export const AUTO_PLAN_STAGES = Object.freeze([
   Object.freeze({ id: 'analysis', title: 'Fixpunkte und Domänen', detail: 'Fixpunkte, Laufgrenzen, Qualifikationen und erfüllbare Wünsche werden vollständig katalogisiert.' }),
   Object.freeze({ id: 'construct', title: 'Constraint-Konstruktion', detail: 'Das vollständige Profilportfolio baut unabhängige Startlösungen mit Vorwärts-Checking.' }),
-  Object.freeze({ id: 'rescue', title: 'Null-Rot-Intensivierung', detail: 'Mehrere streng getrennte Eskalationswellen verbreitern Suchstrahl, Kandidatenfächer und exaktes Restbacktracking.' }),
+  Object.freeze({ id: 'rescue', title: 'Null-Rot-Intensivierung', detail: 'Strikte Eskalationswellen verbreitern Suchstrahl, Kandidatenfächer und exaktes Restbacktracking.' }),
   Object.freeze({ id: 'repair', title: 'Iterative Tauschreparatur', detail: 'Einzelzüge, Paare, Dreierketten, Tagespakete und lokale Neuplanung glätten den besten Aufbau.' }),
   Object.freeze({ id: 'perfect', title: 'Adaptive ALNS-Perfektion', detail: 'Diversifizierte Ruin-and-Recreate-Stränge lernen Zerstörungs- und Wiederaufbauoperatoren online.' }),
   Object.freeze({ id: 'certify', title: 'Vollständiger Nachweis', detail: 'Einzelumsetzungen, Paartausche und Tagespakete werden ohne Abkürzung bis zum stabilen Endzustand geprüft.' })
 ]);
 
+const STRICT_PROFILES = Object.freeze(['strict-balanced', 'strict-coverage']);
+const CONFIRMABLE_PROFILE = 'confirmable-balanced';
 const clamp = (value, min, max, fallback) => {
   const number = Number(value);
   return Number.isFinite(number) ? Math.max(min, Math.min(max, Math.round(number))) : fallback;
 };
 
-function settingsOf(parameters) {
-  const saved = parameters?.state?.settings?.autoPlan || {};
-  const supplied = parameters?.runConfig || {};
-  return { ...saved, ...supplied };
-}
-
-/**
- * The three v8.5 tuning values are deliberately derivable from fields already
- * carried in the worker message. This keeps the worker protocol stable while
- * the Studio can expose meaningful presets immediately:
- *
- * - repair rounds determine the number of strict escalation waves;
- * - local rebuild budget determines rescue breadth;
- * - their combination determines repair aggressiveness.
- */
-function tuning(parameters) {
-  const source = settingsOf(parameters);
-  const repairIterations = clamp(source.repairIterations, 0, 30, 6);
-  const localBudget = clamp(source.localRebuildBudget, 200, 12000, 6000);
-  const derivedRounds = clamp(Math.ceil(Math.max(2, repairIterations) / 2), 1, 4, 3);
-  const derivedStrength = clamp(100 + (localBudget - 200) / 11800 * 150, 100, 250, 160);
-  const derivedAggressiveness = repairIterations >= 8 || localBudget >= 8500
+export function deriveV85Tuning(source = {}) {
+  const repair = clamp(source.repairIterations, 0, 30, 6);
+  const local = clamp(source.localRebuildBudget, 200, 12000, 6500);
+  const rounds = Math.ceil(Math.max(2, repair) / 2);
+  const strength = Math.round(100 + (local - 200) / 11800 * 150);
+  const aggressiveness = repair >= 8 || local >= 8500
     ? 'exhaustive'
-    : repairIterations >= 6 || localBudget >= 5200
-      ? 'intensive'
-      : 'balanced';
+    : repair >= 6 || local >= 5200 ? 'intensive' : 'balanced';
   return {
-    strictEscalationRounds: clamp(source.strictEscalationRounds, 1, 4, derivedRounds),
-    rescueStrength: clamp(source.rescueStrength, 100, 250, derivedStrength),
+    strictEscalationRounds: source.strictEscalationRounds === undefined
+      ? clamp(rounds, 1, 4, 3)
+      : clamp(source.strictEscalationRounds, 1, 4, 3),
+    rescueStrength: source.rescueStrength === undefined
+      ? clamp(strength, 100, 250, 160)
+      : clamp(source.rescueStrength, 100, 250, 160),
     repairAggressiveness: ['balanced', 'intensive', 'exhaustive'].includes(source.repairAggressiveness)
       ? source.repairAggressiveness
-      : derivedAggressiveness
+      : aggressiveness
+  };
+}
+
+function settingsOf(parameters) {
+  return {
+    ...(parameters?.state?.settings?.autoPlan || {}),
+    ...(parameters?.runConfig || {})
   };
 }
 
 function enrichedRunConfig(parameters) {
   const source = { ...(parameters?.runConfig || {}) };
-  const config = tuning(parameters);
-  const repairFloor = config.repairAggressiveness === 'exhaustive' ? 8 : config.repairAggressiveness === 'intensive' ? 6 : 4;
-  const localFloor = config.repairAggressiveness === 'exhaustive' ? 9000 : config.repairAggressiveness === 'intensive' ? 6000 : 3200;
+  const tuning = deriveV85Tuning(settingsOf(parameters));
+  const repairFloor = tuning.repairAggressiveness === 'exhaustive' ? 8 : tuning.repairAggressiveness === 'intensive' ? 6 : 4;
+  const localFloor = tuning.repairAggressiveness === 'exhaustive' ? 9000 : tuning.repairAggressiveness === 'intensive' ? 6000 : 3200;
   return {
     ...source,
     perfectionEnabled: true,
     certificationRounds: Math.max(2, clamp(source.certificationRounds, 1, 8, 4)),
     repairIterations: Math.max(repairFloor, clamp(source.repairIterations, 0, 30, repairFloor)),
     localRebuildBudget: Math.max(localFloor, clamp(source.localRebuildBudget, 200, 12000, localFloor)),
-    strictEscalationRounds: config.strictEscalationRounds,
-    rescueStrength: config.rescueStrength,
-    repairAggressiveness: config.repairAggressiveness
+    ...tuning
   };
 }
 
-function clean(result) {
-  return Boolean(result?.complete)
-    && Number(result?.metrics?.unfilled || 0) === 0
-    && Number(result?.metrics?.gray || 0) === 0
-    && Number(result?.metrics?.red || 0) === 0;
-}
-
-function compareResults(candidate, incumbent) {
-  if (!incumbent) return candidate ? -1 : 0;
-  if (!candidate) return 1;
-  if (candidate.complete !== incumbent.complete) return candidate.complete ? -1 : 1;
-  const left = Array.isArray(candidate.objectiveKey) ? candidate.objectiveKey : [];
-  const right = Array.isArray(incumbent.objectiveKey) ? incumbent.objectiveKey : [];
-  const length = Math.max(left.length, right.length);
-  for (let index = 0; index < length; index += 1) {
-    const difference = Number(left[index] || 0) - Number(right[index] || 0);
-    if (Math.abs(difference) > 1e-9) return difference < 0 ? -1 : 1;
-  }
-  return 0;
-}
+const clean = result => Boolean(result?.complete)
+  && Number(result?.metrics?.unfilled || 0) === 0
+  && Number(result?.metrics?.gray || 0) === 0
+  && Number(result?.metrics?.red || 0) === 0;
 
 function better(candidate, incumbent) {
-  return compareResults(candidate, incumbent) < 0 ? candidate : incumbent;
+  if (!incumbent) return candidate;
+  if (!candidate) return incumbent;
+  if (candidate.complete !== incumbent.complete) return candidate.complete ? candidate : incumbent;
+  const left = Array.isArray(candidate.objectiveKey) ? candidate.objectiveKey : [];
+  const right = Array.isArray(incumbent.objectiveKey) ? incumbent.objectiveKey : [];
+  for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
+    const difference = Number(left[index] || 0) - Number(right[index] || 0);
+    if (Math.abs(difference) > 1e-9) return difference < 0 ? candidate : incumbent;
+  }
+  return incumbent;
 }
 
 function wavePresets(intensity, strength, count) {
@@ -122,19 +98,28 @@ function wavePresets(intensity, strength, count) {
   });
 }
 
-function strictProfileFilter(runConfig) {
-  const requested = Array.isArray(runConfig?.profileFilter) ? runConfig.profileFilter.filter(Boolean) : [];
-  if (requested.length && requested.every(id => id !== 'confirmable-balanced')) return requested;
-  return ['strict-balanced', 'strict-coverage'];
+function requestedProfiles(config) {
+  return Array.isArray(config?.profileFilter) ? config.profileFilter.filter(Boolean) : [];
 }
 
-function annotate(result, telemetry = null) {
+function strictProfiles(config) {
+  const requested = requestedProfiles(config).filter(id => id !== CONFIRMABLE_PROFILE);
+  return requested.length ? requested : [...STRICT_PROFILES];
+}
+
+function fallbackRequested(config) {
+  const requested = requestedProfiles(config);
+  return config.allowRedFallback === true
+    && (!requested.length || requested.includes(CONFIRMABLE_PROFILE));
+}
+
+function annotate(result, telemetry) {
   if (!result) return result;
   result.algorithmRevision = AUTO_PLAN_REVISION;
   result.metrics ||= {};
   result.metrics.engine = AUTO_PLAN_ENGINE_ID;
   result.metrics.phaseContract = {
-    mandatory: ['analysis', 'construct', 'rescue', 'repair', 'perfect', 'certify'],
+    mandatory: AUTO_PLAN_STAGES.map(stage => stage.id),
     perfectionEnabled: true,
     certificationEnabled: true
   };
@@ -142,47 +127,38 @@ function annotate(result, telemetry = null) {
   return result;
 }
 
-export async function constructAutoPlan(parameters) {
-  const runConfig = enrichedRunConfig(parameters);
-  const configured = { ...parameters, runConfig };
-  let incumbent = await V8.constructAutoPlan(configured);
-  if (clean(incumbent)) {
-    return annotate(incumbent, { attempted: 0, completed: 0, cleanFound: true, waves: [] });
-  }
+function strictConstruction(parameters, config, profiles, overrides = {}) {
+  return V8.constructAutoPlan({
+    ...parameters,
+    ...overrides,
+    runConfig: {
+      ...config,
+      allowRedFallback: false,
+      maxRedViolations: 0,
+      zeroRedRescue: false,
+      profileFilter: profiles
+    }
+  });
+}
 
-  const config = tuning(configured);
-  const presets = wavePresets(runConfig.searchIntensity, config.rescueStrength, config.strictEscalationRounds);
+export async function constructAutoPlan(parameters) {
+  const config = enrichedRunConfig(parameters);
+  const profiles = strictProfiles(config);
+  let incumbent = await strictConstruction(parameters, config, profiles);
+  const presets = clean(incumbent) ? [] : wavePresets(config.searchIntensity, config.rescueStrength, config.strictEscalationRounds);
   const waves = [];
-  let cleanFound = false;
 
   for (let index = 0; index < presets.length; index += 1) {
     const preset = presets[index];
     await parameters.onProgress?.({
-      phase: 'propagate',
-      stage: 'null-rot-intensification',
+      phase: 'propagate', stage: 'null-rot-intensification',
       progress: Math.min(.51, .36 + index * .045),
       message: `Null-Rot-Intensivierung ${index + 1}/${presets.length} · Beam ${preset.beamWidth} · Branch ${preset.branchLimit} · exakt ${preset.exactBudget.toLocaleString('de-DE')}`,
-      strictWave: index + 1,
-      strictWaveCount: presets.length,
-      ...preset
+      strictWave: index + 1, strictWaveCount: presets.length, ...preset
     });
-
-    const candidate = await V8.constructAutoPlan({
-      ...parameters,
-      ...preset,
-      runConfig: {
-        ...runConfig,
-        allowRedFallback: false,
-        maxRedViolations: 0,
-        zeroRedRescue: false,
-        profileFilter: strictProfileFilter(runConfig)
-      }
-    });
+    const candidate = await strictConstruction(parameters, config, profiles, preset);
     waves.push({
-      index: index + 1,
-      beamWidth: preset.beamWidth,
-      branchLimit: preset.branchLimit,
-      exactBudget: preset.exactBudget,
+      index: index + 1, ...preset,
       complete: Boolean(candidate?.complete),
       unfilled: Number(candidate?.metrics?.unfilled || 0),
       red: Number(candidate?.metrics?.red || 0),
@@ -191,17 +167,30 @@ export async function constructAutoPlan(parameters) {
     incumbent = better(candidate, incumbent);
     if (clean(candidate)) {
       incumbent = candidate;
-      cleanFound = true;
       break;
     }
+  }
+
+  let fallbackAttempted = false;
+  if (!clean(incumbent) && fallbackRequested(config)) {
+    fallbackAttempted = true;
+    await parameters.onProgress?.({
+      phase: 'repair', stage: 'minimal-red-fallback', progress: .52,
+      message: 'Alle strikten v8.5-Stufen ausgeschöpft · Minimal-Rot-Fallback wird als letzte Eskalation geprüft'
+    });
+    incumbent = better(await V8.constructAutoPlan({
+      ...parameters,
+      runConfig: { ...config, profileFilter: [CONFIRMABLE_PROFILE], zeroRedRescue: false }
+    }), incumbent);
   }
 
   return annotate(incumbent, {
     attempted: presets.length,
     completed: waves.length,
-    cleanFound: cleanFound || clean(incumbent),
+    cleanFound: clean(incumbent),
     strength: config.rescueStrength,
     repairAggressiveness: config.repairAggressiveness,
+    fallbackAttempted,
     waves
   });
 }
