@@ -8,3 +8,4 @@
 import './ui-v9.js?v=20260804.9';
 import './auto-plan-studio-v9.js?v=20260804.9';
 import './auto-plan-studio-v9-contract.js?v=20260804.9';
+import './auto-plan-v9-truth.js?v=20260804.9';
