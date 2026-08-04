@@ -62,7 +62,7 @@ html[data-color-scheme="dark"] :is(.sheet-heading, .below-plan, .dialog-card) .e
 }
 
 html[data-color-scheme="dark"] .month-palette-label {
-  color: color-mix(in oklab, var(--month-accent) 54%, white 46%);
+  color: #eef3f8;
   background: linear-gradient(180deg,
     color-mix(in oklab, var(--v9-surface-3) 88%, white 12%),
     color-mix(in oklab, var(--v9-surface-2) 88%, var(--month-accent) 12%));
