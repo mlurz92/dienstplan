@@ -80,6 +80,12 @@ Der frühere anwendungsspezifische Modus **„Reduzierte Bewegung“** ist aus E
 - automatische Positionierung ober- oder unterhalb des Auslösers;
 - native `title`-Fallbacks, falls Rich Tooltips deaktiviert sind.
 
+### 3.4 Bootstrap- und Observer-Stabilität
+
+Die v8.5-Oberflächenschicht arbeitet strikt idempotent. Spät eingefügte Bedienelemente werden nur dann erneut synchronisiert, wenn die Mutation tatsächlich die Command Bar betrifft. Bereits korrekte Beschriftungen, ARIA-Attribute und Tooltip-Daten werden nicht erneut geschrieben.
+
+Damit ist die beim ursprünglichen v8.5-Release entstandene Rückkopplung beseitigt: Der globale `MutationObserver` reagierte auf beliebige neue DOM-Knoten, setzte danach die unveränderten `.tool-label`-Texte erneut über `textContent` und erzeugte dadurch selbst die nächste `childList`-Mutation. Die Microtask-Kette verhinderte den Abschluss des `load`-Ereignisses und ließ die Anwendung beim Start einfrieren. Zusätzlich sind UI-Installation, Scroll-Policy und Rich-Tooltip-Attributpflege gegen Mehrfachinstallation beziehungsweise redundante Mutationen abgesichert.
+
 ---
 
 ## 4. Auto-Plan v8.5
@@ -169,6 +175,7 @@ Die Ergebnisansicht protokolliert zusätzliche Wellen, Knoten, Rescue-Breite, Re
 - `contain` für große, unabhängige Layout-/Paint-Bereiche;
 - compositorfreundliche Animationen über `transform` und `opacity`;
 - keine dauerhaften `will-change`-Flächen;
+- idempotente, zielgerichtete DOM-Beobachter ohne selbst erzeugte Mutation-Schleifen;
 - vollständiger funktionaler Fallback ohne View-Transition-API.
 
 ---
@@ -234,6 +241,7 @@ Cloudflare Pages wird aus dem Repository-Root gebaut. Das KV-Binding lautet `DIE
 
 ### Browsertests
 
+- vollständiger Abschluss des Browser-`load`-Ereignisses und responsiver Event Loop nach späten DOM-Einbauten;
 - Monatsplanung, Picker, Batch-Verwaltung und Druck;
 - Toolbar über zahlreiche Fensterbreiten ohne Überlagerung oder Horizontal-Scroll;
 - Auto-Plan Studio, Vorschlagstabelle und Abbruchpfade;
@@ -251,12 +259,12 @@ js/auto-planner-v8-5.js       strikte Eskalation und verbindlicher Phasenvertrag
 js/auto-plan-studio-v8-5.js   Profile, Phasentheater und Ergebnisprotokoll
 js/app-theme-v8-5.js          persistenter Hell-/Dunkelcontroller
 js/rich-tooltip-v8-5.js       zentrale ARIA-Tooltips
-js/ui-v8-5.js                 Command-Bar- und Performance-Integration
+js/ui-v8-5.js                 Command-Bar-, Bootstrap- und Performance-Integration
 app-v8-5.css                  adaptive Farb- und Oberflächentoken
 toolbar-v8-5.css              rechter Theme-/Einstellungsblock
 auto-plan-studio-v8-5.css     v8.5-Studiozustände
 tests/auto-plan-v8-5.test.js  Solver- und Integrationsverträge
-tests/e2e/v8-5-shell.spec.js  Browserregressionen der neuen Oberfläche
+tests/e2e/v8-5-shell.spec.js  Browser-, Bootstrap- und Observer-Regressionen
 ```
 
 ---
@@ -274,6 +282,8 @@ tests/e2e/v8-5-shell.spec.js  Browserregressionen der neuen Oberfläche
 
 ### Behoben und gehärtet
 
+- **Start-Freeze nach v8.5-Integration:** selbstverstärkende `MutationObserver`-/`textContent`-Rückkopplung entfernt;
+- UI- und Tooltip-Synchronisierung idempotent sowie gegen Mehrfachinstallation geschützt;
 - sichtbare Profile und Solverparameter sind direkt gekoppelt;
 - Minimal-Rot-Fallback erst nach strikter Eskalation;
 - Perfektion/Zertifizierung nicht mehr versehentlich deaktivierbar;
