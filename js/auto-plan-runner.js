@@ -101,6 +101,15 @@ export function workersAvailable() {
   return typeof Worker === 'function';
 }
 
+function proofRank(result) {
+  const status = result?.metrics?.proof?.status || result?.metrics?.solverStatus || '';
+  if (status === 'OPTIMAL') return 4;
+  if (status === 'INFEASIBLE') return 3;
+  if (status === 'FEASIBLE' && result?.metrics?.proof?.exactAttempted) return 2;
+  if (status === 'FEASIBLE') return 1;
+  return 0;
+}
+
 export function isBetterAutoPlanResult(candidate, incumbent) {
   if (!incumbent) return Boolean(candidate);
   if (!candidate) return false;
@@ -113,7 +122,10 @@ export function isBetterAutoPlanResult(candidate, incumbent) {
       const b = Number(right[index] || 0);
       if (Math.abs(a - b) > 1e-9) return a < b;
     }
-    return false;
+    // Bei objektiv identischen Plänen gewinnt der stärkere Nachweis. Ohne
+    // diesen Tiebreak könnte ein schneller ALNS-Strang einen späteren globalen
+    // OPTIMAL-Nachweis desselben Plans aus der Ergebnisanzeige verdrängen.
+    return proofRank(candidate) > proofRank(incumbent);
   }
   const rank = result => [
     result.metrics?.unfilled || 0,
@@ -125,10 +137,19 @@ export function isBetterAutoPlanResult(candidate, incumbent) {
   const a = rank(candidate);
   const b = rank(incumbent);
   for (let index = 0; index < a.length; index += 1) if (a[index] !== b[index]) return a[index] < b[index];
-  return false;
+  return proofRank(candidate) > proofRank(incumbent);
 }
 
 export async function runAutoPlan({ state, monthData, year, month, runConfig, onProgress, signal }) {
+  let lastProgress = 0;
+  const emitProgress = update => {
+    if (typeof onProgress !== 'function' || !update) return;
+    const incoming = Number(update.progress);
+    const bounded = Number.isFinite(incoming) ? Math.max(0, Math.min(1, incoming)) : lastProgress;
+    lastProgress = Math.max(lastProgress, bounded);
+    onProgress({ ...update, progress: lastProgress });
+  };
+
   const inline = () => buildAutoPlan({
     state,
     monthData,
@@ -136,7 +157,7 @@ export async function runAutoPlan({ state, monthData, year, month, runConfig, on
     month,
     runConfig,
     signal,
-    onProgress: update => onProgress?.({ ...update, searchIndex: 0, searchCount: 1 })
+    onProgress: update => emitProgress({ ...update, searchIndex: 0, searchCount: 1 })
   });
 
   if (!workersAvailable()) return inline();
@@ -151,19 +172,23 @@ export async function runAutoPlan({ state, monthData, year, month, runConfig, on
 
   const openSlots = Object.values(monthData?.days || {}).reduce((sum, day) =>
     sum + Number(!day?.bd) + Number(!day?.hg), 0);
+  const effectivePerformanceProfile = runConfig?.performanceProfile
+    || state?.settings?.autoPlan?.performanceProfile
+    || 'adaptive';
+  const v9ExactPipeline = /^v9:(hybrid|exact|diagnose):/.test(effectivePerformanceProfile);
   const executionPlan = createAutoPlanExecutionPlan({
     hardwareConcurrency: globalThis.navigator?.hardwareConcurrency,
     deviceMemory: globalThis.navigator?.deviceMemory,
     openSlots,
     profileCount: profileIds.length,
-    performanceProfile: runConfig?.performanceProfile || state?.settings?.autoPlan?.performanceProfile || 'adaptive',
+    performanceProfile: effectivePerformanceProfile,
     parallelSearches: runConfig?.parallelSearches ?? state?.settings?.autoPlan?.parallelSearches ?? null
   });
   const perfectionCount = executionPlan.perfectionWorkers;
-  onProgress?.({
+  emitProgress({
     phase: 'analysis',
     progress: .035,
-    message: `v8 Worker-Portfolio · ${executionPlan.constructionWorkers} Aufbau · ${executionPlan.perfectionWorkers} Perfektion · ${executionPlan.reserveCores} UI-Reserve`,
+    message: `${v9ExactPipeline ? 'v9 Hybrid' : 'v8.5'} Worker-Portfolio · ${executionPlan.constructionWorkers} Aufbau · ${executionPlan.perfectionWorkers} Perfektion · ${executionPlan.reserveCores} UI-Reserve`,
     executionPlan
   });
 
@@ -209,7 +234,7 @@ export async function runAutoPlan({ state, monthData, year, month, runConfig, on
       const reportPortfolio = () => {
         const total = phase === 'construct' ? profileIds.length : perfectionCount;
         const unfinished = Math.max(0, total - portfolioCompleted - portfolioCancelled - portfolioFailed);
-        onProgress?.({
+        emitProgress({
           phase: phase === 'construct' ? 'search' : 'perfect',
           stage: phase === 'construct' ? 'aufbau' : 'perfektion',
           progress: phase === 'construct' ? .03 : .55,
@@ -232,7 +257,7 @@ export async function runAutoPlan({ state, monthData, year, month, runConfig, on
       };
       const succeed = result => {
         if (closed) return;
-        onProgress?.({
+        emitProgress({
           phase: result?.complete ? 'complete' : 'blocked',
           stage: 'abschluss',
           progress: 1,
@@ -360,12 +385,12 @@ export async function runAutoPlan({ state, monthData, year, month, runConfig, on
                 ...message.update,
                 phase: phase === 'construct' ? 'polish' : 'perfect',
                 stage: phase === 'construct' ? 'aufbau' : 'perfektion',
-                progress: phase === 'construct' ? .54 : .96,
+                progress: phase === 'construct' ? .54 : v9ExactPipeline ? .80 : .96,
                 workerTerminal: true,
                 message: `Arbeitsstrang ${Number(message.runId) + 1} hat seinen ${phase === 'construct' ? 'Aufbau' : 'Perfektionslauf'} beendet`
               }
             : message.update;
-          onProgress?.({
+          emitProgress({
             ...forwarded,
             searchIndex: Number(message.runId) || 0,
             searchCount: phase === 'construct' ? profileIds.length : perfectionCount
