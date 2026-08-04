@@ -32,6 +32,13 @@ function installAutoPlanV9LayoutGuards() {
       inset-block-start: 0;
     }
 
+    .auto-plan-dialog[data-v9-engine-revision="9"] #autoPlanLog {
+      min-block-size: 0;
+      overflow: hidden auto;
+      overscroll-behavior: contain;
+      scrollbar-gutter: stable;
+    }
+
     @media (min-width: 821px) {
       .auto-plan-dialog[data-v9-engine-revision="9"].is-running #autoPlanBody {
         overflow: hidden;
