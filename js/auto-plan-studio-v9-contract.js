@@ -26,9 +26,11 @@ function setData(element, key, value) {
 
 function applyContract(dialog) {
   if (!dialog) return false;
-  // Nur tatsächlich abweichende Attribute werden geschrieben. Der Observer
-  // beobachtet genau diese Attribute; idempotente Zuweisungen verhindern daher
-  // eine selbst ausgelöste Mutation-/Microtask-Schleife.
+  // Nur tatsächlich abweichende Attribute werden geschrieben. CSS und Telemetrie
+  // lesen ausschließlich `data-v9-engine-revision`, das stabil auf "9" bleibt.
+  // Der Observer reagiert auf Fremdmutationen; eigene Normalisierungen laufen in
+  // einer entkoppelten Microtask mit disconnect/observe, sodass kein selbst
+  // ausgelöster Zyklus entsteht.
   setData(dialog, 'algorithmRevision', '8');
   setData(dialog, 'engineRevision', '8.5');
   setData(dialog, 'v9EngineRevision', '9');
