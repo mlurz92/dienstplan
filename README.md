@@ -11,7 +11,7 @@
 > **Auto-Plan:** `v9` — *CP-SAT Guided Adaptive Exact-LNS*
 > **Feiertagsregion:** Sachsen (`SN`)
 > **Frontend:** Cloudflare Pages + Pages Functions
-> **Solver:** Durable Object + Cloudflare Container + Python/OR-Tools CP-SAT
+> **Solver:** Cloudflare Workflow + Durable Object + Container + Python/OR-Tools CP-SAT
 > **Persistenz:** MonthState Durable Object; Workers KV als Migrations-, Export- und Degraded-Mode-Spiegel; lokale Browser-Sicherung
 
 DienstplanRAD verbindet kontrollierbare manuelle Monatsplanung mit einer mathematisch modellierten Komplettierung offener **Bereitschaftsdienste (BD)** und **Hintergrunddienste (HG)**. Bereits gesetzte Dienste bleiben Fixpunkte. RBN und zweite RBN werden weiterhin manuell geplant.
@@ -37,10 +37,11 @@ DienstplanRAD verbindet kontrollierbare manuelle Monatsplanung mit einer mathema
 3. Fixpunkte, RBN, Abwesenheiten, Wünsche, Optionen und Notizen bleiben unverändert.
 4. Fehlende Qualifikation, inaktive Personen, gleichzeitiger BD/HG und unmittelbar aufeinanderfolgende BD sind nicht relaxierbar.
 5. Abwesenheit, Polednia-Sperre und harte Maxima sind nur entsprechend der expliziten Relaxierungsrichtlinie zulässig.
-6. Personengebundene BD-, HG- und Gesamtobergrenzen gelten in jedem Suchpfad.
+6. Personengebundene BD-, HG- und Gesamtobergrenzen gelten in jedem Suchpfad; eine Überschreitung ist nur bei gleichzeitig aktiviertem Rot-Fallback und ausdrücklich aktivierter Maximum-Relaxierung zulässig.
 7. Rote Abweichungen werden erst nach nachgewiesen erfolgloser strikter Machbarkeitssuche betrachtet.
 8. Bis zur bewussten Übernahme erfolgt keine Mutation des Monatsplans.
 9. Vor der Übernahme werden Fingerprints, Fixpunkte und der vollständige Endzustand erneut auditiert.
+10. Ein nativer Solvernachweis wird ausschließlich als Nachweis für das kompilierten v9-Modell bezeichnet; die fachliche Freigabe erfolgt erst nach dem unabhängigen JavaScript-Endaudit.
 
 ## 3. Auto-Plan v9
 
@@ -50,6 +51,7 @@ DienstplanRAD verbindet kontrollierbare manuelle Monatsplanung mit einer mathema
 Versionierter Snapshot / Constraint Registry
   → Domänen- und Datenvalidierung
   → paralleler lokaler v8.5-Warmstart
+  → idempotenter Cloudflare-Workflow
   → strikte CP-SAT-Machbarkeit ohne Rot
   → optional kontrollierte Minimalrelaxierung
   → sequenzielle lexikografische Optimierung
@@ -60,9 +62,11 @@ Versionierter Snapshot / Constraint Registry
   → atomare Benutzerübernahme
 ```
 
-### 3.2 Modell
+### 3.2 Constraint-Kompilierung
 
-Für jedes offene Dienstfeld und jeden zulässigen Kandidaten existiert eine binäre Entscheidungsvariable. Fixpunkte werden als Konstanten in dasselbe Modell aufgenommen. Das Modell enthält unter anderem:
+Für jedes offene Dienstfeld und jeden zulässigen Kandidaten existiert eine binäre Entscheidungsvariable. Fixpunkte werden als Konstanten in dasselbe Modell aufgenommen. Der Snapshot übernimmt Kandidatendomänen, Schweregrade, Bestätigungstypen, Begründungen und Empfehlungsscores aus derselben produktiven JavaScript-Regelengine, die manuelle Auswahl und Endaudit steuert.
+
+Explizit im CP-SAT-Modell enthalten sind unter anderem:
 
 - vollständige Belegung jedes offenen BD-/HG-Feldes;
 - Qualifikation und zeitabhängige Rollen;
@@ -70,12 +74,15 @@ Für jedes offene Dienstfeld und jeden zulässigen Kandidaten existiert eine bin
 - keine direkt aufeinanderfolgenden BD;
 - werktäglicher HG unmittelbar vor eigenem BD;
 - individuelle BD-, HG- und Gesamtobergrenzen;
-- rote/orange/gelbe Regelkosten;
+- kontrollierte Maximum-Überschreitung als gezählte rote Relaxierung;
+- rote/orange/gelbe Kandidatenkosten;
 - Wunscherfüllung;
 - maximale und gesamte BD-Sollabweichung;
 - gewichtete Gesamtlast- und Wochenendspannweite;
 - Planstabilität gegenüber Warmstart/Baseline;
 - Mindestdistanz zwischen Varianten.
+
+Interaktionen, die vollständig aus der produktiven Regelengine und nicht als eigenständige CP-SAT-Relation kompiliert werden, bleiben durch den unabhängigen Browseraudit verbindlich. Ein Remoteergebnis, das diesen Audit nicht besteht, wird nicht freigegeben; der lokale regelgeprüfte Fallback übernimmt.
 
 ### 3.3 Lexikografische Ziele
 
@@ -92,11 +99,13 @@ Die Ziele werden nicht zu einer einzigen schwer interpretierbaren Großgewichtun
 9. Wochenendlast;
 10. nachrangige Stabilität.
 
-`OPTIMAL` wird nur ausgewiesen, wenn jede Zielstufe im Nachweismodus mit Gap `0` abgeschlossen wurde. Ein durch Zeit- oder Gap-Grenzen beendeter Lauf wird korrekt als `FEASIBLE` bezeichnet.
+`OPTIMAL` wird nur ausgewiesen, wenn jede Zielstufe im Nachweismodus mit Gap `0` abgeschlossen wurde. Die Benutzeroberfläche bezeichnet dies ausdrücklich als Optimalitätsnachweis **im kompilierten v9-Modell**. Ein durch Zeit- oder Gap-Grenzen beendeter Lauf wird als `FEASIBLE` bezeichnet.
 
 ### 3.4 Adaptive Exact-LNS
 
-Die v8.5-Heuristik liefert einen frühen Incumbent. v9 wählt anschließend adaptive Teilmengen aus und löst die freigegebenen Dienstfelder als exaktes CP-SAT-Teilmodell neu. Operatoren umfassen schwache Zuordnungen, Wochenenden, Personenlast, Zeitfenster und Zufallsnachbarschaften. Nutzung, Laufzeit und Qualitätsgewinn werden gemessen; die Auswahl balanciert Exploration und Qualitätsgewinn pro Rechenzeit.
+Die v8.5-Heuristik liefert einen frühen Incumbent. v9 wählt anschließend adaptive Teilmengen aus und löst die freigegebenen Dienstfelder als CP-SAT-Teilmodell neu. Operatoren umfassen schwache Zuordnungen, Wochenenden, Personenlast, Zeitfenster und Zufallsnachbarschaften. Nutzung, Laufzeit und Qualitätsgewinn werden gemessen; die Auswahl balanciert Exploration und Qualitätsgewinn pro Rechenzeit.
+
+Die Annahmeentscheidung der Exact-LNS verwendet dieselbe lexikografische Zielreihenfolge und dieselbe gewichtete Gesamtlast wie das CP-SAT-Hauptmodell. Dadurch kann eine Teilmodellverbesserung nicht aufgrund einer abweichenden Heuristikmetrik fälschlich akzeptiert werden.
 
 ### 3.5 Erklärbarkeit
 
@@ -105,6 +114,7 @@ Die v8.5-Heuristik liefert einen frühen Incumbent. v9 wählt anschließend adap
 - Daraus entstehen konkrete Relaxierungsvorschläge.
 - Hints sind ausschließlich Suchhinweise, niemals fachliche Constraints.
 - Solverstatus, Zielfunktionswert, beste Schranke und relativer Gap werden getrennt angezeigt.
+- Der Solverstatus wird von der fachlichen Browseraudit-Freigabe getrennt dargestellt.
 
 ## 4. Laufprofile und Studioeinstellungen
 
@@ -134,9 +144,13 @@ Browser / Auto-Plan Studio
   └─ /api/autoplan/v9/runs
        └─ Pages-Service-Binding AUTO_PLAN_V9
             └─ AutoPlanJob Durable Object
-                 ├─ SQLite: Zustand, Ereignisse, Ergebnis
-                 └─ AutoPlanContainer
-                      └─ FastAPI + OR-Tools CP-SAT
+                 ├─ SQLite: Zustand, Snapshot, Ereignisse, Ergebnis
+                 └─ AUTO_PLAN_WORKFLOW.create(runId)
+                      └─ AutoPlanWorkflow
+                           ├─ dauerhafte Retries und Zeitgrenzen
+                           ├─ Aufruf des idempotenten Job-DO-Ausführungsschritts
+                           └─ AutoPlanContainer
+                                └─ FastAPI + OR-Tools CP-SAT
 
 /api/month/:year/:month
   ├─ Pages-Service-Binding MONTH_STATE
@@ -149,11 +163,14 @@ Browser / Auto-Plan Studio
 
 - **Pages:** statische Anwendung und Release-Assets.
 - **Pages Functions:** Eingangsvalidierung, API-Vertrag, Service-Routing und sichere Fehlerantworten.
-- **AutoPlanJob:** idempotente Laufkennung, persistierte Events, Status, Wiederaufnahme und Abbruch.
-- **Container:** nativer Python-Prozess und CP-SAT-Rechenlast.
+- **AutoPlanJob:** idempotente Laufkennung, persistierter Snapshot, Events, Status, Ergebnis und hibernierende WebSockets.
+- **AutoPlanWorkflow:** dauerhafte Ausführung über Evictions hinweg, Retry-Policy, Zeitgrenze und Ergebnisverifikation.
+- **Container:** nativer Python-Prozess und CP-SAT-Rechenlast ohne Internetzugriff.
 - **MonthState:** serialisierte Monatsänderungen mit Expected Revision und Mutation-ID.
 - **Workers KV:** nicht mehr Autorität für konkurrierende Monatswrites; weiterhin Migrations-/Exportspiegel und kontrollierter Fallback.
 - **Browseraudit:** fachliche Endkontrolle unabhängig vom nativen Modell.
+
+Der Abbruchpfad setzt zunächst den persistierten Jobstatus, sendet die Cancellation unmittelbar an den Container und terminiert anschließend die zugehörige Workflow-Instanz. Wiederholte Startanfragen mit identischem Request-Fingerprint verwenden dieselbe Job- und Workflow-Kennung.
 
 ## 6. Startup-Stabilität
 
@@ -174,10 +191,11 @@ Zusätzliche Schutzschichten:
 - Requestgrößenbegrenzung in Pages Functions und Solvercontainer;
 - generische externe 5xx-Fehler mit Trace-ID, interne Details ausschließlich im Log;
 - `Cache-Control: no-store` und `X-Content-Type-Options: nosniff` auf APIs;
-- keine Internetverbindung des Solvercontainers;
+- kein Internetzugriff des Solvercontainers;
 - idempotente Lauf- und Monatsmutationen;
-- persistierte Abbruchsignale und unmittelbare Container-Cancellation;
+- persistierte Abbruchsignale, Workflow-Terminierung und unmittelbare Container-Cancellation;
 - Baseline-, Konfigurations- und Request-Fingerprints;
+- auf 100 Zeichen begrenzte, normalisierte Workflow-Instanzkennungen;
 - HTML-Escaping für Solverkommentare und Diagnoseinhalte;
 - kein Vertrauen in ein Remoteergebnis ohne lokalen Endaudit.
 
@@ -239,6 +257,7 @@ cd workers/autoplan-v9
 npm install
 npm run check
 npx wrangler deploy --dry-run
+npx wrangler deploy --dry-run --env preview
 
 cd ../month-state
 npm install
@@ -248,17 +267,17 @@ npx wrangler deploy --dry-run
 
 ## 10. Cloudflare-Konfiguration und Deployment
 
-1. `workers/autoplan-v9` deployen.
+1. `workers/autoplan-v9` deployen; dabei werden Workflow-, Job-DO- und Containerbindungen aus `wrangler.jsonc` angewendet.
 2. `workers/month-state` deployen.
 3. Pages-Service-Binding `AUTO_PLAN_V9` auf `dienstplanrad-autoplan-v9` setzen.
 4. Pages-Service-Binding `MONTH_STATE` auf `dienstplanrad-month-state` setzen.
 5. KV-Binding `DIENSTPLAN_KV` unverändert bereitstellen.
 6. Preview-Bindings auf die jeweiligen `-preview`-Worker richten.
 7. Pages neu deployen; Bindings werden erst nach Redeploy wirksam.
-8. Health-, Solver-, Cancel-, Monats-GET/PUT- und Revisionskonflikt-Smoke-Tests ausführen.
+8. Health-, Workflow-, Solver-, Cancel-, Monats-GET/PUT- und Revisionskonflikt-Smoke-Tests ausführen.
 9. Logs über Dashboard oder `wrangler pages deployment tail` kontrollieren.
 
-Der native Remote-Solver ist optional fail-safe: Fehlt `AUTO_PLAN_V9` oder ist der Container nicht erreichbar, übernimmt der lokale auditierte Fallback. Fehlt `MONTH_STATE`, bleibt die frühere KV-Persistenz als ausdrücklich ausgewiesener `eventual-fallback` verfügbar.
+Der native Remote-Solver ist optional fail-safe: Fehlt `AUTO_PLAN_V9` oder ist der Solverpfad nicht erreichbar, übernimmt der lokale auditierte Fallback. Fehlt `MONTH_STATE`, bleibt die frühere KV-Persistenz als ausdrücklich ausgewiesener `eventual-fallback` verfügbar.
 
 ## 11. Import, Export und Backup
 
@@ -275,8 +294,8 @@ Der native Remote-Solver ist optional fail-safe: Fehlt `AUTO_PLAN_V9` oder ist d
 
 - Regelengine, Berichte und Invarianten;
 - Fixpunktschutz, harte Maxima, Null-Rot-Eskalation und Fallback;
-- v9-Snapshot, Fingerprints, UI-Verträge, Tooltips und Proof-Kommentare;
-- Remote-/Fallback-Orchestrierung, Abbruch und Worker-Lebenszyklus;
+- v9-Snapshot, Fingerprints, UI-Verträge, Tooltips und modellbezogene Proof-Kommentare;
+- Remote-/Fallback-Orchestrierung, Workflow-Vertrag, Abbruch und Worker-Lebenszyklus;
 - Imports, Exports, Dirty-Marker und Konfliktpersistenz;
 - Startup-Root-Cause und äußere Fehlergrenze.
 
@@ -285,8 +304,8 @@ Der native Remote-Solver ist optional fail-safe: Fehlt `AUTO_PLAN_V9` oder ist d
 - Schema- und Modellvalidierung;
 - strikte Machbarkeit und Unlösbarkeit;
 - lexikografische Zielstufen;
-- Rot-Fallback, Limits und Warmstart;
-- Exact-LNS-Metadaten und Varianten;
+- Rot-Fallback, explizite Maximum-Relaxierung, Limits und Warmstart;
+- Exact-LNS-Metadaten, gewichtungskonsistente Annahmeentscheidung und Varianten;
 - FastAPI-Health-, Solve- und Cancel-Vertrag.
 
 ### Reproduzierbarer Solver-Benchmark
@@ -306,8 +325,8 @@ Der Harness `solver/benchmarks/benchmark_v9.py` führt eine deterministische syn
 ```text
 Node-Syntax + 383+ Modultests + Playwright
 Ruff + Mypy + Compileall + Pytest + deterministischer Solver-Benchmark + Docker-Build
-Wrangler TypeScript + Dry-Run AutoPlan Worker
-Wrangler TypeScript + Dry-Run MonthState Worker
+TypeScript + Wrangler Dry-Run AutoPlan Worker/Workflow/Container
+TypeScript + Wrangler Dry-Run MonthState Worker
 ```
 
 Ein Merge ist nur nach vollständig grünem Gate zulässig.
@@ -324,7 +343,7 @@ js/auto-plan-visualizer-v9.js         Solver-/Proof-Visualisierung
 js/startup-health-v9.js               Startüberwachung und Recovery
 functions/api/autoplan/v9/             Pages-Proxy für Solverläufe
 functions/api/month/                   revisionsgebundene Monatsschnittstelle
-workers/autoplan-v9/                   Job-DO und Containersteuerung
+workers/autoplan-v9/                   Workflow, Job-DO und Containersteuerung
 workers/month-state/                   stark konsistente Monatspersistenz
 solver/app/                            FastAPI, Pydantic und OR-Tools CP-SAT
 solver/tests/                          native Solvertests
@@ -336,6 +355,7 @@ tests/e2e/startup-v9.spec.js           Startup-Regression
 ## 14. Bewusste Grenzen
 
 - Ein Status `FEASIBLE` ist kein Optimalitätsbeweis.
+- `OPTIMAL` und `INFEASIBLE` beziehen sich auf das kompilierten v9-Modell; der fachliche JavaScript-Audit bleibt separat verbindlich.
 - Ein CP-SAT-Assumption-Core ist hinreichend, aber nicht zwingend global minimal; v9 reduziert ihn zeitgebunden weiter.
 - Hints können die Suche beschleunigen, werden vom Solver jedoch nicht garantiert befolgt.
 - Der Browserfallback ist fachlich auditiert, liefert aber keinen globalen CP-SAT-Nachweis.
