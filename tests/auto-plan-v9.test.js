@@ -107,7 +107,7 @@ test('proof-aware Kommentierung unterscheidet Beweis, Gap und Fallback wahrheits
   const optimal = formatV9Commentary({ stage: 'fairness', solverStatus: 'OPTIMAL', objectiveValue: 3, bestBound: 3, relativeGap: 0 });
   const feasible = formatV9Commentary({ stage: 'quality', solverStatus: 'FEASIBLE', objectiveValue: 5, bestBound: 4, relativeGap: .2 });
   const fallback = formatV9Commentary({ stage: 'remote-fallback', remoteFallback: true, message: 'HTTP 503' });
-  assert.match(optimal.text, /global optimal/);
+  assert.match(optimal.text, /kompilierten v9-Modell optimal bewiesen/);
   assert.match(feasible.text, /Gap 20/);
   assert.match(fallback.text, /lokale Warmstart übernimmt/);
   assert.notEqual(v9CommentaryKey({ stage: 'fairness', sequence: 1 }), v9CommentaryKey({ stage: 'fairness', sequence: 2 }));
