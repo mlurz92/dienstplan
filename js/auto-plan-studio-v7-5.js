@@ -8,7 +8,9 @@ function addStylesheet() {
   const link = document.createElement('link');
   link.rel = 'stylesheet';
   link.href = `/auto-plan-studio-v7-5.css?v=${RELEASE}`;
-  link.dataset.autoPlanV75Style = 'true';
+  // `dataset.autoPlanV75Style` würde gemäß DOMStringMap-Konvertierung
+  // `data-auto-plan-v75-style` erzeugen und damit den Selektor oben verfehlen.
+  link.setAttribute('data-auto-plan-v7-5-style', 'true');
   document.head.append(link);
 }
 
