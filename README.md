@@ -226,8 +226,9 @@ python -m pip install --upgrade pip==25.2
 python -m pip install -e './solver[dev]'
 ruff check solver
 mypy solver/app
-python -m compileall -q solver/app solver/tests
+python -m compileall -q solver/app solver/tests solver/benchmarks
 pytest solver
+python solver/benchmarks/benchmark_v9.py --smoke --repetitions 2 --output solver/benchmark-results/v9-smoke.json
 docker build -t dienstplanrad-autoplan-v9 ./solver
 ```
 
@@ -268,7 +269,7 @@ Der native Remote-Solver ist optional fail-safe: Fehlt `AUTO_PLAN_V9` oder ist d
 - KV bleibt Export-/Migrationsspiegel, während MonthState die konkurrierende Schreibautorität bildet.
 - Vor Infrastrukturmigration ist ein vollständiger JSON-Export empfohlen.
 
-## 12. Tests und Qualitätsgate
+## 12. Tests, Benchmarks und Qualitätsgate
 
 ### JavaScript
 
@@ -288,6 +289,10 @@ Der native Remote-Solver ist optional fail-safe: Fehlt `AUTO_PLAN_V9` oder ist d
 - Exact-LNS-Metadaten und Varianten;
 - FastAPI-Health-, Solve- und Cancel-Vertrag.
 
+### Reproduzierbarer Solver-Benchmark
+
+Der Harness `solver/benchmarks/benchmark_v9.py` führt eine deterministische synthetische Matrix aus und kann zusätzlich pseudonymisierte reale oder mutierte Solver-Snapshots laden. Er erfasst Solverstatus, Zeit bis zum ersten Incumbent, Laufzeit, Objective/Bound/Gap, Branches, Konflikte, lexikografische Zielstufen, Exact-LNS-Metadaten, Varianten, Konfliktkern sowie stabile Zuordnungsfingerprints. Unerwartete Statuswerte, unvollständige Lösungen oder abweichende deterministische Wiederholungen brechen das CI-Gate ab. Details und Aufrufvarianten stehen in `solver/benchmarks/README.md`.
+
 ### Browser
 
 - echter Chromium-Start ohne `pageerror`;
@@ -300,7 +305,7 @@ Der native Remote-Solver ist optional fail-safe: Fehlt `AUTO_PLAN_V9` oder ist d
 
 ```text
 Node-Syntax + 383+ Modultests + Playwright
-Ruff + Mypy + Compileall + Pytest + Docker-Build
+Ruff + Mypy + Compileall + Pytest + deterministischer Solver-Benchmark + Docker-Build
 Wrangler TypeScript + Dry-Run AutoPlan Worker
 Wrangler TypeScript + Dry-Run MonthState Worker
 ```
@@ -323,6 +328,7 @@ workers/autoplan-v9/                   Job-DO und Containersteuerung
 workers/month-state/                   stark konsistente Monatspersistenz
 solver/app/                            FastAPI, Pydantic und OR-Tools CP-SAT
 solver/tests/                          native Solvertests
+solver/benchmarks/                     synthetische/reale Benchmark- und Reproduzierbarkeitsmatrix
 tests/auto-plan-v9.test.js             v9-Integrationsverträge
 tests/e2e/startup-v9.spec.js           Startup-Regression
 ```
