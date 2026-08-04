@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "dienstplanrad-autoplan-v9-solver"
 version = "0.9.0"
@@ -18,6 +22,9 @@ dev = [
   "pytest==8.4.1",
   "ruff==0.12.5"
 ]
+
+[tool.setuptools]
+packages = ["app"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
