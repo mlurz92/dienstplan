@@ -1,0 +1,133 @@
+/* DienstplanRAD v9 – high-contrast duty table and focus/readability hardening. */
+
+:root {
+  --v9-focus-ring: color-mix(in oklab, var(--month-accent) 72%, #1477ff 28%);
+}
+
+html[data-color-scheme="dark"] {
+  color-scheme: dark;
+  --v9-table-text: #f6f8fb;
+  --v9-table-muted: #c5ced8;
+  --v9-table-line: color-mix(in oklab, #93a1af 48%, var(--month-accent) 52%);
+  --v9-table-cell: color-mix(in oklab, #111820 94%, var(--month-accent) 6%);
+  --v9-table-cell-alt: color-mix(in oklab, #18212b 91%, var(--month-accent) 9%);
+  --v9-table-head: color-mix(in oklab, #25313d 76%, var(--month-accent) 24%);
+}
+
+html[data-color-scheme="dark"] .plan-table {
+  color: var(--v9-table-text);
+  background: var(--v9-table-cell);
+  border-color: var(--v9-table-line);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 8px 28px rgba(0,0,0,.24);
+}
+
+html[data-color-scheme="dark"] .plan-table thead,
+html[data-color-scheme="dark"] .plan-table thead tr,
+html[data-color-scheme="dark"] .plan-table thead th {
+  color: #ffffff !important;
+  background: linear-gradient(180deg,
+    color-mix(in oklab, var(--v9-table-head) 88%, white 12%),
+    var(--v9-table-head)) !important;
+  border-color: var(--v9-table-line) !important;
+  text-shadow: 0 1px 1px rgba(0,0,0,.5);
+}
+
+html[data-color-scheme="dark"] .plan-table tbody tr:not(.saturday-row):not(.sunday-row):not(.holiday-row) > * {
+  color: var(--v9-table-text);
+  background-color: var(--v9-table-cell);
+  border-color: var(--v9-table-line);
+}
+
+html[data-color-scheme="dark"] .plan-table tbody tr:nth-child(even):not(.saturday-row):not(.sunday-row):not(.holiday-row) > * {
+  background-color: var(--v9-table-cell-alt);
+}
+
+html[data-color-scheme="dark"] .plan-table tbody tr:hover > * {
+  background-color: color-mix(in oklab, var(--v9-table-cell-alt) 78%, var(--month-accent) 22%) !important;
+}
+
+html[data-color-scheme="dark"] .plan-table :is(th, td, button, input, select, textarea, summary, details, strong, span, small, time, label) {
+  color: inherit;
+}
+
+html[data-color-scheme="dark"] .plan-table :is(.muted, small, .cell-meta, .assignment-meta, .day-meta, .row-note) {
+  color: var(--v9-table-muted) !important;
+}
+
+html[data-color-scheme="dark"] .plan-table button,
+html[data-color-scheme="dark"] .plan-table .assignment-button,
+html[data-color-scheme="dark"] .plan-table .picker-trigger {
+  color: var(--v9-table-text);
+  border-color: color-mix(in oklab, var(--v9-table-line) 72%, transparent);
+  background: linear-gradient(180deg,
+    color-mix(in oklab, var(--v9-table-cell-alt) 86%, white 14%),
+    color-mix(in oklab, var(--v9-table-cell) 90%, var(--month-accent) 10%));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 1px 3px rgba(0,0,0,.28);
+}
+
+html[data-color-scheme="dark"] .plan-table button:hover,
+html[data-color-scheme="dark"] .plan-table .assignment-button:hover,
+html[data-color-scheme="dark"] .plan-table .picker-trigger:hover {
+  color: #fff;
+  border-color: color-mix(in oklab, var(--month-accent) 68%, white 32%);
+  background: color-mix(in oklab, var(--v9-table-cell-alt) 72%, var(--month-accent) 28%);
+}
+
+html[data-color-scheme="dark"] .plan-table :is(button, input, select, textarea, summary):focus-visible,
+.auto-plan-dialog[data-engine-revision="9"] :is(button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--v9-focus-ring) !important;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--v9-focus-ring) 28%, transparent) !important;
+}
+
+html[data-color-scheme="dark"] .plan-table .saturday-row > *,
+html[data-color-scheme="dark"] .plan-table tr.saturday-row > * {
+  color: #f8fbff !important;
+  background-color: color-mix(in oklab, #17222d 78%, var(--month-accent) 22%) !important;
+}
+
+html[data-color-scheme="dark"] .plan-table .sunday-row > *,
+html[data-color-scheme="dark"] .plan-table tr.sunday-row > * {
+  color: #ffffff !important;
+  background-color: color-mix(in oklab, #19232d 68%, var(--month-accent) 32%) !important;
+}
+
+html[data-color-scheme="dark"] .plan-table .holiday-row > *,
+html[data-color-scheme="dark"] .plan-table tr.holiday-row > * {
+  color: #ffffff !important;
+  background-color: color-mix(in oklab, #1b2631 58%, var(--month-accent) 42%) !important;
+}
+
+/* Semantische Bewertungsflächen behalten ihre Bedeutung und erhalten zugleich
+   einen vom Monatsfarbton unabhängigen Textkontrast. */
+html[data-color-scheme="dark"] .plan-table :is(.green, [data-level="green"], .level-green) {
+  color: #dff8e9 !important;
+}
+html[data-color-scheme="dark"] .plan-table :is(.yellow, [data-level="yellow"], .level-yellow) {
+  color: #fff4c2 !important;
+}
+html[data-color-scheme="dark"] .plan-table :is(.orange, [data-level="orange"], .level-orange) {
+  color: #ffe1c2 !important;
+}
+html[data-color-scheme="dark"] .plan-table :is(.red, [data-level="red"], .level-red) {
+  color: #ffd8dc !important;
+}
+html[data-color-scheme="dark"] .plan-table :is(.gray, [data-level="gray"], .level-gray) {
+  color: #d7dee6 !important;
+}
+
+html[data-color-scheme="dark"] .plan-table ::selection {
+  color: #071019;
+  background: color-mix(in oklab, var(--month-accent) 62%, white 38%);
+}
+
+@media (forced-colors: active) {
+  .plan-table,
+  .plan-table * {
+    forced-color-adjust: auto;
+  }
+  .plan-table :is(button, input, select, textarea, summary):focus-visible,
+  .auto-plan-dialog :is(button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid Highlight !important;
+  }
+}
