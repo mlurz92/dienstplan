@@ -1,0 +1,18 @@
+{
+  "name": "dienstplanrad-month-state",
+  "private": true,
+  "version": "0.9.0",
+  "type": "module",
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "vitest run",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20260724.1",
+    "typescript": "5.9.2",
+    "vitest": "4.1.0",
+    "wrangler": "4.113.0"
+  }
+}
