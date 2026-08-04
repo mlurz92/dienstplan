@@ -32,6 +32,7 @@ jobs:
         run: |
           cp .github/final-ci.yml.template .github/workflows/ci.yml
           rm -f .github/final-ci.yml.template
+          sed -i 's/[[:space:]]\+$//' README.md
       - name: Diff prüfen und pushen
         run: |
           git diff --check
