@@ -45,7 +45,10 @@ function bridgedPreferences(source) {
 
 export function deriveV9Tuning(source = {}) {
   const bridged = bridgedPreferences(source);
-  const solverMode = MODES.has(source.solverMode) ? source.solverMode : bridged.solverMode || 'hybrid';
+  // Direkte/ältere API-Aufrufe ohne expliziten v9-Vertrag behalten das schnelle
+  // v8.5-Verhalten. Das Studio schreibt vor jedem Start bewusst seinen
+  // standardmäßigen Hybridvertrag in `performanceProfile`.
+  const solverMode = MODES.has(source.solverMode) ? source.solverMode : bridged.solverMode || 'fast';
   const proofTarget = TARGETS.has(source.proofTarget) ? source.proofTarget : bridged.proofTarget || 'best-within-budget';
   const totalBudgetMs = clamp(source.timeBudgetMs, 10_000, 900_000, 120_000);
   const exactShare = solverMode === 'fast' ? 0
@@ -123,7 +126,7 @@ export function mapHeuristicProgress(onProgress, { floor = .55, ceiling = .80 } 
       progress: lastProgress,
       heuristicTerminal: terminal,
       message: terminal
-        ? `v8.5-Incumbent abgeschlossen · exakte v9-Prüfung folgt`
+        ? 'v8.5-Incumbent abgeschlossen · exakte v9-Prüfung folgt'
         : update?.message
     });
   };
