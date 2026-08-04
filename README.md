@@ -29,7 +29,9 @@ DienstplanRAD verbindet kontrollierbare manuelle Monatsplanung mit einer bestät
 - server-first Synchronisierung mit lokaler Sicherung;
 - Auto-Plan Studio für Konfiguration, Live-Beobachtung, Vorschlagsprüfung und kontrollierte Übernahme;
 - Hell-/Dunkelmodus mit monatsabhängiger Kontrastfarbe;
-- vollständig clientseitige v9-Optimierung ohne Solver-Server.
+- vollständig clientseitige v9-Optimierung ohne Solver-Server und ohne laufende Zusatzkosten.
+
+---
 
 ## 2. Verbindliche Planungsprinzipien
 
@@ -47,6 +49,7 @@ DienstplanRAD verbindet kontrollierbare manuelle Monatsplanung mit einer bestät
 12. Globale Optimalität wird ausschließlich bei vollständig abgeschlossenem Suchraum als `OPTIMAL` bezeichnet.
 13. Lokale v8.5-Nachbarschaftsstabilität wird niemals als globaler Beweis ausgegeben.
 14. Solverfortschritt und Zwischenzustände werden nicht in KV geschrieben.
+15. Die sichtbare Animation darf den Solverzustand nur darstellen, niemals beeinflussen.
 
 ---
 
@@ -70,7 +73,7 @@ Pages Functions / bestehender KV-Worker
 Workers KV
 ```
 
-Die kombinatorische Suche läuft im Browser. Pages Functions und der KV-Worker übernehmen weiterhin nur kleine API-Aufgaben, Validierung und Persistenz. Es werden keine Cloudflare Containers, Durable Objects, D1, R2, Workflows, Workers AI oder externen Solver-APIs benötigt.
+Die kombinatorische Suche läuft vollständig im Browser. Pages Functions und der KV-Worker übernehmen weiterhin nur kleine API-Aufgaben, Validierung und Persistenz. Es werden keine Cloudflare Containers, Durable Objects, D1, R2, Workflows, Workers AI oder externen Solver-APIs benötigt.
 
 ### 3.2 Weshalb die exakte Suche im Browser läuft
 
@@ -93,13 +96,13 @@ Die Solvergrenze ist bewusst ehrlich dokumentiert: Bei großen vollständigen Mo
 
 ### 3.4 Additive Auslieferungsgeneration
 
-Der bestehende v8.5-Modulgraph bleibt als stabile Basisschicht erhalten. v9 wird als additive, separat versionierte Modulschicht geladen. Dadurch bleiben bestehende Integrationsverträge funktionsfähig, während die produktive Engine eindeutig als Generation 9 markiert wird. Ein Delivery-Test lässt genau den bisherigen Shell-/v8.5-Token und den v9-Token zu und verhindert vermischte Modulstände innerhalb einer Datei.
+Der bestehende v8.5-Modulgraph bleibt als stabile Basisschicht erhalten. v9 wird als additive, separat versionierte Modulschicht geladen. Dadurch bleiben bestehende Integrationsverträge funktionsfähig, während die produktive Engine eindeutig als Generation 9 markiert wird. Delivery-Tests verhindern vermischte Modulstände innerhalb einer Datei.
 
 ---
 
 ## 4. Auto-Plan v9
 
-### 4.1 Verbindliche Pipeline
+### 4.1 Pipeline
 
 ```text
 unveränderlicher Monatssnapshot
@@ -153,9 +156,7 @@ v8.5 erzeugt einen starken Startplan. Fällt die exakte v9-Schicht aus oder ist 
 - gedrosselte Live-Telemetrie;
 - unabhängige Materialisierung und Schlussprüfung.
 
-Rote Bewertungen können in einem Teilzustand von noch offenen, später erfüllbaren Kopplungen abhängen. Die produktive strikte v9-Suche entfernt solche Zwischenzweige deshalb **nicht** vorzeitig. Sie enumeriert technisch wählbare rote Zwischenzustände mit, bewertet aber ausschließlich vollständige Monatspläne. Da Rot in der Zielfunktion vor allen weichen Zielen steht, ist das global beste vollständige Ergebnis automatisch Null-Rot, sofern eine Null-Rot-Belegung existiert.
-
-Wird der gesamte relevante Suchraum abgeschlossen, ist das Ergebnis ein globaler Nachweis innerhalb des implementierten Regel- und Zielmodells.
+Rote Bewertungen können in einem Teilzustand von noch offenen, später erfüllbaren Kopplungen abhängen. Die produktive strikte v9-Suche entfernt solche Zwischenzweige deshalb nicht vorzeitig. Sie enumeriert technisch wählbare rote Zwischenzustände mit, bewertet aber ausschließlich vollständige Monatspläne. Da Rot in der Zielfunktion vor allen weichen Zielen steht, ist das global beste vollständige Ergebnis automatisch Null-Rot, sofern eine Null-Rot-Belegung existiert.
 
 ### 4.4 Solverstatus
 
@@ -166,21 +167,18 @@ Wird der gesamte relevante Suchraum abgeschlossen, ist das Ergebnis ein globaler
 | `INFEASIBLE` | Vollständiger strikter Suchraum abgeschlossen; keine Null-Rot-Lösung vorhanden. |
 | `UNKNOWN` | Limit erreicht, bevor eine Lösung oder ein Unmöglichkeitsnachweis vorlag. |
 
-Der sichtbare Ergebnistext und die Nachweiskarte werden nach jedem Ergebnis aus `metrics.proof` erzeugt. Veraltete Formulierungen wie „global zertifiziert“ werden entfernt, wenn lediglich `FEASIBLE` oder `UNKNOWN` vorliegt.
+Der sichtbare Ergebnistext und die Nachweiskarte werden aus `metrics.proof` erzeugt. Veraltete Formulierungen wie „global zertifiziert“ werden entfernt, wenn lediglich `FEASIBLE` oder `UNKNOWN` vorliegt.
 
 ### 4.5 Strikter Lauf und Minimal-Rot-Fallback
 
-Die produktive Suche verfolgt zuerst Null-Rot. Der exakte Enumerator untersucht dabei verlustfrei alle technisch wählbaren Zwischenzweige und leitet den strikten Status erst aus dem global besten vollständigen Ergebnis ab:
-
-- global bestes vollständiges Ergebnis hat `0` Rot: striktes `OPTIMAL`;
-- Suchraum vollständig, global bestes Ergebnis bleibt rot: striktes `INFEASIBLE`;
+- Global bestes vollständiges Ergebnis hat `0` Rot: striktes `OPTIMAL`, sofern der Suchraum vollständig abgeschlossen wurde.
+- Suchraum vollständig, global bestes Ergebnis bleibt rot: striktes `INFEASIBLE` für Null-Rot.
 - Suchraum nicht vollständig: `FEASIBLE` oder `UNKNOWN`, aber kein Unmöglichkeitsnachweis.
-
-Nur nach einem vollständigen strikten `INFEASIBLE`-Nachweis darf der bereits im selben Suchlauf gefundene globale Minimal-Rot-Plan angeboten werden. Ein identischer zweiter Exaktlauf ist nicht erforderlich. Im Diagnosemodus bleibt der rote Fallback gesperrt. `UNKNOWN` öffnet keinen automatischen Rot-Fallback.
+- Nur nach einem vollständigen strikten `INFEASIBLE`-Nachweis darf der bereits gefundene globale Minimal-Rot-Plan angeboten werden.
+- Im Diagnosemodus bleibt der rote Fallback gesperrt.
+- `UNKNOWN` öffnet keinen automatischen Rot-Fallback.
 
 ### 4.6 Lexikografische Zielordnung
-
-Die Qualitätsreihenfolge bleibt hart priorisiert:
 
 1. Laufgrenzen;
 2. graue beziehungsweise nicht wählbare Belegungen;
@@ -198,14 +196,17 @@ Die Qualitätsreihenfolge bleibt hart priorisiert:
 
 Eine bessere Fairness darf niemals einen zusätzlichen harten, roten, orangefarbenen oder gelben Konflikt erkaufen.
 
-### 4.7 Fortschritts- und Gewinnervertrag
+### 4.7 Ergebnisversiegelung und Übernahme
 
-- v8.5-Aufbau und -Perfektion werden in den reservierten Bereich bis 80 Prozent abgebildet;
-- interne v8.5-Endereignisse werden in der v9-Pipeline nicht als terminal weitergereicht;
-- der Runner klemmt den Gesamtfortschritt monoton, sodass die Prozentanzeige nicht zurückspringt;
-- die exakte Suche übernimmt den Schlussbereich;
-- bei objektiv identischen Plänen gewinnt der stärkere Nachweis;
-- ein `OPTIMAL`-Ergebnis kann dadurch nicht von einem später eintreffenden, lediglich heuristischen Gleichstand verdrängt werden.
+Ein exaktes v9-Ergebnis wird vor der Vorschau mit den Integritätsmetadaten des vollständig ausgeführten Incumbents versiegelt. Plan, Audit, Zielfunktion und Solverstatus stammen weiterhin ausschließlich vom tatsächlich gewählten Endergebnis. Konfigurations-, Iterations-, Optimierer- und Vorschlagsfingerabdrücke werden anschließend auf dem finalen Zustand neu erzeugt.
+
+Die Übernahmeprüfung bleibt damit vollständig aktiv:
+
+- unveränderter Ausgangssnapshot;
+- identische Laufkonfiguration;
+- unveränderte Solver- und Optimiererparameter;
+- erneuter vollständiger Regel-Audit;
+- keine Mutation außerhalb der vorgeschlagenen leeren BD-/HG-Felder.
 
 ---
 
@@ -220,18 +221,16 @@ Eine bessere Fairness darf niemals einen zusätzlichen harten, roten, orangefarb
 | **Exakt · maximales Budget** | Größter Zeitanteil für die vollständige Tiefensuche. |
 | **Diagnose · strikt Null-Rot** | Kein roter Fallback; untersucht ausschließlich den strikten Null-Rot-Anspruch. |
 
-Direkte ältere API-Aufrufe ohne v9-Vertrag bleiben aus Kompatibilitätsgründen im schnellen v8.5-Modus. Das Studio überträgt seinen gewählten v9-Vertrag vor dem Start ausdrücklich an Worker und Inline-Fallback.
-
 ### 5.2 Nachweisziel
 
 | Ziel | Wirkung |
 | --- | --- |
-| **Erste gültige Lösung** | Stoppt nach dem ersten zulässigen Ergebnis beziehungsweise übernimmt einen bereits sauberen Incumbent; geringster Exaktanteil. |
+| **Erste gültige Lösung** | Stoppt nach dem ersten vollständig auditierten Null-Rot-Ergebnis beziehungsweise übernimmt einen bereits sauberen Incumbent. |
 | **Hohe Qualität** | Nutzt einen moderaten Anteil des Zeit- und Knotenbudgets für exakte Verbesserung. |
 | **Bestmöglich im Zeitrahmen** | Verwendet das ausgewogene Standardbudget bis Zeit- oder Knotenlimit. |
 | **Optimum beweisen** | Reserviert deutlich mehr Zeit und Knoten für den Versuch, den Suchraum vollständig abzuschließen. |
 
-Die Ziele sind nicht nur Beschriftungen: Sie verändern Exaktanteil, Knotenlimit und gegebenenfalls das Abbruchverhalten.
+Die Ziele verändern Exaktanteil, Knotenlimit und gegebenenfalls das Abbruchverhalten tatsächlich; sie sind keine rein visuellen Profile.
 
 ### 5.3 Weitere Parameter
 
@@ -246,25 +245,25 @@ Die Ziele sind nicht nur Beschriftungen: Sie verändern Exaktanteil, Knotenlimit
 - personenspezifische BD-/HG-/Gesamtobergrenzen;
 - parallele Portfolio-Worker und UI-Reserve.
 
-Alte v8.5-Integrationsmarker bleiben additiv erhalten, die produktive Generation steht separat als v9 bereit.
-
 ---
 
 ## 6. Auto-Plan Studio v9
 
-### 6.1 Viewportfestes Layout
+### 6.1 Viewportfestes Lauf-Layout
 
-Das Studio verwendet:
+Das Modal verwendet `100dvh` und eine feste Kopf-/Inhalt-/Fuß-Struktur. Konfiguration und Ergebnis bleiben bei Bedarf gemeinsam im zentralen Inhaltsbereich scrollbar. **Während eines aktiven Algorithmuslaufs scrollt das Modal selbst nicht.** Der verfügbare Viewport wird stattdessen vollständig auf die Laufansicht verteilt:
 
-- `100dvh` statt einer starren Fensterhöhe;
-- einen gemeinsam scrollbaren Inhaltsbereich zwischen Kopf und Fuß;
-- explizite Grid-Zeilen für Phasen, Worker, Phasentheater, Log und Metriken;
-- `min-width: 0` und `min-height: 0` an verschachtelten Grid-/Flex-Elementen;
-- stabile Scrollbarflächen;
-- einspaltige Umordnung bei kleineren Fenstern;
-- zwei- beziehungsweise einspaltige Phasenkarten auf schmalen Ansichten.
+- `#autoPlanBody` bleibt in der Laufphase ohne eigenen Überlauf;
+- Visualisierung und Konsole besitzen explizite, begrenzte Grid-/Flex-Höhen;
+- `min-width: 0` und `min-height: 0` verhindern implizites Aufspannen verschachtelter Bereiche;
+- das Algorithmus-Kommentar-Fenster hat eine feste Höhe;
+- neue Kommentarmeldungen vergrößern weder Kommentarbereich noch Modal;
+- ausschließlich `#autoPlanLog` scrollt intern und folgt der neuesten Meldung;
+- Metriken, Phasentheater und Fußleiste bleiben jederzeit sichtbar;
+- bei geringer Fensterhöhe werden Abstände, Karten und Beschreibungstexte verdichtet;
+- auf schmalen Ansichten wird kontrolliert einspaltig umgeordnet.
 
-Damit bleiben Phasenkarten, Protokoll, Kennzahlen, Vorschlagstabelle, Statistik, Bestätigung und Übernahmebutton erreichbar. Eine Browserregression prüft die Dialoggrenzen, Grid-Zeilen und die letzte Phasenkarte bei 1375 × 760 Pixeln.
+Browserregressionen prüfen die Dialoggrenzen, die letzte Phasenkarte und 120 dynamisch angefügte Kommentarmeldungen bei kleinen Viewports. Dabei müssen Modal- und Body-Höhe stabil bleiben, während ausschließlich der Kommentarstrom einen internen Scrollbereich erhält.
 
 ### 6.2 Wahrheitsgetreue, dauerhaft aktive Animation
 
@@ -278,7 +277,7 @@ Die Visualisierung basiert ausschließlich auf echten Fortschrittsereignissen:
 - Zeitanteilsanzeige;
 - finaler Beweisstatus.
 
-Die Animation verändert keine Solverentscheidung. Entsprechend der Produktvorgabe existiert kein Modus für reduzierte Bewegung. Eine zuletzt geladene v9-Motionsschicht hält die vollständige Algorithmusanimation auch dann aktiv, wenn das Betriebssystem `prefers-reduced-motion: reduce` meldet.
+Die Animation verändert keine Solverentscheidung. Entsprechend der Produktvorgabe existiert kein anwendungseigener Modus für reduzierte Bewegung. Eine zuletzt geladene v9-Motionsschicht hält die vollständige Algorithmusanimation auch dann aktiv, wenn das Betriebssystem `prefers-reduced-motion: reduce` meldet.
 
 ### 6.3 Tooltips und Tastaturbedienung
 
@@ -291,7 +290,8 @@ Jedes relevante Konfigurations-, Status- und Ergebnisfeld erhält einen Rich Too
 - automatische Positionierung;
 - Tooltips für Solvermodus, Nachweisziel, Zeitrahmen, Limits, Phasen, Worker, Metriken, Protokoll und Übernahme;
 - generierte Erklärungen für dynamisch eingefügte Tabellen- und Kennzahlenfelder;
-- MutationObserver für nachträglich gerenderte Elemente.
+- MutationObserver für nachträglich gerenderte Elemente;
+- dokumentweit genau ein Tooltip-Host und genau ein delegierter Ereignissatz, auch wenn dieselbe Basisschicht unter unterschiedlichen Release-URLs geladen wird.
 
 ### 6.4 Ergebnisnachweis
 
@@ -306,8 +306,6 @@ Die Ergebnisansicht zeigt getrennt:
 - Kostenmodell `0 €`;
 - Regel-Audit und rote Einzelbestätigung.
 
-`js/auto-plan-v9-truth.js` ersetzt mehrdeutige v8.5-Kurztexte durch die tatsächlich belegte v9-Semantik. `FEASIBLE` wird als zulässige, aber nicht global bewiesene Lösung bezeichnet; `UNKNOWN` bleibt ein offener Zeit-/Knotenabbruch.
-
 ---
 
 ## 7. Command Bar und Erscheinungsbild
@@ -318,23 +316,29 @@ Die Werkzeugleiste ist semantisch in Planung, Daten und Ausgabe gegliedert. Besc
 
 ### 7.2 Hell-/Dunkelmodus
 
-Die Auswahl wird lokal vor Abschluss des Bootstraps angewendet. Die Monatsfarbe bleibt Akzentquelle für Fokus, Glasränder, Wochenenden, Feiertage, Auto-Plan und Statuszustände.
+Die Auswahl wird lokal angewendet. Die Monatsfarbe bleibt Akzentquelle für Fokus, Glasränder, Wochenenden, Feiertage, Auto-Plan und Statuszustände. `color-scheme: dark` sorgt im Dunkelmodus zusätzlich für passende native Formularelemente und Scrollleisten.
 
-### 7.3 Dunkle Diensttabelle v9
+### 7.3 Vollständige Dunkelmodus-Härtung v9
 
-`app-v9.css` definiert für die Diensttabelle:
+`app-v9.css` verwendet eigenständige semantische Dunkelmodus-Tokens für Text, Oberflächen, Gitterlinien, Fokus und Statusfarben. Der Dunkelmodus umfasst nicht nur die Diensttabelle, sondern die gesamte planungsrelevante Oberfläche:
 
-- helle Primär- und Sekundärschrift;
-- eigenständige dunkle Zell- und Alternierungsflächen;
-- kontrastreiche Kopfzeilen;
-- klar getrennte Gitterlinien;
-- lesbare Samstag-, Sonntag- und Feiertagszeilen;
-- kontrastgehärtete Buttons und Picker;
-- sichtbare Fokusindikatoren;
-- lesbare semantische Grün-/Gelb-/Orange-/Rot-/Grau-Texte;
-- `forced-colors`-Fallback.
+- Anwendungschrome, Monatskopf, Monatskontrast-Badge und Abschnittsüberschriften;
+- Diensttabelle mit Kopf, Datum, Wochentag, BD/HG, RBN, Zusammenfassungen, Hover und Fokus;
+- Samstag, Sonntag und Feiertag mit voneinander unterscheidbaren dunklen Flächen;
+- **Offen-Badges** in leeren BD-/HG-Feldern mit eigener dunkler Hintergrund-, Rand- und Textfarbe;
+- alle semantischen Grün-/Gelb-/Orange-/Rot-/Grau-Badges;
+- **Statistik** einschließlich Kopfzeile, Datenzeilen, Alternierung, Sollüberschreitung und hervorgehobener Offen-Zeile;
+- offene Punkte einschließlich Statusbadge, Titel und Begründung;
+- Picker mit Suche, Kandidaten, Lastanzeigen, Detailbereich, Tastaturhinweisen und aktiver Auswahl;
+- Tages-, Batch-, Konflikt- und Einstellungsdialoge;
+- Auto-Plan Studio mit Konfiguration, Phasentheater, Algorithmus-Kommentar, Metriken, Vorschlag, Statistik und Ergebnis;
+- sichtbare Fokusindikatoren und `forced-colors`-Fallback.
 
-Die Browserregression misst für eine normale Tabellenzelle mindestens ein Kontrastverhältnis von 4,5:1.
+Die Browserregression prüft repräsentative sichtbare Elemente automatisch gegen WCAG 2.2 AA:
+
+- normaler Text mindestens `4.5:1`;
+- wesentliche UI-Kanten und Zustandsindikatoren werden mit deutlich kontrastierenden Rändern gestaltet;
+- zusätzlich muss jede geprüfte Dunkelmodusfläche eine niedrige Hintergrundluminanz besitzen, damit eine unbemerkt verbliebene helle Light-Mode-Fläche nicht allein wegen dunkler Schrift als bestanden gilt.
 
 ---
 
@@ -354,7 +358,8 @@ Die Browserregression misst für eine normale Tabellenzelle mindestens ein Kontr
 - keine Mutation des produktiven Monats während der Suche;
 - idempotente UI-, Observer- und Tooltipinstallation;
 - vollständiger Inline-Fallback, falls Web Worker nicht verfügbar ist;
-- stärkerer Nachweis als Tiebreak bei identischem Zielvektor.
+- stärkerer Nachweis als Tiebreak bei identischem Zielvektor;
+- fester Lauf-Viewport ohne Layoutwachstum durch Kommentarereignisse.
 
 ---
 
@@ -421,20 +426,24 @@ KV ist eventual consistent. Gleichzeitige Schreibvorgänge auf denselben Schlüs
 ### 10.3 PDF
 
 - druckoptimierte Monatsansicht;
-- sichtbare Dienste, Abwesenheiten, Wünsche und Statistik;
-- unabhängige Druckfarben und Seitenumbrüche.
+- ein vollständiger Monatsplan auf einer A4-Seite, soweit der konkrete Monatsumfang dies zulässt;
+- Statistik unter dem Plan;
+- unabhängige Druckfarben und Seitenumbrüche;
+- Bedienhilfen, Offen-Badges und offene Punkte werden im Druck ausgeblendet.
 
-Empfehlung: Vor größeren Stammdaten-, Import- oder Regeländerungen einen JSON-Export sichern.
+**Empfehlung:** Vor größeren Stammdaten-, Import- oder Regeländerungen einen JSON-Export sichern.
 
 ---
 
 ## 11. Lokale Entwicklung
 
-Voraussetzungen:
+### 11.1 Voraussetzungen
 
 - Node.js 24;
 - npm;
 - Chromium für Playwright.
+
+### 11.2 Installation und Prüfungen
 
 ```bash
 npm ci
@@ -456,6 +465,15 @@ Ein einfacher lokaler Server genügt für die statischen Browserprüfungen:
 ```bash
 python3 -m http.server 4173
 ```
+
+### 11.3 Entwicklungsregeln
+
+- keine Secrets oder generierten Diagnoseartefakte committen;
+- bestehende Modulversionsverträge beachten;
+- neue Fachregeln zuerst in der gemeinsamen Regelengine implementieren;
+- jede Solveränderung mit Differential-/Invariantentests absichern;
+- nach jeder relevanten Änderung Syntax, v9-Vertrag, Node-Tests und Browserregressionen ausführen;
+- README und Releasebeschreibung mit dem tatsächlichen Verhalten synchron halten.
 
 ---
 
@@ -490,6 +508,7 @@ python3 -m http.server 4173
 - strikte Fallbackreihenfolge;
 - monotone Fortschrittsabbildung;
 - Nullkostenarchitektur;
+- Ergebnisversiegelung und Übernahmeschutz;
 - Studio-, Kontrast-, Layout-, Wahrheits- und Animationsverträge.
 
 ### 12.3 Browsertests
@@ -502,11 +521,13 @@ python3 -m http.server 4173
 - kleine Fensterhöhen und Scrollbarkeit;
 - v9-Viewportgrenzen;
 - sieben v9-Phasenkarten ohne Abschneiden;
+- **höhenstabiler Algorithmus-Kommentar mit ausschließlich internem Scrollen**;
 - Rich Tooltips per Fokus und `Escape`;
 - vollständige Tooltipabdeckung sichtbarer Studiofelder;
-- gemessener Dunkelmoduskontrast;
-- eindeutige `FEASIBLE`-Ergebnissprache ohne falsche Zertifizierung;
-- dauerhaft aktive Animation auch unter emulierter OS-Reduktionspräferenz;
+- wahrheitsgetreue `FEASIBLE`-Ergebnissprache ohne falsche Zertifizierung;
+- dauerhaft aktive Algorithmusanimation unter emulierter OS-Reduktionspräferenz;
+- vollständiger Dunkelmodus-Audit für Diensttabelle, Offen-Badges, Statistik, offene Punkte, semantische Badges, Picker und Auto-Plan Studio;
+- gemessener Textkontrast von mindestens `4.5:1` auf geprüften Dunkelmodusflächen;
 - Legacy-v8.5-Integrationsvertrag.
 
 ### 12.4 CI
@@ -561,7 +582,7 @@ Die v9-Engine erzeugt keine serverseitige Solverlast. Für die vorhandene Größ
 ## 14. Projektstruktur v9
 
 ```text
-js/auto-planner.js                       produktiver Export auf v9
+js/auto-planner.js                       produktiver Export und Ergebnisversiegelung auf v9
 js/auto-planner-v9.js                    Hybrid-Orchestrierung, strikter Suchvertrag und Solverstatus
 js/auto-planner-v9-exact.js              rohe exakte MRV-Constraint-Tiefensuche
 js/auto-planner-v8-5.js                  Incumbent, Eskalation und Fallback
@@ -574,14 +595,16 @@ js/auto-plan-studio-v9-contract.js       additiver v8.5/v9-Integrationsvertrag
 js/auto-plan-v9-truth.js                 eindeutige sichtbare Nachweissprache
 js/auto-plan-v9-motion.js                Lader der dauerhaft aktiven Animation
 js/auto-plan-studio-v8-5.js              bewährte Studio-Basisschicht
-js/rich-tooltip-v8-5.js                  zentrale ARIA-Tooltips
+js/rich-tooltip-v8-5.js                  zentraler, deduplizierter ARIA-Tooltipdienst
 js/ui-v9.js                              additive v9-Shellintegration
+js/auto-plan-ui.js                       v9-UI-Einstieg und Lauf-Layout-Invarianten
 auto-plan-studio-v9.css                  v9-HUD, Telemetrie und Ergebnisdarstellung
 auto-plan-studio-v9-contract.css         viewportfestes Schichtenlayout
 auto-plan-studio-v9-always-motion.css    vollständige Animation ohne Reduktionsmodus
-app-v9.css                                Dunkelmodus- und Fokuskontrast
+app-v9.css                                vollständige Dunkelmodus- und Fokuskontrasthärtung
 tests/auto-plan-v9.test.js               v9-Solver- und Architekturverträge
-tests/e2e/auto-plan-v9.spec.js           Layout-, Tooltip-, Wahrheits-, Animations- und Kontrastregressionen
+tests/e2e/auto-plan-v9.spec.js           Layout-, Scroll-, Tooltip-, Wahrheits- und Animationsregressionen
+tests/e2e/dark-mode.spec.js              vollständige Dunkelmodus- und WCAG-Kontrastregressionen
 ```
 
 ---
@@ -599,7 +622,7 @@ tests/e2e/auto-plan-v9.spec.js           Layout-, Tooltip-, Wahrheits-, Animatio
 - unterschiedliche Budgets für alle Nachweisziele;
 - monotone Fortschrittsabbildung;
 - stärkerer Nachweis als Gleichstandsentscheidung;
-- globale Nachweiskennzeichnung nur bei vollständig beendetem Suchraum;
+- versiegelte Integritätsmetadaten des tatsächlich ausgewählten Endplans;
 - keine kostenpflichtige Solver- oder Cloudkomponente.
 
 ### Studio
@@ -609,18 +632,22 @@ tests/e2e/auto-plan-v9.spec.js           Layout-, Tooltip-, Wahrheits-, Animatio
 - exakte Knoten-, Lösungs- und Sackgassentelemetrie;
 - finaler wahrheitsgetreuer Beweisstatus;
 - überarbeitete energie- und qualitätsabhängige Animation;
-- vollständige Animation ohne Reduktionsmodus;
+- vollständige Animation ohne anwendungseigenen Reduktionsmodus;
 - flächendeckende Rich Tooltips;
-- korrektes Scroll- und Responsive-Verhalten;
-- keine abgeschnittenen Phasenkarten oder Ergebnisbereiche.
+- feste Laufansicht ohne Modal-Scroll;
+- intern scrollender, höhenstabiler Algorithmus-Kommentar;
+- keine abgeschnittenen Phasenkarten, Kennzahlen oder Ergebnisbereiche.
 
 ### Oberfläche
 
-- kontrastgehärtete Diensttabelle im Dunkelmodus;
+- vollständige Dunkelmodus-Härtung statt einer isolierten Tabellenkorrektur;
+- lesbare Offen-Badges in BD/HG;
+- kontrastfeste Statistik einschließlich Offen-Zeile;
+- lesbare offene Punkte und semantische Statusbadges;
+- dunkle Picker-, Dialog- und Auto-Plan-Flächen;
 - klare Wochenend- und Feiertagsabstufungen;
 - sichtbare Fokusindikatoren;
-- Forced-Colors-Fallback;
-- eindeutige Ergebnis- und Nachweissprache.
+- Forced-Colors-Fallback.
 
 ### Qualität
 
@@ -628,6 +655,7 @@ tests/e2e/auto-plan-v9.spec.js           Layout-, Tooltip-, Wahrheits-, Animatio
 - separates `check:v9`;
 - funktionaler Exakt-Solver-Test;
 - neue Unit- und Playwright-Regressionen;
+- automatischer Dunkelmodus-Kontrastaudit;
 - CI mit Node 24, Chromium und Diagnoseartefakten;
 - v8.5-Kompatibilitätstests bleiben erhalten;
 - Delivery-Test für atomare v8.5-/v9-Modulgenerationen.
@@ -645,4 +673,4 @@ tests/e2e/auto-plan-v9.spec.js           Layout-, Tooltip-, Wahrheits-, Animatio
 - Workers KV ist eventual consistent und nicht für globale atomare Konkurrenzkoordination geeignet.
 - RBN und zweite RBN bleiben manuell.
 - Browserleistung, Kernzahl und Speicherdruck beeinflussen die erreichbare Suchtiefe.
-- Die vollständige Animation bleibt gemäß Produktvorgabe auch bei einer Betriebssystempräferenz für reduzierte Bewegung aktiv.
+- Die vollständige Algorithmusanimation bleibt gemäß Produktvorgabe auch bei einer Betriebssystempräferenz für reduzierte Bewegung aktiv.
