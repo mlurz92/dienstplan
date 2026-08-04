@@ -1,8 +1,8 @@
 /** Proof-aware, deduplicated commentary for Auto-Plan v9 events. */
 const STATUS_LABEL = Object.freeze({
-  OPTIMAL: 'Optimum bewiesen',
-  FEASIBLE: 'zulässige Lösung gefunden',
-  INFEASIBLE: 'Unlösbarkeit bewiesen',
+  OPTIMAL: 'Optimum im kompilierten v9-Modell bewiesen',
+  FEASIBLE: 'zulässige Modelllösung gefunden',
+  INFEASIBLE: 'Unlösbarkeit im kompilierten v9-Modell bewiesen',
   MODEL_INVALID: 'Solvermodell ungültig',
   UNKNOWN: 'Status innerhalb des Budgets offen',
   HEURISTIC: 'lokaler heuristischer Fallback'
@@ -58,10 +58,10 @@ export function formatV9Commentary(update = {}) {
     return { kind: 'phase', text: `<b>Regel-Snapshot eingefroren</b>${update.message ? ` · ${update.message}` : ''}` };
   }
   if (stage === 'strict-feasibility' && status === 'INFEASIBLE') {
-    return { kind: 'blocked', text: '<b>Null-Rot-Belegung nachweislich unmöglich</b> · Konflikt- und Relaxierungsanalyse startet.' };
+    return { kind: 'blocked', text: '<b>Null-Rot-Belegung im kompilierten v9-Modell nicht möglich</b> · Konflikt- und Relaxierungsanalyse startet.' };
   }
   if (status === 'OPTIMAL') {
-    return { kind: 'gain', text: `<b>${STAGE_LABEL[stage] || 'Zielstufe'} global optimal</b>${facts.length ? ` · ${facts.join(' · ')}` : ''}` };
+    return { kind: 'gain', text: `<b>${STAGE_LABEL[stage] || 'Zielstufe'} im kompilierten v9-Modell optimal bewiesen</b>${facts.length ? ` · ${facts.join(' · ')}` : ''}` };
   }
   if (status === 'FEASIBLE' && Number.isFinite(Number(update.relativeGap))) {
     return { kind: 'work', text: `<b>${STAGE_LABEL[stage] || 'Solver'} verbessert</b> · ${facts.join(' · ')}` };
