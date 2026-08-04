@@ -45,7 +45,28 @@ async function mockApi(page, initialMonth = monthWithTwoOpenSlots(2026, 7)) {
   let currentMonth = initialMonth;
   let putCount = 0;
   await page.route('https://cdn.sheetjs.com/**', route => route.fulfill({ status: 200, contentType: 'application/javascript', body: 'window.XLSX = undefined;' }));
-  await page.route('**/api/bootstrap', route => route.fulfill({ json: { ok: true, settings: { schemaVersion: 2 }, staff, rbnNames: [] } }));
+  await page.route('**/api/bootstrap', route => route.fulfill({
+    json: {
+      ok: true,
+      settings: {
+        schemaVersion: 4,
+        appearance: { density: 'comfortable', richTooltips: true },
+        workflow: { algorithmCommentary: true, studioVisualizer: true },
+        autoPlan: {
+          performanceProfile: 'adaptive',
+          searchIntensity: 'standard',
+          optimizationFocus: 'balanced',
+          timeBudgetSeconds: 10,
+          allowRedFallback: true,
+          perfectionEnabled: true,
+          certificationRounds: 2,
+          portfolioDiversity: true
+        }
+      },
+      staff,
+      rbnNames: []
+    }
+  }));
   await page.route('**/api/month/**', async route => {
     const parts = new URL(route.request().url()).pathname.split('/');
     const year = Number(parts.at(-2));
@@ -71,12 +92,15 @@ async function openStudio(page) {
   await page.locator('#autoPlanBtn').click();
   await expect(page.locator('#autoPlanDialog')).toBeVisible();
   await expect(page.locator('#autoPlanDialog')).toHaveAttribute('data-algorithm-revision', '8');
+  await expect(page.locator('#autoPlanDialog')).toHaveAttribute('data-engine-revision', '8.5');
   await expect(page.locator('#autoPlanV8Ribbon')).toContainText('Incremental Constraint Observatory');
+  await expect(page.locator('#autoPlanV8Ribbon')).toContainText('v8.5');
   // Die Stufenliste stammt aus der Engine selbst, nicht aus einem zweiten Text.
   await expect(page.locator('#autoPlanV8Ribbon .auto-plan-v8-stages li')).toHaveCount(6);
   await expect(page.locator('#autoPlanPerformanceProfile')).toHaveValue('adaptive');
   await expect(page.locator('#autoPlanConfig')).toBeVisible();
   await expect(page.locator('#autoPlanStage')).toBeHidden();
+  await expect(page.locator('#autoPlanTimeBudget')).toHaveValue('10');
   await expect(page.locator('#autoPlanStartBtn')).toBeEnabled();
 }
 
@@ -87,7 +111,7 @@ async function startStudio(page) {
 }
 
 test('Auto-Plan startet erst nach Parameterfreigabe und schreibt erst nach Ergebnisbestätigung', async ({ page }) => {
-  test.setTimeout(150_000);
+  test.setTimeout(90_000);
   const api = await mockApi(page);
   await openJuly(page);
   await openStudio(page);
@@ -99,6 +123,7 @@ test('Auto-Plan startet erst nach Parameterfreigabe und schreibt erst nach Ergeb
 
   await page.locator('#autoPlanRepairIterations').fill('4');
   await page.locator('#autoPlanSearchIntensity').selectOption('standard');
+  await page.locator('#autoPlanTimeBudget').fill('10');
   await page.locator('#autoPlanStartBtn').click();
   await expect(page.locator('#autoPlanCanvas')).toBeVisible();
   await expect(page.locator('#autoPlanPhaseList .auto-plan-phase')).toHaveCount(6);
@@ -106,7 +131,7 @@ test('Auto-Plan startet erst nach Parameterfreigabe und schreibt erst nach Ergeb
   await expect(page.locator('#autoPlanLog .auto-plan-log-entry').first()).toBeVisible();
   await expect(page.locator('#autoPlanLog')).toContainText('Lauf gestartet');
 
-  await expect(page.locator('#autoPlanResult')).toBeVisible({ timeout: 120_000 });
+  await expect(page.locator('#autoPlanResult')).toBeVisible({ timeout: 60_000 });
   await expect(page.locator('#autoPlanCanvas')).toHaveAttribute('data-render-mode', 'stopped');
   await expect(page.locator('#autoPlanResultTitle')).toHaveText('Regelkonformer Vorschlag bereit');
   await expect(page.locator('#autoPlanChangeCount')).toContainText('2 neue Einträge');
@@ -123,12 +148,12 @@ test('Auto-Plan startet erst nach Parameterfreigabe und schreibt erst nach Ergeb
 });
 
 test('Minimal-Rot-Fallback bleibt bis zur Einzelprüfung und Begründung gesperrt', async ({ page }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(90_000);
   const api = await mockApi(page, monthWithTwoOpenSlots(2026, 7, { forceRed: true }));
   await openJuly(page);
   await startStudio(page);
 
-  await expect(page.locator('#autoPlanResult')).toBeVisible({ timeout: 150_000 });
+  await expect(page.locator('#autoPlanResult')).toBeVisible({ timeout: 60_000 });
   await expect(page.locator('#autoPlanResultTitle')).toHaveText('Vollständige Belegung mit roten Ausnahmen');
   await expect(page.locator('#autoPlanRedReview')).toBeVisible();
   await expect(page.locator('[data-red-check]')).toHaveCount(2);
@@ -146,7 +171,7 @@ test('Minimal-Rot-Fallback bleibt bis zur Einzelprüfung und Begründung gesperr
 });
 
 test('Tageszeilen, Statistik und Bestätigung bleiben bei geringer Fensterhöhe scrollbar', async ({ page }) => {
-  test.setTimeout(150_000);
+  test.setTimeout(90_000);
   await page.setViewportSize({ width: 920, height: 520 });
   await mockApi(page);
   await openJuly(page);
@@ -155,12 +180,12 @@ test('Tageszeilen, Statistik und Bestätigung bleiben bei geringer Fensterhöhe 
   // Gescrollt wird im gemeinsamen Arbeitsbereich zwischen Kopf und Fußleiste,
   // nicht in den einzelnen Abschnitten.
   const body = page.locator('#autoPlanBody');
-  await expect(page.locator('#autoPlanResult')).toBeVisible({ timeout: 120_000 });
+  await expect(page.locator('#autoPlanResult')).toBeVisible({ timeout: 60_000 });
   await expect(page.locator('#autoPlanProposalBody tr')).toHaveCount(31);
   await expect(page.locator('#autoPlanLoadTable .auto-plan-distribution-table')).toBeVisible();
-  const state = await body.evaluate(element => ({ clientHeight: element.clientHeight, scrollHeight: element.scrollHeight, overflowY: getComputedStyle(element).overflowY }));
-  expect(state.overflowY).toBe('auto');
-  expect(state.scrollHeight).toBeGreaterThan(state.clientHeight);
+  const viewport = await body.evaluate(element => ({ clientHeight: element.clientHeight, scrollHeight: element.scrollHeight, overflowY: getComputedStyle(element).overflowY }));
+  expect(viewport.overflowY).toBe('auto');
+  expect(viewport.scrollHeight).toBeGreaterThan(viewport.clientHeight);
   await body.evaluate(element => { element.scrollTop = element.scrollHeight; });
   await expect.poll(() => body.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
   await expect(page.locator('#autoPlanApplyBtn')).toBeVisible();
@@ -188,7 +213,6 @@ test('jede Person ist im Parameterbereich erreichbar und ihre Obergrenzen sind s
     await expect(input).toHaveValue(String(index + 1));
   }
 
-  // Auch die Freigabemeldung unterhalb der Tabelle bleibt erreichbar.
   const validation = page.locator('#autoPlanValidation');
   await validation.scrollIntoViewIfNeeded();
   await expect(validation).toBeInViewport();
@@ -221,7 +245,7 @@ test('negative Rohgrenze blockiert den Start', async ({ page }) => {
 });
 
 test('Fortschrittsanzeige besitzt einen zugänglichen Prozentwert', async ({ page }) => {
-  test.setTimeout(150_000);
+  test.setTimeout(60_000);
   await mockApi(page);
   await openJuly(page);
   await startStudio(page);
@@ -236,7 +260,7 @@ test('Fortschrittsanzeige besitzt einen zugänglichen Prozentwert', async ({ pag
 });
 
 test('Abbruch während der Ergebnisüberleitung hält das Studio geschlossen', async ({ page }) => {
-  test.setTimeout(150_000);
+  test.setTimeout(90_000);
   await mockApi(page);
   await openJuly(page);
   await openStudio(page);
@@ -244,7 +268,7 @@ test('Abbruch während der Ergebnisüberleitung hält das Studio geschlossen', a
   await page.locator('#autoPlanStartBtn').click();
   await expect(page.locator('#autoPlanStage')).toBeVisible();
 
-  await expect(page.locator('#autoPlanProgressMeter')).toHaveAttribute('aria-valuenow', '100', { timeout: 120_000 });
+  await expect(page.locator('#autoPlanProgressMeter')).toHaveAttribute('aria-valuenow', '100', { timeout: 60_000 });
   await expect(page.locator('#autoPlanStage')).toBeVisible();
   await page.locator('#autoPlanCancelBtn').click();
   await expect(page.locator('#autoPlanDialog')).toBeHidden();
@@ -253,16 +277,18 @@ test('Abbruch während der Ergebnisüberleitung hält das Studio geschlossen', a
   await expect(page.locator('#autoPlanResult')).toBeHidden();
 });
 
-test('Reduced Motion schaltet die Canvas auf Ereigniszeichnung', async ({ page }) => {
+test('Legacy-Bewegungsstatus wird vor dem Lauf entfernt', async ({ page }) => {
   await mockApi(page);
   await openJuly(page);
   await page.evaluate(() => {
     document.documentElement.dataset.motion = 'reduced';
     document.documentElement.classList.add('reduce-motion');
+    window.dispatchEvent(new CustomEvent('appsettingschange', { detail: {} }));
   });
+  await expect(page.locator('html')).not.toHaveAttribute('data-motion');
+  await expect(page.locator('html')).not.toHaveClass(/reduce-motion/);
   await startStudio(page);
-
-  await expect(page.locator('#autoPlanCanvas')).toHaveAttribute('data-render-mode', 'reduced');
+  await expect(page.locator('#autoPlanCanvas')).not.toHaveAttribute('data-render-mode', 'reduced');
 });
 
 test('Deaktivierte Rich Tooltips schließen einen sichtbaren Hinweis', async ({ page }) => {
