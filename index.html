@@ -66,6 +66,21 @@
   <link rel="manifest" href="/manifest.webmanifest?manifest=algorithm-spectrum-2" />
   <link rel="stylesheet" href="/styles.css?v=20260803.4" />
   <link rel="stylesheet" href="/controls.css?v=20260803.4" />
+  <!--
+    Diese Stylesheets sind absichtlich parserseitig eingebunden. Als sie erst
+    während der Modulinitialisierung angelegt wurden, blieben Chromium-Starts
+    mit noch nicht ausgelöstem DOMContentLoaded und dauerhaftem „Lädt …“ hängen.
+    Die data-Attribute entsprechen den idempotenten JS-Fallback-Ladern.
+  -->
+  <link rel="stylesheet" href="/app-v8-5.css?v=20260803.4" data-v85-shell-style="/app-v8-5.css" />
+  <link rel="stylesheet" href="/toolbar-v8-5.css?v=20260803.4" data-v85-shell-style="/toolbar-v8-5.css" />
+  <link rel="stylesheet" href="/auto-plan-studio.css?v=20260803.4" data-auto-plan-style="/auto-plan-studio.css" />
+  <link rel="stylesheet" href="/auto-plan-studio-v6.css?v=20260803.4" data-auto-plan-v6-style="true" />
+  <link rel="stylesheet" href="/auto-plan-studio-v7.css?v=20260803.4" data-auto-plan-v7-style="true" />
+  <link rel="stylesheet" href="/auto-plan-studio-v7-5.css?v=20260803.4" data-auto-plan-v7-5-style="true" />
+  <link rel="stylesheet" href="/auto-plan-studio-v8.css?v=20260803.4" data-auto-plan-v8-style="true" />
+  <link rel="stylesheet" href="/auto-plan-studio-v8-5.css?v=20260803.4" data-auto-plan-v85-style="true" />
+  <link rel="stylesheet" href="/auto-plan-studio-v9.css?v=20260803.4" data-auto-plan-v9-style="true" />
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" defer></script>
   <script type="module" src="/js/app.js?v=20260803.4"></script>
   <script type="module" src="/js/ui-controls.js?v=20260803.4"></script>
