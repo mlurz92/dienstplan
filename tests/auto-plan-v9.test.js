@@ -4,7 +4,9 @@ import { readFile } from 'node:fs/promises';
 
 process.env.TZ = 'Europe/Berlin';
 
-const planner = await import('../js/auto-planner.js');
+// Diese Datei prüft bewusst den eingefrorenen Legacy-v9-Vertrag. Der
+// produktive Einstiegspunkt wird separat durch auto-plan-v9-5.test.js geprüft.
+const planner = await import('../js/auto-planner-v9.js');
 const bridge = await import('../js/auto-plan-cp-sat.js');
 const { DEFAULT_STAFF } = await import('../js/defaults.js');
 const { setAssignment, setPreference } = await import('../js/rules.js');
