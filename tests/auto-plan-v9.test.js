@@ -150,19 +150,24 @@ test('Cloudflare- und Solverartefakte sind produktiv verdrahtet', async () => {
   const pages = await source('../functions/api/autoplan/v9/runs.js');
   const cancel = await source('../functions/api/autoplan/v9/runs/[runId]/cancel.js');
   const worker = await source('../workers/autoplan-v9/src/index.ts');
+  const wrangler = await source('../workers/autoplan-v9/wrangler.jsonc');
   const solver = await source('../solver/app/solver_core.py');
   assert.match(pages, /AUTO_PLAN_V9/);
   assert.match(pages, /Idempotency-Key/);
   assert.match(cancel, /\/cancel/);
   assert.match(worker, /class AutoPlanJob/);
   assert.match(worker, /class AutoPlanContainer/);
+  assert.match(worker, /class AutoPlanWorkflow extends WorkflowEntrypoint/);
+  assert.match(worker, /step\.do/);
+  assert.match(worker, /workflow-execute/);
   assert.match(worker, /run_events/);
+  assert.match(wrangler, /AUTO_PLAN_WORKFLOW/);
+  assert.match(wrangler, /dienstplanrad-autoplan-v9-preview-workflow/);
   assert.match(solver, /lexicographic_solve/);
   assert.match(solver, /adaptive_exact_lns/);
   assert.match(solver, /diagnose_infeasibility/);
   assert.match(solver, /generate_alternatives/);
 });
-
 
 test('v9-Monatspersistenz ist revisionsgebunden und degradiert kontrolliert auf KV', async () => {
   const endpoint = await source('../functions/api/month/[year]/[month].js');
@@ -177,7 +182,7 @@ test('v9-Monatspersistenz ist revisionsgebunden und degradiert kontrolliert auf 
   assert.match(api, /error\.status = res\.status/);
   assert.match(runner, /Snapshot compilation can fail/);
   assert.match(runner, /removeEventListener\?\.\('abort'/);
-  assert.match(job, /ensureExecution/);
+  assert.match(job, /executionPromise/);
   assert.match(job, /solverContainerKey/);
   assert.doesNotMatch(job, /ctx\.waitUntil\(this\.execute/);
 });
