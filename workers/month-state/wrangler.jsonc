@@ -1,0 +1,36 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "dienstplanrad-month-state",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-24",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "MONTHS",
+        "class_name": "MonthState"
+      }
+    ]
+  },
+  "exports": {
+    "MonthState": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    }
+  },
+  "vars": {
+    "ENVIRONMENT": "production"
+  },
+  "env": {
+    "preview": {
+      "name": "dienstplanrad-month-state-preview",
+      "vars": {
+        "ENVIRONMENT": "preview"
+      }
+    }
+  }
+}
