@@ -4,6 +4,7 @@ import { addDays, getAssignment, parseIso, toLocalIso } from './rules-core.js?v=
 export * from './rules-evaluation.js?v=20260803.4';
 
 const REASON = 'HG am Tag vor eigenem BD (HG am Werktag vor eigenem BD)';
+const SPLIT_WEEKEND_REASON = 'Geteiltes BD-Wochenende: Freitag-BD, Samstag frei, Sonntag-BD';
 const LEGACY_REASONS = new Set([
   'Eigener HG am Vortag vor BD',
   'HG am Tag vor eigenem BD',
@@ -23,6 +24,19 @@ function weekdayHgBeforeBdConflict({ state, dateIso, role, staffId }) {
     const previousWeekday = previous.getDay();
     if (previousWeekday < 1 || previousWeekday > 4) return false;
     return getAssignment(state, toLocalIso(previous), 'hg') === staffId;
+  }
+  return false;
+}
+
+function splitWeekendBdConflict({ state, dateIso, role, staffId }) {
+  if (role !== 'bd') return false;
+  const date = parseIso(dateIso);
+  const weekday = date.getDay();
+  if (weekday === 5) {
+    return getAssignment(state, toLocalIso(addDays(date, 2)), 'bd') === staffId;
+  }
+  if (weekday === 0) {
+    return getAssignment(state, toLocalIso(addDays(date, -2)), 'bd') === staffId;
   }
   return false;
 }
@@ -54,6 +68,32 @@ function withWeekdayHgBeforeBdConflict(evaluation) {
   };
 }
 
+function withSplitWeekendWarning(evaluation) {
+  if (!evaluation || evaluation.canSelect === false) return evaluation;
+  const existing = Array.isArray(evaluation.reasonDetails) ? evaluation.reasonDetails : [];
+  if (existing.some(item => item?.text === SPLIT_WEEKEND_REASON)) return evaluation;
+  const warning = {
+    text: SPLIT_WEEKEND_REASON,
+    kind: 'conflict',
+    level: 'yellow',
+    lane: null,
+    selection: 'normal'
+  };
+  const reasonDetails = [warning, ...existing];
+  const rank = { green: 0, yellow: 1, orange: 2, red: 3, gray: 4 };
+  const level = (rank[evaluation.level] || 0) >= rank.yellow ? evaluation.level : 'yellow';
+  return {
+    ...evaluation,
+    level,
+    reasons: reasonDetails.map(item => item.text).filter(Boolean),
+    reasonDetails,
+    meta: {
+      ...(evaluation.meta || {}),
+      splitWeekendBd: true
+    }
+  };
+}
+
 /**
  * Montag bis Donnerstag ist ein eigener HG unmittelbar vor einem eigenen BD
  * am Folgetag rot. Die Prüfung erfolgt symmetrisch bei Auswahl des HG und des
@@ -62,10 +102,15 @@ function withWeekdayHgBeforeBdConflict(evaluation) {
  * Freitag-HG vor Samstags-BD bleibt ausgenommen; hierfür gelten die definierten
  * Wochenendkopplungen. Bereits nicht wählbare Bewertungen werden niemals durch
  * diese Policy wieder freigeschaltet oder in eine bestätigbare Auswahl verwandelt.
+ *
+ * Zusätzlich wird die zerrissene Kombination Freitag-BD, Samstag frei,
+ * Sonntag-BD derselben Person gelb bewertet. Sie bleibt technisch wählbar,
+ * wird aber in Regelengine, Heuristik und Boolean-CP-SAT übereinstimmend nach
+ * konfliktärmeren Wochenendmustern eingeordnet.
  */
 export function evaluateCandidate(parameters) {
-  const evaluation = evaluateCandidateBase(parameters);
-  return weekdayHgBeforeBdConflict(parameters)
-    ? withWeekdayHgBeforeBdConflict(evaluation)
-    : evaluation;
+  let evaluation = evaluateCandidateBase(parameters);
+  if (weekdayHgBeforeBdConflict(parameters)) evaluation = withWeekdayHgBeforeBdConflict(evaluation);
+  if (splitWeekendBdConflict(parameters)) evaluation = withSplitWeekendWarning(evaluation);
+  return evaluation;
 }
