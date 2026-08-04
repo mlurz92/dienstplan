@@ -33,7 +33,7 @@ function installAutoPlanV9LayoutGuards() {
     }
 
     @media (min-width: 821px) {
-      .auto-plan-dialog[data-engine-revision="9"].is-running #autoPlanBody {
+      .auto-plan-dialog[data-v9-engine-revision="9"].is-running #autoPlanBody {
         overflow: hidden;
       }
 
