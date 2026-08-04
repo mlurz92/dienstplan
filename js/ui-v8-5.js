@@ -86,6 +86,27 @@ function markToolbarReady() {
   return true;
 }
 
+/**
+ * v8.5 no longer exposes an application-specific reduced-motion mode.
+ * Existing profiles are migrated by fixing the legacy select to "system" and
+ * removing it visually. The application root is kept out of the old class-based
+ * reduced mode after every settings application.
+ */
+function removeLegacyMotionMode(root = document) {
+  const select = root.querySelector?.('#settingsMotion') || document.getElementById('settingsMotion');
+  if (select) {
+    select.value = 'system';
+    const field = select.closest('label');
+    if (field) {
+      field.hidden = true;
+      field.setAttribute('aria-hidden', 'true');
+    }
+  }
+  const html = document.documentElement;
+  html.classList.remove('reduce-motion');
+  html.dataset.motion = 'system';
+}
+
 function installScrollPerformancePolicy() {
   let timer = 0;
   let scheduled = false;
@@ -109,6 +130,7 @@ function observeLateControls() {
       for (const node of record.addedNodes) {
         if (!(node instanceof Element)) continue;
         upgradeActions(node);
+        removeLegacyMotionMode(node);
       }
     }
     markToolbarReady();
@@ -120,11 +142,14 @@ export function installUiV85() {
   addStylesheet();
   installThemeController();
   installRichTooltips();
+  removeLegacyMotionMode();
   upgradeMonthNavigation();
   markToolbarReady();
   observeLateControls();
   installScrollPerformancePolicy();
+  window.addEventListener('appsettingschange', () => removeLegacyMotionMode());
   requestAnimationFrame(() => {
+    removeLegacyMotionMode();
     upgradeMonthNavigation();
     markToolbarReady();
   });
