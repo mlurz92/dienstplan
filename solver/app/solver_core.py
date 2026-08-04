@@ -493,9 +493,11 @@ def solve_model(
 
 def stage_result(stage_id: str, title: str, status: Any, solver: Any, wall_ms: int) -> StageResult:
     if has_solution(status):
-        value: float | None = float(solver.objective_value)
-        bound: float | None = float(solver.best_objective_bound)
-        gap: float | None = relative_gap(value, bound)
+        objective_value = float(solver.objective_value)
+        best_bound = float(solver.best_objective_bound)
+        value: float | None = objective_value
+        bound: float | None = best_bound
+        gap: float | None = relative_gap(objective_value, best_bound)
     else:
         value = bound = gap = None
     return StageResult(

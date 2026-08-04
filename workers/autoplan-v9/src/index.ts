@@ -59,6 +59,10 @@ function safeRunId(value: string): string {
   return `v9-${value.replace(/[^a-zA-Z0-9_-]/g, '-').slice(0, 140)}`;
 }
 
+function solverContainerKey(requestFingerprint: string): string {
+  return `solver-${requestFingerprint.slice(0, 24).replace(/[^a-zA-Z0-9_-]/g, '-')}`;
+}
+
 function pathParts(request: Request): string[] {
   return new URL(request.url).pathname.split('/').filter(Boolean);
 }
@@ -96,6 +100,7 @@ export class AutoPlanContainer extends Container<Env> {
 
 export class AutoPlanJob extends DurableObject<Env> {
   private readonly initialized: Promise<void>;
+  private execution: Promise<void> | null = null;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -153,11 +158,26 @@ export class AutoPlanJob extends DurableObject<Env> {
     });
   }
 
+  private ensureExecution(snapshot: SolverSnapshot): void {
+    if (this.execution) return;
+    this.execution = this.execute(snapshot)
+      .catch(error => console.error(JSON.stringify({
+        event: 'solver-controller-unhandled',
+        requestFingerprint: snapshot.requestFingerprint,
+        message: error instanceof Error ? error.message : String(error)
+      })))
+      .finally(() => { this.execution = null; });
+  }
+
   private async start(snapshot: SolverSnapshot): Promise<Response> {
     await this.initialized;
     const existing = await this.runState();
     if (existing) {
       const result = await this.ctx.storage.get<unknown>('result');
+      if (result === undefined && (existing.status === 'created' || existing.status === 'running')) {
+        const storedSnapshot = await this.ctx.storage.get<SolverSnapshot>('snapshot');
+        if (storedSnapshot && isSnapshot(storedSnapshot)) this.ensureExecution(storedSnapshot);
+      }
       return json({
         ok: true,
         runId: existing.runId,
@@ -188,7 +208,7 @@ export class AutoPlanJob extends DurableObject<Env> {
       status: 'created',
       message: 'Versionierter Solver-Snapshot gespeichert.'
     });
-    this.ctx.waitUntil(this.execute(snapshot));
+    this.ensureExecution(snapshot);
     return json({ ok: true, runId, status: 'running', sequence: 1 }, 202);
   }
 
@@ -204,7 +224,7 @@ export class AutoPlanJob extends DurableObject<Env> {
       message: 'Container und CP-SAT-Modell werden vorbereitet.'
     });
 
-    const containerKey = `solver-${snapshot.requestFingerprint.slice(0, 24).replace(/[^a-zA-Z0-9_-]/g, '-')}`;
+    const containerKey = solverContainerKey(snapshot.requestFingerprint);
     try {
       const container = getContainer(this.env.AUTO_PLAN_CONTAINER, containerKey);
       const response = await container.fetch(new Request('http://container/solve-stream', {
@@ -291,6 +311,10 @@ export class AutoPlanJob extends DurableObject<Env> {
   private async status(request: Request): Promise<Response> {
     const state = await this.runState();
     if (!state) return json({ ok: false, error: { code: 'RUN_NOT_FOUND', message: 'Lauf nicht gefunden.' } }, 404);
+    if (state.status === 'created' || state.status === 'running') {
+      const snapshot = await this.ctx.storage.get<SolverSnapshot>('snapshot');
+      if (snapshot && isSnapshot(snapshot)) this.ensureExecution(snapshot);
+    }
     const after = Math.max(0, Math.round(Number(new URL(request.url).searchParams.get('after')) || 0));
     const result = state.status === 'completed'
       ? await this.ctx.storage.get<unknown>('result')
@@ -311,6 +335,10 @@ export class AutoPlanJob extends DurableObject<Env> {
     }
     state.status = 'cancelled';
     await this.putState(state);
+    const container = getContainer(this.env.AUTO_PLAN_CONTAINER, solverContainerKey(state.requestFingerprint));
+    await container.fetch(new Request('http://container/cancel', {
+      method: 'POST', headers: { 'X-Run-Id': state.runId }
+    })).catch(() => undefined);
     await this.appendEvent({
       stage: 'explain',
       phase: 'blocked',

@@ -6,13 +6,15 @@
 
 <p align="center"><strong>Regelgestützte Monatsplanung für Bereitschaftsdienst, Hintergrunddienst und neuroradiologische Rufbereitschaft</strong></p>
 
-> **Paketversion:** `0.8.5`  
-> **Regelwerk:** Eignungsregeln `v4.9`  
-> **Auto-Plan:** Algorithmus `v8.5` — *Exhaustive Clean-Solution Observatory*  
-> **Feiertagsregion:** Sachsen (`SN`)  
-> **Betrieb:** Cloudflare Pages · Pages Functions · Workers KV · lokale Browser-Sicherung
+> **Paketversion:** `0.9.0`
+> **Regelwerk:** Eignungsregeln `v5.0.0`
+> **Auto-Plan:** `v9` — *CP-SAT Guided Adaptive Exact-LNS*
+> **Feiertagsregion:** Sachsen (`SN`)
+> **Frontend:** Cloudflare Pages + Pages Functions
+> **Solver:** Durable Object + Cloudflare Container + Python/OR-Tools CP-SAT
+> **Persistenz:** MonthState Durable Object; Workers KV als Migrations-, Export- und Degraded-Mode-Spiegel; lokale Browser-Sicherung
 
-DienstplanRAD verbindet kontrollierbare manuelle Monatsplanung mit einer bestätigungspflichtigen automatischen Komplettierung offener **Bereitschaftsdienste (BD)** und **Hintergrunddienste (HG)**. Bereits gesetzte Dienste bleiben unveränderliche Fixpunkte. RBN und zweite RBN werden weiterhin manuell geplant.
+DienstplanRAD verbindet kontrollierbare manuelle Monatsplanung mit einer mathematisch modellierten Komplettierung offener **Bereitschaftsdienste (BD)** und **Hintergrunddienste (HG)**. Bereits gesetzte Dienste bleiben Fixpunkte. RBN und zweite RBN werden weiterhin manuell geplant.
 
 ---
 
@@ -22,270 +24,319 @@ DienstplanRAD verbindet kontrollierbare manuelle Monatsplanung mit einer bestät
 - regelgestützte Kandidatenlisten mit Grün/Gelb/Orange/Rot/Grau und vollständiger Begründung;
 - Abwesenheiten, Dienstwünsche, Optionen, Notizen und revisionsfähige Ausnahmebestätigungen;
 - Monatsstatistik, Sollvergleich, Wochenendäquivalente und offene Punkte;
-- Excel-/JSON-Import, Excel-/PDF-/JSON-Export;
-- server-first Synchronisierung mit lokaler Offline-Sicherung;
-- Auto-Plan Studio für Konfiguration, laufende Beobachtung, vollständige Vorschlagsprüfung und atomare Übernahme.
+- Excel-/JSON-Import, Excel-/PDF-/JSON-Export und lokale Offline-Sicherung;
+- Auto-Plan Studio mit Laufprofilen, Ziel-Gap, Varianten, Stabilitätsgrenze, Exact-LNS und Relaxierungsrichtlinien;
+- persistiertes Solver-Observatorium mit Status, Schranke, Gap, Branches, Konflikten, Zielstufen und Konfliktkern;
+- unabhängiger Browseraudit vor jeder Übernahme;
+- kontrollierter lokaler v8.5-Fallback, wenn der native Solver nicht erreichbar ist.
 
-## 2. Leitprinzipien
+## 2. Fachliche Invarianten
 
-1. Die produktive Regelengine ist die einzige fachliche Wahrheitsquelle.
+1. Die produktive JavaScript-Regelengine bleibt die fachliche Wahrheits- und Auditschicht.
 2. Auto-Plan verändert ausschließlich zuvor leere BD-/HG-Felder des sichtbaren Monats.
 3. Fixpunkte, RBN, Abwesenheiten, Wünsche, Optionen und Notizen bleiben unverändert.
-4. Graue beziehungsweise technisch nicht wählbare Besetzungen sind in jeder Stufe ausgeschlossen.
-5. Personengebundene BD-, HG- und Gesamtobergrenzen gelten in Konstruktion, Rescue, Reparatur und Perfektion.
-6. Rote Abweichungen sind ausschließlich der letzte, ausdrücklich freigegebene Fallback.
-7. Bis zur bewussten Übernahme erfolgt keine Mutation des Monatsplans.
-8. Vor der Übernahme wird der vollständige Vorschlag erneut gegen das aktuelle Regelwerk auditiert.
+4. Fehlende Qualifikation, inaktive Personen, gleichzeitiger BD/HG und unmittelbar aufeinanderfolgende BD sind nicht relaxierbar.
+5. Abwesenheit, Polednia-Sperre und harte Maxima sind nur entsprechend der expliziten Relaxierungsrichtlinie zulässig.
+6. Personengebundene BD-, HG- und Gesamtobergrenzen gelten in jedem Suchpfad.
+7. Rote Abweichungen werden erst nach nachgewiesen erfolgloser strikter Machbarkeitssuche betrachtet.
+8. Bis zur bewussten Übernahme erfolgt keine Mutation des Monatsplans.
+9. Vor der Übernahme werden Fingerprints, Fixpunkte und der vollständige Endzustand erneut auditiert.
 
----
+## 3. Auto-Plan v9
 
-## 3. Command Bar und Erscheinungsbild
-
-### 3.1 Pictogrammbasierte Befehlsleiste
-
-Die Werkzeugleiste ist semantisch in **Planung**, **Daten** und **Ausgabe** gegliedert. Jede Aktion besitzt ein SVG-Pictogramm. Beschriftungen werden nur gezeigt, wenn die gemessene Breite dies zulässt.
-
-Dichtestufen:
-
-1. Gruppenüberschriften und Beschriftungen;
-2. ohne Gruppenüberschriften;
-3. Beschriftungen nur für primäre Planungsaktionen;
-4. reine Symbole;
-5. Überlaufmenü für Daten- und Ausgabeaktionen.
-
-Die Dichte wird anhand der realen Containerbreite bestimmt, nicht anhand starrer Viewport-Schwellen. **Theme-Schalter und Zahnrad** bilden einen dauerhaft erreichbaren rechten Befehlsblock und wandern nicht in das Überlaufmenü.
-
-### 3.2 Hell-/Dunkelmodus
-
-Der Schalter wechselt direkt zwischen `light` und `dark`. Die Auswahl wird lokal gespeichert und vor Abschluss des Anwendungs-Bootstraps angewendet, damit kein Farbblitz entsteht.
-
-Die Monatskontrastfarbe bleibt in beiden Modi die Akzentquelle für:
-
-- Fokusindikatoren;
-- Glasränder und Flächentönungen;
-- Wochenend-/Feiertagsabstufungen;
-- Auto-Plan-Fortschritt;
-- Status- und Interaktionszustände.
-
-Der frühere anwendungsspezifische Modus **„Reduzierte Bewegung“** ist aus Einstellungen, gespeicherten UI-Zuständen und Root-Klassen entfernt. Animationen bleiben Bestandteil der Anwendung.
-
-### 3.3 Erklärende Tooltips
-
-`js/rich-tooltip-v8-5.js` vereinheitlicht die zuvor verteilten nativen `title`-Hinweise:
-
-- Maus und Tastaturfokus;
-- `role="tooltip"`;
-- Verknüpfung über `aria-describedby`;
-- Schließen mit `Escape`;
-- automatische Positionierung ober- oder unterhalb des Auslösers;
-- native `title`-Fallbacks, falls Rich Tooltips deaktiviert sind.
-
----
-
-## 4. Auto-Plan v8.5
-
-### 4.1 Verbindliche Pipeline
+### 3.1 Pipeline
 
 ```text
-Fixpunkte/Domänen
-  → striktes Konstruktionsportfolio
-  → profilabhängige Null-Rot-Intensivierung
-  → optionaler Minimal-Rot-Fallback nur nach ausgeschöpfter strikter Suche
-  → iterative Tausch- und lokale Reparatur
-  → diversifizierte ALNS-Perfektion
-  → vollständige Zertifizierung
+Versionierter Snapshot / Constraint Registry
+  → Domänen- und Datenvalidierung
+  → paralleler lokaler v8.5-Warmstart
+  → strikte CP-SAT-Machbarkeit ohne Rot
+  → optional kontrollierte Minimalrelaxierung
+  → sequenzielle lexikografische Optimierung
+  → adaptive Exact-LNS mit CP-SAT-Teilmodellen
+  → qualitätsgebundene, hinreichend verschiedene Varianten
+  → Konfliktkern und Relaxierungsvorschläge
+  → unabhängiger Browseraudit
+  → atomare Benutzerübernahme
 ```
 
-Perfektion und Zertifizierung sind in v8.5 verbindlich. Ein Lauf kann sie nicht mehr über eine Studio-Checkbox deaktivieren.
+### 3.2 Modell
 
-### 4.2 Gekoppelte Suchprofile
+Für jedes offene Dienstfeld und jeden zulässigen Kandidaten existiert eine binäre Entscheidungsvariable. Fixpunkte werden als Konstanten in dasselbe Modell aufgenommen. Das Modell enthält unter anderem:
 
-| Profil | Reparaturrunden | lokales Neuplanungsbudget | Late Acceptance | strikte Wellen | Rescue-Breite |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| Ausgewogen | 4 | 4.000 | 300 | 2 | 148 % |
-| Intensiv | 6 | 6.500 | 500 | 3 | 180 % |
-| Exhaustiv | 8 | 10.000 | 900 | 4 | 225 % |
+- vollständige Belegung jedes offenen BD-/HG-Feldes;
+- Qualifikation und zeitabhängige Rollen;
+- kein gleichzeitiger BD und HG derselben Person;
+- keine direkt aufeinanderfolgenden BD;
+- werktäglicher HG unmittelbar vor eigenem BD;
+- individuelle BD-, HG- und Gesamtobergrenzen;
+- rote/orange/gelbe Regelkosten;
+- Wunscherfüllung;
+- maximale und gesamte BD-Sollabweichung;
+- gewichtete Gesamtlast- und Wochenendspannweite;
+- Planstabilität gegenüber Warmstart/Baseline;
+- Mindestdistanz zwischen Varianten.
 
-Die Ableitung erfolgt in `deriveV85Tuning()`. Dadurch steuern die sichtbaren Felder tatsächlich den Solver und nicht nur die Darstellung.
+### 3.3 Lexikografische Ziele
 
-### 4.3 Strikte Eskalation vor Rot
+Die Ziele werden nicht zu einer einzigen schwer interpretierbaren Großgewichtung zusammengezogen. Jede Stufe wird separat gelöst; ihr erreichter Wert wird vor der nächsten Stufe gebunden:
 
-Jede Welle erhöht begrenzt:
+1. bestätigungspflichtige rote Ausnahmen;
+2. bei Minimaländerung: Planstabilität;
+3. orange Regelhinweise;
+4. gelbe Regelhinweise;
+5. Wünsche und Optionen;
+6. maximale individuelle BD-Abweichung;
+7. gesamte BD-Abweichung;
+8. gewichtete Gesamtlast;
+9. Wochenendlast;
+10. nachrangige Stabilität.
 
-- Beam-Breite;
-- Kandidatenfächer;
-- Budget des exakten Restbacktrackings.
+`OPTIMAL` wird nur ausgewiesen, wenn jede Zielstufe im Nachweismodus mit Gap `0` abgeschlossen wurde. Ein durch Zeit- oder Gap-Grenzen beendeter Lauf wird korrekt als `FEASIBLE` bezeichnet.
 
-`allowRedFallback`, `maxRedViolations` und `profileFilter` werden für sämtliche strikten Wellen hart auf Null-Rot gesetzt. Erst wenn reguläre Konstruktion und alle Wellen keine saubere Vollbelegung liefern, darf das Profil `confirmable-balanced` ausgeführt werden.
+### 3.4 Adaptive Exact-LNS
 
-### 4.4 Adaptive Perfektion
+Die v8.5-Heuristik liefert einen frühen Incumbent. v9 wählt anschließend adaptive Teilmengen aus und löst die freigegebenen Dienstfelder als exaktes CP-SAT-Teilmodell neu. Operatoren umfassen schwache Zuordnungen, Wochenenden, Personenlast, Zeitfenster und Zufallsnachbarschaften. Nutzung, Laufzeit und Qualitätsgewinn werden gemessen; die Auswahl balanciert Exploration und Qualitätsgewinn pro Rechenzeit.
 
-Die v8-Basis bleibt erhalten und wird verpflichtend genutzt:
+### 3.5 Erklärbarkeit
 
-- acht Zerstörungsoperatoren;
-- drei Wiederaufbauoperatoren einschließlich Regret-2;
-- segmentweise adaptive Operatorgewichte;
-- Late-Acceptance-Annahme;
-- Luby-Neustarts;
-- absteigende Nachbarschaften mit Einzelumsetzung, Paartausch, Rollentausch, Dreierkette, Tages- und Wochenendpaket;
-- vollständiger Nachweis über Einzelumsetzungen, Paartausche und Tagespakete.
+- Assumption Literals gruppieren fachlich zusammengehörige harte Bedingungen.
+- Bei `INFEASIBLE` wird ein reduzierter hinreichender Konfliktkern bestimmt.
+- Daraus entstehen konkrete Relaxierungsvorschläge.
+- Hints sind ausschließlich Suchhinweise, niemals fachliche Constraints.
+- Solverstatus, Zielfunktionswert, beste Schranke und relativer Gap werden getrennt angezeigt.
 
-### 4.5 Parallelität
+## 4. Laufprofile und Studioeinstellungen
 
-Die Zahl der Perfektionsstränge ist automatisch oder explizit einstellbar. Das effektive Worker-Budget bleibt das Minimum aus:
+| Profil | Zeitbudget | Varianten | Ziel-Gap | Exact-LNS |
+| --- | ---: | ---: | ---: | --- |
+| Schnell | 15 s | 1 | 10 % | 6–14 Felder |
+| Ausgewogen | 60 s | 3 | 2 % | 8–24 Felder |
+| Intensiv | 180 s | 5 | 1 % | 12–36 Felder |
+| Nachweis | 600 s | 3 | 0 % | 14–48 Felder |
 
-- verfügbaren logischen Kernen;
-- reservierten UI-Kernen;
-- Leistungsprofil;
-- Gerätespeicher;
-- Zahl offener Dienstfelder.
+Zusätzlich einstellbar:
 
-Die fachliche Regelberechnung bleibt in Web Workers identisch zur manuellen Bewertung. Es existiert keine vereinfachte zweite Regelengine.
+- Neuplanung, Reparatur oder Minimaländerung;
+- maximale Zahl geänderter Felder;
+- Mindest-Hamming-Distanz der Varianten;
+- reproduzierbarer Ein-Worker-Modus und Seed;
+- Remote-CP-SAT oder lokaler Fallback;
+- Relaxierung von Abwesenheit, organisatorischen Regeln und harten Maxima;
+- bestehende personenspezifische BD-/HG-/Gesamtgrenzen;
+- Rot-Fallback und maximale Zahl roter Ausnahmen.
 
-### 4.6 Wahrheitsgetreue Laufanzeige
+## 5. Architektur
 
-Das Studio zeigt getrennt:
+```text
+Browser / Auto-Plan Studio
+  ├─ lokale v8.5-Worker: früher Warmstart + Offlinefallback
+  └─ /api/autoplan/v9/runs
+       └─ Pages-Service-Binding AUTO_PLAN_V9
+            └─ AutoPlanJob Durable Object
+                 ├─ SQLite: Zustand, Ereignisse, Ergebnis
+                 └─ AutoPlanContainer
+                      └─ FastAPI + OR-Tools CP-SAT
 
-- Fixpunkt-/Domänenanalyse;
-- Constraint-Konstruktion;
-- aktuelle Null-Rot-Welle mit Beam- und Backtrackingwerten;
-- Reparatur;
-- Perfektionsstränge;
-- Zertifizierung;
-- reale Verbesserungen und geprüfte Zustände.
+/api/month/:year/:month
+  ├─ Pages-Service-Binding MONTH_STATE
+  │    └─ MonthState Durable Object + SQLite/CAS/Mutation-ID
+  ├─ DIENSTPLAN_KV: Migration, Spiegel, Export und Degraded Mode
+  └─ Browser: Dirty-Marker und lokale Notfallsicherung
+```
 
-Die Ergebnisansicht protokolliert zusätzliche Wellen, Knoten, Rescue-Breite, Reparaturprofil und gegebenenfalls den nachgelagerten Fallback.
+### Verantwortlichkeiten
 
----
+- **Pages:** statische Anwendung und Release-Assets.
+- **Pages Functions:** Eingangsvalidierung, API-Vertrag, Service-Routing und sichere Fehlerantworten.
+- **AutoPlanJob:** idempotente Laufkennung, persistierte Events, Status, Wiederaufnahme und Abbruch.
+- **Container:** nativer Python-Prozess und CP-SAT-Rechenlast.
+- **MonthState:** serialisierte Monatsänderungen mit Expected Revision und Mutation-ID.
+- **Workers KV:** nicht mehr Autorität für konkurrierende Monatswrites; weiterhin Migrations-/Exportspiegel und kontrollierter Fallback.
+- **Browseraudit:** fachliche Endkontrolle unabhängig vom nativen Modell.
 
-## 5. Performance für Windows 11 und Chrome
+## 6. Startup-Stabilität
 
-- rechenintensive Konstruktion und Perfektion in Modul-Web-Workern;
-- reservierte UI-Kerne für Eingaben, Fortschritt und Animation;
-- `requestAnimationFrame()` für visuelle Aktualisierungen;
-- passive Scroll-Listener;
-- reduzierte Backdrop-Filter-Kosten während aktiven Scrollens;
-- `content-visibility: auto` für nachgelagerte Statistik- und Ergebnisbereiche;
-- `contain` für große, unabhängige Layout-/Paint-Bereiche;
-- compositorfreundliche Animationen über `transform` und `opacity`;
-- keine dauerhaften `will-change`-Flächen;
-- vollständiger funktionaler Fallback ohne View-Transition-API.
+Der frühere Startabsturz entstand durch `insertBefore()` mit einem Referenzknoten, der kein direktes Kind des gewählten Toolbar-Containers war. v9 verwendet den tatsächlichen Elternknoten und kapselt UI-Initialisierungsschritte separat.
 
----
+Zusätzliche Schutzschichten:
 
-## 6. Einstellungen und Persistenz
+- globale Behandlung von `error` und `unhandledrejection`;
+- Watchdog gegen dauerhaften Zustand „Lädt …“;
+- sichtbare Diagnose-ID;
+- nicht-destruktive Bereinigung ausschließlich eigener Legacy-Service-Worker und Caches;
+- keine pauschale Löschung von Local Storage oder lokalen Dienstplandaten;
+- Playwright-Regression mit absichtlich noch nicht reorganisierter Toolbar.
 
-Gespeichert und über den Bootstrap-Pfad synchronisiert werden unter anderem:
+## 7. Sicherheit und Robustheit
 
-- Informationsdichte;
-- Monatsfarbsystem und Wochenendhervorhebung;
-- atmosphärischer Hintergrund;
-- Autosave-Verzögerung;
-- Algorithmus-Kommentar und Studio-Visualisierung;
-- Leistungsprofil, Suchintensität, Optimierungsfokus und Zeitbudget;
-- Parallelitätslimit, Portfolio-Diversität, Rot-Obergrenze und Zertifizierungsrunden.
+- Pydantic-Modelle mit `extra="forbid"`, Größen- und Wertebereichen;
+- Requestgrößenbegrenzung in Pages Functions und Solvercontainer;
+- generische externe 5xx-Fehler mit Trace-ID, interne Details ausschließlich im Log;
+- `Cache-Control: no-store` und `X-Content-Type-Options: nosniff` auf APIs;
+- keine Internetverbindung des Solvercontainers;
+- idempotente Lauf- und Monatsmutationen;
+- persistierte Abbruchsignale und unmittelbare Container-Cancellation;
+- Baseline-, Konfigurations- und Request-Fingerprints;
+- HTML-Escaping für Solverkommentare und Diagnoseinhalte;
+- kein Vertrauen in ein Remoteergebnis ohne lokalen Endaudit.
 
-Das Hell-/Dunkelschema wird bewusst lokal vor dem Server-Bootstrap geladen. Die Auto-Plan-v8.5-Studiokopplung wird ebenfalls lokal gesichert; die resultierenden Solverfelder werden bei jedem Lauf erneut in die Laufkonfiguration übertragen.
+## 8. Datenmodell und Migration
 
----
+### Solver-Snapshot `schemaVersion: 9`
 
-## 7. Datenhaltung und Cloudflare
+- Planungszeitraum und Regelwerkversion;
+- Personal, zeitabhängige Rolleneigenschaften und Limits;
+- offene/fixe Slots und vollständig evaluierte Kandidatendomänen;
+- Relationen und Fixpunkte;
+- Baseline und Warmstarts;
+- Solverkonfiguration;
+- drei Fingerprints.
 
-- **Pages:** statische Anwendung;
-- **Pages Functions:** Bootstrap, Monatsdaten, Personal, RBN-Namen, Einstellungen, Import/Export;
-- **Workers KV:** gemeinsame Persistenz mit versionierten Datenobjekten;
-- **Browser:** Offline-Fallback und ausstehende lokale Änderungen.
+### Monatsdaten
 
-KV besitzt Eventual Consistency. Die Anwendung verwendet deshalb Revisionsstände, Dirty-Marker und server-first Wiederabgleich; konkurrierende Änderungen dürfen nicht stillschweigend als identisch behandelt werden.
+- `year`, `month`, `revision`, `updatedAt`;
+- Tagesfelder einschließlich BD/HG/RBN;
+- Abwesenheiten, Wünsche, Optionen und Notizen;
+- Override-/Bestätigungsnachweise.
 
----
+Beim ersten Zugriff übernimmt `MonthState` einen vorhandenen KV-Datensatz oder einen normalisierten leeren Monat. Danach erfolgen Writes per Compare-and-Swap. Ein Revisionskonflikt liefert HTTP `409`; der lokale Dirty-Stand bleibt erhalten und wird nicht als Offlinefehler umgedeutet.
 
-## 8. Lokale Entwicklung
+## 9. Lokale Entwicklung
+
+### Frontend und Pages Functions
 
 Voraussetzungen: Node.js 24, npm.
 
 ```bash
 npm ci
 npm run check
+npm run check:v9
 npm test
+npx playwright install --with-deps chromium
 npm run test:e2e
 ```
 
-Vollständiges Gate:
+### Nativer Solver
+
+Voraussetzungen: Python 3.13.7 und Docker.
 
 ```bash
-npm run verify
+python -m pip install --upgrade pip==25.2
+python -m pip install -e './solver[dev]'
+ruff check solver
+mypy solver/app
+python -m compileall -q solver/app solver/tests
+pytest solver
+docker build -t dienstplanrad-autoplan-v9 ./solver
 ```
 
-Cloudflare Pages wird aus dem Repository-Root gebaut. Das KV-Binding lautet `DIENSTPLAN_KV`.
+### Cloudflare Worker
 
----
+```bash
+cd workers/autoplan-v9
+npm install
+npm run check
+npx wrangler deploy --dry-run
 
-## 9. Tests
+cd ../month-state
+npm install
+npm run check
+npx wrangler deploy --dry-run
+```
 
-### Modultests
+## 10. Cloudflare-Konfiguration und Deployment
 
-- Regelengine und Regelberichte;
-- Imports/Exports und Persistenz;
-- Toolbar-Dichtestufen;
-- Auto-Plan-Invarianten, Fixpunktschutz und Zielordnung;
-- Worker-Budget und Portfoliovergleich;
-- v8.5-Phasenvertrag, Profilableitung und Fallback-Reihenfolge.
+1. `workers/autoplan-v9` deployen.
+2. `workers/month-state` deployen.
+3. Pages-Service-Binding `AUTO_PLAN_V9` auf `dienstplanrad-autoplan-v9` setzen.
+4. Pages-Service-Binding `MONTH_STATE` auf `dienstplanrad-month-state` setzen.
+5. KV-Binding `DIENSTPLAN_KV` unverändert bereitstellen.
+6. Preview-Bindings auf die jeweiligen `-preview`-Worker richten.
+7. Pages neu deployen; Bindings werden erst nach Redeploy wirksam.
+8. Health-, Solver-, Cancel-, Monats-GET/PUT- und Revisionskonflikt-Smoke-Tests ausführen.
+9. Logs über Dashboard oder `wrangler pages deployment tail` kontrollieren.
 
-### Browsertests
+Der native Remote-Solver ist optional fail-safe: Fehlt `AUTO_PLAN_V9` oder ist der Container nicht erreichbar, übernimmt der lokale auditierte Fallback. Fehlt `MONTH_STATE`, bleibt die frühere KV-Persistenz als ausdrücklich ausgewiesener `eventual-fallback` verfügbar.
 
-- Monatsplanung, Picker, Batch-Verwaltung und Druck;
-- Toolbar über zahlreiche Fensterbreiten ohne Überlagerung oder Horizontal-Scroll;
-- Auto-Plan Studio, Vorschlagstabelle und Abbruchpfade;
-- Theme-Persistenz;
-- Entfernung des Legacy-Bewegungsmodus;
-- tastaturfähige Rich Tooltips;
-- Übertragung des Exhaustiv-Profils in reale Laufparameter.
+## 11. Import, Export und Backup
 
----
+- Excel-Import lädt alle Zielmonate vor dem Merge.
+- JSON-Import validiert und normalisiert vor dem ersten Schreibzugriff.
+- JSON-Backup kombiniert Serverstand mit neueren lokalen Dirty-Monaten.
+- Excel-/PDF-Export verwenden lokale Kalendertage und den sichtbaren Monatsstand.
+- KV bleibt Export-/Migrationsspiegel, während MonthState die konkurrierende Schreibautorität bildet.
+- Vor Infrastrukturmigration ist ein vollständiger JSON-Export empfohlen.
 
-## 10. Projektstruktur v8.5
+## 12. Tests und Qualitätsgate
+
+### JavaScript
+
+- Regelengine, Berichte und Invarianten;
+- Fixpunktschutz, harte Maxima, Null-Rot-Eskalation und Fallback;
+- v9-Snapshot, Fingerprints, UI-Verträge, Tooltips und Proof-Kommentare;
+- Remote-/Fallback-Orchestrierung, Abbruch und Worker-Lebenszyklus;
+- Imports, Exports, Dirty-Marker und Konfliktpersistenz;
+- Startup-Root-Cause und äußere Fehlergrenze.
+
+### Python
+
+- Schema- und Modellvalidierung;
+- strikte Machbarkeit und Unlösbarkeit;
+- lexikografische Zielstufen;
+- Rot-Fallback, Limits und Warmstart;
+- Exact-LNS-Metadaten und Varianten;
+- FastAPI-Health-, Solve- und Cancel-Vertrag.
+
+### Browser
+
+- echter Chromium-Start ohne `pageerror`;
+- kein dauerhafter Ladezustand;
+- Monatsrendering und Toolbar-Regression;
+- Legacy-Cache-/Service-Worker-Recovery;
+- vorhandene Planungs-, Dialog-, Druck- und Accessibility-Pfade.
+
+### CI-Gate
 
 ```text
-js/auto-planner-v8-5.js       strikte Eskalation und verbindlicher Phasenvertrag
-js/auto-plan-studio-v8-5.js   Profile, Phasentheater und Ergebnisprotokoll
-js/app-theme-v8-5.js          persistenter Hell-/Dunkelcontroller
-js/rich-tooltip-v8-5.js       zentrale ARIA-Tooltips
-js/ui-v8-5.js                 Command-Bar- und Performance-Integration
-app-v8-5.css                  adaptive Farb- und Oberflächentoken
-toolbar-v8-5.css              rechter Theme-/Einstellungsblock
-auto-plan-studio-v8-5.css     v8.5-Studiozustände
-tests/auto-plan-v8-5.test.js  Solver- und Integrationsverträge
-tests/e2e/v8-5-shell.spec.js  Browserregressionen der neuen Oberfläche
+Node-Syntax + 383+ Modultests + Playwright
+Ruff + Mypy + Compileall + Pytest + Docker-Build
+Wrangler TypeScript + Dry-Run AutoPlan Worker
+Wrangler TypeScript + Dry-Run MonthState Worker
 ```
 
----
+Ein Merge ist nur nach vollständig grünem Gate zulässig.
 
-## 11. Release 0.8.5
+## 13. Projektstruktur v9
 
-### Neu
+```text
+js/constraint-registry-v9.js          Constraint IR und Snapshotcompiler
+js/auto-planner-v9.js                 produktive v9-Fassade und Phasenvertrag
+js/auto-plan-runner.js                Remote-/Warmstart-/Fallback-Orchestrierung
+js/auto-plan-contracts-v9.js          Remoteergebnis und Browseraudit
+js/auto-plan-studio-v9.js             Studioeinstellungen und Nachweisansicht
+js/auto-plan-visualizer-v9.js         Solver-/Proof-Visualisierung
+js/startup-health-v9.js               Startüberwachung und Recovery
+functions/api/autoplan/v9/             Pages-Proxy für Solverläufe
+functions/api/month/                   revisionsgebundene Monatsschnittstelle
+workers/autoplan-v9/                   Job-DO und Containersteuerung
+workers/month-state/                   stark konsistente Monatspersistenz
+solver/app/                            FastAPI, Pydantic und OR-Tools CP-SAT
+solver/tests/                          native Solvertests
+tests/auto-plan-v9.test.js             v9-Integrationsverträge
+tests/e2e/startup-v9.spec.js           Startup-Regression
+```
 
-- monatsfarbabhängiger Hell-/Dunkelmodus in der Befehlsleiste;
-- kurze Beschriftungen mit Pictogrammen und zentralen Rich Tooltips;
-- gekoppelte Null-Rot-Profile;
-- mehrstufige strikte Intensivierung;
-- separate v8.5-Phasen- und Wellenanzeige;
-- profilabhängige Parallelitäts- und Diversitätssteuerung.
+## 14. Bewusste Grenzen
 
-### Behoben und gehärtet
+- Ein Status `FEASIBLE` ist kein Optimalitätsbeweis.
+- Ein CP-SAT-Assumption-Core ist hinreichend, aber nicht zwingend global minimal; v9 reduziert ihn zeitgebunden weiter.
+- Hints können die Suche beschleunigen, werden vom Solver jedoch nicht garantiert befolgt.
+- Der Browserfallback ist fachlich auditiert, liefert aber keinen globalen CP-SAT-Nachweis.
+- Eine Cloudflare-Binding-Änderung erfordert ein erneutes Pages-Deployment.
+- RBN bleibt bewusst außerhalb der Auto-Plan-v9-Entscheidungsvariablen.
+- Änderungen an Regelwerk oder Snapshotstruktur erfordern eine neue `rulesetVersion` beziehungsweise `schemaVersion`.
 
-- sichtbare Profile und Solverparameter sind direkt gekoppelt;
-- Minimal-Rot-Fallback erst nach strikter Eskalation;
-- Perfektion/Zertifizierung nicht mehr versehentlich deaktivierbar;
-- Legacy-Modus „Reduzierte Bewegung“ entfernt;
-- Toolbar-Hilfsaktionen bleiben gemeinsam am rechten Rand;
-- zusätzliche Modul- und Browserregressionen.
+## 15. Lizenz und Betrieb
 
----
-
-## 12. Grenzen
-
-- Eine vollständige Null-Rot-Belegung kann mathematisch unmöglich sein.
-- Die Zertifizierung beweist lokale Optimalität für die vollständig geprüften Nachbarschaften, nicht globale Optimalität des gesamten kombinatorischen Problems.
-- Mehr Zeit und mehr Worker erhöhen die Suchtiefe, garantieren aber keinen globalen Optimalitätsbeweis.
-- RBN und zweite RBN bleiben manuell.
+Das Repository enthält keine Secrets. Cloudflare-IDs, Tokens und produktive Bindings werden außerhalb des Quellcodes verwaltet. Vor jedem Produktivdeployment sind Preview-Smoke-Test, vollständiges CI-Gate, Backup und Diffkontrolle verpflichtend.

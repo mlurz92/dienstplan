@@ -162,3 +162,22 @@ test('Cloudflare- und Solverartefakte sind produktiv verdrahtet', async () => {
   assert.match(solver, /diagnose_infeasibility/);
   assert.match(solver, /generate_alternatives/);
 });
+
+
+test('v9-Monatspersistenz ist revisionsgebunden und degradiert kontrolliert auf KV', async () => {
+  const endpoint = await source('../functions/api/month/[year]/[month].js');
+  const api = await source('../js/api.js');
+  const runner = await source('../js/auto-plan-runner.js');
+  const job = await source('../workers/autoplan-v9/src/index.ts');
+  assert.match(endpoint, /MONTH_STATE/);
+  assert.match(endpoint, /expectedRevision/);
+  assert.match(endpoint, /MONTH_REVISION_CONFLICT/);
+  assert.match(endpoint, /eventual-fallback/);
+  assert.match(api, /Idempotency-Key/);
+  assert.match(api, /error\.status = res\.status/);
+  assert.match(runner, /Snapshot compilation can fail/);
+  assert.match(runner, /removeEventListener\?\.\('abort'/);
+  assert.match(job, /ensureExecution/);
+  assert.match(job, /solverContainerKey/);
+  assert.doesNotMatch(job, /ctx\.waitUntil\(this\.execute/);
+});

@@ -434,6 +434,18 @@ export async function persistMonth(year, monthNumber) {
       state.monthSources.set(key, 'local');
       persistDirtyMarkers();
       updateDirtyFlag();
+      if (error?.status === 409 && error?.code === 'MONTH_REVISION_CONFLICT') {
+        state.saveStatus = 'conflict';
+        state.serverReady = true;
+        return {
+          ok: false,
+          current: false,
+          pending: true,
+          conflict: true,
+          serverMonth: error.details?.month || null,
+          error
+        };
+      }
       state.saveStatus = 'offline';
       state.serverReady = false;
       return { ok: false, current: false, pending: true, error };

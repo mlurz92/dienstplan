@@ -153,7 +153,11 @@ test('Backend unterscheidet ungültige Monatsparameter von Infrastrukturfehlern'
   assert.equal(missingKv.status, 500);
   const bootstrap = await getBootstrap({ env: {} });
   assert.equal(bootstrap.status, 500);
-  assert.match((await bootstrap.json()).error, /KV Binding/);
+  const body = await bootstrap.json();
+  assert.equal(body.error.code, 'INTERNAL_ERROR');
+  assert.match(body.error.message, /nicht verarbeitet/);
+  assert.equal(typeof body.error.traceId, 'string');
+  assert.doesNotMatch(JSON.stringify(body), /KV Binding|stack|functions\//i);
 });
 
 test('Excel-Import lädt jeden Zielmonat vor dem Merge', async () => {

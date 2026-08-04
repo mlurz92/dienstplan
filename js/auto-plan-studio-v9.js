@@ -309,9 +309,11 @@ function reset(dialog) {
 
 function upgradeIdentity(dialog) {
   // Alte Integrationshooks bleiben für bestehende Automatisierung stabil.
-  dialog.dataset.algorithmRevision = '8';
-  dialog.dataset.engineRevision = '8.5';
+  dialog.dataset.algorithmRevision = '9';
+  dialog.dataset.engineRevision = '9';
   dialog.dataset.solverRevision = '9';
+  dialog.dataset.legacyAlgorithmRevision = '8';
+  dialog.dataset.legacyEngineRevision = '8.5';
   const ribbon = dialog.querySelector('#autoPlanV8Ribbon, #autoPlanV75Ribbon, #autoPlanV7Ribbon');
   if (ribbon) {
     ribbon.classList.add('auto-plan-v9-ribbon');

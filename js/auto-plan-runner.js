@@ -22,12 +22,17 @@ const abortError = signal => {
 };
 
 const delay = (milliseconds, signal) => new Promise((resolve, reject) => {
-  if (signal?.aborted) return reject(abortError(signal));
-  const timer = setTimeout(resolve, Math.max(0, milliseconds));
+  let timer;
   const onAbort = () => {
     clearTimeout(timer);
+    signal?.removeEventListener?.('abort', onAbort);
     reject(abortError(signal));
   };
+  if (signal?.aborted) return onAbort();
+  timer = setTimeout(() => {
+    signal?.removeEventListener?.('abort', onAbort);
+    resolve();
+  }, Math.max(0, milliseconds));
   signal?.addEventListener?.('abort', onAbort, { once: true });
 });
 
@@ -401,7 +406,8 @@ function runLocalFallback({ state, monthData, year, month, runConfig, signal, on
     });
     if (signal?.aborted) return onAbort();
     signal?.addEventListener?.('abort', onAbort, { once: true });
-    worker.postMessage({
+    try {
+      worker.postMessage({
       type: 'run',
       state: {
         months: state.months,
@@ -416,7 +422,10 @@ function runLocalFallback({ state, monthData, year, month, runConfig, signal, on
       month,
       runConfig,
       localBudgetMs: Math.max(10_000, Math.min(45_000, Number(runConfig.timeBudgetMs || 60_000)))
-    });
+      });
+    } catch (error) {
+      finish(reject)(error);
+    }
   });
 }
 
@@ -523,6 +532,9 @@ async function runV9({ state, monthData, year, month, runConfig, onProgress, sig
   const settings = v9Settings(state);
   const endpoint = String(config.v9?.endpoint || settings.endpoint || DEFAULT_ENDPOINT);
   const forceLocal = config.v9?.remoteSolver === false;
+  // Snapshot compilation can fail on inconsistent input. Compile before any
+  // worker is started so a rejected snapshot cannot leave orphaned work.
+  const snapshot = compileAutoPlanV9Snapshot({ state, monthData, runConfig: config });
   const localController = new AbortController();
   const relayAbort = () => localController.abort(abortError(signal));
   if (signal?.aborted) relayAbort();
@@ -535,7 +547,6 @@ async function runV9({ state, monthData, year, month, runConfig, onProgress, sig
   // Sofort behandeln, damit ein später Remoteerfolg keine unbeobachtete lokale
   // Rejection hinterlässt.
   const handledLocal = localPromise.then(result => ({ result }), error => ({ error }));
-  const snapshot = compileAutoPlanV9Snapshot({ state, monthData, runConfig: config });
 
   onProgress?.({
     phase: 'analysis', progress: .03,
@@ -599,6 +610,9 @@ async function runV9({ state, monthData, year, month, runConfig, onProgress, sig
     return local.result;
   } finally {
     signal?.removeEventListener?.('abort', relayAbort);
+    if (!localController.signal.aborted) {
+      localController.abort(new DOMException('Auto-Plan-v9-Lauf beendet', 'AbortError'));
+    }
   }
 }
 
