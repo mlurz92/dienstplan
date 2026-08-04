@@ -28,13 +28,13 @@ def candidate(staff_id: str, level: str = "green") -> Candidate:
 
 def snapshot(
     *,
-    staff_ids: Iterable[str] = ("a", "b"),
+    staff_ids: Iterable[str] = ("a", "b", "c"),
     allow_red: bool = False,
     red_hg_first_day: bool = False,
 ) -> SolverSnapshot:
     ids = tuple(staff_ids)
     dates = dates_for_february()
-    people = [Staff(id=staff_id, name=staff_id, short=staff_id, bdTarget=14) for staff_id in ids]
+    people = [Staff(id=staff_id, name=staff_id, short=staff_id, bdTarget=9) for staff_id in ids]
     slots: list[Slot] = []
     for day_index, day in enumerate(dates):
         for role in ("bd", "hg"):
@@ -80,6 +80,8 @@ def assert_schedule_invariants(assignments: list[Assignment]) -> None:
         assert by_slot[(day, "bd")] != by_slot[(day, "hg")]
     for left, right in pairwise(dates):
         assert by_slot[(left, "bd")] != by_slot[(right, "bd")]
+        if date.fromisoformat(left).isoweekday() in {1, 2, 3, 4}:
+            assert by_slot[(left, "hg")] != by_slot[(right, "bd")]
 
 
 def test_strict_model_finds_complete_valid_schedule() -> None:
