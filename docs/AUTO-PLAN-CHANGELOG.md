@@ -1,5 +1,46 @@
 # Auto-Plan Changelog
 
+## 2026-08-04 – Release 0.9.0 / Auto-Plan v9 (Hybrid Exact Observatory)
+
+- **CP-SAT-Kern im Browser:** Googles OR-Tools CP-SAT läuft als WebAssembly
+  (`or-tools-wasm` / `cpsat-js`); der Monatszustand wird in ein lineares
+  Constraint-Modell mit phasenweisen Zielkomponenten übersetzt.
+- **Lexikografische exakte Suche:** Maximin-Fairness (Leximin) zuerst, danach
+  Wünsche, BD-Soll, Wochenend- und Samstagslast in der Reihenfolge des
+  Optimierungsschwerpunkts; erreichte Werte werden phasenweise fixiert.
+- **Beweisbare Optimalität:** OPTIMAL-Status mit unterer Schranke
+  (`bestObjectiveBound`) und Zertifizierung; das Exaktheitsnachweis-Panel im
+  Studio zeigt Status, Schranke, Phasenspur und Bindung.
+- **MUS-artige Ursachenanalyse:** Bei INFEASIBLE werden Constraint-Gruppen
+  gierig wieder aktiviert, bis die kleinste Konfliktursache benannt ist;
+  `infeasibilityMode: 'relax'` weicht Gruppen in fachlicher Reihenfolge auf
+  und weist die aufgegebenen Regeln im Ergebnis aus.
+- **Warmstart und Fallback:** Die v8.5-Heuristik liefert Lösungshinweise
+  (Hints) und bleibt vollständig tragfähig, wenn keine WASM-Bindung ladbar
+  ist; das Ergebnis wird immer durch die Regelengine auditiert und nach
+  deren Zielordnung entschieden.
+- **Determinismus:** CP-SAT-Seed und Heuristik-Seed leiten sich aus
+  Konfiguration und Monatszustand ab; identische Eingaben ergeben identische
+  Pläne.
+- **Studio v9:** zehn neue Regler (Solver-Backend, Exaktheit, CP-SAT-Zeitbudget
+  und -Worker, Warmstart, Fairness-Profil, Determinismus, Infeasibility-Modus,
+  Reparatur-nach-Änderung, Erklärungstiefe), erklärende Tooltips an jeder
+  Stelle, Exaktheitsnachweis-Panel und v9-Phasentheater.
+- **Layout:** Der Dialog passt vollständig in den Viewport; nur innere
+  Bereiche scrollen. Das Algorithmus-Kommentar-Fenster wächst nicht mehr,
+  sondern scrollt intern (feste Höhe 210 px).
+- **Dark-Mode-Kontraste** für Offen-Badges, Tabellen, Karten und Modals;
+  die Anwendung startet standardmäßig im hellen Erscheinungsbild; der
+  Theme-Umschalter ist ein reines Sonnen-/Mond-Piktogramm.
+- **COOP/COEP-Header** in `_headers` für multithreaded WebAssembly;
+  `credentialless`-Variante dokumentiert.
+- **Animations-Politur:** Suchstrahl-Sheen der Null-Rot-Welle, Phasenpuls
+  und gleitende Logzeilen.
+- v9-Konfigurationsfelder sind fingerprint-stabil und idempotent
+  normalisiert; die Fallback-Pipeline meldet Abschlüsse genau einmal.
+- Neue Tests: `tests/auto-plan-v9.test.js` (Modellbau, Konfiguration,
+  Relaxations-Diagnose, Fallback-Pipeline, Studio- und Header-Verträge).
+
 ## 2026-08-03 – Release 0.6.5 / Auto-Plan v7.5
 
 - Truthful Constraint Observatory mit getrennten Anzeigen für reale Arbeitsmenge, Portfoliozustand, Qualitätsgewinn und aggregierten Gesamtfortschritt.

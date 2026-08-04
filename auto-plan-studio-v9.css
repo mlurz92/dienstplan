@@ -1,0 +1,363 @@
+/**
+ * Auto-Plan Studio v9 – Layout-, Kontrast- und Animationsverfeinerung.
+ *
+ * 1. Der Dialog passt vollständig in den Viewport. Der gemeinsame
+ *    Arbeitsbereich scrollt nicht mehr selbst; jeder Abschnitt scrollt intern
+ *    (Konfiguration, Laufansicht, Ergebnis). Damit bleibt die Fußleiste immer
+ *    erreichbar, ohne das Modal zu scrollen.
+ * 2. Das Algorithmus-Kommentar-Fenster wächst nicht mehr dynamisch, sondern
+ *    hat eine feste Höhe und scrollt intern.
+ * 3. Dark-Mode-Kontraste: Offen-Badges, Tabellen, Karten und Modals werden in
+ *    dunklen Farbschemata auf lesbare Kontraste gehoben.
+ * 4. Animationen der exakten Suche: Suchstrahl-, Wellen- und
+ *    Phasen-Lebenszeichen laufen auch in der v9-Ansicht.
+ */
+
+/* --------------------------------------------------------------- v9-Status */
+
+.auto-plan-v9-run-strip {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 10px;
+  align-items: center;
+  padding: 7px 10px;
+  border: 1px solid color-mix(in srgb, var(--month-accent) 30%, transparent);
+  border-radius: var(--app-radius-sm);
+  background: color-mix(in srgb, var(--month-accent) 9%, rgba(255, 255, 255, .85));
+  font-size: .68rem;
+}
+.auto-plan-v9-run-strip > span {
+  grid-column: 1;
+  color: var(--ap-accent-strong);
+  font-size: .58rem;
+  font-weight: 700;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+.auto-plan-v9-run-strip b { grid-column: 2; color: var(--ap-ink); font-weight: 750; }
+.auto-plan-v9-run-strip small { grid-column: 2; color: var(--muted); }
+
+/* ------------------------------------------------- v9-Regler im Parameterfeld */
+
+.auto-plan-field--v9 { position: relative; }
+.auto-plan-field--v9::before {
+  content: '';
+  position: absolute;
+  inset: -4px -5px auto auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--month-accent) 55%, transparent);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--month-accent) 50%, transparent);
+}
+
+/* ------------------------------------------------------- Exaktheitsnachweis */
+
+.auto-plan-v9-result { padding: 0; }
+.auto-plan-v9-status {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: .6rem;
+  font-weight: 750;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.auto-plan-v9-status.optimal { background: color-mix(in srgb, var(--green) 15%, #fff); color: var(--green); }
+.auto-plan-v9-status.feasible { background: color-mix(in srgb, var(--month-accent) 14%, #fff); color: var(--ap-accent-strong); }
+.auto-plan-v9-status.infeasible { background: color-mix(in srgb, var(--red) 13%, #fff); color: var(--red); }
+.auto-plan-v9-status.unavailable { background: rgba(0, 0, 0, .06); color: var(--muted); }
+
+.auto-plan-v9-result-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--flow-inner);
+  padding: var(--flow-block) 13px;
+}
+.auto-plan-v9-result-grid > div {
+  padding: 7px 9px;
+  border: 1px solid var(--ap-hairline);
+  border-radius: var(--app-radius-sm);
+  background: rgba(255, 255, 255, .8);
+}
+.auto-plan-v9-result-grid span {
+  display: block;
+  color: var(--muted);
+  font-size: .57rem;
+  font-weight: 700;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+.auto-plan-v9-result-grid b { display: block; margin-top: 2px; font-size: .8rem; color: var(--ap-ink); }
+
+.auto-plan-v9-trace {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0 13px var(--flow-block);
+  list-style: none;
+}
+.auto-plan-v9-trace li {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: baseline;
+  padding: 4px 8px;
+  border-radius: var(--app-radius-sm);
+  background: rgba(255, 255, 255, .7);
+  font-size: .68rem;
+}
+.auto-plan-v9-trace li b { font-weight: 750; color: var(--ap-accent-strong); }
+.auto-plan-v9-trace li small { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.auto-plan-v9-mus,
+.auto-plan-v9-relaxed {
+  margin: 0 13px var(--flow-block);
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--orange) 38%, transparent);
+  border-radius: var(--app-radius-sm);
+  background: color-mix(in srgb, var(--orange) 7%, #fff);
+}
+.auto-plan-v9-mus > span,
+.auto-plan-v9-relaxed > span {
+  display: block;
+  color: var(--orange);
+  font-size: .58rem;
+  font-weight: 700;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+.auto-plan-v9-mus ul,
+.auto-plan-v9-relaxed ul { margin: 4px 0 0; padding-left: 15px; font-size: .7rem; }
+.auto-plan-v9-mus small { display: block; margin-top: 4px; color: var(--muted); font-size: .64rem; }
+
+/* --------------------------------------- Layout: alles im Modal ohne Scroll */
+
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-body {
+  overflow: hidden;
+}
+.auto-plan-dialog[data-v9-layout="1"] #autoPlanConfig,
+.auto-plan-dialog[data-v9-layout="1"] #autoPlanStage,
+.auto-plan-dialog[data-v9-layout="1"] #autoPlanResult {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--month-accent) 45%, #b9c4d0) transparent;
+}
+
+/* Sticky-Köpfe der intern scrollenden Abschnitte bleiben oben sichtbar. */
+.auto-plan-dialog[data-v9-layout="1"] #autoPlanConfig .auto-plan-limit-head,
+.auto-plan-dialog[data-v9-layout="1"] #autoPlanResult .auto-plan-section-title {
+  position: sticky;
+  top: -1px;
+  z-index: 4;
+  background: color-mix(in srgb, #fff 96%, var(--month-accent) 4%);
+  backdrop-filter: blur(6px);
+}
+
+/* Laufansicht: feste Höhen statt dynamischem Wachstum. */
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-stage {
+  min-height: 0;
+  align-content: stretch;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-console {
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  align-content: start;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-log {
+  flex: 0 0 auto;
+  height: 210px;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-log-stream {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+  overflow-y: auto;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-phase-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+/* --------------------------------------------------- Dark-Mode-Kontraste */
+
+html[data-color-scheme="dark"] .auto-plan-shell {
+  background:
+    linear-gradient(145deg,
+      color-mix(in srgb, var(--month-accent) 5%, #131a22),
+      color-mix(in srgb, var(--month-accent) 10%, #0d1319));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05), 0 24px 74px rgba(0, 0, 0, .6);
+}
+html[data-color-scheme="dark"] .auto-plan-card,
+html[data-color-scheme="dark"] .auto-plan-visual,
+html[data-color-scheme="dark"] .auto-plan-console {
+  background: linear-gradient(180deg, color-mix(in srgb, #1a222c 96%, var(--month-accent) 4%), color-mix(in srgb, #141b23 92%, var(--month-accent) 8%));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04), 0 1px 2px rgba(0, 0, 0, .4);
+}
+html[data-color-scheme="dark"] .auto-plan-field small,
+html[data-color-scheme="dark"] .auto-plan-card p,
+html[data-color-scheme="dark"] .auto-plan-header p,
+html[data-color-scheme="dark"] .auto-plan-context-list span,
+html[data-color-scheme="dark"] .auto-plan-live-metrics span,
+html[data-color-scheme="dark"] .auto-plan-log-entry time,
+html[data-color-scheme="dark"] .auto-plan-v9-result-grid span,
+html[data-color-scheme="dark"] .auto-plan-search-metrics span,
+html[data-color-scheme="dark"] .auto-plan-weekday small,
+html[data-color-scheme="dark"] .auto-plan-cell-state,
+html[data-color-scheme="dark"] .auto-plan-red-item time,
+html[data-color-scheme="dark"] .auto-plan-confirm-note,
+html[data-color-scheme="dark"] .auto-plan-run-config span {
+  color: #b7c1cb;
+}
+html[data-color-scheme="dark"] .auto-plan-shell,
+html[data-color-scheme="dark"] .auto-plan-card,
+html[data-color-scheme="dark"] .auto-plan-switch,
+html[data-color-scheme="dark"] .auto-plan-log,
+html[data-color-scheme="dark"] .auto-plan-live-metrics > div,
+html[data-color-scheme="dark"] .auto-plan-search-metrics > div,
+html[data-color-scheme="dark"] .auto-plan-v9-result-grid > div,
+html[data-color-scheme="dark"] .auto-plan-v9-trace li,
+html[data-color-scheme="dark"] .auto-plan-assignment-cell,
+html[data-color-scheme="dark"] .auto-plan-red-item,
+html[data-color-scheme="dark"] .auto-plan-confirm-note {
+  border-color: color-mix(in srgb, #5f6b77 55%, var(--month-accent) 45%);
+}
+html[data-color-scheme="dark"] .auto-plan-assignment-cell {
+  background: color-mix(in srgb, #1a222c 92%, var(--month-accent) 8%);
+}
+html[data-color-scheme="dark"] .auto-plan-assignment-cell.proposed,
+html[data-color-scheme="dark"] .auto-plan-assignment-cell.yellow,
+html[data-color-scheme="dark"] .auto-plan-assignment-cell.orange,
+html[data-color-scheme="dark"] .auto-plan-assignment-cell.red {
+  background: color-mix(in srgb, #1a222c 86%, var(--month-accent) 14%);
+}
+html[data-color-scheme="dark"] .auto-plan-assignment-cell.open { opacity: .7; }
+html[data-color-scheme="dark"] .auto-plan-cell-reasons ul,
+html[data-color-scheme="dark"] .auto-plan-row-review details ul,
+html[data-color-scheme="dark"] .auto-plan-red-item ul { color: #c3cdd6; }
+
+/* Offen-/Status-Badges: Kontrast statt Transparenz auf Schwarz. */
+html[data-color-scheme="dark"] .auto-plan-row-status.fixed,
+html[data-color-scheme="dark"] .auto-plan-v9-status.unavailable {
+  background: #2a3540;
+  color: #dbe3ea;
+}
+html[data-color-scheme="dark"] .auto-plan-row-status { color: #a8f0c0; background: color-mix(in srgb, var(--green) 22%, #1a222c); }
+html[data-color-scheme="dark"] .auto-plan-row-status.yellow { color: #ffe08a; background: color-mix(in srgb, var(--yellow) 24%, #1a222c); }
+html[data-color-scheme="dark"] .auto-plan-row-status.orange { color: #ffc490; background: color-mix(in srgb, var(--orange) 24%, #1a222c); }
+html[data-color-scheme="dark"] .auto-plan-row-status.red { color: #ff9d9d; background: color-mix(in srgb, var(--red) 26%, #1a222c); }
+html[data-color-scheme="dark"] .auto-plan-source-pill {
+  background: color-mix(in srgb, var(--month-accent) 26%, #1a222c);
+  color: color-mix(in srgb, var(--month-accent-strong) 55%, #fff);
+}
+html[data-color-scheme="dark"] .auto-plan-cell-state i.fixed,
+html[data-color-scheme="dark"] .auto-plan-assignment-cell.fixed .auto-plan-cell-state i { background: #8fa0ae; }
+
+/* Tabellen: Zeilen und sticky-Köpfe im Dunkeln. */
+html[data-color-scheme="dark"] .auto-plan-proposal-table thead th,
+html[data-color-scheme="dark"] .auto-plan-distribution-table thead th {
+  background: color-mix(in srgb, var(--month-accent) 18%, #141b23);
+  color: color-mix(in srgb, var(--month-accent-strong) 45%, #fff);
+}
+html[data-color-scheme="dark"] .auto-plan-proposal-table tbody tr.saturday-row,
+html[data-color-scheme="dark"] .auto-plan-distribution-table tbody tr.saturday-row { background: color-mix(in srgb, #7a5cc4 14%, #12181f); }
+html[data-color-scheme="dark"] .auto-plan-proposal-table tbody tr.sunday-row,
+html[data-color-scheme="dark"] .auto-plan-distribution-table tbody tr.sunday-row { background: color-mix(in srgb, #b8478f 13%, #12181f); }
+html[data-color-scheme="dark"] .auto-plan-proposal-table tbody tr.holiday-row,
+html[data-color-scheme="dark"] .auto-plan-distribution-table tbody tr.holiday-row { background: color-mix(in srgb, var(--orange) 15%, #12181f); }
+html[data-color-scheme="dark"] .auto-plan-proposal-table tbody tr:hover { background: color-mix(in srgb, var(--month-accent) 20%, #12181f); }
+html[data-color-scheme="dark"] .auto-plan-distribution-table i { color: #8fa0ae; }
+
+/* Log und Phasenband im Dunkeln. */
+html[data-color-scheme="dark"] .auto-plan-log {
+  background: linear-gradient(180deg, color-mix(in srgb, #171e26 98%, var(--month-accent) 2%), color-mix(in srgb, #131a21 94%, var(--month-accent) 6%));
+}
+html[data-color-scheme="dark"] .auto-plan-log-entry.is-phase { background: color-mix(in srgb, var(--month-accent) 12%, transparent); }
+html[data-color-scheme="dark"] .auto-plan-log-entry.is-final { background: color-mix(in srgb, var(--green) 14%, transparent); }
+html[data-color-scheme="dark"] .auto-plan-log-entry.is-blocked { background: color-mix(in srgb, var(--red) 14%, transparent); }
+html[data-color-scheme="dark"] .auto-plan-log-entry i { background: #5b6a78; }
+html[data-color-scheme="dark"] .auto-plan-phase {
+  background: color-mix(in srgb, #1a222c 90%, var(--month-accent) 10%);
+}
+html[data-color-scheme="dark"] .auto-plan-phase i { background: #5b6a78; }
+html[data-color-scheme="dark"] .auto-plan-phase[data-state=active] {
+  background: color-mix(in srgb, var(--ap-accent) 20%, #1a222c);
+}
+html[data-color-scheme="dark"] .auto-plan-phase[data-state=done] b { color: #a8f0c0; }
+html[data-color-scheme="dark"] .auto-plan-phase[data-state=done] i { background: #5ecb7f; }
+
+/* Ergebnis-Flächen im Dunkeln. */
+html[data-color-scheme="dark"] .auto-plan-result-hero { background: linear-gradient(180deg, color-mix(in srgb, var(--green) 14%, #141b23), color-mix(in srgb, #141b23 92%, var(--month-accent) 8%)); }
+html[data-color-scheme="dark"] .auto-plan-seal { background: color-mix(in srgb, var(--green) 18%, #141b23); }
+html[data-color-scheme="dark"] .auto-plan-red-review { background: color-mix(in srgb, var(--orange) 10%, #141b23); }
+html[data-color-scheme="dark"] .auto-plan-confirm-red { background: color-mix(in srgb, var(--orange) 12%, #141b23); }
+html[data-color-scheme="dark"] .auto-plan-mus,
+html[data-color-scheme="dark"] .auto-plan-v9-mus,
+html[data-color-scheme="dark"] .auto-plan-v9-relaxed { background: color-mix(in srgb, var(--orange) 10%, #141b23); }
+html[data-color-scheme="dark"] .auto-plan-v9-run-strip { background: color-mix(in srgb, var(--month-accent) 16%, #141b23); }
+
+/* v9-Sticky-Köpfe im Dunkeln. */
+html[data-color-scheme="dark"] .auto-plan-dialog[data-v9-layout="1"] #autoPlanConfig .auto-plan-limit-head,
+html[data-color-scheme="dark"] .auto-plan-dialog[data-v9-layout="1"] #autoPlanResult .auto-plan-section-title {
+  background: color-mix(in srgb, #151c24 96%, var(--month-accent) 4%);
+}
+
+/* --------------------------------------------------------- Animations-Politur */
+
+.auto-plan-v85-wave em {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--ap-accent) 55%, #fff),
+    var(--ap-accent),
+    var(--ap-accent-strong));
+  transition: inline-size .35s cubic-bezier(.22, 1, .36, 1);
+}
+.auto-plan-v85-wave {
+  position: relative;
+  overflow: hidden;
+}
+.auto-plan-v85-wave::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, .55) 50%, transparent 70%);
+  transform: translateX(-120%);
+  animation: auto-plan-v9-sheen 1.6s cubic-bezier(.3, .6, .3, 1) infinite;
+  pointer-events: none;
+}
+@keyframes auto-plan-v9-sheen {
+  to { transform: translateX(120%); }
+}
+
+.auto-plan-phase[data-state=active] {
+  animation: auto-plan-v9-active 1.8s ease-in-out infinite;
+}
+@keyframes auto-plan-v9-active {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ap-accent) 0%, transparent); }
+  50% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--ap-accent) 22%, transparent); }
+}
+
+.auto-plan-log-entry {
+  animation: auto-plan-v9-log-in .3s cubic-bezier(.22, 1, .36, 1) both;
+}
+@keyframes auto-plan-v9-log-in {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: none; }
+}
+
+html[data-color-scheme="dark"] .auto-plan-v85-wave::after {
+  background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, .12) 50%, transparent 70%);
+}
+
+/* ---------------------------------------------- Umschalter ohne Beschriftung */
+
+.tool-action--theme .tool-label,
+.tool-action--theme .tool-action__label {
+  display: none !important;
+}
+.tool-action--theme {
+  min-width: 0;
+  padding: .42rem .5rem;
+}

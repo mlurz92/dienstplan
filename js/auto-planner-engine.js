@@ -327,6 +327,16 @@ export function createDefaultAutoPlanConfig(state, monthData) {
     optimizationFocus: 'balanced',
     allowRedFallback: true,
     maxRedViolations: null,
+    solverBackend: 'auto',
+    cpSatTimeBudgetSeconds: 10,
+    cpSatWorkers: null,
+    cpSatWarmStart: 'heuristic',
+    fairnessProfile: 'leximin',
+    deterministic: true,
+    infeasibilityMode: 'mus',
+    repairOnEdit: true,
+    explanationDepth: 'detailed',
+    randomSeed: null,
     staffLimits: Object.fromEntries(monthPlanningStaff(state, monthData).map(person => [person.id, {
       maxBd: defaultBdLimit(monthData, person),
       maxHg: defaultHgLimit(state, monthData, person),
@@ -335,9 +345,16 @@ export function createDefaultAutoPlanConfig(state, monthData) {
   };
 }
 
+const SOLVER_BACKENDS = new Set(['auto', 'cp-sat-exact', 'cp-sat-lns', 'heuristic-alns']);
+const FAIRNESS_PROFILES = new Set(['leximin', 'spread', 'variance', 'owa']);
+const INFEASIBILITY_MODES = new Set(['mus', 'relax', 'report']);
+const EXPLANATION_DEPTHS = new Set(['short', 'detailed', 'llm']);
+
 export function normalizeAutoPlanConfig(state, monthData, input = null) {
   const defaults = createDefaultAutoPlanConfig(state, monthData);
   const source = input && typeof input === 'object' ? input : {};
+  const settings = state?.settings?.autoPlan && typeof state.settings.autoPlan === 'object' ? state.settings.autoPlan : {};
+  const pick = key => (source[key] === undefined ? settings[key] : source[key]);
   const staffLimits = {};
   for (const person of monthPlanningStaff(state, monthData)) {
     const supplied = source.staffLimits?.[person.id] || {};
@@ -347,11 +364,33 @@ export function normalizeAutoPlanConfig(state, monthData, input = null) {
       maxTotal: supplied.maxTotal === undefined ? defaults.staffLimits[person.id]?.maxTotal ?? null : normalizeCap(supplied.maxTotal)
     };
   }
+  const cpSatTimeBudgetSeconds = Number(pick('cpSatTimeBudgetSeconds'));
+  const cpSatWorkers = pick('cpSatWorkers');
+  const rawRandomSeed = pick('randomSeed');
+  const randomSeed = rawRandomSeed === null || rawRandomSeed === undefined || rawRandomSeed === ''
+    ? null
+    : Number.isFinite(Number(rawRandomSeed))
+      ? Number(rawRandomSeed)
+      : null;
   return {
     searchIntensity: INTENSITY_VALUES.has(source.searchIntensity) ? source.searchIntensity : defaults.searchIntensity,
     optimizationFocus: FOCUS_VALUES.has(source.optimizationFocus) ? source.optimizationFocus : defaults.optimizationFocus,
     allowRedFallback: source.allowRedFallback === undefined ? defaults.allowRedFallback : source.allowRedFallback === true,
     maxRedViolations: normalizeCap(source.maxRedViolations),
+    solverBackend: SOLVER_BACKENDS.has(source.solverBackend ?? settings.solverBackend)
+      ? (source.solverBackend ?? settings.solverBackend)
+      : defaults.solverBackend,
+    cpSatTimeBudgetSeconds: Number.isFinite(cpSatTimeBudgetSeconds)
+      ? Math.max(1, Math.min(60, Math.round(cpSatTimeBudgetSeconds)))
+      : defaults.cpSatTimeBudgetSeconds,
+    cpSatWorkers: Number.isInteger(cpSatWorkers) ? Math.max(1, Math.min(8, cpSatWorkers)) : null,
+    cpSatWarmStart: pick('cpSatWarmStart') === 'none' ? 'none' : 'heuristic',
+    fairnessProfile: FAIRNESS_PROFILES.has(pick('fairnessProfile')) ? pick('fairnessProfile') : defaults.fairnessProfile,
+    deterministic: pick('deterministic') === false ? false : true,
+    infeasibilityMode: INFEASIBILITY_MODES.has(pick('infeasibilityMode')) ? pick('infeasibilityMode') : defaults.infeasibilityMode,
+    repairOnEdit: pick('repairOnEdit') === false ? false : true,
+    explanationDepth: EXPLANATION_DEPTHS.has(pick('explanationDepth')) ? pick('explanationDepth') : defaults.explanationDepth,
+    randomSeed,
     staffLimits
   };
 }

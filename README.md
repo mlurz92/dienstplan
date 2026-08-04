@@ -6,9 +6,9 @@
 
 <p align="center"><strong>Regelgestützte Monatsplanung für Bereitschaftsdienst, Hintergrunddienst und neuroradiologische Rufbereitschaft</strong></p>
 
-> **Paketversion:** `0.8.5`  
+> **Paketversion:** `0.9.0`  
 > **Regelwerk:** Eignungsregeln `v4.9`  
-> **Auto-Plan:** Algorithmus `v8.5` — *Exhaustive Clean-Solution Observatory*  
+> **Auto-Plan:** Algorithmus `v9` — *Hybrid Exact Observatory* (CP-SAT-Kern, Heuristik-Fallback)  
 > **Feiertagsregion:** Sachsen (`SN`)  
 > **Betrieb:** Cloudflare Pages · Pages Functions · Workers KV · lokale Browser-Sicherung
 
@@ -88,9 +88,50 @@ Damit ist die beim ursprünglichen v8.5-Release entstandene Rückkopplung beseit
 
 ---
 
-## 4. Auto-Plan v8.5
+## 4. Auto-Plan v9
 
-### 4.1 Verbindliche Pipeline
+### 4.1 Hybride exakte Architektur
+
+```text
+Fixpunkte/Domänen
+  → Warmstart-Heuristik (v8.5-Pipeline, unverändert)
+  → CP-SAT-Modellbau (Variablen, Klauseln, phasenweise Zielkomponenten)
+  → lexikografische exakte Suche (Maximin-Fairness zuerst, dann weiche Ziele)
+  → Regelengine-Schlussaudit (einzige fachliche Wahrheitsquelle)
+  → bei OPTIMAL: beweisbare untere Schranke und Zertifizierung
+  → bei INFEASIBLE: MUS-artige Ursachenanalyse, optional Relaxierung
+  → sonst: bewährte Null-Rot-Intensivierung, Reparatur und ALNS-Perfektion
+```
+
+v9 übersetzt den Monatszustand in ein lineares Constraint-Modell und löst es mit
+**Googles OR-Tools CP-SAT**, das als WebAssembly direkt im Browser läuft
+(`or-tools-wasm`, Apache-2.0, bzw. `cpsat-js`, MIT, als Single-Thread-Fallback).
+Kann die Bindung nicht geladen werden (älterer Browser, fehlende COOP/COEP-
+Isolation), bleibt die v8.5-Heuristik vollständig erhalten und übernimmt.
+
+**Regelengine bleibt die einzige Wahrheitsquelle:** Jeder CP-SAT-Vorschlag
+durchläuft den vollständigen Schlussaudit der produktiven Engine; gewonnen wird
+ausschließlich nach deren lexikografischer Zielordnung. Das CP-Modell ist eine
+Suchhilfe, kein zweites Regelwerk.
+
+### 4.2 Exakte Suche und Erklärbarkeit
+
+- **Lexikografische Phasen:** Maximin-Fairness zuerst, danach Wünsche,
+  BD-Soll, Wochenend- und Samstagslast in der Reihenfolge des
+  Optimierungsschwerpunkts; erreichte Werte werden phasenweise fixiert.
+- **Optimalitätsnachweis:** `OPTIMAL` liefert eine echte untere Schranke und
+  zertifiziert den Plan – der erste beweisbare Optimalitätsbeweis des Projekts.
+- **MUS-artige Konfliktanalyse:** Bei Unzulässigkeit werden Constraint-Gruppen
+  gierig wieder aktiviert, bis die kleinste Konfliktursache benannt ist;
+  auf Wunsch (`infeasibilityMode: 'relax'`) werden Gruppen in fachlicher
+  Reihenfolge aufgeweicht und im Ergebnis ausgewiesen.
+- **Determinismus:** Alle Zufallsströme (CP-SAT-Seed, Heuristik-Seed) leiten
+  sich aus Konfiguration und Monatszustand ab; identische Eingaben ergeben
+  identische Pläne.
+- **Warmstart:** Das Heuristik-Ergebnis dient als Lösungshinweis (Hint) und
+  prunt die exakte Suche.
+
+### 4.3 Verbindliche v8.5-Pipeline (Fallback und Warmstart)
 
 ```text
 Fixpunkte/Domänen
@@ -102,7 +143,9 @@ Fixpunkte/Domänen
   → vollständige Zertifizierung
 ```
 
-Perfektion und Zertifizierung sind in v8.5 verbindlich. Ein Lauf kann sie nicht mehr über eine Studio-Checkbox deaktivieren.
+Die v8.5-Profile (Ausgewogen/Intensiv/Exhaustiv), die strikte Eskalation vor
+Rot und die verbindliche Perfektion bleiben unverändert bestehen und werden
+weiterhin über `deriveV85Tuning()` in echte Solverfelder übersetzt.
 
 ### 4.2 Gekoppelte Suchprofile
 
@@ -190,9 +233,15 @@ Gespeichert und über den Bootstrap-Pfad synchronisiert werden unter anderem:
 - Autosave-Verzögerung;
 - Algorithmus-Kommentar und Studio-Visualisierung;
 - Leistungsprofil, Suchintensität, Optimierungsfokus und Zeitbudget;
-- Parallelitätslimit, Portfolio-Diversität, Rot-Obergrenze und Zertifizierungsrunden.
+- Parallelitätslimit, Portfolio-Diversität, Rot-Obergrenze und Zertifizierungsrunden;
+- v9: Solver-Backend, Exaktheitsmodus, CP-SAT-Zeitbudget und -Worker,
+  Warmstart, Fairness-Profil, Determinismus, Infeasibility-Modus,
+  Reparatur-nach-Änderung und Erklärungstiefe.
 
-Das Hell-/Dunkelschema wird bewusst lokal vor dem Server-Bootstrap geladen. Die Auto-Plan-v8.5-Studiokopplung wird ebenfalls lokal gesichert; die resultierenden Solverfelder werden bei jedem Lauf erneut in die Laufkonfiguration übertragen.
+Das Hell-/Dunkelschema wird bewusst lokal vor dem Server-Bootstrap geladen
+und startet standardmäßig im **hellen** Erscheinungsbild. Die
+Auto-Plan-Studiokopplung wird ebenfalls lokal gesichert; die resultierenden
+Solverfelder werden bei jedem Lauf erneut in die Laufkonfiguration übertragen.
 
 ---
 
@@ -237,7 +286,9 @@ Cloudflare Pages wird aus dem Repository-Root gebaut. Das KV-Binding lautet `DIE
 - Toolbar-Dichtestufen;
 - Auto-Plan-Invarianten, Fixpunktschutz und Zielordnung;
 - Worker-Budget und Portfoliovergleich;
-- v8.5-Phasenvertrag, Profilableitung und Fallback-Reihenfolge.
+- v8.5-Phasenvertrag, Profilableitung und Fallback-Reihenfolge;
+- v9: CP-SAT-Modellbau, Konfigurationsfelder, Relaxations-Diagnose,
+  Fallback-Pipeline und Exaktheitsnachweis (`tests/auto-plan-v9.test.js`).
 
 ### Browsertests
 
@@ -252,50 +303,79 @@ Cloudflare Pages wird aus dem Repository-Root gebaut. Das KV-Binding lautet `DIE
 
 ---
 
-## 10. Projektstruktur v8.5
+## 10. Projektstruktur v9
 
 ```text
+js/auto-planner-v9.js         hybride exakte Orchestrierung (CP-SAT + Fallback)
+js/auto-plan-cp-sat.js        CP-SAT-Modellbau, Solver-Loader, Phasen, MUS-Diagnose
+js/auto-plan-studio-v9.js     v9-Regler, Tooltips, Exaktheitsnachweis, Layout
 js/auto-planner-v8-5.js       strikte Eskalation und verbindlicher Phasenvertrag
 js/auto-plan-studio-v8-5.js   Profile, Phasentheater und Ergebnisprotokoll
-js/app-theme-v8-5.js          persistenter Hell-/Dunkelcontroller
+js/app-theme-v8-5.js          persistenter Hell-/Dunkelcontroller (Start: hell)
 js/rich-tooltip-v8-5.js       zentrale ARIA-Tooltips
 js/ui-v8-5.js                 Command-Bar-, Bootstrap- und Performance-Integration
 app-v8-5.css                  adaptive Farb- und Oberflächentoken
 toolbar-v8-5.css              rechter Theme-/Einstellungsblock
 auto-plan-studio-v8-5.css     v8.5-Studiozustände
+auto-plan-studio-v9.css       Modal-Fit-Layout, Dark-Mode-Kontraste, Animation
+_headers                      COOP/COEP für multithreaded WebAssembly
 tests/auto-plan-v8-5.test.js  Solver- und Integrationsverträge
+tests/auto-plan-v9.test.js    CP-SAT-Modell- und v9-Verträge
 tests/e2e/v8-5-shell.spec.js  Browser-, Bootstrap- und Observer-Regressionen
 ```
 
 ---
 
-## 11. Release 0.8.5
+## 11. Release 0.9.0
 
 ### Neu
 
-- monatsfarbabhängiger Hell-/Dunkelmodus in der Befehlsleiste;
-- kurze Beschriftungen mit Pictogrammen und zentralen Rich Tooltips;
-- gekoppelte Null-Rot-Profile;
-- mehrstufige strikte Intensivierung;
-- separate v8.5-Phasen- und Wellenanzeige;
-- profilabhängige Parallelitäts- und Diversitätssteuerung.
+- **Hybride exakte Engine v9:** CP-SAT (WebAssembly) als Lösungskern mit
+  Warmstart-Hint und vollständigem Heuristik-Fallback;
+- **lexikografische exakte Suche:** Maximin-Fairness zuerst, dann die weichen
+  Ziele in der Reihenfolge des Optimierungsschwerpunkts;
+- **Optimalitätsnachweis:** OPTIMAL-Status mit beweisbarer unterer Schranke
+  und Zertifizierung des Plans;
+- **MUS-artige Ursachenanalyse** bei Unzulässigkeit, optional mit
+  schrittweiser Relaxierung von Constraint-Gruppen;
+- **Determinismus:** abgeleitete Seeds für CP-SAT und Heuristik;
+- **Exaktheitsnachweis-Panel** im Studio mit Status, Schranke, Phasenspur
+  und Konfliktursachen;
+- **zehn neue Studio-Regler** (Solver-Backend, Exaktheit, CP-SAT-Zeitbudget
+  und -Worker, Warmstart, Fairness-Profil, Determinismus, Infeasibility-Modus,
+  Reparatur-nach-Änderung, Erklärungstiefe) mit erklärenden Tooltips;
+- **erklärende Tooltips an jeder Stelle** des Studios (inklusive Ergebnis-
+  und Laufansicht);
+- **Layout:** Der Studio-Dialog passt vollständig in den Viewport; nur innere
+  Bereiche scrollen. Das Algorithmus-Kommentar-Fenster wächst nicht mehr,
+  sondern scrollt intern;
+- **Dark-Mode-Kontraste** für Badges, Tabellen, Karten und Modals;
+- **Start im hellen Erscheinungsbild**; der Theme-Umschalter ist ein reines
+  Sonnen-/Mond-Piktogramm;
+- **COOP/COEP-Header** in `_headers` für multithreaded WebAssembly;
+- **Animations-Politur:** Suchstrahl-Sheen, Phasenpuls und gleitende
+  Logzeilen.
 
 ### Behoben und gehärtet
 
-- **Start-Freeze nach v8.5-Integration:** selbstverstärkende `MutationObserver`-/`textContent`-Rückkopplung entfernt;
-- UI- und Tooltip-Synchronisierung idempotent sowie gegen Mehrfachinstallation geschützt;
-- sichtbare Profile und Solverparameter sind direkt gekoppelt;
-- Minimal-Rot-Fallback erst nach strikter Eskalation;
-- Perfektion/Zertifizierung nicht mehr versehentlich deaktivierbar;
-- Legacy-Modus „Reduzierte Bewegung“ entfernt;
-- Toolbar-Hilfsaktionen bleiben gemeinsam am rechten Rand;
-- zusätzliche Modul- und Browserregressionen.
+- v9 erhält den vollständigen öffentlichen Vertrag der Engine
+  (Konfiguration, Fingerprints, Übernahmeprüfung, Heuristik-Parameter);
+- der Heuristik-Fallback meldet Abschlüsse genau einmal;
+- die v9-Konfigurationsfelder sind fingerprint-stabil und idempotent
+  normalisiert;
+- CP-SAT-Ergebnisse durchlaufen immer den Regelengine-Schlussaudit;
+- fehlende Solver-Bindung (kein WASM/COOP-COEP) degradiert kontrolliert auf
+  die v8.5-Heuristik.
 
 ---
 
 ## 12. Grenzen
 
 - Eine vollständige Null-Rot-Belegung kann mathematisch unmöglich sein.
-- Die Zertifizierung beweist lokale Optimalität für die vollständig geprüften Nachbarschaften, nicht globale Optimalität des gesamten kombinatorischen Problems.
-- Mehr Zeit und mehr Worker erhöhen die Suchtiefe, garantieren aber keinen globalen Optimalitätsbeweis.
+- Die Zertifizierung beweist lokale Optimalität für die vollständig geprüften
+  Nachbarschaften; bei CP-SAT-OPTIMAL zusätzlich globale Optimalität des
+  Modells. Da das CP-Modell eine Suchhilfe der Regelengine ist, bleibt der
+  fachliche Schlussaudit die maßgebliche Instanz.
+- Mehr Zeit und mehr Worker erhöhen die Suchtiefe, garantieren aber keinen
+  globalen Optimalitätsbeweis der Regelengine.
 - RBN und zweite RBN bleiben manuell.
