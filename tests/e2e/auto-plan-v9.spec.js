@@ -149,9 +149,51 @@ test('Diensttabelle erreicht im Dunkelmodus lesbaren Textkontrast', async ({ pag
   await expect(page.locator('#planTable thead th').first()).toHaveCSS('color', 'rgb(255, 255, 255)');
 });
 
-test('v9-Animation respektiert die Systempräferenz für reduzierte Bewegung', async ({ page }) => {
+test('v9 zeigt ausschließlich den wahrheitsgetreuen globalen Solverstatus', async ({ page }) => {
+  await openStudio(page);
+  await page.evaluate(() => {
+    const cards = document.getElementById('autoPlanScorecards');
+    cards.innerHTML = '<div class="auto-plan-scorecard verified"><span>Optimalität</span><strong>zertifiziert</strong><small>lokal</small></div>';
+    document.getElementById('autoPlanResultText').textContent = 'global optimiert und zertifiziert';
+    window.dispatchEvent(new CustomEvent('autoplanresult', {
+      detail: {
+        complete: true,
+        changes: [{ dateIso: '2026-07-01', role: 'bd', staffId: 'lurz' }],
+        metrics: {
+          red: 0,
+          proof: {
+            status: 'FEASIBLE',
+            exactAttempted: true,
+            globalSearchComplete: false,
+            relaxed: false,
+            scope: 'feasible-incumbent',
+            truthfulLabel: 'Zulässige Lösung, Optimum nicht bewiesen'
+          },
+          exactSearch: { nodes: 12_345, solutions: 3, stoppedBy: 'time' }
+        }
+      }
+    }));
+  });
+
+  await expect(page.locator('#autoPlanScorecards .auto-plan-scorecard span')).toHaveText('Globaler Nachweis');
+  await expect(page.locator('#autoPlanScorecards .auto-plan-scorecard strong')).toHaveText('FEASIBLE');
+  await expect(page.locator('#autoPlanResultText')).toContainText('nicht bewiesen');
+  await expect(page.locator('#autoPlanResultText')).not.toContainText('zertifiziert');
+  await expect(page.locator('#autoPlanV9ProofDetail')).toHaveText('Zulässige Lösung, Optimum nicht bewiesen');
+});
+
+test('v9-Algorithmusanimation bleibt ohne Reduktionsmodus vollständig aktiv', async ({ page }) => {
+  // Playwright emuliert hier bewusst eine OS-Präferenz für reduzierte Bewegung.
+  // Die Anwendung besitzt gemäß Produktvorgabe keinen Reduktionsmodus und lädt
+  // deshalb ihre zuletzt priorisierte vollständige Algorithmusanimation.
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await openStudio(page);
-  const animationName = await page.locator('#autoPlanV9Hud > i').first().evaluate(element => getComputedStyle(element).animationName);
-  expect(animationName).toBe('none');
+  await expect(page.locator('link[data-auto-plan-v9-motion]')).toHaveCount(1);
+  const animation = await page.locator('#autoPlanV9Hud > i').first().evaluate(element => {
+    const style = getComputedStyle(element);
+    return { name: style.animationName, duration: style.animationDuration, playState: style.animationPlayState };
+  });
+  expect(animation.name).toBe('v9-hud-spin');
+  expect(animation.duration).not.toBe('0s');
+  expect(animation.playState).toBe('running');
 });
