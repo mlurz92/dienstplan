@@ -1,7 +1,9 @@
 /**
- * Einstiegspunkt des Auto-Plan Studios.
+ * Einstiegspunkt des Auto-Plan Studios und der v8.5-Anwendungsschicht.
  *
- * Das Studio bringt seine Stylesheets selbst mit und meldet sich an der
- * Werkzeugleiste an, sobald diese vorhanden ist.
+ * Die Reihenfolge ist bewusst: Zuerst wird die bestehende Oberfläche aufgebaut,
+ * danach ergänzen die additiven v8.5-Schichten Command Bar, Farbschema,
+ * Tooltips, Solver-Parameter und Lauftelemetrie.
  */
-import './auto-plan-studio-v8.js?v=20260803.4';
+import './ui-v8-5.js?v=20260804.1';
+import './auto-plan-studio-v8-5.js?v=20260804.1';
