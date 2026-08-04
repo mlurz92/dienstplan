@@ -4,7 +4,10 @@ import assert from 'node:assert/strict';
 process.env.TZ = 'Europe/Berlin';
 
 const { DEFAULT_STAFF } = await import('../js/defaults.js');
-const { constructAutoPlan } = await import('../js/auto-planner.js');
+// Diese Datei prüft gezielt die v7.5-/v8.5-Suchschichten. Der produktive
+// Einstieg zeigt seit v9 bewusst die neue Revision und ist dafür nicht die
+// richtige Testgrenze.
+const { constructAutoPlan } = await import('../js/auto-planner-v8-5.js');
 const { perfectAutoPlan } = await import('../js/auto-planner-v7-5.js');
 
 function miniMonth(dates) {
@@ -56,8 +59,6 @@ test('v7.5 global fail-first selection starts with the tighter role domain', asy
 
   const firstSearch = progress.find(update => update.phase === 'search');
   assert.equal(firstSearch?.role, 'hg');
-  // Der öffentliche Einstiegspunkt trägt die jeweils aktuelle Revision; die
-  // Prüfung der v7.5-Schicht selbst steht im Test darunter.
   assert.equal(result.algorithmRevision, 8.5);
   assert.ok(result.metrics.assignmentLedgerHits > 0);
   assert.ok(result.metrics.assignmentLedgerMisses > 0);
