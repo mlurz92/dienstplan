@@ -72,9 +72,9 @@ jobs:
           cache-to: type=gha,mode=max,scope=autoplan-v9-solver
 
   cloudflare-worker:
-    name: Cloudflare Solver Worker und Durable Objects
+    name: Cloudflare Solver Worker, Workflow und Container
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: workers/autoplan-v9
@@ -85,12 +85,15 @@ jobs:
           node-version: 24
       - run: npm install --ignore-scripts --no-audit --no-fund
       - run: npm run check
-      - run: npx wrangler deploy --dry-run --outdir dist
+      - name: Produktionskonfiguration prüfen
+        run: npx wrangler deploy --dry-run --outdir dist
+      - name: Previewkonfiguration prüfen
+        run: npx wrangler deploy --dry-run --env preview --outdir dist-preview
 
   month-state-worker:
     name: Revisionssichere Monatspersistenz
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: workers/month-state
@@ -101,4 +104,7 @@ jobs:
           node-version: 24
       - run: npm install --ignore-scripts --no-audit --no-fund
       - run: npm run check
-      - run: npx wrangler deploy --dry-run --outdir dist
+      - name: Produktionskonfiguration prüfen
+        run: npx wrangler deploy --dry-run --outdir dist
+      - name: Previewkonfiguration prüfen
+        run: npx wrangler deploy --dry-run --env preview --outdir dist-preview
