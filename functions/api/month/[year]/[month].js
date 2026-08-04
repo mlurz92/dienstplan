@@ -119,7 +119,7 @@ export async function onRequestPut(context) {
       })
     });
     const body = await responseJson(response);
-    if (response.status === 409) return json(body, 409);
+    if (response.status === 409 && body?.error?.code === 'MONTH_REVISION_CONFLICT') return json(body, 409);
     if (!response.ok) throw new Error(body?.error?.message || `MonthState-Schreiben HTTP ${response.status}`);
     const saved = ensureMonthShape(year, month, body.month);
     // KV is a migration/export mirror only. Failure here must not invalidate an
