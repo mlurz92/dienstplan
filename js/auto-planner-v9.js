@@ -38,9 +38,15 @@ const clamp = (value, min, max, fallback) => {
   return Number.isFinite(number) ? Math.max(min, Math.min(max, Math.round(number))) : fallback;
 };
 
+function bridgedPreferences(source) {
+  const match = /^v9:(fast|hybrid|exact|diagnose):(first-feasible|high-quality|best-within-budget|prove-optimal)$/.exec(String(source?.performanceProfile || ''));
+  return match ? { solverMode: match[1], proofTarget: match[2] } : {};
+}
+
 export function deriveV9Tuning(source = {}) {
-  const solverMode = MODES.has(source.solverMode) ? source.solverMode : 'hybrid';
-  const proofTarget = TARGETS.has(source.proofTarget) ? source.proofTarget : 'best-within-budget';
+  const bridged = bridgedPreferences(source);
+  const solverMode = MODES.has(source.solverMode) ? source.solverMode : bridged.solverMode || 'hybrid';
+  const proofTarget = TARGETS.has(source.proofTarget) ? source.proofTarget : bridged.proofTarget || 'best-within-budget';
   const totalBudgetMs = clamp(source.timeBudgetMs, 10_000, 900_000, 120_000);
   const exactShare = solverMode === 'fast' ? 0
     : solverMode === 'exact' ? .68
@@ -113,9 +119,11 @@ function annotate(result, parameters, tuning, exact = null) {
   const exactStatus = exact?.solverStatus || null;
   const overallStatus = exactStatus === V9_SOLVER_STATUSES.OPTIMAL
     ? V9_SOLVER_STATUSES.OPTIMAL
-    : result.complete
-      ? V9_SOLVER_STATUSES.FEASIBLE
-      : exactStatus || V9_SOLVER_STATUSES.UNKNOWN;
+    : exactStatus === V9_SOLVER_STATUSES.INFEASIBLE && !result.complete
+      ? V9_SOLVER_STATUSES.INFEASIBLE
+      : result.complete
+        ? V9_SOLVER_STATUSES.FEASIBLE
+        : exactStatus || V9_SOLVER_STATUSES.UNKNOWN;
   result.metrics.solverStatus = overallStatus;
   result.metrics.exactSearch = exact?.search || result.metrics.exactSearch || null;
   result.metrics.proof = {
@@ -192,8 +200,8 @@ export async function perfectAutoPlan(parameters) {
   // strikten INFEASIBLE-Nachweis begonnen. UNKNOWN ist ausdrücklich kein
   // Unmöglichkeitsbeweis und darf den Null-Rot-Anspruch nicht abkürzen.
   let fallbackExact = null;
-  if (!selected?.complete
-    && exact.solverStatus === V9_SOLVER_STATUSES.INFEASIBLE
+  if (exact.solverStatus === V9_SOLVER_STATUSES.INFEASIBLE
+    && (incumbent.requiresConfirmation || !incumbent.complete)
     && parameters.runConfig?.allowRedFallback !== false
     && !tuning.forceStrict) {
     fallbackExact = await solveExactly({
