@@ -37,7 +37,7 @@ function installAutoPlanV9LayoutGuards() {
         overflow: hidden;
       }
 
-      .auto-plan-dialog[data-engine-revision="9"].is-running #autoPlanStage {
+      .auto-plan-dialog[data-v9-engine-revision="9"].is-running #autoPlanStage {
         flex: 1 1 0;
         min-block-size: 0;
         max-block-size: 100%;
