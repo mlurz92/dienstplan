@@ -2,10 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-const planner = await import('../js/auto-planner.js');
+const planner = await import('../js/auto-planner-v8-5.js');
 const source = async path => readFile(new URL(path, import.meta.url), 'utf8');
 
-test('produktiver Auto-Plan exportiert Revision 8.5 und alle Pflichtphasen', () => {
+test('v8.5-Kompatibilitätsschicht exportiert Revision 8.5 und alle Pflichtphasen', () => {
   assert.equal(planner.AUTO_PLAN_REVISION, 8.5);
   assert.equal(planner.AUTO_PLAN_ENGINE_ID, 'v8.5-exhaustive-clean-escalation');
   assert.deepEqual(planner.AUTO_PLAN_STAGES.map(stage => stage.id), [
