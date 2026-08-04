@@ -10,7 +10,41 @@
  */
 import * as V9 from './auto-planner-v9.js?v=20260804.9';
 
-export * from './auto-planner-v9.js?v=20260804.9';
+/**
+ * Explizite Re-Export-Liste statt `export *`.
+ *
+ * `export *` würde bei ES-Modulen von lokal definierten Exporten desselben
+ * Namens überschattet – lautlos und ohne Warnung. Da dieses Modul weiter
+ * unten eigene Implementierungen von `buildAutoPlan`, `constructAutoPlan`
+ * und `perfectAutoPlan` definiert, wird die v9-Fassung von `buildAutoPlan`
+ * hier bewusst nicht unter ihrem Originalnamen weitergereicht, sondern unter
+ * `_v9BuildAutoPlan`. Ändert sich die Exportliste von auto-planner-v9.js,
+ * fällt das dank der expliziten Liste sofort auf (Bezugsfehler statt
+ * stillschweigendem Shadowing).
+ */
+export {
+  AUTO_PLAN_ENGINE_ID,
+  AUTO_PLAN_REVISION,
+  AUTO_PLAN_STAGES,
+  NATIVE_JS_EXACT_MRV_DFS_SOLVER_NAME,
+  V9_SOLVER_STATUSES,
+  autoPlanConfigFingerprint,
+  createDefaultAutoPlanConfig,
+  deriveV85Tuning,
+  deriveV9Tuning,
+  fingerprintMonth,
+  mapHeuristicProgress,
+  mergeAutoPlanRunConfig,
+  normalizeAutoPlanConfig,
+  optimizerDefaults,
+  optimizerFingerprint,
+  planningFingerprint,
+  shouldRunZeroRedRescue,
+  solveExactly,
+  validateAutoPlanConfig,
+  zeroRedRescueProfiles,
+  buildAutoPlan as _v9BuildAutoPlan,
+} from './auto-planner-v9.js?v=20260804.9';
 
 const clone = value => typeof structuredClone === 'function'
   ? structuredClone(value)
