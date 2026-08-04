@@ -55,8 +55,6 @@ function enrichedRunConfig(parameters) {
   const localFloor = tuning.repairAggressiveness === 'exhaustive' ? 9000 : tuning.repairAggressiveness === 'intensive' ? 6000 : 3200;
   return {
     ...source,
-    // Das Studio hält diesen Wert unveränderlich auf true. Explizite verkürzte
-    // Test-/API-Verträge dürfen ihre bewusste Abschaltung weiter verwenden.
     perfectionEnabled: source.perfectionEnabled !== false,
     certificationRounds: Math.max(2, clamp(source.certificationRounds, 1, 8, 4)),
     repairIterations: Math.max(repairFloor, clamp(source.repairIterations, 0, 30, repairFloor)),
@@ -111,7 +109,10 @@ function strictProfiles(config) {
 
 function fallbackRequested(config) {
   const requested = requestedProfiles(config);
-  return config.allowRedFallback === true
+  // Der bestehende Auto-Plan-Vertrag erlaubt den Fallback standardmäßig. Nur
+  // ein explizites false sperrt ihn; v8.5 darf diesen Altvertrag nicht still
+  // in das Gegenteil verkehren.
+  return config.allowRedFallback !== false
     && (!requested.length || requested.includes(CONFIRMABLE_PROFILE));
 }
 
@@ -126,7 +127,23 @@ function annotate(result, telemetry) {
     perfectionEnabled,
     certificationEnabled: perfectionEnabled
   };
-  if (telemetry) result.metrics.strictEscalation = telemetry;
+  if (telemetry) {
+    result.metrics.strictEscalation = telemetry;
+    // Rückwärtskompatible, semantisch äquivalente Telemetrie für bestehende
+    // Integrationen: v8.5 ersetzt die einzelne Rescue durch mehrere Wellen.
+    result.metrics.zeroRedRescue = {
+      ...(result.metrics.zeroRedRescue || {}),
+      attempted: telemetry.attempted > 0,
+      succeeded: Boolean(telemetry.cleanFound && !telemetry.fallbackAttempted),
+      priorRed: Number(result.metrics.zeroRedRescue?.priorRed || 0),
+      priorUnfilled: Number(result.metrics.zeroRedRescue?.priorUnfilled || 0),
+      elapsedMs: Number(result.metrics.zeroRedRescue?.elapsedMs || 0),
+      avoidedRed: Boolean(telemetry.cleanFound && !telemetry.fallbackAttempted)
+    };
+    if (telemetry.attempted > 0 && !String(result.searchProfile || '').includes('Null-Rot-Rescue')) {
+      result.searchProfile = `${result.searchProfile || 'Auto-Plan'} · Null-Rot-Rescue v8.5 geprüft`;
+    }
+  }
   return result;
 }
 
