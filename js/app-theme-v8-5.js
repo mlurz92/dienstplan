@@ -78,13 +78,11 @@ function applyImmediately(value, { persist = true, animate = false } = {}) {
     window.dispatchEvent(new CustomEvent('appcolorschemechange', { detail: { mode: next } }));
   };
 
-  const reduced = document.documentElement.classList.contains('reduce-motion')
-    || globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
-  if (animate && !reduced && typeof document.startViewTransition === 'function') {
-    document.startViewTransition(commit);
-  } else {
-    commit();
-  }
+  // v8.5 intentionally has no reduced-motion mode. The transition is part of
+  // the fixed application experience and falls back atomically where the API
+  // is unavailable.
+  if (animate && typeof document.startViewTransition === 'function') document.startViewTransition(commit);
+  else commit();
   return next;
 }
 
@@ -149,8 +147,6 @@ export function installThemeController() {
   return mode;
 }
 
-// Execute at module evaluation time to avoid a light/dark flash while the rest
-// of the application is still bootstrapping.
 if (typeof document !== 'undefined') {
   applyImmediately(mode, { persist: false, animate: false });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', observeSettingsDialog, { once: true });
