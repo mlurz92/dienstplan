@@ -7,7 +7,7 @@
  * „Optimum nicht bewiesen“ in derselben Vorschau.
  */
 
-import { setRichTooltip } from './rich-tooltip-v8-5.js?v=20260804.9';
+import { setRichTooltip } from './rich-tooltip-v8-5.js?v=20260803.4';
 
 const STATUS_TONE = Object.freeze({
   OPTIMAL: 'verified',
@@ -42,7 +42,7 @@ function resultMessage(result, proof) {
     return 'Der vollständig untersuchte strikte Suchraum enthält keine technisch zulässige Komplettbelegung.';
   }
   if (proof.status === 'UNKNOWN') {
-    return `Die exakte Suche erreichte ihr Zeit- oder Knotenlimit. Es liegt weder ein Unmöglichkeits- noch ein Optimalitätsnachweis vor.`;
+    return 'Die exakte Suche erreichte ihr Zeit- oder Knotenlimit. Es liegt weder ein Unmöglichkeits- noch ein Optimalitätsnachweis vor.';
   }
   if (!proof.exactAttempted) {
     return `${proposed} Vorschläge vollständig auditiert. Der schnelle v8.5-Modus liefert einen zulässigen Incumbent ohne globalen Nachweis.`;
