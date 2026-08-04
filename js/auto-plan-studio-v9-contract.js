@@ -37,7 +37,7 @@ function applyContract(dialog) {
   const ribbon = dialog.querySelector('#autoPlanV9Ribbon, #autoPlanV8Ribbon');
   if (ribbon) {
     if (ribbon.id !== 'autoPlanV8Ribbon') ribbon.id = 'autoPlanV8Ribbon';
-    ribbon.classList.add('auto-plan-v9-ribbon');
+    if (!ribbon.classList.contains('auto-plan-v9-ribbon')) ribbon.classList.add('auto-plan-v9-ribbon');
     if (!ribbon.querySelector('[data-v9-legacy-marker]')) {
       const marker = document.createElement('span');
       marker.className = 'visually-hidden';
@@ -67,18 +67,35 @@ function install() {
     if (!applyContract(dialog)) return false;
     if (!dialog.dataset.v9ContractObserved) {
       dialog.dataset.v9ContractObserved = 'true';
-      new MutationObserver(records => {
-        const relevant = records.some(record =>
-          record.type === 'attributes'
-          || (record.type === 'childList' && record.addedNodes.length > 0));
-        if (!relevant) return;
-        queueMicrotask(() => applyContract(dialog));
-      }).observe(dialog, {
+      let scheduled = false;
+      let observer = null;
+      const observe = () => observer.observe(dialog, {
         attributes: true,
         attributeFilter: ['class', 'data-engine-revision', 'data-algorithm-revision'],
         childList: true,
         subtree: true
       });
+      const reconcile = () => {
+        if (scheduled) return;
+        scheduled = true;
+        queueMicrotask(() => {
+          scheduled = false;
+          // Eigene Normalisierungen dürfen nicht erneut als externe Mutation
+          // in dieselbe Microtask-Kette zurücklaufen. Das verhindert einen
+          // Load-Blocker, während nachgelagerte echte UI-Mutationen weiterhin
+          // zuverlässig erkannt werden.
+          observer.disconnect();
+          applyContract(dialog);
+          observe();
+        });
+      };
+      observer = new MutationObserver(records => {
+        const relevant = records.some(record =>
+          record.type === 'attributes'
+          || (record.type === 'childList' && record.addedNodes.length > 0));
+        if (relevant) reconcile();
+      });
+      observe();
     }
     return true;
   };
