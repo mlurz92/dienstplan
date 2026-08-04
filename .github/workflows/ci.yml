@@ -6,6 +6,14 @@ on:
   pull_request:
     branches: [main]
 
+# Bei neuen Commits desselben Branches ist ausschließlich der aktuelle Stand
+# relevant. Alte, mehrminütige Auto-Plan-/Playwright-Läufe werden sofort
+# abgebrochen, statt parallel Rechenzeit zu verbrauchen und veraltete Ergebnisse
+# nachzuliefern.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
