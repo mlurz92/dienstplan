@@ -89,7 +89,9 @@ def snapshot(
         ),
         baselineFingerprint="baseline:test",
         configFingerprint="config:test",
-        requestFingerprint=f"request:{ids}:{allow_red}:{red_hg_first_day}",
+        requestFingerprint=(
+            f"request:{ids}:{allow_red}:{red_hg_first_day}:{max_bd}:{relax_hard_maximum}"
+        ),
     )
 
 
@@ -142,6 +144,7 @@ def test_cancelled_run_returns_a_defined_solver_status() -> None:
     cancelled.set()
     result = solve_snapshot(snapshot(), lambda _event: None, cancelled)
     assert result.status in {"UNKNOWN", "FEASIBLE", "OPTIMAL", "INFEASIBLE"}
+
 
 def test_hard_maximum_is_relaxed_only_by_explicit_policy() -> None:
     blocked = solve_snapshot(
