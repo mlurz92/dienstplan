@@ -1,4 +1,4 @@
-/* DienstplanRAD v9 – high-contrast duty table and focus/readability hardening. */
+/* DienstplanRAD v9 – high-contrast duty table and complete dark-mode hardening. */
 
 :root {
   --v9-focus-ring: color-mix(in oklab, var(--month-accent) 72%, #1477ff 28%);
@@ -6,12 +6,79 @@
 
 html[data-color-scheme="dark"] {
   color-scheme: dark;
+  --v9-text: #f7fafc;
+  --v9-muted: #c4ced8;
+  --v9-surface-0: #0f151c;
+  --v9-surface-1: #141c25;
+  --v9-surface-2: #1b2631;
+  --v9-surface-3: #25323f;
+  --v9-border: #71808e;
+  --v9-border-soft: #465462;
+  --v9-open-text: #ffe7e9;
+  --v9-open-bg: #40262a;
+  --v9-open-border: #a96770;
+  --v9-green-text: #d6f7e3;
+  --v9-green-bg: #193329;
+  --v9-green-border: #4e9a70;
+  --v9-yellow-text: #fff2b8;
+  --v9-yellow-bg: #3c3214;
+  --v9-yellow-border: #b99a3a;
+  --v9-orange-text: #ffd9bd;
+  --v9-orange-bg: #402817;
+  --v9-orange-border: #c27a43;
+  --v9-red-text: #ffd6d9;
+  --v9-red-bg: #40201f;
+  --v9-red-border: #c36a70;
+  --v9-gray-text: #dce3ea;
+  --v9-gray-bg: #29333e;
+  --v9-gray-border: #788694;
   --v9-table-text: #f6f8fb;
   --v9-table-muted: #c5ced8;
   --v9-table-line: color-mix(in oklab, #93a1af 48%, var(--month-accent) 52%);
   --v9-table-cell: color-mix(in oklab, #111820 94%, var(--month-accent) 6%);
   --v9-table-cell-alt: color-mix(in oklab, #18212b 91%, var(--month-accent) 9%);
   --v9-table-head: color-mix(in oklab, #25313d 76%, var(--month-accent) 24%);
+  scrollbar-color: color-mix(in oklab, var(--month-accent) 44%, #82909d 56%) var(--v9-surface-0);
+}
+
+/* --------------------------------------------------------------------------
+   Anwendungschrome und Monatskopf
+   -------------------------------------------------------------------------- */
+
+html[data-color-scheme="dark"] :is(.sheet-panel, .below-plan, .dialog-card) {
+  color: var(--v9-text);
+}
+
+html[data-color-scheme="dark"] :is(.subline, .calendar-legend, .rule-legend, .section-note, .status-wrap, .dialog-header p) {
+  color: var(--v9-muted);
+}
+
+html[data-color-scheme="dark"] :is(.sheet-heading, .below-plan, .dialog-card) :is(h1, h2, h3, h4, strong) {
+  color: var(--v9-text);
+}
+
+html[data-color-scheme="dark"] :is(.sheet-heading, .below-plan, .dialog-card) .eyebrow {
+  color: color-mix(in oklab, var(--month-accent) 52%, white 48%);
+}
+
+html[data-color-scheme="dark"] .month-palette-label {
+  color: color-mix(in oklab, var(--month-accent) 54%, white 46%);
+  background: linear-gradient(180deg,
+    color-mix(in oklab, var(--v9-surface-3) 88%, white 12%),
+    color-mix(in oklab, var(--v9-surface-2) 88%, var(--month-accent) 12%));
+  border-color: color-mix(in oklab, var(--month-accent) 58%, var(--v9-border));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 5px 16px rgba(0,0,0,.28);
+}
+
+/* --------------------------------------------------------------------------
+   Diensttabelle
+   -------------------------------------------------------------------------- */
+
+html[data-color-scheme="dark"] .plan-table-wrap {
+  color: var(--v9-table-text);
+  background: var(--v9-surface-0);
+  border-color: var(--v9-table-line);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 8px 28px rgba(0,0,0,.28);
 }
 
 html[data-color-scheme="dark"] .plan-table {
@@ -25,7 +92,8 @@ html[data-color-scheme="dark"] .plan-table thead,
 html[data-color-scheme="dark"] .plan-table thead tr,
 html[data-color-scheme="dark"] .plan-table thead th {
   color: #ffffff !important;
-  background: linear-gradient(180deg,
+  background-color: var(--v9-table-head) !important;
+  background-image: linear-gradient(180deg,
     color-mix(in oklab, var(--v9-table-head) 88%, white 12%),
     var(--v9-table-head)) !important;
   border-color: var(--v9-table-line) !important;
@@ -54,6 +122,16 @@ html[data-color-scheme="dark"] .plan-table :is(.muted, small, .cell-meta, .assig
   color: var(--v9-table-muted) !important;
 }
 
+html[data-color-scheme="dark"] .plan-table td.date-cell,
+html[data-color-scheme="dark"] .plan-table td.weekday-cell {
+  color: #ffffff;
+  background-color: color-mix(in oklab, var(--v9-table-cell-alt) 78%, var(--month-accent) 22%);
+}
+
+html[data-color-scheme="dark"] .plan-table td.weekday-cell {
+  box-shadow: inset 3px 0 0 color-mix(in oklab, var(--month-accent) 72%, white 28%);
+}
+
 html[data-color-scheme="dark"] .plan-table button,
 html[data-color-scheme="dark"] .plan-table .assignment-button,
 html[data-color-scheme="dark"] .plan-table .picker-trigger {
@@ -63,6 +141,20 @@ html[data-color-scheme="dark"] .plan-table .picker-trigger {
     color-mix(in oklab, var(--v9-table-cell-alt) 86%, white 14%),
     color-mix(in oklab, var(--v9-table-cell) 90%, var(--month-accent) 10%));
   box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 1px 3px rgba(0,0,0,.28);
+}
+
+html[data-color-scheme="dark"] .plan-table .assignment-btn,
+html[data-color-scheme="dark"] .plan-table .cell-summary-button,
+html[data-color-scheme="dark"] .plan-table .rbn-input {
+  color: var(--v9-table-text);
+  background: transparent;
+  box-shadow: none;
+}
+
+html[data-color-scheme="dark"] .plan-table :is(.assignment-btn, .cell-summary-button, .rbn-input):hover {
+  color: #ffffff;
+  background: color-mix(in oklab, var(--v9-table-cell-alt) 72%, var(--month-accent) 28%);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--month-accent) 58%, var(--v9-border));
 }
 
 html[data-color-scheme="dark"] .plan-table button:hover,
@@ -98,32 +190,382 @@ html[data-color-scheme="dark"] .plan-table tr.holiday-row > * {
   background-color: color-mix(in oklab, #1b2631 58%, var(--month-accent) 42%) !important;
 }
 
+html[data-color-scheme="dark"] .plan-table .summary-entry {
+  color: var(--v9-table-text);
+  background: color-mix(in oklab, var(--v9-surface-3) 86%, var(--month-accent) 14%);
+  box-shadow: inset 0 0 0 1px var(--v9-border-soft);
+}
+
+html[data-color-scheme="dark"] .plan-table :is(.absence-summary-detail, .rbn2-inactive-note) {
+  color: var(--v9-table-muted) !important;
+}
+
+/* --------------------------------------------------------------------------
+   Badges und semantische Zustände
+   -------------------------------------------------------------------------- */
+
+html[data-color-scheme="dark"] .small-chip {
+  color: var(--v9-gray-text) !important;
+  background: var(--v9-gray-bg) !important;
+  border-color: var(--v9-gray-border) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.10);
+  text-shadow: none;
+}
+
+html[data-color-scheme="dark"] .assignment-badges .small-chip {
+  color: var(--v9-open-text) !important;
+  background: var(--v9-open-bg) !important;
+  border-color: var(--v9-open-border) !important;
+  font-weight: 750;
+  letter-spacing: .015em;
+}
+
+html[data-color-scheme="dark"] .small-chip.green,
+html[data-color-scheme="dark"] :is(.status-chip, .badge)[data-level="green"] {
+  color: var(--v9-green-text) !important;
+  background: var(--v9-green-bg) !important;
+  border-color: var(--v9-green-border) !important;
+}
+
+html[data-color-scheme="dark"] .small-chip.yellow,
+html[data-color-scheme="dark"] :is(.status-chip, .badge)[data-level="yellow"] {
+  color: var(--v9-yellow-text) !important;
+  background: var(--v9-yellow-bg) !important;
+  border-color: var(--v9-yellow-border) !important;
+}
+
+html[data-color-scheme="dark"] .small-chip.orange,
+html[data-color-scheme="dark"] :is(.status-chip, .badge)[data-level="orange"] {
+  color: var(--v9-orange-text) !important;
+  background: var(--v9-orange-bg) !important;
+  border-color: var(--v9-orange-border) !important;
+}
+
+html[data-color-scheme="dark"] .small-chip.red,
+html[data-color-scheme="dark"] :is(.status-chip, .badge)[data-level="red"] {
+  color: var(--v9-red-text) !important;
+  background: var(--v9-red-bg) !important;
+  border-color: var(--v9-red-border) !important;
+}
+
+html[data-color-scheme="dark"] .small-chip.gray,
+html[data-color-scheme="dark"] :is(.status-chip, .badge)[data-level="gray"] {
+  color: var(--v9-gray-text) !important;
+  background: var(--v9-gray-bg) !important;
+  border-color: var(--v9-gray-border) !important;
+}
+
 /* Semantische Bewertungsflächen behalten ihre Bedeutung und erhalten zugleich
    einen vom Monatsfarbton unabhängigen Textkontrast. */
 html[data-color-scheme="dark"] .plan-table :is(.green, [data-level="green"], .level-green) {
-  color: #dff8e9 !important;
+  color: var(--v9-green-text) !important;
 }
 html[data-color-scheme="dark"] .plan-table :is(.yellow, [data-level="yellow"], .level-yellow) {
-  color: #fff4c2 !important;
+  color: var(--v9-yellow-text) !important;
 }
 html[data-color-scheme="dark"] .plan-table :is(.orange, [data-level="orange"], .level-orange) {
-  color: #ffe1c2 !important;
+  color: var(--v9-orange-text) !important;
 }
 html[data-color-scheme="dark"] .plan-table :is(.red, [data-level="red"], .level-red) {
-  color: #ffd8dc !important;
+  color: var(--v9-red-text) !important;
 }
 html[data-color-scheme="dark"] .plan-table :is(.gray, [data-level="gray"], .level-gray) {
-  color: #d7dee6 !important;
+  color: var(--v9-gray-text) !important;
 }
 
-html[data-color-scheme="dark"] .plan-table ::selection {
+/* --------------------------------------------------------------------------
+   Statistik und offene Punkte
+   -------------------------------------------------------------------------- */
+
+html[data-color-scheme="dark"] .excel-stats {
+  color: var(--v9-text);
+  background: var(--v9-surface-0);
+  border-color: var(--v9-border);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 8px 24px rgba(0,0,0,.26);
+}
+
+html[data-color-scheme="dark"] .distribution-table {
+  color: var(--v9-text);
+  background: var(--v9-surface-1);
+}
+
+html[data-color-scheme="dark"] .distribution-table :is(th, td) {
+  color: var(--v9-text);
+  background: var(--v9-surface-1);
+  border-color: var(--v9-border-soft);
+}
+
+html[data-color-scheme="dark"] .distribution-table thead th {
+  color: #ffffff;
+  background-color: var(--v9-table-head);
+  background-image: linear-gradient(180deg,
+    color-mix(in oklab, var(--v9-table-head) 86%, white 14%),
+    var(--v9-table-head));
+  border-color: var(--v9-border);
+  text-shadow: 0 1px 1px rgba(0,0,0,.45);
+}
+
+html[data-color-scheme="dark"] .distribution-table tbody tr:nth-child(even):not(.open-row) td {
+  background: var(--v9-surface-2);
+}
+
+html[data-color-scheme="dark"] .distribution-table .open-row,
+html[data-color-scheme="dark"] .distribution-table .open-row td {
+  color: var(--v9-open-text);
+  background: var(--v9-open-bg);
+  border-color: var(--v9-open-border);
+}
+
+html[data-color-scheme="dark"] .distribution-table .open-row td:first-child {
+  box-shadow: inset 4px 0 0 var(--v9-open-border);
+}
+
+html[data-color-scheme="dark"] .distribution-table .over-target {
+  color: #ff9da5;
+  font-weight: 800;
+}
+
+html[data-color-scheme="dark"] .issue-item {
+  color: var(--v9-text);
+  background: var(--v9-surface-2);
+  border-color: var(--v9-border-soft);
+  border-left-color: var(--v9-gray-border);
+}
+
+html[data-color-scheme="dark"] .issue-item.red {
+  color: var(--v9-red-text);
+  background: var(--v9-red-bg);
+  border-left-color: var(--v9-red-border);
+}
+
+html[data-color-scheme="dark"] .issue-item.orange {
+  color: var(--v9-orange-text);
+  background: var(--v9-orange-bg);
+  border-left-color: var(--v9-orange-border);
+}
+
+html[data-color-scheme="dark"] .issue-item.yellow {
+  color: var(--v9-yellow-text);
+  background: var(--v9-yellow-bg);
+  border-left-color: var(--v9-yellow-border);
+}
+
+html[data-color-scheme="dark"] .issue-text strong {
+  color: inherit;
+}
+
+html[data-color-scheme="dark"] .issue-text span,
+html[data-color-scheme="dark"] .issue-empty {
+  color: var(--v9-muted);
+}
+
+/* --------------------------------------------------------------------------
+   Picker, Dialoge und Komforteingabe
+   -------------------------------------------------------------------------- */
+
+html[data-color-scheme="dark"] .dialog-card {
+  color: var(--v9-text);
+  background: linear-gradient(145deg,
+    color-mix(in oklab, var(--v9-surface-1) 94%, var(--month-accent) 6%),
+    var(--v9-surface-0));
+  border-color: color-mix(in oklab, var(--month-accent) 38%, var(--v9-border));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.10), 0 28px 82px rgba(0,0,0,.58);
+}
+
+html[data-color-scheme="dark"] .picker-header {
+  color: var(--v9-text);
+  background: linear-gradient(180deg,
+    color-mix(in oklab, var(--v9-surface-3) 82%, var(--month-accent) 18%),
+    var(--v9-surface-1));
+  border-color: var(--v9-border-soft);
+}
+
+html[data-color-scheme="dark"] .picker-role,
+html[data-color-scheme="dark"] .picker-current strong,
+html[data-color-scheme="dark"] .batch-holiday-name {
+  color: color-mix(in oklab, var(--month-accent) 52%, white 48%);
+}
+
+html[data-color-scheme="dark"] :is(.picker-current, .picker-note, .picker-keys, .picker-function, .picker-item .reasons, .picker-load, .picker-detail) {
+  color: var(--v9-muted);
+}
+
+html[data-color-scheme="dark"] .picker-search input {
+  color: var(--v9-text);
+  background: var(--v9-surface-0);
+  border-color: var(--v9-border);
+}
+
+html[data-color-scheme="dark"] .picker-group-label {
+  color: var(--v9-muted);
+  background: linear-gradient(180deg, var(--v9-surface-1) 72%, transparent);
+}
+
+html[data-color-scheme="dark"] .picker-group-label::after {
+  background: var(--v9-border-soft);
+}
+
+html[data-color-scheme="dark"] :is(.picker-group-count, .picker-load, .reason-more, .picker-detail-reason, .picker-keys kbd) {
+  color: var(--v9-text);
+  background: var(--v9-surface-3);
+  border-color: var(--v9-border-soft);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
+}
+
+html[data-color-scheme="dark"] .picker-load.is-exceeded {
+  color: var(--v9-red-text);
+  background: var(--v9-red-bg);
+  border-color: var(--v9-red-border);
+}
+
+html[data-color-scheme="dark"] .picker-item {
+  color: var(--v9-text);
+  background: var(--v9-surface-2);
+  border-color: var(--v9-border-soft);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
+}
+
+html[data-color-scheme="dark"] .picker-item:hover:not(:disabled),
+html[data-color-scheme="dark"] .picker-item.is-active:not(:disabled) {
+  color: #ffffff;
+  background: color-mix(in oklab, var(--v9-surface-3) 76%, var(--month-accent) 24%);
+  border-color: color-mix(in oklab, var(--month-accent) 58%, var(--v9-border));
+}
+
+html[data-color-scheme="dark"] .picker-detail,
+html[data-color-scheme="dark"] .picker-footer,
+html[data-color-scheme="dark"] .day-meta-row,
+html[data-color-scheme="dark"] .batch-day,
+html[data-color-scheme="dark"] .meta-chip {
+  color: var(--v9-text);
+  background: var(--v9-surface-2);
+  border-color: var(--v9-border-soft);
+}
+
+html[data-color-scheme="dark"] .picker-detail-name,
+html[data-color-scheme="dark"] .row-title {
+  color: var(--v9-text);
+}
+
+html[data-color-scheme="dark"] .meta-chip.active,
+html[data-color-scheme="dark"] .batch-day.selected {
+  color: #ffffff;
+  background: color-mix(in oklab, var(--v9-surface-3) 68%, var(--month-accent) 32%);
+  border-color: color-mix(in oklab, var(--month-accent) 62%, white 38%);
+}
+
+html[data-color-scheme="dark"] .batch-day.saturday {
+  background: color-mix(in oklab, var(--v9-surface-2) 80%, var(--month-accent) 20%);
+}
+html[data-color-scheme="dark"] .batch-day.sunday {
+  background: color-mix(in oklab, var(--v9-surface-2) 70%, var(--month-accent) 30%);
+}
+html[data-color-scheme="dark"] .batch-day.holiday {
+  background: color-mix(in oklab, var(--v9-surface-2) 58%, var(--month-accent) 42%);
+}
+
+/* --------------------------------------------------------------------------
+   Auto-Plan Studio im Dunkelmodus
+   -------------------------------------------------------------------------- */
+
+html[data-color-scheme="dark"] .auto-plan-dialog {
+  --auto-plan-panel: var(--v9-surface-1);
+  --auto-plan-panel-strong: var(--v9-surface-2);
+  --auto-plan-line: var(--v9-border-soft);
+  --auto-plan-ink: var(--v9-text);
+  --auto-plan-muted: var(--v9-muted);
+  color: var(--v9-text);
+}
+
+html[data-color-scheme="dark"] .auto-plan-dialog :is(
+  .auto-plan-card,
+  .auto-plan-panel,
+  .auto-plan-console,
+  .auto-plan-log,
+  .auto-plan-v85-theatre,
+  .auto-plan-v85-theatre li,
+  .auto-plan-live-metrics > div,
+  .auto-plan-scorecard,
+  .auto-plan-v9-exact-meter,
+  .auto-plan-config-group,
+  .auto-plan-result-summary,
+  .auto-plan-red-review,
+  .auto-plan-proposal-wrap
+) {
+  color: var(--v9-text);
+  background: var(--v9-surface-2);
+  border-color: var(--v9-border-soft);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
+}
+
+html[data-color-scheme="dark"] .auto-plan-dialog :is(
+  .auto-plan-card,
+  .auto-plan-panel,
+  .auto-plan-console,
+  .auto-plan-v85-theatre,
+  .auto-plan-result-summary
+) {
+  background: linear-gradient(145deg,
+    color-mix(in oklab, var(--v9-surface-2) 92%, var(--month-accent) 8%),
+    var(--v9-surface-1));
+}
+
+html[data-color-scheme="dark"] .auto-plan-dialog :is(small, .muted, .auto-plan-subtitle, .auto-plan-stage-copy, .auto-plan-log-entry time) {
+  color: var(--v9-muted);
+}
+
+html[data-color-scheme="dark"] .auto-plan-dialog :is(h1, h2, h3, h4, strong, output) {
+  color: var(--v9-text);
+}
+
+html[data-color-scheme="dark"] .auto-plan-dialog :is(input, select, textarea) {
+  color: var(--v9-text);
+  background: var(--v9-surface-0);
+  border-color: var(--v9-border);
+}
+
+html[data-color-scheme="dark"] .auto-plan-dialog :is(.auto-plan-proposal-table, .auto-plan-distribution-table) {
+  color: var(--v9-text);
+  background: var(--v9-surface-1);
+}
+
+html[data-color-scheme="dark"] .auto-plan-dialog :is(.auto-plan-proposal-table, .auto-plan-distribution-table) :is(th, td) {
+  color: var(--v9-text);
+  background: var(--v9-surface-1);
+  border-color: var(--v9-border-soft);
+}
+
+html[data-color-scheme="dark"] .auto-plan-dialog :is(.auto-plan-proposal-table, .auto-plan-distribution-table) thead th {
+  color: #ffffff;
+  background: var(--v9-table-head);
+  border-color: var(--v9-border);
+}
+
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-log-entry {
+  color: var(--v9-text);
+  border-color: var(--v9-border-soft);
+}
+
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-footer {
+  color: var(--v9-text);
+  background: var(--v9-surface-1);
+  border-color: var(--v9-border-soft);
+}
+
+html[data-color-scheme="dark"] .plan-table ::selection,
+html[data-color-scheme="dark"] .distribution-table ::selection,
+html[data-color-scheme="dark"] .auto-plan-dialog ::selection {
   color: #071019;
   background: color-mix(in oklab, var(--month-accent) 62%, white 38%);
 }
 
 @media (forced-colors: active) {
   .plan-table,
-  .plan-table * {
+  .plan-table *,
+  .distribution-table,
+  .distribution-table *,
+  .auto-plan-dialog,
+  .auto-plan-dialog * {
     forced-color-adjust: auto;
   }
   .plan-table :is(button, input, select, textarea, summary):focus-visible,
