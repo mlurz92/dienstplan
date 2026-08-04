@@ -3,7 +3,7 @@ import { createThemeToggle, installThemeController } from './app-theme-v8-5.js?v
 import { installRichTooltips, setRichTooltip } from './rich-tooltip-v8-5.js?v=20260803.4';
 import { state } from './state.js?v=20260803.4';
 
-const RELEASE = '20260804.2';
+const RELEASE = '20260803.4';
 const STYLESHEETS = Object.freeze(['/app-v8-5.css', '/toolbar-v8-5.css']);
 const NAV_ICONS = Object.freeze({
   prevMonthBtn: '<svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg>',
@@ -86,12 +86,11 @@ function upgradeMonthNavigation() {
 /**
  * Setzt den Theme-Schalter unmittelbar vor das Zahnrad.
  *
- * Root Cause des Startabsturzes: In der nicht oder noch nicht reorganisierten
- * Toolbar liegt `settingsBtn` innerhalb einer `.toolbar-group`. Der frühere
- * Aufruf `toolbar.insertBefore(toggle, settings)` verlangt jedoch, dass der
- * Referenzknoten ein *direktes* Kind von `toolbar` ist und wirft andernfalls
- * synchron `NotFoundError`. Je nach Modul-/DOMContentLoaded-Reihenfolge blieb
- * die Anwendung danach bei „Lädt …“ stehen. Der tatsächliche Elternknoten ist
+ * Startabsturzursache: In der nicht oder noch nicht reorganisierten Toolbar
+ * liegt `settingsBtn` innerhalb einer `.toolbar-group`. Ein Einfügeversuch an
+ * der äußeren Toolbar mit diesem verschachtelten Referenzknoten wirft synchron
+ * `NotFoundError`. Je nach Modul-/DOMContentLoaded-Reihenfolge blieb die
+ * Anwendung danach bei „Lädt …“ stehen. Der tatsächliche Elternknoten ist
  * deshalb die Einfügefläche; als letzter Fallback wird sicher angehängt.
  */
 function installThemeButton() {
@@ -112,7 +111,9 @@ function installThemeButton() {
 function markToolbarReady() {
   const toolbar = document.querySelector('.toolbar');
   if (!toolbar) return false;
-  toolbar.dataset.commandBarRevision = '9';
+  // Bestehender Hook bleibt stabil; v9 wird separat ausgewiesen.
+  toolbar.dataset.commandBarRevision = '8.5';
+  toolbar.dataset.solverRevision = '9';
   toolbar.setAttribute('aria-label', 'DienstplanRAD Befehlsleiste');
   upgradeActions(toolbar);
   installThemeButton();
