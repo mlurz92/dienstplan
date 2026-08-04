@@ -1,0 +1,34 @@
+name: Patch app startup readiness once
+
+on:
+  push:
+    branches: [agent/auto-plan-v9-cpsat]
+    paths:
+      - .github/patch_app_startup_v9.py
+
+permissions:
+  contents: write
+
+concurrency:
+  group: patch-app-startup-v9
+  cancel-in-progress: false
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: agent/auto-plan-v9-cpsat
+          fetch-depth: 0
+      - name: Startup- und E2E-Patch anwenden
+        run: python .github/patch_app_startup_v9.py
+      - name: Diff prüfen und committen
+        run: |
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(startup): make app entrypoint and browser readiness deterministic [startup-ready]"
+          git push origin HEAD:agent/auto-plan-v9-cpsat
