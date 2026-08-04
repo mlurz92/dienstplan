@@ -29,7 +29,9 @@ jobs:
       - run: npm run check:v9
       - run: npm test
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e
+      - name: Browser-Regressionen
+        timeout-minutes: 5
+        run: npm run test:e2e
       - name: Playwright-Diagnostik sichern
         if: always()
         uses: actions/upload-artifact@v7
