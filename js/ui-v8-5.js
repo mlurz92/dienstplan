@@ -46,7 +46,9 @@ function upgradeActions(root = document) {
     if (!element || !root.contains(element)) continue;
     const label = element.querySelector('.tool-label');
     if (label) label.textContent = shortLabel;
-    element.setAttribute('aria-label', tooltip);
+    // Der zugängliche Name bleibt kurz und stabil. Die ausführliche Erklärung
+    // gehört in den Tooltip und wird über aria-describedby verknüpft.
+    if (!element.hasAttribute('aria-label')) element.setAttribute('aria-label', shortLabel);
     setRichTooltip(element, tooltip);
   }
 }
