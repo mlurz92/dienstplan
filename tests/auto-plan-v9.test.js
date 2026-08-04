@@ -143,9 +143,10 @@ test('strikte v9-Suche enumeriert rote Zwischenzweige verlustfrei und öffnet Ro
   assert.doesNotMatch(hybrid, /fallbackExact = await solveExactly/);
 });
 
-test('Studio v9 enthält Solversteuerung, Beweisstatus und flächendeckende Tooltips', async () => {
+test('Studio v9 enthält Solversteuerung, Beweisstatus, klare Nachweissprache und flächendeckende Tooltips', async () => {
   const studio = await source('../js/auto-plan-studio-v9.js');
   const contract = await source('../js/auto-plan-studio-v9-contract.js');
+  const truth = await source('../js/auto-plan-v9-truth.js');
   assert.match(studio, /autoPlanV9SolverMode/);
   assert.match(studio, /autoPlanV9ProofTarget/);
   assert.match(studio, /autoPlanV9ExactMeter/);
@@ -154,16 +155,26 @@ test('Studio v9 enthält Solversteuerung, Beweisstatus und flächendeckende Tool
   assert.match(studio, /setRichTooltip/);
   assert.match(contract, /data-v9-engine-revision|v9EngineRevision/);
   assert.match(contract, /free-browser-hybrid/);
+  assert.match(truth, /Globaler Nachweis/);
+  assert.match(truth, /truthfulLabel/);
+  assert.match(truth, /Branch-and-Bound-Suche/);
+  assert.match(truth, /Constraint-Tiefensuche/);
 });
 
-test('v9 behebt das abgeschnittene Studio und härtet Dunkelmodus sowie Bewegungsfallback', async () => {
+test('v9 behebt abgeschnittene Studioelemente, härtet Dunkelmodus und hält die vollständige Animation aktiv', async () => {
   const studioCss = await source('../auto-plan-studio-v9.css');
   const contractCss = await source('../auto-plan-studio-v9-contract.css');
+  const motionCss = await source('../auto-plan-studio-v9-always-motion.css');
+  const motionLoader = await source('../js/auto-plan-v9-motion.js');
   const appCss = await source('../app-v9.css');
   assert.match(studioCss, /100dvh/);
   assert.match(contractCss, /grid-template-rows:\s*auto auto auto minmax\(190px, 1fr\) auto/);
   assert.match(contractCss, /overflow:\s*auto/);
-  assert.match(studioCss, /prefers-reduced-motion:\s*reduce/);
+  assert.match(motionCss, /animation:\s*v9-hud-spin[\s\S]*!important/);
+  assert.match(motionCss, /animation:\s*v9-core-breathe[\s\S]*!important/);
+  assert.match(motionCss, /transition:\s*inline-size \.3s ease !important/);
+  assert.doesNotMatch(motionCss, /prefers-reduced-motion/);
+  assert.match(motionLoader, /auto-plan-studio-v9-always-motion\.css/);
   assert.match(appCss, /html\[data-color-scheme="dark"\] \.plan-table/);
   assert.match(appCss, /focus-visible/);
   assert.match(appCss, /forced-colors:\s*active/);
