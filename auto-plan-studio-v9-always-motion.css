@@ -1,0 +1,25 @@
+/*
+ * Auto-Plan Studio v9 – vollständige Animation ohne Reduktionsmodus.
+ *
+ * Der Anwendungsschalter für reduzierte Bewegung wurde bereits in v8.5
+ * entfernt. Diese zuletzt geladene Schicht stellt ausdrücklich sicher, dass
+ * auch eine Betriebssystempräferenz die fachlich gewünschte, fortlaufende
+ * Algorithmusvisualisierung nicht abschaltet.
+ */
+
+.auto-plan-v9-hud > i {
+  animation: v9-hud-spin calc(15s - var(--ring, 0) * 2s) linear infinite !important;
+}
+.auto-plan-v9-hud > i:nth-child(2),
+.auto-plan-v9-hud > i:nth-child(4) {
+  animation-direction: reverse !important;
+}
+.auto-plan-v9-hud > span {
+  animation: v9-core-breathe 2.8s ease-in-out infinite !important;
+}
+.auto-plan-shell.v9-quality-pulse::after {
+  animation: v9-quality-shell .74s cubic-bezier(.2, .8, .2, 1) both !important;
+}
+.auto-plan-v9-exact-meter > i em {
+  transition: inline-size .3s ease !important;
+}
