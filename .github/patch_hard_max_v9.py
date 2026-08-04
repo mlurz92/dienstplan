@@ -153,4 +153,5 @@ with (ROOT / "solver/tests/test_solver.py").open("a", encoding="utf-8") as handl
 '''
     )
 
+# Self-delete after a successful one-time patch.
 (ROOT / ".github/patch_hard_max_v9.py").unlink()
