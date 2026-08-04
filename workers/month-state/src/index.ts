@@ -9,12 +9,12 @@ interface MonthPayload {
   [key: string]: unknown;
 }
 
-interface StoredMonthRow {
+type StoredMonthRow = Record<string, ArrayBuffer | string | number | null> & {
   revision: number;
   content_json: string;
   fingerprint: string;
   updated_at: string;
-}
+};
 
 interface WriteRequest {
   month: MonthPayload;
@@ -272,11 +272,12 @@ export class MonthState extends DurableObject<Env> {
 
 async function routeToMonth(env: Env, year: number, month: number, action: 'state' | 'init', request: Request): Promise<Response> {
   const stub = env.MONTHS.getByName(`${year}-${String(month).padStart(2, '0')}`);
-  return stub.fetch(new Request(`https://month.internal/${action}`, {
+  const init: RequestInit = {
     method: request.method,
-    headers: request.headers,
-    body: request.method === 'GET' ? undefined : request.body
-  }));
+    headers: request.headers
+  };
+  if (request.method !== 'GET' && request.method !== 'HEAD' && request.body !== null) init.body = request.body;
+  return stub.fetch(new Request(`https://month.internal/${action}`, init));
 }
 
 export default {
