@@ -19,9 +19,20 @@ import * as V9 from './auto-planner-v9.js?v=20260804.9';
  * und `perfectAutoPlan` definiert, wird die v9-Fassung von `buildAutoPlan`
  * hier bewusst nicht weitergereicht. Wird sie intern benötigt, steht sie über
  * `V9.buildAutoPlan` zur Verfügung, ohne die Integritätsversiegelung
- * (`sealV9ProposalIntegrity`) zu umgehen. Ändert sich die Exportliste von
- * auto-planner-v9.js, fällt das dank der expliziten Liste sofort auf
- * (Bezugsfehler statt stillschweigendem Shadowing).
+ * (`sealV9ProposalIntegrity`) zu umgehen.
+ *
+ * Wichtig: Eine explizite Liste schützt zuverlässig vor dem *Entfernen* oder
+ * *Umbenennen* von Exporten in auto-planner-v9.js (das führt sofort zu einem
+ * Bezugsfehler statt zu stillschweigendem Shadowing) – sie schützt aber NICHT
+ * davor, dass ein *neuer* Export in auto-planner-v9.js hinzugefügt wird. In
+ * diesem Fall würde `export *` den neuen Export automatisch mitziehen,
+ * während die explizite Liste ihn lautlos unterschlägt und er über dieses
+ * Modul für sämtliche Konsumenten (auto-plan-runner.js, auto-plan-worker.js,
+ * auto-plan-studio-v5.js sowie alle tests/auto-plan*.test.js) unerreichbar
+ * bliebe. tests/auto-planner-v9-export-parity.test.js prüft deshalb bei jedem
+ * Testlauf, dass jeder Export von auto-planner-v9.js entweder unter seinem
+ * Originalnamen re-exportiert oder hier bewusst lokal überschrieben ist, und
+ * schlägt fehl, sobald ein neuer v9-Export nicht angebunden wurde.
  */
 export {
   AUTO_PLAN_ENGINE_ID,
