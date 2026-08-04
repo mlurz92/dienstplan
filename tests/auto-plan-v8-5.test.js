@@ -48,7 +48,7 @@ test('explizite Integrationswerte überschreiben die Profilableitung kontrollier
 
 test('v8.5 erzwingt strikte Eskalation vor dem optionalen Rot-Fallback', async () => {
   const text = await source('../js/auto-planner-v8-5.js');
-  assert.match(text, /perfectionEnabled:\s*true/);
+  assert.match(text, /perfectionEnabled:\s*source\.perfectionEnabled\s*!==\s*false/);
   assert.match(text, /allowRedFallback:\s*false/);
   assert.match(text, /maxRedViolations:\s*0/);
   assert.match(text, /strictWaveCount/);
@@ -68,6 +68,7 @@ test('Studio-Profile steuern echte Worker-Felder statt reine Dekoration', async 
   assert.match(text, /autoPlanV85Parallel/);
   assert.match(text, /portfolioDiversity/);
   assert.match(text, /autoPlanPerfection/);
+  assert.match(text, /perfection\.checked\s*=\s*true/);
 });
 
 test('manueller Modus für reduzierte Bewegung ist in v8.5 entfernt', async () => {
@@ -76,7 +77,9 @@ test('manueller Modus für reduzierte Bewegung ist in v8.5 entfernt', async () =
   assert.doesNotMatch(theme, /prefers-reduced-motion/);
   assert.match(shell, /settingsMotion/);
   assert.match(shell, /field\.hidden\s*=\s*true/);
+  assert.match(shell, /delete state\.settings\.appearance\.motion/);
   assert.match(shell, /classList\.remove\('reduce-motion'\)/);
+  assert.match(shell, /delete html\.dataset\.motion/);
 });
 
 test('Command Bar enthält Theme-Schalter, Rich Tooltips und passive Scrollpolitik', async () => {
