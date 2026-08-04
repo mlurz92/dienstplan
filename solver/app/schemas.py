@@ -72,6 +72,24 @@ class FixedAssignment(StrictModel):
     staffId: str
 
 
+class Assignment(StrictModel):
+    dateIso: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+    role: Role
+    staffId: str = Field(min_length=1, max_length=50)
+
+
+class WarmStart(StrictModel):
+    source: str = Field(min_length=1, max_length=80)
+    assignments: list[Assignment] = Field(min_length=1, max_length=62)
+
+    @model_validator(mode="after")
+    def unique_slots(self) -> WarmStart:
+        keys = [(item.dateIso, item.role) for item in self.assignments]
+        if len(keys) != len(set(keys)):
+            raise ValueError("warm-start assignments must contain unique slot keys")
+        return self
+
+
 class RelaxationPolicy(StrictModel):
     absence: bool = True
     hardMaximum: bool = False
@@ -114,6 +132,7 @@ class SolverSnapshot(StrictModel):
     slots: list[Slot] = Field(min_length=56, max_length=62)
     relations: list[Relation] = Field(default_factory=list, max_length=512)
     fixedAssignments: list[FixedAssignment] = Field(default_factory=list, max_length=62)
+    warmStarts: list[WarmStart] = Field(default_factory=list, max_length=8)
     baseline: dict[str, Any]
     config: SolverConfig
     baselineFingerprint: str = Field(min_length=3, max_length=180)
@@ -122,7 +141,8 @@ class SolverSnapshot(StrictModel):
 
     @model_validator(mode="after")
     def validate_unique_scope(self) -> SolverSnapshot:
-        if self.dates != sorted(set(self.dates)):
+        date_set = set(self.dates)
+        if self.dates != sorted(date_set):
             raise ValueError("dates must be sorted and unique")
         keys = [(slot.dateIso, slot.role) for slot in self.slots]
         if len(keys) != len(set(keys)):
@@ -130,8 +150,9 @@ class SolverSnapshot(StrictModel):
         staff_ids = {person.id for person in self.staff}
         if len(staff_ids) != len(self.staff):
             raise ValueError("staff ids must be unique")
+        slot_keys = set(keys)
         for slot in self.slots:
-            if slot.dateIso not in set(self.dates):
+            if slot.dateIso not in date_set:
                 raise ValueError("slot date outside planning horizon")
             if slot.fixedStaffId and slot.fixedStaffId not in staff_ids:
                 raise ValueError("fixed assignment references unknown staff")
@@ -140,13 +161,13 @@ class SolverSnapshot(StrictModel):
                 raise ValueError("candidate ids must be unique per slot")
             if any(candidate_id not in staff_ids for candidate_id in candidate_ids):
                 raise ValueError("candidate references unknown staff")
+        for warm_start in self.warmStarts:
+            for assignment in warm_start.assignments:
+                if (assignment.dateIso, assignment.role) not in slot_keys:
+                    raise ValueError("warm-start assignment references unknown slot")
+                if assignment.staffId not in staff_ids:
+                    raise ValueError("warm-start assignment references unknown staff")
         return self
-
-
-class Assignment(StrictModel):
-    dateIso: str
-    role: Role
-    staffId: str
 
 
 class StageResult(StrictModel):
