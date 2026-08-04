@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 
 const read = path => readFile(new URL(path, import.meta.url), 'utf8');
 
@@ -23,4 +23,17 @@ test('E2E-Bereitschaft folgt dem App-Vertrag statt dem vollständigen load-Ereig
   assert.match(helper, /#planTableBody tr/);
   assert.match(helper, /#saveStatus/);
   assert.match(helper, /#startupFailureV9/);
+});
+
+test('reguläre E2E-Spezifikationen verwenden keinen unqualifizierten load-Wait mehr', async () => {
+  const directory = new URL('../tests/e2e/', import.meta.url);
+  const names = (await readdir(directory)).filter(name => name.endsWith('.spec.js'));
+  const allowCustomStartupNavigation = new Set(['startup-v9.spec.js']);
+  for (const name of names) {
+    const source = await read(`../tests/e2e/${name}`);
+    assert.doesNotMatch(source, /await page\.goto\('\/'\);/, `${name} wartet noch auf das vollständige load-Ereignis`);
+    if (!allowCustomStartupNavigation.has(name) && source.includes("page.goto('/')")) {
+      assert.match(source, /openApp\(page\)/, `${name} besitzt keinen expliziten App-Ready-Vertrag`);
+    }
+  }
 });
