@@ -324,6 +324,16 @@ def build_model(snapshot: SolverSnapshot, *, allow_red: bool, diagnostic: bool =
         ):
             if cap is None:
                 continue
+            if allow_red and snapshot.config.relaxationPolicy.hardMaximum:
+                maximum_excess = len(snapshot.dates) * (2 if label == "TOTAL" else 1)
+                excess = model.new_int_var(
+                    0,
+                    maximum_excess,
+                    f"{label.casefold()}_maximum_excess_{person.id}",
+                )
+                model.add_max_equality(excess, [0, expression - cap])
+                red_terms.append(excess)
+                continue
             assumption = add_assumption(
                 model,
                 assumption_vars,

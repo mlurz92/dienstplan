@@ -5,7 +5,16 @@ from datetime import date, timedelta
 from itertools import pairwise
 from threading import Event
 
-from app.schemas import Assignment, Candidate, Slot, SolverConfig, SolverSnapshot, Staff
+from app.schemas import (
+    Assignment,
+    Candidate,
+    Limits,
+    RelaxationPolicy,
+    Slot,
+    SolverConfig,
+    SolverSnapshot,
+    Staff,
+)
 from app.solver import solve_snapshot
 
 
@@ -31,10 +40,21 @@ def snapshot(
     staff_ids: Iterable[str] = ("a", "b", "c"),
     allow_red: bool = False,
     red_hg_first_day: bool = False,
+    max_bd: int | None = None,
+    relax_hard_maximum: bool = False,
 ) -> SolverSnapshot:
     ids = tuple(staff_ids)
     dates = dates_for_february()
-    people = [Staff(id=staff_id, name=staff_id, short=staff_id, bdTarget=9) for staff_id in ids]
+    people = [
+        Staff(
+            id=staff_id,
+            name=staff_id,
+            short=staff_id,
+            bdTarget=9,
+            limits=Limits(maxBd=max_bd),
+        )
+        for staff_id in ids
+    ]
     slots: list[Slot] = []
     for day_index, day in enumerate(dates):
         for role in ("bd", "hg"):
@@ -65,6 +85,7 @@ def snapshot(
             deterministic=True,
             exactLns=False,
             seed=17,
+            relaxationPolicy=RelaxationPolicy(hardMaximum=relax_hard_maximum),
         ),
         baselineFingerprint="baseline:test",
         configFingerprint="config:test",
@@ -121,3 +142,22 @@ def test_cancelled_run_returns_a_defined_solver_status() -> None:
     cancelled.set()
     result = solve_snapshot(snapshot(), lambda _event: None, cancelled)
     assert result.status in {"UNKNOWN", "FEASIBLE", "OPTIMAL", "INFEASIBLE"}
+
+def test_hard_maximum_is_relaxed_only_by_explicit_policy() -> None:
+    blocked = solve_snapshot(
+        snapshot(allow_red=True, max_bd=0, relax_hard_maximum=False),
+        lambda _event: None,
+        Event(),
+    )
+    assert blocked.status == "INFEASIBLE"
+
+    relaxed = solve_snapshot(
+        snapshot(allow_red=True, max_bd=0, relax_hard_maximum=True),
+        lambda _event: None,
+        Event(),
+    )
+    assert relaxed.status in {"OPTIMAL", "FEASIBLE"}
+    assert len(relaxed.assignments) == 56
+    assert_schedule_invariants(relaxed.assignments)
+    assert relaxed.metadata.lexicographicStages[0].id == "minimal-relaxation"
+    assert (relaxed.metadata.lexicographicStages[0].value or 0) > 0
