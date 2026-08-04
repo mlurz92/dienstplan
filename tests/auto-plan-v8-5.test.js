@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 const planner = await import('../js/auto-planner.js');
-
 const source = async path => readFile(new URL(path, import.meta.url), 'utf8');
 
 test('produktiver Auto-Plan exportiert Revision 8.5 und alle Pflichtphasen', () => {
@@ -15,14 +14,50 @@ test('produktiver Auto-Plan exportiert Revision 8.5 und alle Pflichtphasen', () 
   assert.ok(planner.AUTO_PLAN_STAGES.every(stage => stage.title && stage.detail));
 });
 
-test('v8.5 erzwingt Perfektion und mehrstufige Null-Rot-Eskalation', async () => {
+test('sichtbare Suchprofile leiten echte v8.5-Solverwerte ab', () => {
+  assert.deepEqual(planner.deriveV85Tuning({ repairIterations: 4, localRebuildBudget: 4000 }), {
+    strictEscalationRounds: 2,
+    rescueStrength: 148,
+    repairAggressiveness: 'balanced'
+  });
+  assert.deepEqual(planner.deriveV85Tuning({ repairIterations: 6, localRebuildBudget: 6500 }), {
+    strictEscalationRounds: 3,
+    rescueStrength: 180,
+    repairAggressiveness: 'intensive'
+  });
+  assert.deepEqual(planner.deriveV85Tuning({ repairIterations: 8, localRebuildBudget: 10000 }), {
+    strictEscalationRounds: 4,
+    rescueStrength: 225,
+    repairAggressiveness: 'exhaustive'
+  });
+});
+
+test('explizite Integrationswerte überschreiben die Profilableitung kontrolliert', () => {
+  assert.deepEqual(planner.deriveV85Tuning({
+    repairIterations: 4,
+    localRebuildBudget: 4000,
+    strictEscalationRounds: 4,
+    rescueStrength: 210,
+    repairAggressiveness: 'exhaustive'
+  }), {
+    strictEscalationRounds: 4,
+    rescueStrength: 210,
+    repairAggressiveness: 'exhaustive'
+  });
+});
+
+test('v8.5 erzwingt strikte Eskalation vor dem optionalen Rot-Fallback', async () => {
   const text = await source('../js/auto-planner-v8-5.js');
   assert.match(text, /perfectionEnabled:\s*true/);
   assert.match(text, /allowRedFallback:\s*false/);
   assert.match(text, /maxRedViolations:\s*0/);
   assert.match(text, /strictWaveCount/);
-  assert.match(text, /profileFilter:\s*strictProfileFilter/);
   assert.match(text, /certificationRounds:\s*Math\.max\(2/);
+  const strict = text.indexOf('const presets =');
+  const fallback = text.indexOf('let fallbackAttempted');
+  const confirmable = text.indexOf('profileFilter: [CONFIRMABLE_PROFILE]');
+  assert.ok(strict >= 0 && fallback > strict && confirmable > fallback,
+    'der bestätigungspflichtige Fallback steht nach allen strikten Wellen');
 });
 
 test('Studio-Profile steuern echte Worker-Felder statt reine Dekoration', async () => {
