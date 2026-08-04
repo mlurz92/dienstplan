@@ -148,10 +148,12 @@ test('Startup-Root-Cause ist behoben und eine äußere Fehlergrenze vorhanden', 
 
 test('Cloudflare- und Solverartefakte sind produktiv verdrahtet', async () => {
   const pages = await source('../functions/api/autoplan/v9/runs.js');
+  const cancel = await source('../functions/api/autoplan/v9/runs/[runId]/cancel.js');
   const worker = await source('../workers/autoplan-v9/src/index.ts');
-  const solver = await source('../solver/app/solver.py');
+  const solver = await source('../solver/app/solver_core.py');
   assert.match(pages, /AUTO_PLAN_V9/);
   assert.match(pages, /Idempotency-Key/);
+  assert.match(cancel, /\/cancel/);
   assert.match(worker, /class AutoPlanJob/);
   assert.match(worker, /class AutoPlanContainer/);
   assert.match(worker, /run_events/);
