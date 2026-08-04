@@ -18,16 +18,25 @@ function addStylesheet() {
   document.head.append(link);
 }
 
+function setData(element, key, value) {
+  if (element.dataset[key] === value) return false;
+  element.dataset[key] = value;
+  return true;
+}
+
 function applyContract(dialog) {
   if (!dialog) return false;
-  dialog.dataset.algorithmRevision = '8';
-  dialog.dataset.engineRevision = '8.5';
-  dialog.dataset.v9EngineRevision = '9';
-  dialog.dataset.solverArchitecture = 'free-browser-hybrid';
+  // Nur tatsächlich abweichende Attribute werden geschrieben. Der Observer
+  // beobachtet genau diese Attribute; idempotente Zuweisungen verhindern daher
+  // eine selbst ausgelöste Mutation-/Microtask-Schleife.
+  setData(dialog, 'algorithmRevision', '8');
+  setData(dialog, 'engineRevision', '8.5');
+  setData(dialog, 'v9EngineRevision', '9');
+  setData(dialog, 'solverArchitecture', 'free-browser-hybrid');
 
   const ribbon = dialog.querySelector('#autoPlanV9Ribbon, #autoPlanV8Ribbon');
   if (ribbon) {
-    ribbon.id = 'autoPlanV8Ribbon';
+    if (ribbon.id !== 'autoPlanV8Ribbon') ribbon.id = 'autoPlanV8Ribbon';
     ribbon.classList.add('auto-plan-v9-ribbon');
     if (!ribbon.querySelector('[data-v9-legacy-marker]')) {
       const marker = document.createElement('span');
@@ -59,9 +68,17 @@ function install() {
     if (!dialog.dataset.v9ContractObserved) {
       dialog.dataset.v9ContractObserved = 'true';
       new MutationObserver(records => {
-        if (!records.some(record => record.type === 'attributes' || record.addedNodes.length)) return;
+        const relevant = records.some(record =>
+          record.type === 'attributes'
+          || (record.type === 'childList' && record.addedNodes.length > 0));
+        if (!relevant) return;
         queueMicrotask(() => applyContract(dialog));
-      }).observe(dialog, { attributes: true, attributeFilter: ['class', 'data-engine-revision', 'data-algorithm-revision'], childList: true, subtree: true });
+      }).observe(dialog, {
+        attributes: true,
+        attributeFilter: ['class', 'data-engine-revision', 'data-algorithm-revision'],
+        childList: true,
+        subtree: true
+      });
     }
     return true;
   };
