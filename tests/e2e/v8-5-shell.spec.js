@@ -65,7 +65,7 @@ test('Legacy-Modus reduzierte Bewegung ist vollständig aus der Bedienung entfer
   await expect(page.locator('#settingsDialog')).toBeVisible();
   await expect(page.locator('#settingsMotion').locator('..')).toBeHidden();
   await expect(page.locator('html')).not.toHaveClass(/reduce-motion/);
-  await expect(page.locator('html')).toHaveAttribute('data-motion', 'system');
+  await expect(page.locator('html')).not.toHaveAttribute('data-motion');
 });
 
 test('Rich Tooltip ist per Tastatur erreichbar und mit ARIA beschrieben', async ({ page }) => {
