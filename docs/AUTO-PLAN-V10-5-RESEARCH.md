@@ -93,7 +93,7 @@ Der zweite, in `AUTO-PLAN-V9.5-FINAL.md` als „kritischer Brücken-Fix“ besch
 
 ### 2.4 Defekt 4 — Der lokale Vendor-Pfad kann im Browser nicht laden
 
-`vendor/cpsat-js/dist/**` enthält den bloßen Bezeichner `from '@bufbuild/protobuf'`. `index.html` führt **keine Import-Map**. Ein `import('/vendor/cpsat-js/dist/index.portable.js')` scheitert im Browser zwingend an der Modulauflösung. Die dokumentierte Ladeordnung „lokal zuerst, CDN als Reserve“ ist faktisch „CDN allein“.
+`vendor/cpsat-js/dist/**` enthält den bloßen Bezeichner `from '@bufbuild/protobuf'` (und `.../codegenv2`) — nicht nur an der Ladestelle, sondern in mehreren Vendor-Dateien selbst (`model/cp-model.js`, `model/linear-expr.js`, `solver/cp-solver.js`, `generated/cp_model_pb.js`, `generated/sat_parameters_pb.js`). `index.html` führt **keine Import-Map**, und eine solche würde hier auch nichts nützen: Der Solver lädt ausschließlich im Web Worker (§10.2), und dedizierte Worker erben keine dokumentweite Import-Map. Ein `import('/vendor/cpsat-js/dist/index.portable.js')` scheitert im Browser zwingend an der Modulauflösung. Die dokumentierte Ladeordnung „lokal zuerst, CDN als Reserve“ ist faktisch „CDN allein“. Der korrekte Fix — bloße Bezeichner in den Vendor-Dateien durch relative Pfade auf ein mitvendorisiertes `@bufbuild/protobuf` ersetzen, ohne Build-Schritt — ist unter P0 (Abschnitt 14) ausgeführt.
 
 Verschärfend: `_headers` setzt global `Cross-Origin-Embedder-Policy: require-corp`. Das ist die richtige Wahl für den *threaded* Build — es stellt aber jede Fremdressource unter CORP/CORS-Vorbehalt. Der klassische `<script src="https://cdn.sheetjs.com/…">` in `index.html` trägt **kein** `crossorigin`-Attribut und wird deshalb im No-CORS-Modus geladen; unter `require-corp` ist das nur zulässig, wenn die Gegenstelle `Cross-Origin-Resource-Policy: cross-origin` sendet. Das ist eine Abhängigkeit von fremder Header-Politik an einer Stelle, an der der Excel-Import hängt. **Zu prüfen und zu entkoppeln.**
 
@@ -332,7 +332,7 @@ Der Herstellerhinweis ist eindeutig: `numWorkers` wählt das Subsolver-Portfolio
 
 ### 10.3 WASM-Auslieferung und Zwischenspeicherung
 
-- **Import-Map ist Pflicht** (Defekt 4): `@bufbuild/protobuf` muss vendorisiert und über `<script type="importmap">` aufgelöst werden — sonst bleibt der lokale Pfad tot.
+- **Bare-Specifier in den Vendor-Dateien beheben, nicht per Import-Map** (Defekt 4): `vendor/cpsat-js/dist/**` importiert `@bufbuild/protobuf` (und `@bufbuild/protobuf/codegenv2`) als bloßen Bezeichner — und zwar **innerhalb** der Vendor-Dateien selbst, nicht nur an der Ladestelle im Worker. Eine `<script type="importmap">` in `index.html` löst das nicht: Der Solver läuft ausschließlich im Web Worker (dieser Abschnitt), und ein dediziertes Worker-Skript (`importScripts` oder `new Worker(url, { type: 'module' })`) erbt die Import-Map des Dokuments **nicht**; ein eigener Import-Map-Geltungsbereich für dedizierte Worker existiert in aktuellen Browsern nicht. Richtiger Fix: `@bufbuild/protobuf` unverändert als ESM nach `vendor/bufbuild/protobuf/` vendorisieren und die bloßen Bezeichner in den betroffenen Dateien (`model/cp-model.js`, `model/linear-expr.js`, `solver/cp-solver.js`, `generated/cp_model_pb.js`, `generated/sat_parameters_pb.js`) einmalig durch relative Pfade ersetzen (Details und exakte Pfade unter P0).
 - **6 MB WASM** einmalig; `/vendor/*` trägt bereits `Cache-Control: public, max-age=31536000, immutable`. Zusätzlich Vorabladen per `Cache`-API beim ersten Öffnen des Studios, nicht beim Anwendungsstart.
 - **Lazy Loading** bleibt richtig: erst beim Klick auf Auto-Plan.
 
@@ -346,8 +346,8 @@ Workers KV im kostenfreien Tarif: **100.000 Lesevorgänge/Tag, 1.000 Schreibvorg
 
 | Baustein | Lizenz | Kosten | Rolle | Urteil |
 |---|---|---|---|---|
-| `cpsat-js` (portable) | Apache-2.0 | frei | exakter Kern | **einbinden** (vendorisiert, Import-Map ergänzen) |
-| `@bufbuild/protobuf` | Apache-2.0 | frei | Abhängigkeit von cpsat-js | **vendorisieren** (Pflicht) |
+| `cpsat-js` (portable) | Apache-2.0 | frei | exakter Kern | **einbinden** (vendorisiert; Bezeichner-Fix an den Vendor-Dateien statt Import-Map, siehe P0) |
+| `@bufbuild/protobuf` | Apache-2.0 | frei | Abhängigkeit von cpsat-js | **vendorisieren + bloße Bezeichner in den Vendor-Dateien auf relative Pfade umschreiben** (Pflicht, siehe P0) |
 | `highs-js` | MIT | frei | Zweitmeinung/Notreserve | **optional**, hinter Fahne |
 | `comlink` | Apache-2.0 | frei | Worker-RPC | **optional** — der vorhandene `postMessage`-Vertrag genügt |
 | `d3-scale`, `d3-shape` | ISC | frei | Achsen/Pfade der Animation | **optional**, nur diese zwei Module |
@@ -479,11 +479,22 @@ Alle Aussagen dieses Berichts über den Ist-Zustand wurden ausgeführt, nicht ge
 Reihenfolge ist bindend: jedes Paket ist für sich lauffähig und testbar.
 
 ### P0 — Ladefähigkeit herstellen *(Voraussetzung für alles)*
-- `@bufbuild/protobuf` nach `vendor/bufbuild/` vendorisieren.
-- `<script type="importmap">` in `index.html` **und** im Worker-Kontext (`import`-Map gilt nicht in Workern → im Worker den vollständigen Pfad importieren oder das Vendor-Bundle vorab zu einer Datei ohne bloße Bezeichner zusammenführen).
+
+**Zwei naheliegende Auswege tragen nicht — beide sind zu verwerfen, nicht umzusetzen:**
+
+1. *„Im Worker den vollständigen Pfad importieren“* behebt Defekt 4 nicht. Der Worker importiert die Eintrittsdatei bereits über den vollständigen Pfad (`SOLVER_LOAD_ORDER`, `js/auto-plan-cp-sat.js:50–54`, Eintrag `/vendor/cpsat-js/dist/index.portable.js`). Der bloße Bezeichner `@bufbuild/protobuf` steht aber **innerhalb der Vendor-Dateien selbst** (`vendor/cpsat-js/dist/model/cp-model.js`, `.../model/linear-expr.js`, `.../solver/cp-solver.js`, `.../generated/cp_model_pb.js`, `.../generated/sat_parameters_pb.js` — alle importieren `@bufbuild/protobuf` bzw. `@bufbuild/protobuf/codegenv2` bloß). Ein vollständiger Pfad auf die Eintrittsdatei ändert an deren internen `import`-Anweisungen nichts; die Modulauflösung scheitert unverändert bei diesen Dateien.
+2. *„Import-Map in `index.html`“* hilft ebenso nicht und widerspricht zusätzlich §10.5 (reines ESM, kein Build-Schritt, siehe unten). Nach §10.2 läuft der Solver **ausschließlich im Web Worker**. Eine im Dokument deklarierte Import-Map gilt nicht für dedizierte Worker-Skripte: Weder `importScripts()` noch `new Worker(url, { type: 'module' })` erben die Import-Map des ladenden Dokuments; ein separater, dem Worker mitgegebener Import-Map-Geltungsbereich ist in aktuellen Browsern nicht spezifiziert bzw. nicht verfügbar. Selbst wenn er verfügbar wäre, bräuchte man ein zweites, Worker-eigenes `<script type="importmap">`-Äquivalent — das existiert für Worker-Konstruktoren nicht.
+
+**Tatsächlicher Fix — Bezeichner in den Vendor-Dateien selbst umschreiben, kein Build-Schritt:**
+- `@bufbuild/protobuf` unverändert als ESM (aus `dist/esm/**` des npm-Pakets, keine Transpilation/kein Bundling) nach `vendor/bufbuild/protobuf/` vendorisieren.
+- In den fünf betroffenen Dateien die bloßen Bezeichner **einmalig und mechanisch** durch relative Pfade ersetzen (alle fünf Dateien liegen auf derselben Verzeichnistiefe `vendor/cpsat-js/dist/<subdir>/<datei>.js`, daher identischer Pfad-Präfix):
+  - `from '@bufbuild/protobuf'` → `from '../../../bufbuild/protobuf/dist/esm/index.js'`
+  - `from '@bufbuild/protobuf/codegenv2'` → `from '../../../bufbuild/protobuf/dist/esm/codegenv2/index.js'`
+  - Betroffen: `model/cp-model.js`, `model/linear-expr.js`, `solver/cp-solver.js`, `generated/cp_model_pb.js`, `generated/sat_parameters_pb.js`.
+- Das ist ein Text-Ersatz an bereits eingecheckten, vendorisierten Dateien — keine Import-Map, kein Bundler, kein Build-Schritt. `index.html` benötigt **keine** Import-Map; das reine-ESM-Modell aus §10.5 bleibt unverändert.
 - `Cross-Origin-Embedder-Policy` aus `_headers` entfernen; `Cross-Origin-Opener-Policy: same-origin` darf bleiben.
 - SheetJS entkoppeln: entweder lokal vendorisieren oder mit `crossorigin="anonymous"` laden.
-- **Test:** Browser-E2E lädt `/vendor/cpsat-js/dist/index.portable.js` und löst ein Zwei-Variablen-Modell. Grün = P0 fertig.
+- **Test:** Browser-E2E lädt `/vendor/cpsat-js/dist/index.portable.js` **im Worker-Kontext** (nicht nur im Dokument) und löst ein Zwei-Variablen-Modell. Grün = P0 fertig.
 
 ### P1 — Solver-Brücke neu *(`js/auto-plan-solver.js`, ersetzt die Bindungsschicht)*
 - Erkennung **ausschließlich `cpsat-js`** (`typeof module.CpSolver.create === 'function'`); `or-tools-wasm` entfällt als Erkennungszweig (siehe §10.5/§12 — COEP-Konflikt). Lädt `cpsat-js` nicht, greift kein CDN-Wechsel, sondern der ALNS-Warmstart als vollständiger Plan (Abschnitt 6.1/236).
@@ -685,7 +696,7 @@ Robustheit: Anteil der (Person, Tag)-Paare, deren fiktiver Ausfall keine rote Be
 
 | Risiko | Wahrscheinlichkeit | Gegenmaßnahme |
 |---|---|---|
-| Import-Map löst im Worker nicht auf | hoch | Vendor-Bundle ohne bloße Bezeichner erzeugen; E2E-Test in P0 als Tor |
+| Bloße `@bufbuild/protobuf`-Bezeichner in den Vendor-Dateien laden im Worker nicht | hoch (bestätigt) | Bezeichner in den fünf Vendor-Dateien mechanisch durch relative Pfade auf mitvendorisiertes `@bufbuild/protobuf` ersetzen (kein Bundling, kein Build-Schritt); E2E-Test in P0 als Tor |
 | Modell driftet gegen die Regelengine | mittel | Kreuztest in P2 (200 Zufallspläne, Äquivalenz Modell ⇔ Audit) |
 | MCS in Budget nicht beweisbar minimal | **eingetreten (gemessen)** | anytime führen, Ergebnis als „in *t* s nachgewiesen“ ausweisen, nie als Minimum |
 | WASM-Ladezeit beim ersten Studio-Öffnen | mittel | Lazy Load, `immutable`-Cache, Vorabladen bei Studio-Öffnung, sichtbarer Ladezustand |
