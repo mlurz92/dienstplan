@@ -507,7 +507,7 @@ Reihenfolge ist bindend: jedes Paket ist für sich lauffähig und testbar.
 - Auslöser: manuelle Änderung nach einem Lauf.
 - Freigabefenster: geänderter Tag ± 3 Tage, gleiches Wochenende, betroffene Person im ganzen Monat.
 - Rest per `add(y.equals(1))` fixiert, Kaskade nur auf dem Fenster.
-- **Test:** Änderung eines Feldes darf höchstens *n* weitere Felder bewegen.
+- **Test:** Änderung eines Feldes darf höchstens **25** weitere Felder bewegen. Dieser Schwellwert ist keine Annahme, sondern die obere Schranke des Freigabefensters selbst: 7 Tage × 2 Rollen (Tag ± 3) + 2 Tage × 2 Rollen (gleiches Wochenende, worst case ohne Überlappung mit dem Tagesfenster) + Ø 8 Felder der betroffenen Person über den ganzen Monat (60 Felder / 8 Personen der Referenzinstanz aus Abschnitt 1) = 26 Felder im Fenster; abzüglich des bereits geänderten Feldes selbst verbleiben **n = 25**. Da die Kaskade außerhalb des Freigabefensters ausschließlich `add(y.equals(1))`-Fixierungen sieht, kann kein Feld jenseits dieser Schranke bewegt werden — die Zusicherung ist damit für jede konkrete Instanz vorab berechenbar und automatisiert prüfbar.
 
 ### P7 — Studio-Einstellungen v10.5 *(Abschnitt 15)*
 
