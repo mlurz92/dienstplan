@@ -54,7 +54,14 @@ export const DEFAULT_SETTINGS = Object.freeze({
     deterministic: true,
     infeasibilityMode: 'mus',
     repairOnEdit: true,
-    explanationDepth: 'detailed'
+    explanationDepth: 'detailed',
+    cpSatFairnessWeight: 90,
+    protectBaseline: true,
+    cpSatPerturbationWeight: 45,
+    cpSatCtLeadershipWeight: 70,
+    cpSatWeekendChainWeight: 100,
+    relaxationDepth: 'deep',
+    musAutoRelax: false
   })
 });
 
@@ -227,7 +234,14 @@ export function normalizeSettings(value, { strict = false } = {}) {
       deterministic: normalizedBoolean(autoPlan.deterministic, DEFAULT_SETTINGS.autoPlan.deterministic, 'settings.autoPlan.deterministic', strict),
       infeasibilityMode: normalizedEnum(autoPlan.infeasibilityMode, new Set(['mus', 'relax', 'report']), DEFAULT_SETTINGS.autoPlan.infeasibilityMode, 'settings.autoPlan.infeasibilityMode', strict),
       repairOnEdit: normalizedBoolean(autoPlan.repairOnEdit, DEFAULT_SETTINGS.autoPlan.repairOnEdit, 'settings.autoPlan.repairOnEdit', strict),
-      explanationDepth: normalizedEnum(autoPlan.explanationDepth, new Set(['short', 'detailed', 'llm']), DEFAULT_SETTINGS.autoPlan.explanationDepth, 'settings.autoPlan.explanationDepth', strict)
+      explanationDepth: normalizedEnum(autoPlan.explanationDepth, new Set(['short', 'detailed', 'llm']), DEFAULT_SETTINGS.autoPlan.explanationDepth, 'settings.autoPlan.explanationDepth', strict),
+      cpSatFairnessWeight: normalizedBoundedInteger(autoPlan.cpSatFairnessWeight, DEFAULT_SETTINGS.autoPlan.cpSatFairnessWeight, 1, 100, 'settings.autoPlan.cpSatFairnessWeight', strict),
+      protectBaseline: normalizedBoolean(autoPlan.protectBaseline, DEFAULT_SETTINGS.autoPlan.protectBaseline, 'settings.autoPlan.protectBaseline', strict),
+      cpSatPerturbationWeight: normalizedBoundedInteger(autoPlan.cpSatPerturbationWeight, DEFAULT_SETTINGS.autoPlan.cpSatPerturbationWeight, 0, 100, 'settings.autoPlan.cpSatPerturbationWeight', strict),
+      cpSatCtLeadershipWeight: normalizedBoundedInteger(autoPlan.cpSatCtLeadershipWeight, DEFAULT_SETTINGS.autoPlan.cpSatCtLeadershipWeight, 0, 100, 'settings.autoPlan.cpSatCtLeadershipWeight', strict),
+      cpSatWeekendChainWeight: normalizedBoundedInteger(autoPlan.cpSatWeekendChainWeight, DEFAULT_SETTINGS.autoPlan.cpSatWeekendChainWeight, 0, 200, 'settings.autoPlan.cpSatWeekendChainWeight', strict),
+      relaxationDepth: normalizedEnum(autoPlan.relaxationDepth, new Set(['shallow', 'deep']), DEFAULT_SETTINGS.autoPlan.relaxationDepth, 'settings.autoPlan.relaxationDepth', strict),
+      musAutoRelax: normalizedBoolean(autoPlan.musAutoRelax, DEFAULT_SETTINGS.autoPlan.musAutoRelax, 'settings.autoPlan.musAutoRelax', strict)
     }
   };
 }

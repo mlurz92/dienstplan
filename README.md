@@ -110,11 +110,14 @@ Fixpunkte/Domänen
   → sonst: bewährte Null-Rot-Intensivierung, Reparatur und ALNS-Perfektion
 ```
 
-v9 übersetzt den Monatszustand in ein lineares Constraint-Modell und löst es mit
-**Googles OR-Tools CP-SAT**, das als WebAssembly direkt im Browser läuft
-(`or-tools-wasm`, Apache-2.0, bzw. `cpsat-js`, MIT, als Single-Thread-Fallback).
-Kann die Bindung nicht geladen werden (älterer Browser, fehlende COOP/COEP-
-Isolation), bleibt die v8.5-Heuristik vollständig erhalten und übernimmt.
+v9.5 übersetzt den Monatszustand in ein lineares Constraint-Modell und löst es
+mit **Googles OR-Tools CP-SAT**, das als WebAssembly direkt im Browser läuft.
+Der Single-Thread-Solver `cpsat-js` (MIT) wird seit v9.5 **lokal unter
+`vendor/cpsat-js` ausgeliefert** (offline-fähig, ohne CDN-Laufzeitrisiko,
+keine Cross-Origin-Isolation nötig); `or-tools-wasm` (Apache-2.0) und der
+CDN-Weg bleiben als Fallback erhalten. Kann keine Bindung geladen werden
+(älterer Browser, fehlende COOP/COEP-Isolation), bleibt die v8.5-Heuristik
+vollständig erhalten und übernimmt.
 
 **Regelengine bleibt die einzige Wahrheitsquelle:** Jeder CP-SAT-Vorschlag
 durchläuft den vollständigen Schlussaudit der produktiven Engine; gewonnen wird
@@ -126,17 +129,30 @@ Suchhilfe, kein zweites Regelwerk.
 - **Lexikografische Phasen:** Maximin-Fairness zuerst, danach Wünsche,
   BD-Soll, Wochenend- und Samstagslast in der Reihenfolge des
   Optimierungsschwerpunkts; erreichte Werte werden phasenweise fixiert.
+  Seit v9.5 folgen am Ende der Kette drei zusätzliche Vermeidungsziele:
+  **Wochenendkette** (Fr-BD · Sa frei · So-BD, v4.10 – möglichst vermeiden),
+  **CT-Leitung** (M1 – keine selbst erzeugte Becker-FZA, wenn Martin fehlt)
+  und **Minimal-Perturbation** (Abweichung vom Heuristik-Vorschlag).
+- **Modellvollständigkeit:** Das CP-Modell kennt seit v9.5 die fachlichen
+  Kernregeln als Constraints, die früher nur das Schlussaudit sah: Becker-FZA
+  wird **nach jedem BD** (Werktag wie Wochenende) am nächsten regulären
+  Werktag abgeleitet und sperrt dort BD und HG; die CT-Leitungsdeckung (M1)
+  und die Wochenendkette (v4.10) fließen als weiche Ziele ein.
 - **Optimalitätsnachweis:** `OPTIMAL` liefert eine echte untere Schranke und
   zertifiziert den Plan – der erste beweisbare Optimalitätsbeweis des Projekts.
-- **MUS-artige Konfliktanalyse:** Bei Unzulässigkeit werden Constraint-Gruppen
-  gierig wieder aktiviert, bis die kleinste Konfliktursache benannt ist;
-  auf Wunsch (`infeasibilityMode: 'relax'`) werden Gruppen in fachlicher
-  Reihenfolge aufgeweicht und im Ergebnis ausgewiesen.
+- **Echte MUS-Konfliktanalyse:** Bei Unzulässigkeit wird seit v9.5 eine
+  zweistufige Löschdiagnose gefahren (Gruppen- und Constraint-Ebene) und die
+  **kleinste nachgewiesene Konfliktmenge (MUS)** benannt – statt der früheren
+  gierigen Aktivierung. Auf Wunsch (`infeasibilityMode: 'relax'` oder
+  `musAutoRelax`) werden genau diese Gruppen aufgeweicht und im Ergebnis
+  ausgewiesen.
 - **Determinismus:** Alle Zufallsströme (CP-SAT-Seed, Heuristik-Seed) leiten
   sich aus Konfiguration und Monatszustand ab; identische Eingaben ergeben
   identische Pläne.
 - **Warmstart:** Das Heuristik-Ergebnis dient als Lösungshinweis (Hint) und
   prunt die exakte Suche.
+- **Stabilität:** `protectBaseline` (Standard an) hält bestehende Belegungen;
+  manuelle Edits bleiben beim Re-Planen erhalten.
 
 ### 4.3 Verbindliche v8.5-Pipeline (Fallback und Warmstart)
 
@@ -295,7 +311,10 @@ Cloudflare Pages wird aus dem Repository-Root gebaut. Das KV-Binding lautet `DIE
 - Worker-Budget und Portfoliovergleich;
 - v8.5-Phasenvertrag, Profilableitung und Fallback-Reihenfolge;
 - v9: CP-SAT-Modellbau, Konfigurationsfelder, Relaxations-Diagnose,
-  Fallback-Pipeline und Exaktheitsnachweis (`tests/auto-plan-v9.test.js`).
+  Fallback-Pipeline und Exaktheitsnachweis (`tests/auto-plan-v9.test.js`);
+- v9.5: Modellkodierung von Becker-FZA, CT-Leitung und Wochenendkette,
+  Perturbations-Ziel und MUS-fähige Diagnose ohne Solver
+  (zusätzliche Tests in `tests/auto-plan-v9.test.js`).
 
 ### Browsertests
 
@@ -314,8 +333,8 @@ Cloudflare Pages wird aus dem Repository-Root gebaut. Das KV-Binding lautet `DIE
 
 ```text
 js/auto-planner-v9.js         hybride exakte Orchestrierung (CP-SAT + Fallback)
-js/auto-plan-cp-sat.js        CP-SAT-Modellbau, Solver-Loader, Phasen, MUS-Diagnose
-js/auto-plan-studio-v9.js     v9-Regler, Tooltips, Exaktheitsnachweis, Layout
+js/auto-plan-cp-sat.js        CP-SAT-Modellbau, Solver-Loader, Phasen, echte MUS-Diagnose
+js/auto-plan-studio-v9.js     v9-Regler, Tooltips (Katalog + Fallback), Layout, Exaktheitsnachweis
 js/auto-planner-v8-5.js       strikte Eskalation und verbindlicher Phasenvertrag
 js/auto-plan-studio-v8-5.js   Profile, Phasentheater und Ergebnisprotokoll
 js/app-theme-v8-5.js          persistenter Hell-/Dunkelcontroller (Start: hell)
@@ -324,16 +343,50 @@ js/ui-v8-5.js                 Command-Bar-, Bootstrap- und Performance-Integrati
 app-v8-5.css                  adaptive Farb- und Oberflächentoken
 toolbar-v8-5.css              rechter Theme-/Einstellungsblock
 auto-plan-studio-v8-5.css     v8.5-Studiozustände
-auto-plan-studio-v9.css       Modal-Fit-Layout, Dark-Mode-Kontraste, Animation
+auto-plan-studio-v9.css       Modal-Fit-Layout, kollabierbare v9-Sektion, Dark-Mode, Animation
+vendor/cpsat-js/              lokal ausgelieferter CP-SAT-Solver (portable, MIT)
 _headers                      COOP/COEP für multithreaded WebAssembly
 tests/auto-plan-v8-5.test.js  Solver- und Integrationsverträge
-tests/auto-plan-v9.test.js    CP-SAT-Modell- und v9-Verträge
+tests/auto-plan-v9.test.js    CP-SAT-Modell-, MUS- und v9-Verträge
 tests/e2e/v8-5-shell.spec.js  Browser-, Bootstrap- und Observer-Regressionen
 ```
 
 ---
 
 ## 11. Release 0.9.1
+
+### Auto-Plan v9.5 („Correct Engine“)
+
+- **Solver lokal ausgeliefert:** `cpsat-js` (portable, MIT) liegt unter
+  `vendor/cpsat-js` und wird zuerst geladen; `or-tools-wasm` und der CDN-Weg
+  bleiben als Fallback. Keine CDN-Laufzeitabhängigkeit, offline-fähig.
+- **Modellvollständigkeit:** Becker-FZA wird nun **nach jedem BD** am nächsten
+  regulären Werktag abgeleitet (nicht mehr nur nach Samstags-BD) und sperrt
+  dort BD und HG im CP-Modell. CT-Leitung (M1) und Wochenendkette (v4.10,
+  Fr-BD · Sa frei · So-BD) sind als weiche Vermeidungsziele im Modell.
+- **Echte MUS:** Zweistufige Löschdiagnose (Gruppen- und Constraint-Ebene)
+  benennt die kleinste nachgewiesene Konfliktmenge; Relaxierung arbeitet
+  gezielt auf dieser Menge (`musAutoRelax`).
+- **Minimal-Perturbation:** `protectBaseline` (Standard an) plus
+  Perturbations-Gewicht halten bestehende Belegungen und manuelle Edits beim
+  Re-Planen stabil.
+- **Neue Studio-Regler:** Fairness-Gewicht, Stabilität (Änderungen
+  minimieren), Minimal-Perturbation-Gewicht, Relaxationstiefe und
+  „MUS automatisch relaxieren“ – alle mit erklärenden Tooltips; jede
+  Studio-Einstellung trägt jetzt eine Erklärung (Katalog + Fallback).
+- **Studio-Layout:** v9-Regler in einer **einklappbaren Sektion**
+  („v9 · Exakte Engine“); der Dialog passt vollständig in den Viewport, nur
+  innere Bereiche scrollen, das Algorithmus-Kommentar-Fenster scrollt intern
+  und wächst nicht mehr.
+- **Animation:** Der Suchkern ändert seinen **Glow je nach Ereignisfarbe**
+  (rot/orange/gelb/grün) – Ereignisse mit `level` lassen die Szene in der
+  passenden Farbe aufleuchten.
+- **Dark-Mode-Kontraste:** Monatsplakette, Plan-Tabelle (Zellen, sticky Kopf,
+  Fokus), offene Punkte, Dialogköpfe und Reiter werden im Dunkelmodus auf
+  lesbare Kontraste gehoben; Überläufe in Kopfleiste, Dialogköpfen,
+  Einstellungs-Reitern und Dropdown-Menüs sind behoben.
+- **Korrigierte Becker-FZA-Ableitung** in `rules-core.js` wirkt konsistent in
+  Audit, Statistik und Modell.
 
 ### Regelwerk v4.10
 

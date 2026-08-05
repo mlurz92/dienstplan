@@ -8,9 +8,9 @@ const controls = await readFile(new URL('../js/ui-controls.js', import.meta.url)
 const packageJson = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
 
 test('month motion is initialized before the color and stability layers', () => {
-  const motionImport = controls.indexOf("import './month-view-transition.js?v=20260803.4';");
-  const directorImport = controls.indexOf("import './color-director.js?v=20260803.4';");
-  const stabilityImport = controls.indexOf("import './month-transition-stability.js?v=20260803.4';");
+  const motionImport = controls.indexOf("import './month-view-transition.js?v=20260805.1';");
+  const directorImport = controls.indexOf("import './color-director.js?v=20260805.1';");
+  const stabilityImport = controls.indexOf("import './month-transition-stability.js?v=20260805.1';");
   assert.ok(motionImport >= 0);
   assert.ok(directorImport > motionImport);
   assert.ok(stabilityImport > directorImport);
@@ -70,6 +70,6 @@ test('native animation state begins only when transition layers are ready', () =
 });
 
 test('transition stylesheet and syntax check are shipped', () => {
-  assert.match(motion, /\/transitions\.css\?v=20260803\.4/);
+  assert.match(motion, /\/transitions\.css\?v=20260805\.1/);
   assert.match(packageJson.scripts.check, /js\/month-view-transition\.js/);
 });

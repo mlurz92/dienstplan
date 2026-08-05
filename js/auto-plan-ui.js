@@ -6,6 +6,6 @@
  * Solver-Parameter, Lauftelemetrie und schließlich die v9-exakte
  * Sucharchitektur mit ihrem Exaktheitsnachweis.
  */
-import './ui-v8-5.js?v=20260803.4';
-import './auto-plan-studio-v8-5.js?v=20260803.4';
-import './auto-plan-studio-v9.js?v=20260803.4';
+import './ui-v8-5.js?v=20260805.1';
+import './auto-plan-studio-v8-5.js?v=20260805.1';
+import './auto-plan-studio-v9.js?v=20260805.1';

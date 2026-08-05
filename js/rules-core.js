@@ -1,5 +1,5 @@
-import { MONTH_NAMES, OPTION_TYPES, PREFERENCE_TYPES, STAFF_ORDER, createEmptyMonth, toIsoDate, WEEKDAYS } from './defaults.js?v=20260803.4';
-import { isFirstRegularWorkdayAfter } from './holidays.js?v=20260803.4';
+import { MONTH_NAMES, OPTION_TYPES, PREFERENCE_TYPES, STAFF_ORDER, createEmptyMonth, toIsoDate, WEEKDAYS } from './defaults.js?v=20260805.1';
+import { isFirstRegularWorkdayAfter } from './holidays.js?v=20260805.1';
 
 /**
  * Kalenderhilfen mit Zwischenspeicher.
@@ -181,9 +181,11 @@ export function getAbsenceFromState(state, staffId, dateIso) { return getAbsence
 
 export function isDerivedBeckerFza(state, staffId, dateIso) {
   if (staffId !== 'becker') return false;
+  // Korrektur v9.5: Becker leitet aus jedem BD (Werktag wie Wochenende) einen
+  // wirksamen FZA am nächsten regulären Werktag ab – nicht mehr nur nach Samstags-BD.
   return isFirstRegularWorkdayAfter(
     dateIso,
-    iso => parseIso(iso).getDay() === 6 && getAssignment(state, iso, 'bd') === 'becker'
+    iso => getAssignment(state, iso, 'bd') === 'becker'
   );
 }
 

@@ -1,6 +1,6 @@
-import * as V8 from './auto-planner-v8.js?v=20260803.4';
+import * as V8 from './auto-planner-v8.js?v=20260805.1';
 
-export * from './auto-planner-v8.js?v=20260803.4';
+export * from './auto-planner-v8.js?v=20260805.1';
 
 export const AUTO_PLAN_REVISION = 8.5;
 export const AUTO_PLAN_ENGINE_ID = 'v8.5-exhaustive-clean-escalation';

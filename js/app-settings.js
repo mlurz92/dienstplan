@@ -14,10 +14,10 @@
  *
  * Die drei Abschnitte folgen der Gliederung des Einstellungsschemas.
  */
-import { DEFAULT_SETTINGS, normalizeSettings } from './defaults.js?v=20260803.4';
-import { markBootstrapDirty, persistBootstrap, state } from './state.js?v=20260803.4';
+import { DEFAULT_SETTINGS, normalizeSettings } from './defaults.js?v=20260805.1';
+import { markBootstrapDirty, persistBootstrap, state } from './state.js?v=20260805.1';
 
-const RELEASE = '20260803.4';
+const RELEASE = '20260805.1';
 const byId = id => document.getElementById(id);
 
 function addStylesheet() {

@@ -39,14 +39,18 @@
  * minimal angenäherte Ursachenliste für die Oberfläche.
  */
 
-import { basicallyEligiblePeers, getPlanningStaff } from './rules-core.js?v=20260803.4';
+import { basicallyEligiblePeers, getPlanningStaff, getAbsence, ABSENCE_FOR_CT_LEADERSHIP } from './rules-core.js?v=20260805.1';
+import { isRegularWorkdayIso } from './holidays.js?v=20260805.1';
 
-export const CP_SAT_REVISION = 1;
+export const CP_SAT_REVISION = 2;
 
+// Lokale Auslieferung hat Vorrang (kein CDN-Laufzeitrisiko, offline-fähig).
+// cpsat-js (portable) läuft ohne Cross-Origin-Isolation; or-tools-wasm bleibt
+// als CDN-Fallback erhalten, da das npm-Paket keinen cp-sat-Build mitliefert.
 export const SOLVER_LOAD_ORDER = Object.freeze([
-  { id: 'or-tools-wasm', source: 'local', url: '/vendor/or-tools-wasm/cp-sat/index.js' },
-  { id: 'or-tools-wasm', source: 'cdn', url: 'https://cdn.jsdelivr.net/npm/or-tools-wasm@0.9.1/cp-sat/+esm' },
-  { id: 'cpsat-js', source: 'cdn', url: 'https://cdn.jsdelivr.net/npm/cpsat-js@1.3.0/+esm' }
+  { id: 'cpsat-js', source: 'local', url: '/vendor/cpsat-js/dist/index.portable.js' },
+  { id: 'cpsat-js', source: 'cdn', url: 'https://cdn.jsdelivr.net/npm/cpsat-js@1.3.0/+esm' },
+  { id: 'or-tools-wasm', source: 'cdn', url: 'https://cdn.jsdelivr.net/npm/or-tools-wasm@0.9.1/cp-sat/+esm' }
 ]);
 
 export const RELAX_GROUPS = Object.freeze({
@@ -67,7 +71,7 @@ export const OBJECTIVE_COMPONENTS = Object.freeze({
   hgBurden: 'hgBurden'
 });
 
-const VERSION_MARKER = '20260803.4';
+const VERSION_MARKER = '20260805.1';
 const BIG_M = 128;
 
 let loader = null;
@@ -86,6 +90,56 @@ function countFixedRole(baseline, staffId, role) {
     if (baseline.days?.[iso]?.[role] === staffId) count += 1;
   }
   return count;
+}
+
+/**
+ * Nächster regulärer Werktag (Mo–Fr) nach `dateIso` innerhalb des Monats.
+ * Wochenenden werden übersprungen; Ferien sind im Modell nachrangig, da die
+ * fachliche Wahrheit ohnehin im Regel-Audit geprüft wird.
+ */
+function nextRegularWorkdayIso(days, dateIso) {
+  const index = days.indexOf(dateIso);
+  if (index < 0) return null;
+  for (let offset = 1; index + offset < days.length; offset += 1) {
+    const candidate = days[index + offset];
+    if (isRegularWorkdayIso(candidate)) return candidate;
+  }
+  return null;
+}
+
+/**
+ * Erzeugt ein 0/1-Literal `b`, das genau dann 1 ist, wenn `targetIndex == value`.
+ * Rückgabe ist der Index des Literals.
+ */
+function addReifiedEqual(addAuxiliary, hardConstraints, targetIndex, value, group, idPrefix) {
+  const a = addAuxiliary(`${idPrefix}_eq`, 0, 1);
+  // a=1 ⇒ target == value
+  hardConstraints.push({ id: `${idPrefix}_eq_hi`, group, terms: [[targetIndex, 1], [a, BIG_M]], lb: -BIG_M, ub: BIG_M + value, detail: '' });
+  hardConstraints.push({ id: `${idPrefix}_eq_lo`, group, terms: [[targetIndex, 1], [a, -BIG_M]], lb: value - BIG_M, ub: BIG_M, detail: '' });
+  // a=0 ⇒ target != value (über Hilfsliterale b1/b2)
+  const b1 = addAuxiliary(`${idPrefix}_neq_hi`, 0, 1);
+  const b2 = addAuxiliary(`${idPrefix}_neq_lo`, 0, 1);
+  hardConstraints.push({ id: `${idPrefix}_neq_hi`, group, terms: [[targetIndex, 1], [b1, -BIG_M]], lb: value + 1 - BIG_M, ub: BIG_M, detail: '' });
+  hardConstraints.push({ id: `${idPrefix}_neq_lo`, group, terms: [[targetIndex, 1], [b2, BIG_M]], lb: -BIG_M, ub: value - 1 + BIG_M, detail: '' });
+  hardConstraints.push({ id: `${idPrefix}_neq_or`, group, terms: [[b1, 1], [b2, 1]], lb: 1, ub: 2, detail: '' });
+  hardConstraints.push({ id: `${idPrefix}_eq_off`, group, terms: [[a, 1], [b1, -1], [b2, -1]], lb: -BIG_M, ub: 0, detail: '' });
+  return a;
+}
+
+/**
+ * Erzeugt ein 0/1-Literal, das genau dann 1 ist, wenn `targetIndex != value`.
+ * Rückgabe ist der Index des Literals.
+ */
+function addReifiedNotEqual(addAuxiliary, hardConstraints, targetIndex, value, group, idPrefix) {
+  const b = addAuxiliary(`${idPrefix}_ne`, 0, 1);
+  const b1 = addAuxiliary(`${idPrefix}_ne_hi`, 0, 1);
+  const b2 = addAuxiliary(`${idPrefix}_ne_lo`, 0, 1);
+  hardConstraints.push({ id: `${idPrefix}_ne_hi`, group, terms: [[targetIndex, 1], [b1, -BIG_M]], lb: value + 1 - BIG_M, ub: BIG_M, detail: '' });
+  hardConstraints.push({ id: `${idPrefix}_ne_lo`, group, terms: [[targetIndex, 1], [b2, BIG_M]], lb: -BIG_M, ub: value - 1 + BIG_M, detail: '' });
+  hardConstraints.push({ id: `${idPrefix}_ne_or`, group, terms: [[b1, 1], [b2, 1]], lb: 1, ub: 2, detail: '' });
+  hardConstraints.push({ id: `${idPrefix}_ne`, group, terms: [[b, 1], [b1, -1], [b2, -1]], lb: -BIG_M, ub: 0, detail: '' });
+  hardConstraints.push({ id: `${idPrefix}_ne_impl`, group, terms: [[b, 1], [b1, -1], [b2, -1]], lb: 0, ub: BIG_M, detail: '' });
+  return b;
 }
 
 /**
@@ -246,6 +300,32 @@ export function buildCpSatModel({ state, monthData, baseline = monthData, config
   const slotByKey = new Map();
   const candidateBySlot = [];
 
+  // Weiche Zielkomponenten und Gewichte – hier deklariert, damit die
+  // harten Regelabschnitte (Becker-FZA, CT-Leitung, Wochenendkette) und die
+  // Perturbationsziele bereits beim Aufbau auf sie zugreifen können.
+  const components = {
+    fairness: { terms: [], slack: [] },
+    wishes: { terms: [], slack: [] },
+    bdTarget: { terms: [], slack: [] },
+    weekend: { terms: [] },
+    saturday: { terms: [] },
+    hgBurden: { terms: [] },
+    ctLeadership: { terms: [], slack: [] },
+    weekendChain: { terms: [], slack: [] },
+    perturbation: { terms: [], slack: [] }
+  };
+  const weights = {
+    fairness: Number(config.cpSatFairnessWeight ?? 90),
+    wish: Number(config.cpSatWishWeight ?? 80),
+    bdTarget: Number(config.cpSatBdTargetWeight ?? 60),
+    weekend: Number(config.cpSatWeekendWeight ?? 55),
+    saturday: Number(config.cpSatSaturdayWeight ?? 30),
+    hgBurden: Number(config.cpSatHgWeight ?? 40),
+    ctLeadership: Number(config.cpSatCtLeadershipWeight ?? 70),
+    weekendChain: Number(config.cpSatWeekendChainWeight ?? 100),
+    perturbation: Number(config.cpSatPerturbationWeight ?? 45)
+  };
+
   for (const slot of openSlots) {
     const key = `${slot.dateIso}|${slot.role}`;
     const candidates = basicallyEligiblePeers(state, monthData, slot.dateIso, slot.role)
@@ -373,6 +453,73 @@ export function buildCpSatModel({ state, monthData, baseline = monthData, config
     );
   }
 
+  // 5b. Becker-FZA (korrigiert: nach jedem BD, nicht nur Samstag) und CT-Leitung (M1).
+  // Becker leitet aus jedem BD einen wirksamen FZA am nächsten regulären Werktag
+  // ab; an diesem Tag ist Becker weder für BD noch für HG wählbar. Gleichzeitig
+  // soll die Modellierung nicht selbst eine CT-Leitungslücke erzeugen: Ist Martin
+  // am FZA-Tag abwesend, wird Becker-BD an vortagigen Tagen bestraft.
+  const beckerValue = staffIndex.get('becker');
+  const martinAbsentOn = iso => {
+    const absence = getAbsence(monthData, 'martin', iso);
+    return Boolean(absence) && ABSENCE_FOR_CT_LEADERSHIP.has(absence);
+  };
+  if (beckerValue !== undefined) {
+    for (const dateIso of days) {
+      const bd = slotVariable(dateIso, 'bd');
+      if (bd === undefined) continue;
+      const next = nextRegularWorkdayIso(days, dateIso);
+      if (!next) continue;
+      const a = addReifiedEqual(addAuxiliary, hardConstraints, bd, beckerValue, 'sequence', `becker_fza_${dateIso}`);
+      const nextBd = slotVariable(next, 'bd');
+      const nextHg = slotVariable(next, 'hg');
+      if (nextBd !== undefined) {
+        const ne = addReifiedNotEqual(addAuxiliary, hardConstraints, nextBd, beckerValue, 'sequence', `becker_fza_nbd_${dateIso}`);
+        hardConstraints.push({ id: `becker_fza_nbd_imply_${dateIso}`, group: 'sequence', terms: [[a, 1], [ne, -1]], lb: -BIG_M, ub: 0, detail: `Becker-FZA am ${next}: BD gesperrt.` });
+      }
+      if (nextHg !== undefined) {
+        const ne = addReifiedNotEqual(addAuxiliary, hardConstraints, nextHg, beckerValue, 'sequence', `becker_fza_nhg_${dateIso}`);
+        hardConstraints.push({ id: `becker_fza_nhg_imply_${dateIso}`, group: 'sequence', terms: [[a, 1], [ne, -1]], lb: -BIG_M, ub: 0, detail: `Becker-FZA am ${next}: HG gesperrt.` });
+      }
+      if (martinAbsentOn(next)) {
+        components.ctLeadership.terms.push([a, weights.ctLeadership]);
+        components.ctLeadership.slack.push(a);
+      }
+    }
+  }
+
+  // 5c. Wochenendkette Fr-BD · Sa frei · So-BD (v4.10) – weiches Vermeidungsziel.
+  // Die Kette ist rot und besonders bestätigungspflichtig; die exakte Suche soll
+  // sie nach Möglichkeit vermeiden, ohne harte Ziele zu verletzen.
+  for (let index = 0; index < days.length - 2; index += 1) {
+    if (weekdayOf(days[index]) !== 5) continue;
+    const fri = days[index];
+    const sat = days[index + 1];
+    const sun = days[index + 2];
+    if (weekdayOf(sun) !== 0) continue;
+    const bdFri = slotVariable(fri, 'bd');
+    const satBd = slotVariable(sat, 'bd');
+    const satHg = slotVariable(sat, 'hg');
+    const bdSun = slotVariable(sun, 'bd');
+    if (bdFri === undefined || bdSun === undefined) continue;
+    for (const staffId of staffIds) {
+      const pv = staffIndex.get(staffId);
+      if (!pv) continue;
+      const a1 = addReifiedEqual(addAuxiliary, hardConstraints, bdFri, pv, 'coupling', `chain_fri_${fri}_${staffId}`);
+      const a4 = addReifiedEqual(addAuxiliary, hardConstraints, bdSun, pv, 'coupling', `chain_sun_${fri}_${staffId}`);
+      const a2 = satBd !== undefined ? addReifiedNotEqual(addAuxiliary, hardConstraints, satBd, pv, 'coupling', `chain_satbd_${fri}_${staffId}`) : null;
+      const a3 = satHg !== undefined ? addReifiedNotEqual(addAuxiliary, hardConstraints, satHg, pv, 'coupling', `chain_sathg_${fri}_${staffId}`) : null;
+      const chain = addAuxiliary(`chain_${fri}_${staffId}`, 0, 1);
+      const present = [a1, a2, a3, a4].filter(Boolean);
+      for (const lit of present) {
+        hardConstraints.push({ id: `chain_le_${fri}_${staffId}_${lit}`, group: 'coupling', terms: [[chain, 1], [lit, -1]], lb: -BIG_M, ub: 0, detail: '' });
+      }
+      const geTerms = [[chain, 1], ...present.map(lit => [lit, -1])];
+      hardConstraints.push({ id: `chain_ge_${fri}_${staffId}`, group: 'coupling', terms: geTerms, lb: -(present.length - 1), ub: BIG_M, detail: 'Wochenendkette Fr-BD · Sa frei · So-BD' });
+      components.weekendChain.terms.push([chain, weights.weekendChain]);
+      components.weekendChain.slack.push(chain);
+    }
+  }
+
   // 6. Personengebundene Obergrenzen (Laufgrenzen + Personalmaxima).
   const configLimits = config.staffLimits || {};
   for (const staffId of staffIds) {
@@ -414,24 +561,7 @@ export function buildCpSatModel({ state, monthData, baseline = monthData, config
     }
   }
 
-  // 7. Weiche Zielkomponenten.
-  const components = {
-    fairness: { terms: [], slack: [] },
-    wishes: { terms: [], slack: [] },
-    bdTarget: { terms: [], slack: [] },
-    weekend: { terms: [] },
-    saturday: { terms: [] },
-    hgBurden: { terms: [] }
-  };
-  const weights = {
-    fairness: Number(config.cpSatFairnessWeight ?? 90),
-    wish: Number(config.cpSatWishWeight ?? 80),
-    bdTarget: Number(config.cpSatBdTargetWeight ?? 60),
-    weekend: Number(config.cpSatWeekendWeight ?? 55),
-    saturday: Number(config.cpSatSaturdayWeight ?? 30),
-    hgBurden: Number(config.cpSatHgWeight ?? 40)
-  };
-
+  // 7. Weiche Zielkomponenten (Komponenten und Gewichte sind oben deklariert).
   // 7a. Fairness-Slack F: F ≥ |bdCount_i − bdTarget_i| für alle Personen.
   const fairnessSlack = addAuxiliary('slack_fairness', 0, BIG_M);
   for (const staffId of staffIds) {
@@ -541,6 +671,20 @@ export function buildCpSatModel({ state, monthData, baseline = monthData, config
     const personValue = staffIndex.get(hint.staffId);
     if (variableIndex === undefined || personValue === undefined) continue;
     hintMap[variableIndex] = personValue;
+  }
+
+  // 8b. Minimal-Perturbation: Abweichung vom Heuristik-Hinweis (ehrt manuelle
+  // Edits, da die Heuristik bestehende Belegungen übernimmt) möglichst vermeiden.
+  // Aktiv nur, wenn der Stabilitätsschutz (protectBaseline) eingeschaltet ist.
+  if (Number(weights.perturbation) > 0 && config.protectBaseline !== false) {
+    for (const [variableIndex, personValue] of Object.entries(hintMap)) {
+      const idx = Number(variableIndex);
+      if (idx >= variables.length) continue;
+      if (!candidateBySlot[idx]?.includes(staffIds[personValue - 1])) continue;
+      const ne = addReifiedNotEqual(addAuxiliary, hardConstraints, idx, personValue, 'coverage', `perturb_${idx}`);
+      components.perturbation.terms.push([ne, weights.perturbation]);
+      components.perturbation.slack.push(ne);
+    }
   }
 
   return {
@@ -698,38 +842,78 @@ export function relaxGroupOrder(config) {
  * bis das Modell unzulässig wird; die zuletzt aktivierte Gruppe ist die
  * kleinste nachgewiesene Konfliktursache.
  */
+/**
+ * Echte MUS (Minimal Unsatisfiable Subset) via zweistufige Löschdiagnose
+ * (QuickXplain-Anleihen), ohne Assumptions-API:
+ *
+ *  - Ebene 1 (Gruppen): Ausgehend von der vollständigen, unzulässigen
+ *    Constraint-Menge wird Gruppe für Gruppe geprüft, ob deren Entfernung die
+ *    Zulässigkeit wiederherstellt. Nicht essenzielle Gruppen fallen aus dem
+ *    Konflikt. Gruppen mit niedriger Priorität werden zuerst entspannt, damit
+ *    im MUS die fachlich gewichtigeren Konflikte stehen bleiben.
+ *  - Ebene 2 (Constraint): Innerhalb jeder essenziellen Gruppe wird dieselbe
+ *    Löschdiagnose auf einzelne Constraints angewendet – das Ergebnis ist eine
+ *    minimale, erklärbare Konfliktmenge, nicht nur eine ganzes Bündel.
+ *
+ * Die zurückgegebene `groups`-Liste enthält ausschließlich die im Konflikt
+ * stehenden relaxierbaren Gruppen (mit Label) und speist direkt die
+ * Relaxierungs-UI der v9-Engine.
+ */
 export async function diagnoseInfeasibility(model, api, {
-  timeLimitMs = 4000,
+  timeLimitMs = 8000,
   maxWorkers = null,
-  randomSeed = 42
+  randomSeed = 42,
+  signal = null
 } = {}) {
-  if (!api || !model) return { infeasible: true, groups: [], detail: 'Solver nicht verfügbar.' };
-  const order = relaxGroupOrder({});
-  const causes = [];
-  let activeIds = new Set();
-  for (const group of order) {
-    const ids = constraintIdsOfGroup(model, group);
-    if (!ids.length) continue;
-    const trial = new Set(activeIds);
-    for (const id of ids) trial.add(id);
-    const result = await solveCpSatModel(model, api, {
-      timeLimitMs,
-      maxWorkers,
-      randomSeed,
-      activeConstraintIds: [...trial]
-    });
-    if (result.statusName === 'INFEASIBLE' || result.statusName === 'MODEL_INVALID') {
-      causes.push(group);
-      break;
-    }
-    activeIds = trial;
+  if (!api || !model) return { infeasible: true, mus: [], groups: [], detail: 'Solver nicht verfügbar.' };
+  const isFeasible = result => Boolean(result) && (result.statusName === 'FEASIBLE' || result.statusName === 'OPTIMAL');
+  const allGroups = [...new Set(model.hardConstraints.map(constraint => constraint.group))];
+  const groupPriority = id => RELAX_GROUPS[id]?.priority ?? 99;
+  const orderedGroups = [...allGroups].sort((a, b) => groupPriority(a) - groupPriority(b));
+  const perGroupBudget = Math.max(700, Math.floor(Number(timeLimitMs || 8000) / Math.max(1, orderedGroups.length + 8)));
+  const solveRelaxed = droppedGroups => {
+    const dropped = new Set(droppedGroups);
+    const activeIds = model.hardConstraints.filter(constraint => !dropped.has(constraint.group)).map(constraint => constraint.id);
+    return solveCpSatModel(model, api, { timeLimitMs: perGroupBudget, maxWorkers, randomSeed, activeConstraintIds: activeIds });
+  };
+
+  // Ebene 1: Gruppen-MUS.
+  const essentialGroups = new Set(allGroups);
+  for (const group of orderedGroups) {
+    if (signal?.aborted) break;
+    const trial = new Set(essentialGroups);
+    trial.delete(group);
+    const result = await solveRelaxed(trial);
+    if (isFeasible(result)) essentialGroups.delete(group);
   }
+
+  // Ebene 2: minimale Konfliktmenge je essenzieller Gruppe.
+  const conflictIds = new Set();
+  for (const group of essentialGroups) {
+    if (signal?.aborted) break;
+    const groupConstraints = model.hardConstraints.filter(constraint => constraint.group === group);
+    const kept = new Set(groupConstraints.map(constraint => constraint.id));
+    for (const constraint of groupConstraints) {
+      const trial = new Set(kept);
+      trial.delete(constraint.id);
+      const activeIds = model.hardConstraints
+        .filter(constraint2 => constraint2.group !== group || trial.has(constraint2.id))
+        .map(constraint2 => constraint2.id);
+      const result = await solveCpSatModel(model, api, { timeLimitMs: perGroupBudget, maxWorkers, randomSeed, activeConstraintIds: activeIds });
+      if (isFeasible(result)) kept.delete(constraint.id);
+    }
+    for (const id of kept) conflictIds.add(id);
+  }
+
+  const conflictGroups = [...new Set([...conflictIds].map(id => model.hardConstraints.find(constraint => constraint.id === id)?.group))].filter(Boolean);
+  const groups = conflictGroups.map(id => ({ id, label: RELAX_GROUPS[id]?.label || id }));
   return {
-    infeasible: causes.length > 0,
-    groups: causes.map(id => ({ id, label: RELAX_GROUPS[id]?.label || id })),
-    activeGroups: [...activeIds].map(id => ({ id, label: RELAX_GROUPS[id]?.label || id })),
-    detail: causes.length
-      ? `Konfliktursache: ${causes.map(id => RELAX_GROUPS[id]?.label || id).join(', ')}`
+    infeasible: true,
+    mus: [...conflictIds],
+    groups,
+    activeGroups: groups.map(group => group.id),
+    detail: groups.length
+      ? `Kleinste nachgewiesene Konfliktursache (MUS): ${groups.map(group => group.label).join(', ')}`
       : 'Keine einzelne Gruppe erklärt die Unzulässigkeit – die Ursache liegt in der Kombination.'
   };
 }

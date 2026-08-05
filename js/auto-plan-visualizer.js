@@ -1,4 +1,4 @@
-import { renderPolicyFor } from './auto-plan-animation-policy.js?v=20260803.4';
+import { renderPolicyFor } from './auto-plan-animation-policy.js?v=20260805.1';
 
 /**
  * Lebende Visualisierung des laufenden Auto-Plans.
@@ -45,6 +45,20 @@ const PHASE_TINT = Object.freeze({
 });
 
 const DEFAULT_ACCENT = [79, 143, 189];
+
+/**
+ * Farbwelt der Alarm- und Erfolgssignale. Ein Ereignis mit `level` (rot,
+ * orange, gelb, grün, grau) lässt den Suchkern kurz in der entsprechenden
+ * Farbe aufleuchten – die Glow-Farbe folgt also der Bedeutung des Ereignisses.
+ */
+const SEVERITY_TINT = Object.freeze({
+  red: [150, -70, -70],
+  orange: [120, 10, -90],
+  yellow: [120, 90, -70],
+  green: [-60, 110, -50],
+  gray: [-30, -30, -30],
+  blocked: [150, -70, -70]
+});
 
 function readAccent() {
   if (typeof getComputedStyle !== 'function' || typeof document === 'undefined') return [...DEFAULT_ACCENT];
@@ -99,6 +113,7 @@ export class AutoPlanVisualizer {
     this.accent = readAccent();
     this.color = phaseColor(this.accent, 'analysis');
     this.targetColor = [...this.color];
+    this.glowBoost = 0;
 
     this.nodes = [];
     this.slotIndex = new Map();
@@ -167,6 +182,19 @@ export class AutoPlanVisualizer {
     this.canvas.dataset.frameInterval = policy.frameIntervalMs === null ? 'event' : String(policy.frameIntervalMs);
     this.policy = policy;
     return policy;
+  }
+
+  /**
+   * Lässt den Suchkern in der Farbe eines Ereignisses aufleuchten. `level` ist
+   * einer von `red|orange|yellow|green|gray` (siehe SEVERITY_TINT).
+   */
+  setMood(level) {
+    const tint = SEVERITY_TINT[String(level)];
+    if (!tint) return;
+    this.targetColor = this.accent.map((channel, index) => clampChannel(channel + tint[index]));
+    this.glowBoost = Math.min(1, this.glowBoost + .55);
+    this.dirty = true;
+    this.requestRender();
   }
 
   requestRender() {
@@ -260,6 +288,8 @@ export class AutoPlanVisualizer {
     this.deadEnds = Math.max(this.deadEnds, Number(update.deadEnds ?? update.rejected) || 0);
     this.moves = Math.max(this.moves, Number(update.moves) || 0);
 
+    if (update.level) this.setMood(update.level);
+
     const improvements = Number(update.improvements) || 0;
     const gained = improvements > this.improvements;
     this.improvements = Math.max(this.improvements, improvements);
@@ -341,6 +371,7 @@ export class AutoPlanVisualizer {
     }
     this.displayProgress += (this.progress - this.displayProgress) * Math.min(1, delta * 2.6);
     this.energy = Math.max(0, this.energy - delta * .38);
+    this.glowBoost = Math.max(0, this.glowBoost - delta * .45);
     this.activity += (Math.min(1, this.energy + (this.finished ? .22 : .1)) - this.activity) * Math.min(1, delta * 3);
 
     const { width, height } = this;
@@ -439,8 +470,8 @@ export class AutoPlanVisualizer {
     gradient.addColorStop(1, this.rgba(.45, 40));
     context.strokeStyle = gradient;
     context.lineWidth = 3.4;
-    context.shadowBlur = 18;
-    context.shadowColor = this.rgba(.7);
+    context.shadowBlur = 18 + this.glowBoost * 20;
+    context.shadowColor = this.rgba(.75);
     context.beginPath();
     context.arc(0, 0, size * 1.02, 0, Math.max(.001, this.displayProgress * TAU));
     context.stroke();
@@ -490,6 +521,9 @@ export class AutoPlanVisualizer {
   }
 
   paintComets(context, centerX, centerY, delta) {
+    context.save();
+    context.shadowBlur = 6 + this.glowBoost * 16;
+    context.shadowColor = this.rgba(.9);
     for (let index = this.comets.length - 1; index >= 0; index -= 1) {
       const comet = this.comets[index];
       comet.travel += delta * comet.speed;
@@ -524,6 +558,7 @@ export class AutoPlanVisualizer {
       context.arc(x, y, comet.strong ? 2.8 : 1.9, 0, TAU);
       context.fill();
     }
+    context.restore();
   }
 
   burst(x, y, count) {
@@ -599,6 +634,9 @@ export class AutoPlanVisualizer {
   paintCore(context, centerX, centerY, size, seconds) {
     const beat = this.reduced ? 0 : Math.sin(seconds * (1.4 + this.activity * 2.2)) * (.014 + this.activity * .03);
     const radius = size * (.24 + beat);
+    context.save();
+    context.shadowBlur = 14 + this.glowBoost * 30;
+    context.shadowColor = this.rgba(.85);
     const gradient = context.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius * 2.1);
     gradient.addColorStop(0, this.rgba(.42 + this.activity * .3));
     gradient.addColorStop(.55, this.rgba(.1));
@@ -607,6 +645,7 @@ export class AutoPlanVisualizer {
     context.beginPath();
     context.arc(centerX, centerY, radius * 2.1, 0, TAU);
     context.fill();
+    context.restore();
 
     if (this.reduced) return;
     context.save();

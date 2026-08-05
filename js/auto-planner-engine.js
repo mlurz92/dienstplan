@@ -10,9 +10,9 @@ import {
   parseIso,
   setAssignment,
   setPeerGroupCacheToken
-} from './rules.js?v=20260803.4';
-import { createPacer, yieldToBrowser } from './cooperative-scheduling.js?v=20260803.4';
-import { AUTO_PLAN_BD_LIMITS } from './defaults.js?v=20260803.4';
+} from './rules.js?v=20260805.1';
+import { createPacer, yieldToBrowser } from './cooperative-scheduling.js?v=20260805.1';
+import { AUTO_PLAN_BD_LIMITS } from './defaults.js?v=20260805.1';
 import {
   baselineOpenSlots,
   buildLedger,
@@ -22,7 +22,7 @@ import {
   primeStaffIds,
   planToken,
   spread
-} from './auto-plan-index.js?v=20260803.4';
+} from './auto-plan-index.js?v=20260805.1';
 
 const LEVEL_RANK = Object.freeze({ green: 0, yellow: 1, orange: 2, red: 3, gray: 4 });
 const ROLE_ORDER = Object.freeze(['bd', 'hg']);
@@ -336,6 +336,13 @@ export function createDefaultAutoPlanConfig(state, monthData) {
     infeasibilityMode: 'mus',
     repairOnEdit: true,
     explanationDepth: 'detailed',
+    cpSatFairnessWeight: 90,
+    protectBaseline: true,
+    cpSatPerturbationWeight: 45,
+    cpSatCtLeadershipWeight: 70,
+    cpSatWeekendChainWeight: 100,
+    relaxationDepth: 'deep',
+    musAutoRelax: false,
     randomSeed: null,
     staffLimits: Object.fromEntries(monthPlanningStaff(state, monthData).map(person => [person.id, {
       maxBd: defaultBdLimit(monthData, person),
@@ -349,6 +356,12 @@ const SOLVER_BACKENDS = new Set(['auto', 'cp-sat-exact', 'cp-sat-lns', 'heuristi
 const FAIRNESS_PROFILES = new Set(['leximin', 'spread', 'variance', 'owa']);
 const INFEASIBILITY_MODES = new Set(['mus', 'relax', 'report']);
 const EXPLANATION_DEPTHS = new Set(['short', 'detailed', 'llm']);
+const RELAXATION_DEPTHS = new Set(['shallow', 'deep']);
+
+const clampInt = (value, min, max, fallback) => {
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.max(min, Math.min(max, Math.round(number))) : fallback;
+};
 
 export function normalizeAutoPlanConfig(state, monthData, input = null) {
   const defaults = createDefaultAutoPlanConfig(state, monthData);
@@ -390,6 +403,13 @@ export function normalizeAutoPlanConfig(state, monthData, input = null) {
     infeasibilityMode: INFEASIBILITY_MODES.has(pick('infeasibilityMode')) ? pick('infeasibilityMode') : defaults.infeasibilityMode,
     repairOnEdit: pick('repairOnEdit') === false ? false : true,
     explanationDepth: EXPLANATION_DEPTHS.has(pick('explanationDepth')) ? pick('explanationDepth') : defaults.explanationDepth,
+    cpSatFairnessWeight: clampInt(pick('cpSatFairnessWeight'), 1, 100, defaults.cpSatFairnessWeight),
+    protectBaseline: pick('protectBaseline') === false ? false : true,
+    cpSatPerturbationWeight: clampInt(pick('cpSatPerturbationWeight'), 0, 100, defaults.cpSatPerturbationWeight),
+    cpSatCtLeadershipWeight: clampInt(pick('cpSatCtLeadershipWeight'), 0, 100, defaults.cpSatCtLeadershipWeight),
+    cpSatWeekendChainWeight: clampInt(pick('cpSatWeekendChainWeight'), 0, 200, defaults.cpSatWeekendChainWeight),
+    relaxationDepth: RELAXATION_DEPTHS.has(pick('relaxationDepth')) ? pick('relaxationDepth') : defaults.relaxationDepth,
+    musAutoRelax: pick('musAutoRelax') === true,
     randomSeed,
     staffLimits
   };

@@ -34,7 +34,7 @@
  * Heuristik (Perfektionsschalter, iterative Parameter, Fingerprints).
  */
 
-import * as V85 from './auto-planner-v8-5.js?v=20260803.4';
+import * as V85 from './auto-planner-v8-5.js?v=20260805.1';
 
 // Die vollständige öffentliche API bleibt erhalten: Konfigurations-,
 // Bewertungs- und Übernahmefunktionen der Engine sowie v8.5-Werkzeuge.
@@ -42,7 +42,7 @@ import * as V85 from './auto-planner-v8-5.js?v=20260803.4';
 // Vorrang vor den Stern-Re-Exporten. Namen, die die v8.5-Kette bereits mit
 // eigener Bedeutung bereitstellt (validateAutoPlanConfig, applyAutoPlanProposal
 // u. a.), werden bewusst nicht überschrieben.
-export * from './auto-planner-v8-5.js?v=20260803.4';
+export * from './auto-planner-v8-5.js?v=20260805.1';
 
 import {
   buildCpSatModel,
@@ -50,7 +50,7 @@ import {
   loadCpSatSolver,
   relaxGroupOrder,
   solveCpSatModel
-} from './auto-plan-cp-sat.js?v=20260803.4';
+} from './auto-plan-cp-sat.js?v=20260805.1';
 import {
   beginEvaluationEpoch,
   currentEvaluationEpoch,
@@ -66,8 +66,8 @@ import {
   syncPeerCache,
   adoptPeerCacheToken,
   validateAutoPlanConfig
-} from './auto-planner-engine.js?v=20260803.4';
-import { getStaffById } from './rules.js?v=20260803.4';
+} from './auto-planner-engine.js?v=20260805.1';
+import { getStaffById } from './rules.js?v=20260805.1';
 
 // Bewertungs- und Konfigurationswerkzeuge der Engine explizit re-exportieren:
 // Sie gehören zur öffentlichen API, sind aber nicht durch die v8.5-Kette
@@ -86,7 +86,7 @@ export {
   planProfileIds,
   syncPeerCache,
   adoptPeerCacheToken
-} from './auto-planner-engine.js?v=20260803.4';
+} from './auto-planner-engine.js?v=20260805.1';
 
 export const AUTO_PLAN_REVISION = 9;
 export const AUTO_PLAN_ENGINE_ID = 'v9-hybrid-exact-observatory';
@@ -102,14 +102,14 @@ export const AUTO_PLAN_STAGES = Object.freeze([
   Object.freeze({ id: 'certify', title: 'Optimalitätsnachweis', detail: 'OPTIMAL-Status liefert eine beweisbare untere Schranke; sonst vollständiger Nachweis über die lokalen Nachbarschaften.' })
 ]);
 
-const VERSION_MARKER = '20260803.4';
+const VERSION_MARKER = '20260805.1';
 const OPTIMIZER_REVISION = 5;
 
 const FOCUS_PHASE_ORDER = Object.freeze({
-  balanced: ['wishes', 'bdTarget', 'weekend', 'saturday'],
-  wishes: ['wishes', 'bdTarget', 'weekend', 'saturday'],
-  workload: ['bdTarget', 'weekend', 'wishes', 'saturday'],
-  weekends: ['weekend', 'saturday', 'wishes', 'bdTarget']
+  balanced: ['wishes', 'bdTarget', 'weekend', 'saturday', 'weekendChain', 'ctLeadership', 'perturbation'],
+  wishes: ['wishes', 'bdTarget', 'weekend', 'saturday', 'weekendChain', 'ctLeadership', 'perturbation'],
+  workload: ['bdTarget', 'weekend', 'wishes', 'saturday', 'weekendChain', 'ctLeadership', 'perturbation'],
+  weekends: ['weekend', 'saturday', 'wishes', 'bdTarget', 'weekendChain', 'ctLeadership', 'perturbation']
 });
 
 function cloneMonth(monthData) {
@@ -456,7 +456,7 @@ export async function constructAutoPlan(parameters) {
         message: `CP-SAT: unzulässig · ${diagnosis.detail}`
       });
 
-      if (config.infeasibilityMode === 'relax' && diagnosis.groups.length) {
+      if ((config.infeasibilityMode === 'relax' || config.musAutoRelax) && diagnosis.groups.length) {
         const dropped = new Set(diagnosis.groups);
         let relaxedSolution = null;
         for (const group of relaxGroupOrder(config)) {
@@ -598,6 +598,6 @@ export async function buildAutoPlan(parameters) {
   return perfectAutoPlan({ ...parameters, constructed });
 }
 
-export { isCpSatReady } from './auto-plan-cp-sat.js?v=20260803.4';
-export { loadCpSatSolver } from './auto-plan-cp-sat.js?v=20260803.4';
+export { isCpSatReady } from './auto-plan-cp-sat.js?v=20260805.1';
+export { loadCpSatSolver } from './auto-plan-cp-sat.js?v=20260805.1';
 export const AUTO_PLAN_RELEASE = VERSION_MARKER;
