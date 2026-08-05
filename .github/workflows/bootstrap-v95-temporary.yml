@@ -9,9 +9,9 @@ permissions:
 
 jobs:
   bootstrap-v95:
-    name: Generate lock and verify v9.5 core
+    name: Generate lock and verify complete repository
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -25,15 +25,24 @@ jobs:
         run: npm run check
       - name: Vendor and type build
         run: npm run build
-      - name: Focused v9.5 tests
-        run: npm run test:v9.5
+      - name: Complete Node regression suite
+        timeout-minutes: 20
+        run: npm test
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Complete browser regression suite
+        timeout-minutes: 15
+        run: npm run test:e2e
       - name: Upload generated repository files
+        if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: v95-bootstrap-files
+          name: v95-complete-verify-files
           path: |
             package-lock.json
             vendor/floating-ui
             vendor/or-tools-wasm
+            playwright-report
+            test-results
           retention-days: 1
-          if-no-files-found: error
+          if-no-files-found: ignore
