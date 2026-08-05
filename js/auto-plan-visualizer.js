@@ -60,6 +60,20 @@ const SEVERITY_TINT = Object.freeze({
   blocked: [150, -70, -70]
 });
 
+/** Kurzbeschriftung der Phase für den lebenden Readout im Kern. */
+const PHASE_LABEL = Object.freeze({
+  analysis: 'Analyse',
+  propagate: 'Ausbreitung',
+  search: 'Suche',
+  repair: 'Reparatur',
+  polish: 'Politur',
+  perfect: 'Perfektion',
+  certify: 'Nachweis',
+  audit: 'Audit',
+  complete: 'Fertig',
+  blocked: 'Blockiert'
+});
+
 function readAccent() {
   if (typeof getComputedStyle !== 'function' || typeof document === 'undefined') return [...DEFAULT_ACCENT];
   const raw = getComputedStyle(document.documentElement).getPropertyValue('--month-accent').trim();
@@ -117,10 +131,14 @@ export class AutoPlanVisualizer {
 
     this.nodes = [];
     this.slotIndex = new Map();
+    this.nodes = [];
+    this.slotIndex = new Map();
     this.comets = [];
     this.waves = [];
     this.sparks = [];
     this.history = [];
+    this.dust = [];
+    this.finishFlash = 0;
 
     this.buildNodes(monthData);
     this.buildLinks();
@@ -162,6 +180,7 @@ export class AutoPlanVisualizer {
       : null;
     this.motionQuery?.addEventListener?.('change', this.onMotionChange);
     this.resize();
+    this.buildDust();
     this.syncRenderState();
     this.requestRender();
   }
@@ -261,6 +280,27 @@ export class AutoPlanVisualizer {
       }
       const nextDay = index + 2;
       if (nextDay < this.nodes.length) this.links.push({ from: index, to: nextDay, offset: Math.random() });
+    }
+  }
+
+  /**
+   * Staubpartikel für funkelnde Tiefenwirkung.
+   * Zufällig verteilte Punkte mit langsamer Drift und pulsierendem Glanz.
+   */
+  buildDust() {
+    this.dust = [];
+    const count = Math.ceil(this.width * this.height * 0.0008); // Etwa 0.08% Pixel als Staub
+    for (let i = 0; i < count; i++) {
+      this.dust.push({
+        x: Math.random() * this.width,
+        y: Math.random() * this.height,
+        radius: 0.3 + Math.random() * 1.2,
+        driftX: (Math.random() - 0.5) * 0.08,
+        driftY: (Math.random() - 0.5) * 0.08,
+        twinkle: Math.random() * Math.PI * 2,
+        twinkleSpeed: 0.15 + Math.random() * 0.3,
+        brightness: 0.4 + Math.random() * 0.6
+      });
     }
   }
 
@@ -372,6 +412,7 @@ export class AutoPlanVisualizer {
     this.displayProgress += (this.progress - this.displayProgress) * Math.min(1, delta * 2.6);
     this.energy = Math.max(0, this.energy - delta * .38);
     this.glowBoost = Math.max(0, this.glowBoost - delta * .45);
+    this.finishFlash = Math.max(0, this.finishFlash - delta * .45);
     this.activity += (Math.min(1, this.energy + (this.finished ? .22 : .1)) - this.activity) * Math.min(1, delta * 3);
 
     const { width, height } = this;
@@ -406,13 +447,25 @@ export class AutoPlanVisualizer {
   }
 
   paintAtmosphere(context, centerX, centerY, size, seconds) {
-    const glow = context.createRadialGradient(centerX, centerY, 0, centerX, centerY, size * 1.9);
-    glow.addColorStop(0, this.rgba(.16 + this.activity * .14));
-    glow.addColorStop(.5, this.rgba(.05 + this.activity * .04));
+    const glow = context.createRadialGradient(centerX, centerY, 0, centerX, centerY, size * 2.2);
+    glow.addColorStop(0, this.rgba(.22 + this.activity * .16));
+    glow.addColorStop(.35, this.rgba(.08 + this.activity * .06));
+    glow.addColorStop(.7, this.rgba(.03 + this.activity * .02));
     glow.addColorStop(1, 'rgba(0,0,0,0)');
     context.fillStyle = glow;
     context.beginPath();
-    context.arc(centerX, centerY, size * 1.9, 0, TAU);
+    context.arc(centerX, centerY, size * 2.2, 0, TAU);
+    context.fill();
+
+    // Konvergenz-Glow: der Kern leuchtet stärker, je mehr Knoten besetzt sind.
+    const settledRatio = this.nodes.length > 0
+      ? this.nodes.filter(n => n.settled).length / this.nodes.length : 0;
+    const convergenceGlow = context.createRadialGradient(centerX, centerY, 0, centerX, centerY, size * .7);
+    convergenceGlow.addColorStop(0, this.rgba(.08 + settledRatio * .12 + this.activity * .06));
+    convergenceGlow.addColorStop(1, 'rgba(0,0,0,0)');
+    context.fillStyle = convergenceGlow;
+    context.beginPath();
+    context.arc(centerX, centerY, size * .7, 0, TAU);
     context.fill();
 
     if (this.reduced) return;
@@ -455,7 +508,7 @@ export class AutoPlanVisualizer {
     context.setLineDash([]);
 
     // Fortschrittsbogen: der sichtbare Anteil des Rings entspricht dem Anteil
-    // der bereits abgeschlossenen Arbeit.
+    // der bereits abgeschlossenen Arbeit. Mit führendem Kopf für Richtung.
     context.save();
     context.translate(centerX, centerY);
     context.rotate(-Math.PI / 2);
@@ -472,9 +525,21 @@ export class AutoPlanVisualizer {
     context.lineWidth = 3.4;
     context.shadowBlur = 18 + this.glowBoost * 20;
     context.shadowColor = this.rgba(.75);
+    const progressAngle = Math.max(.001, this.displayProgress * TAU);
     context.beginPath();
-    context.arc(0, 0, size * 1.02, 0, Math.max(.001, this.displayProgress * TAU));
+    context.arc(0, 0, size * 1.02, 0, progressAngle);
     context.stroke();
+    // Führender Kopf: kleiner leuchtender Punkt am Ende des Bogens
+    if (progressAngle > .01 && !this.reduced) {
+      const headX = Math.cos(progressAngle) * size * 1.02;
+      const headY = Math.sin(progressAngle) * size * 1.02;
+      context.shadowBlur = 10 + this.glowBoost * 12;
+      context.shadowColor = this.rgba(1);
+      context.fillStyle = this.rgba(.95);
+      context.beginPath();
+      context.arc(headX, headY, 3.5, 0, TAU);
+      context.fill();
+    }
     context.restore();
   }
 
@@ -593,12 +658,21 @@ export class AutoPlanVisualizer {
   }
 
   paintNodes(context, delta) {
+    const settledRatio = this.nodes.length > 0
+      ? this.nodes.filter(n => n.settled).length / this.nodes.length : 0;
+    const convergenceGlow = 1 + settledRatio * 0.3; // bis zu 30% heller bei Vollständigkeit
+
     this.nodes.forEach(node => {
       const done = node.settled;
       const radius = done ? 2.4 + node.pulse * 4.8 : 1.5;
+      // Konvergenz-Helligkeit: gesetzte Knoten leuchten stärker je weiter der Plan ist
+      const baseAlpha = node.fixed
+        ? .42 + node.glow * .3
+        : done ? .72 + node.glow * .28 : .26;
+      const alpha = baseAlpha * convergenceGlow;
       context.fillStyle = node.fixed
-        ? `rgba(122,136,152,${.42 + node.glow * .3})`
-        : done ? this.rgba(.72 + node.glow * .28) : 'rgba(150,163,178,.26)';
+        ? `rgba(122,136,152,${alpha})`
+        : done ? this.rgba(Math.min(1, alpha)) : `rgba(150,163,178,${Math.min(.5, alpha)})`;
       context.beginPath();
       context.arc(node.x, node.y, radius, 0, TAU);
       context.fill();
@@ -694,6 +768,83 @@ export class AutoPlanVisualizer {
     fill.addColorStop(1, 'rgba(0,0,0,0)');
     context.fillStyle = fill;
     context.fill();
+  }
+
+  /** Staubpartikel für funkelnde Tiefenwirkung. */
+  paintDust(context, delta) {
+    if (this.reduced || !this.dust.length) return;
+    for (const particle of this.dust) {
+      particle.x += particle.driftX * delta * 60;
+      particle.y += particle.driftY * delta * 60;
+      particle.twinkle += particle.twinkleSpeed * delta;
+
+      // Wrap around edges
+      if (particle.x < 0) particle.x = this.width;
+      if (particle.x > this.width) particle.x = 0;
+      if (particle.y < 0) particle.y = this.height;
+      if (particle.y > this.height) particle.y = 0;
+
+      const alpha = particle.brightness * (0.5 + Math.sin(particle.twinkle) * 0.3) * (0.3 + this.activity * 0.4);
+      context.fillStyle = this.rgba(alpha);
+      context.beginPath();
+      context.arc(particle.x, particle.y, particle.radius, 0, TAU);
+      context.fill();
+    }
+  }
+
+  /** Lebender Readout im Kern: Phase + Fortschritt + Metriken. */
+  paintReadout(context, centerX, centerY, size) {
+    if (this.reduced) return;
+    const label = PHASE_LABEL[this.phase] || this.phase;
+    const pct = Math.round(this.displayProgress * 100);
+
+    context.save();
+    context.translate(centerX, centerY);
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+
+    // Phase-Label
+    context.font = `600 ${Math.max(10, size * 0.07)}px system-ui, -apple-system, sans-serif`;
+    context.fillStyle = this.rgba(0.9);
+    context.fillText(label, 0, -size * 0.12);
+
+    // Fortschritts-Prozent
+    context.font = `700 ${Math.max(14, size * 0.12)}px ui-monospace, SFMono-Regular, Menlo, monospace`;
+    const progressColor = this.finished
+      ? `rgba(76, 175, 80, 1)`
+      : this.rgba(1);
+    context.fillStyle = progressColor;
+    context.fillText(`${pct}%`, 0, size * 0.08);
+
+    // Metrik-Zeile
+    context.font = `400 ${Math.max(8, size * 0.055)}px system-ui, -apple-system, sans-serif`;
+    context.fillStyle = this.rgba(0.65);
+    const metrics = `Eval: ${this.explored.toLocaleString()} · Sackgassen: ${this.deadEnds} · Verbesserungen: ${this.improvements}`;
+    context.fillText(metrics, 0, size * 0.28);
+    context.restore();
+  }
+
+  /** Abschluss-Flash beim Fertigstellen. */
+  paintFlash(context, centerX, centerY, size) {
+    if (this.finishFlash <= 0) return;
+    const intensity = this.finishFlash;
+    context.save();
+    context.translate(centerX, centerY);
+    const gradient = context.createRadialGradient(0, 0, 0, 0, 0, size * 1.5);
+    gradient.addColorStop(0, this.rgba(0.6 * intensity, 60));
+    gradient.addColorStop(0.5, this.rgba(0.2 * intensity, 30));
+    gradient.addColorStop(1, 'rgba(0,0,0,0)');
+    context.fillStyle = gradient;
+    context.beginPath();
+    context.arc(0, 0, size * 1.5, 0, TAU);
+    context.fill();
+    // Ring-Puls
+    context.strokeStyle = this.rgba(0.9 * intensity);
+    context.lineWidth = 3;
+    context.beginPath();
+    context.arc(0, 0, size * (1.05 + intensity * 0.3), 0, TAU);
+    context.stroke();
+    context.restore();
   }
 
   stop() {

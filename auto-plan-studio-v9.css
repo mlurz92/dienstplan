@@ -439,9 +439,8 @@ html[data-color-scheme="dark"] .auto-plan-dialog[data-v9-layout="1"] .auto-plan-
   border-radius: 50%;
 }
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-theatre li div b {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-size: .64rem;
 }
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-theatre li div small,
@@ -499,7 +498,6 @@ html[data-color-scheme="dark"] .auto-plan-dialog[data-v9-layout="1"] .auto-plan-
   min-width: 0;
   min-height: 0;
   width: 100%;
-  height: 100%;
 }
 
 /* Console-Zone: eigener, beschnittener Stacking-Kontext; scrollt intern.

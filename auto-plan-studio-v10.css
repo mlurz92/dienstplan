@@ -135,6 +135,61 @@
   padding: 4px 12px 12px;
 }
 
+/* Felder als ruhige, zusammenhängende Karten. Aus der parallelen
+   Studio-Überarbeitung übernommen: Der Rahmen bindet Beschriftung, Bedienelement
+   und Erläuterung sichtbar zusammen, statt sie im Raster verschwimmen zu lassen. */
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-field {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  padding: 11px 12px;
+  border: 1px solid color-mix(in oklab, var(--border, #d6dee6) 64%, transparent);
+  border-radius: 11px;
+  background: color-mix(in oklab, var(--panel, #fff) 95%, transparent);
+  transition: border-color .2s ease, box-shadow .2s ease, background .2s ease, transform .2s ease;
+}
+
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-field:hover {
+  border-color: color-mix(in oklab, var(--month-accent, #4f8fbd) 42%, transparent);
+  box-shadow: 0 2px 10px color-mix(in oklab, var(--month-accent, #4f8fbd) 12%, transparent);
+}
+
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-field:focus-within {
+  border-color: color-mix(in oklab, var(--month-accent, #4f8fbd) 60%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--month-accent, #4f8fbd) 16%, transparent);
+}
+
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-field > span {
+  font-size: .76rem;
+  font-weight: 700;
+  letter-spacing: .01em;
+  color: color-mix(in oklab, var(--text, #16202b) 92%, transparent);
+}
+
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-field > small {
+  color: var(--muted, #6b7682);
+  font-size: .68rem;
+  line-height: 1.4;
+}
+
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-range input[type="range"] {
+  accent-color: var(--month-accent, #4f8fbd);
+}
+
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-range output {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: color-mix(in oklab, var(--month-accent) 70%, var(--text, #16202b));
+}
+
+/* Bedienelemente füllen ihre Karte vollständig aus. */
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-field select,
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-field input[type="number"],
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-field input[type="text"] {
+  width: 100%;
+  min-height: 34px;
+}
+
 @container autoplan-config (min-width: 520px) {
   .auto-plan-group-body { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .auto-plan-group-body > .auto-plan-field--wide { grid-column: 1 / -1; }
@@ -387,7 +442,7 @@
 }
 
 .auto-plan-v10-trace > li > span { overflow-wrap: anywhere; }
-.auto-plan-v10-trace > li > small { opacity: .7; font-size: .66rem; white-space: nowrap; }
+.auto-plan-v10-trace > li > small { opacity: .7; font-size: .66rem; min-width: 0; overflow-wrap: anywhere; }
 
 .auto-plan-v10-conflict {
   margin: 0;
