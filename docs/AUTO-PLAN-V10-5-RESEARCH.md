@@ -350,7 +350,7 @@ Workers KV im kostenfreien Tarif: **100.000 Lesevorgänge/Tag, 1.000 Schreibvorg
 | `comlink` | Apache-2.0 | frei | Worker-RPC | **optional** — der vorhandene `postMessage`-Vertrag genügt |
 | `d3-scale`, `d3-shape` | ISC | frei | Achsen/Pfade der Animation | **optional**, nur diese zwei Module |
 | `MiniZinc.js` | MPL-2.0 | frei | Modellierungssprache | **abgelehnt** (Größe, zweite Modellsprache) |
-| `or-tools-wasm` | Apache-2.0 | frei | CDN-Reserve | **beibehalten** als letzte Stufe |
+| `or-tools-wasm` | Apache-2.0 | frei | CDN-Reserve | **verworfen** — Nachverifikation zeigt: der Build ist multithreaded und verlangt laut eigenem README zwingend `Cross-Origin-Opener-Policy: same-origin` + `Cross-Origin-Embedder-Policy: require-corp` („Browser builds require cross-origin isolation headers for WebAssembly threads“). Das widerspricht §12/P0 (COEP-Entfernung) direkt: eine „letzte Stufe“, die ohne COEP nicht mehr lädt, ist keine Stufe, sondern ein stiller Ausfall wie heute bei Defekt 4. Da die App ein Single-Page-Dokument ist, lässt sich COEP nicht pfadweise nur für den Fallback setzen (COEP wirkt auf das HTML-Dokument, nicht auf einzelne JS-Pfade) — eine Iframe-Isolation nur für diesen Reservepfad wäre zusätzlicher Architekturaufwand, der den Nutzen einer selten gebrauchten dritten Stufe nicht rechtfertigt. Die tatsächliche letzte Rückfallebene bleibt **ALNS** (Abschnitt 6.1/236: „ALNS ist die Versicherung, wenn WASM nicht lädt“), die ohne WASM und ohne COEP funktioniert. Muss vor P0 gegen den echten CDN-Build verifiziert werden (§13). |
 
 Kein Framework-Wechsel. Der Bestand ist reines ESM ohne Build-Schritt; das ist für Cloudflare Pages die robusteste Auslieferung und soll so bleiben.
 
@@ -432,7 +432,7 @@ Kein Framework-Wechsel. Der Bestand ist reines ESM ohne Build-Schritt; das ist f
 | `fairnessProfile: spread/variance/owa` | nie implementiert |
 | `diagnoseInfeasibility` Ebene 2 (Constraint-Löschschleife) | vierstellige Solve-Zahl ohne Aussagewert |
 | `random_seed`/`log_search_progress` in `cpSatParameters` | von `cpsat-js` nicht entgegengenommen |
-| `Cross-Origin-Embedder-Policy: require-corp` | für den portablen Build nicht nötig; gefährdet Fremdressourcen |
+| `Cross-Origin-Embedder-Policy: require-corp` | für den portablen `cpsat-js`-Build nicht nötig; gefährdet Fremdressourcen. **Voraussetzung dafür ist, dass `or-tools-wasm` nicht mehr als Reserve geladen wird** (siehe §10.5) — dessen multithreaded Build verlangt laut eigenem README genau dieses Header-Paar. Ohne diese Streichung des Reservepfads würde die COEP-Entfernung den einen bekannten Defekt (Defekt 4, lokaler Vendor-Pfad) gegen einen neuen, bislang ungemessenen Defekt tauschen (stiller Ausfall der letzten CDN-Stufe). Mit dem Verwurf von `or-tools-wasm` ist die Entfernung unkritisch, weil `cpsat-js` (Hauptpfad) und ALNS (echte letzte Rückfallebene, Abschnitt 6.1) beide ohne Cross-Origin-Isolation lauffähig sind. |
 
 ---
 
@@ -452,6 +452,14 @@ Alle Aussagen dieses Berichts über den Ist-Zustand wurden ausgeführt, nicht ge
 | Neues Modell | Prototyp gegen echtes `cpsat-js`-WASM, 30 Tage/60 Felder/8 Personen | `OPTIMAL` 218 ms · Minimax BD-Last `OPTIMAL` 188 ms (Bound = Wert) · Kaskade 445 ms |
 | MCS-Diagnose | 8 Relaxationsliterale, künstlich unerfüllbar | `FEASIBLE` in 15 s, 5/8 aufgegeben — **nicht beweisbar minimal** |
 | Inkumbenten-Stream | `onSolution` mit `numWorkers: 1` | feuert **live** während des Solves (`live: true`) |
+| **or-tools-wasm / COEP (offen)** | README-Nachschlag des CDN-Reserve-Builds gegen die COEP-Entfernung aus §12 | README fordert explizit `Cross-Origin-Opener-Policy: same-origin` + `Cross-Origin-Embedder-Policy: require-corp` für den multithreaded Build („Browser builds require cross-origin isolation headers for WebAssembly threads“) — **Konflikt bestätigt**, deshalb Verwurf in §10.5. **Vor P0 im Ziel-Deployment zu bestätigen**, siehe Aktionspunkt unten |
+
+**Offener Aktionspunkt vor P0 — muss vor Beginn des Arbeitspakets P0 verifiziert und hier nachgetragen werden:**
+
+- **Prüfung:** `_headers` ohne `Cross-Origin-Embedder-Policy: require-corp` deployen und den `or-tools-wasm`-CDN-Build (falls er im Code überhaupt noch erreichbar bleibt) im Browser laden.
+- **Bestehen-Kriterium (Pass):** Entweder (a) der Build wird nirgends mehr referenziert (Konsequenz aus §10.5 — dann ist dieser Punkt durch Codeentfernung erledigt und nur noch als Nichtbenutzung zu bestätigen), oder (b) er initialisiert nachweislich ohne `SharedArrayBuffer`/`crossOriginIsolated` und ohne Worker-Startfehler in der Konsole.
+- **Durchfallen-Kriterium (Fail):** Der Build wirft beim Laden/Initialisieren einen Fehler, der auf fehlende Cross-Origin-Isolation zurückgeht (z. B. `SharedArrayBuffer is not defined`, Worker-Startabbruch), **während** er im Code noch als Fallback erreichbar ist.
+- **Konsequenz bei Fail, falls der Reservepfad entgegen §10.5 doch beibehalten werden soll:** COEP darf dann nicht global entfernt werden; stattdessen entweder (i) COEP nur für ein isoliertes Iframe/eigenständiges Dokument setzen, das ausschließlich den `or-tools-wasm`-Pfad lädt, oder (ii) den Reservepfad endgültig streichen. Letzteres ist die in diesem Bericht getroffene Empfehlung.
 
 **Zwei API-Fallen von `cpsat-js`, die im Plan berücksichtigt sein müssen:**
 
@@ -470,7 +478,7 @@ Reihenfolge ist bindend: jedes Paket ist für sich lauffähig und testbar.
 - **Test:** Browser-E2E lädt `/vendor/cpsat-js/dist/index.portable.js` und löst ein Zwei-Variablen-Modell. Grün = P0 fertig.
 
 ### P1 — Solver-Brücke neu *(`js/auto-plan-solver.js`, ersetzt die Bindungsschicht)*
-- Erkennung **cpsat-js zuerst** (`typeof module.CpSolver.create === 'function'`), danach `or-tools-wasm`.
+- Erkennung **ausschließlich `cpsat-js`** (`typeof module.CpSolver.create === 'function'`); `or-tools-wasm` entfällt als Erkennungszweig (siehe §10.5/§12 — COEP-Konflikt). Lädt `cpsat-js` nicht, greift kein CDN-Wechsel, sondern der ALNS-Warmstart als vollständiger Plan (Abschnitt 6.1/236).
 - Einmalige `CpSolver.create()`-Instanz je Worker-Lebensdauer, wiederverwendet.
 - `sumOf()`-Hilfsfunktion, Verbot von `notEquals` durch Lint-Regel/Kommentar.
 - Parameterabbildung ausschließlich auf `maxTimeInSeconds`, `numWorkers`, `onSolution`.
