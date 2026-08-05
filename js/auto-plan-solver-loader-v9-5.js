@@ -9,13 +9,15 @@
  *
  * `or-tools-wasm` enthält mehrere vollständige WebAssembly-Laufzeitvarianten,
  * die beim lokalen Bundling die 25-MiB-Grenze einzelner Cloudflare-Pages-
- * Assets deutlich überschreiten. Deshalb wird die exakt gepinnte ESM-Version
- * primär über jsDelivr geladen; die Anwendung bleibt vollständig kostenlos
- * und fällt bei Ladefehlern kontrolliert auf cpsat-js beziehungsweise v8.5
- * zurück.
+ * Assets deutlich überschreiten. Der primäre gleiche-Origin-Einstieg ist
+ * deshalb eine wenige Zeilen große lokale ESM-Brücke, die exakt
+ * `or-tools-wasm@0.9.1` von jsDelivr re-exportiert. Ein direkter CDN-Pfad und
+ * `cpsat-js@1.0.0` folgen als kontrollierte freie Fallbacks; anschließend
+ * übernimmt die vollständig lokale v8.5-Heuristik.
  */
 
 export const V95_SOLVER_LOAD_ORDER = Object.freeze([
+  Object.freeze({ id: 'or-tools-wasm', source: 'local', url: '/vendor/or-tools-wasm/cp-sat.js', version: '0.9.1' }),
   Object.freeze({ id: 'or-tools-wasm', source: 'cdn', url: 'https://cdn.jsdelivr.net/npm/or-tools-wasm@0.9.1/cp-sat/+esm', version: '0.9.1' }),
   Object.freeze({ id: 'cpsat-js', source: 'cdn', url: 'https://cdn.jsdelivr.net/npm/cpsat-js@1.0.0/+esm', version: '1.0.0' })
 ]);
