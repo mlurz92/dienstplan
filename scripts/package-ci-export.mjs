@@ -1,3 +1,4 @@
+// Temporärer CI-Transport; diese Datei wird aus dem Release-ZIP ausgeschlossen.
 import { cp, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
