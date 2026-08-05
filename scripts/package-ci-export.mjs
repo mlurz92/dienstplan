@@ -74,12 +74,12 @@ await writeFile(
   validationPath,
   `# Validierung Auto-Plan v9.5\n\n` +
     `Quellstand: \`${process.env.GITHUB_SHA || 'lokaler Exportlauf'}\`\n\n` +
-    `Vor Erzeugung dieses Archivs erfolgreich ausgeführt:\n\n` +
-    `- \`npm ci\`\n` +
-    `- \`npm run check\`\n` +
-    `- \`npm test\`\n` +
-    `- \`npm run build\`\n` +
-    `- \`npm run test:e2e\`\n\n` +
+    `Vor Erzeugung dieses Archivs im isolierten CI-Lauf erfolgreich abgeschlossen:\n\n` +
+    `- reproduzierbare Abhängigkeitsinstallation mit \`npm ci\`\n` +
+    `- vollständige JavaScript-Syntax- und Lieferumfangsprüfung mit \`npm run check\`\n` +
+    `- vollständige Node-Regressionssuite mit \`npm test\`\n` +
+    `- Vendor-Build und TypeScript-Vertragsprüfung mit \`npm run build\`\n\n` +
+    `Die Browser-Regressionssuite wird im selben CI-Lauf nach der Archiverzeugung ausgeführt; ihr Ergebnis ist daher absichtlich nicht als vorab bestandene Archivprüfung ausgewiesen.\n\n` +
     `Nicht enthalten: Git-Metadaten, \`node_modules\`, Testreports, temporäre Diagnose- und Exporthilfen.\n`,
   'utf8',
 );
