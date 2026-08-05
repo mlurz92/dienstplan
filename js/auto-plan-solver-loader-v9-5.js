@@ -6,10 +6,16 @@
  * Loader prüft deshalb ausschließlich tatsächlich benötigte Fähigkeiten wie
  * WebAssembly und dynamische Modulimporte. Jede Bindung muss vor Verwendung
  * außerdem eine kleine bekannte Binärinstanz korrekt lösen.
+ *
+ * `or-tools-wasm` enthält mehrere vollständige WebAssembly-Laufzeitvarianten,
+ * die beim lokalen Bundling die 25-MiB-Grenze einzelner Cloudflare-Pages-
+ * Assets deutlich überschreiten. Deshalb wird die exakt gepinnte ESM-Version
+ * primär über jsDelivr geladen; die Anwendung bleibt vollständig kostenlos
+ * und fällt bei Ladefehlern kontrolliert auf cpsat-js beziehungsweise v8.5
+ * zurück.
  */
 
 export const V95_SOLVER_LOAD_ORDER = Object.freeze([
-  Object.freeze({ id: 'or-tools-wasm', source: 'local', url: '/vendor/or-tools-wasm/cp-sat.js', version: '0.9.1' }),
   Object.freeze({ id: 'or-tools-wasm', source: 'cdn', url: 'https://cdn.jsdelivr.net/npm/or-tools-wasm@0.9.1/cp-sat/+esm', version: '0.9.1' }),
   Object.freeze({ id: 'cpsat-js', source: 'cdn', url: 'https://cdn.jsdelivr.net/npm/cpsat-js@1.0.0/+esm', version: '1.0.0' })
 ]);
@@ -104,8 +110,6 @@ function constructorApi(module, id) {
 }
 
 export function normalizeV95SolverApi(module, id = 'unknown') {
-  // Factory-Bindungen müssen vor dem allgemeinen Konstruktorzweig geprüft
-  // werden, weil `CpSolver` dort ebenfalls ein wahrer Funktions-/Objektwert ist.
   return modernFactoryApi(module, id) || constructorApi(module, id);
 }
 
