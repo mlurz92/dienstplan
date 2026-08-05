@@ -258,7 +258,14 @@ export class AutoPlanCrystallizer {
         bound: Number.isFinite(incumbent.bestBound) ? incumbent.bestBound : null
       });
       if (this.bounds.length > 240) this.bounds.shift();
-      const gapClosed = Number.isFinite(incumbent.bestBound)
+      // Eine geschlossene Lücke ist nur dann ein Optimalitätsbeweis, wenn
+      // überhaupt ein Ziel minimiert wird. Die vorgeschaltete Zulässigkeits-
+      // suche läuft ohne Zielfunktion; dort sind Zielwert und Schranke beide
+      // null, die Lücke also trivial geschlossen. Bis v10.4 kristallisierte die
+      // Darstellung deshalb sofort beim ersten Zwischenergebnis und stand die
+      // gesamte restliche Optimierung still.
+      const gapClosed = incumbent.hasObjective === true
+        && Number.isFinite(incumbent.bestBound)
         && Math.abs(incumbent.objectiveValue - incumbent.bestBound) < 1e-9;
       if (gapClosed && this.crystallizedAt === null) this.crystallize();
     }

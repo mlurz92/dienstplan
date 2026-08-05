@@ -228,19 +228,45 @@
   }
 }
 
+/* Die Canvas-Zone ist ein eigenes Grid mit drei Zeilen: Badge, Leinwand,
+   Algorithmuszustand. Bis v10.4 hingen Badge und Zustandsbanner als
+   `position: absolute` über der Leinwand – in der Orbit-Ansicht, deren
+   Zeichnung bis an den unteren Rand läuft, verdeckte das Banner die
+   Animation. Statisch positionierte Grid-Kinder können sich strukturell
+   nicht mehr überlagern, unabhängig von der gewählten Visualisierung. */
 .auto-plan-dialog[data-v10-layout="1"] .auto-plan-visual {
   position: relative;
   isolation: isolate;
   z-index: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 8px;
   min-width: 0;
   min-height: 0;
   overflow: clip;
 }
 
-.auto-plan-dialog[data-v10-layout="1"] .auto-plan-visual canvas {
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-visual > canvas {
   display: block;
+  grid-row: 2;
   width: 100%;
   height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-visual > .auto-plan-engine-badge {
+  position: static;
+  grid-row: 1;
+  justify-self: end;
+  max-width: 100%;
+}
+
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-visual > .auto-plan-phase-narrative {
+  position: static;
+  grid-row: 3;
+  inset: auto;
+  max-width: 100%;
 }
 
 .auto-plan-dialog[data-v10-layout="1"] .auto-plan-console {

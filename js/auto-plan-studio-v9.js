@@ -284,10 +284,28 @@ function installV9Controls(dialog) {
 
   const saved = readSettings();
   const target = state.settings?.autoPlan || {};
+  // Alle Zugriffe auf die v9-Regler sind bewusst tolerant gegenüber fehlenden
+  // Knoten: Die v10.5-Studioschicht entfernt jene Bedienelemente, die von der
+  // exakten Engine nicht mehr gelesen werden (Gewichtungen, Worker-Zahl,
+  // Fairness-Profil). Ein harter Zugriff wie `byId(id).value` hätte hier eine
+  // TypeError geworfen und das Speichern der übrigen Einstellungen mitgerissen.
   const setSelect = (id, value) => {
     const field = byId(id);
     if (field && value) field.value = value;
   };
+  const setValue = (id, value) => {
+    const field = byId(id);
+    if (field) field.value = String(value);
+  };
+  const setText = (id, value) => {
+    const field = byId(id);
+    if (field) field.textContent = String(value);
+  };
+  const valueOf = (id, fallback) => {
+    const field = byId(id);
+    return field ? field.value : fallback;
+  };
+  const on = (id, type, handler) => byId(id)?.addEventListener(type, handler);
   setSelect('autoPlanV9SolverBackend', saved.solverBackend || target.solverBackend || 'auto');
   setSelect('autoPlanV9Exactness', saved.exactness || 'strict');
   setSelect('autoPlanV9Workers', saved.cpSatWorkers ?? target.cpSatWorkers ?? '');
@@ -298,51 +316,55 @@ function installV9Controls(dialog) {
   setSelect('autoPlanV9RepairOnEdit', saved.repairOnEdit === false ? 'off' : 'on');
   setSelect('autoPlanV9Explanation', saved.explanationDepth || target.explanationDepth || 'detailed');
   const fairnessWeight = Number(saved.cpSatFairnessWeight ?? target.cpSatFairnessWeight ?? 90);
-  byId('autoPlanV9FairnessWeight').value = String(fairnessWeight);
-  byId('autoPlanV9FairnessWeightOut').textContent = String(fairnessWeight);
+  setValue('autoPlanV9FairnessWeight', fairnessWeight);
+  setText('autoPlanV9FairnessWeightOut', fairnessWeight);
   const perturbationWeight = Number(saved.cpSatPerturbationWeight ?? target.cpSatPerturbationWeight ?? 45);
-  byId('autoPlanV9PerturbationWeight').value = String(perturbationWeight);
-  byId('autoPlanV9PerturbationWeightOut').textContent = String(perturbationWeight);
+  setValue('autoPlanV9PerturbationWeight', perturbationWeight);
+  setText('autoPlanV9PerturbationWeightOut', perturbationWeight);
   setSelect('autoPlanV9ProtectBaseline', saved.protectBaseline === false ? 'off' : 'on');
   setSelect('autoPlanV9RelaxationDepth', saved.relaxationDepth ?? target.relaxationDepth ?? 'deep');
   setSelect('autoPlanV9MusAutoRelax', saved.musAutoRelax === true ? 'on' : 'off');
   const budget = Number(saved.cpSatTimeBudgetSeconds ?? target.cpSatTimeBudgetSeconds ?? 10);
-  byId('autoPlanV9TimeBudget').value = String(budget);
-  byId('autoPlanV9TimeBudgetOut').textContent = `${budget} s`;
+  setValue('autoPlanV9TimeBudget', budget);
+  setText('autoPlanV9TimeBudgetOut', `${budget} s`);
 
   const persist = () => {
+    // Fehlt ein Regler, bleibt der zuletzt gespeicherte Wert erhalten, statt
+    // auf einen Vorgabewert zurückzufallen — sonst überschriebe ein Klick auf
+    // ein beliebiges anderes Feld stillschweigend die Einstellung.
+    const workers = valueOf('autoPlanV9Workers', saved.cpSatWorkers ?? '');
     const value = {
-      solverBackend: byId('autoPlanV9SolverBackend').value,
-      exactness: byId('autoPlanV9Exactness').value,
-      cpSatTimeBudgetSeconds: Number(byId('autoPlanV9TimeBudget').value) || 10,
-      cpSatWorkers: byId('autoPlanV9Workers').value === '' ? null : Number(byId('autoPlanV9Workers').value),
-      cpSatWarmStart: byId('autoPlanV9WarmStart').value,
-      fairnessProfile: byId('autoPlanV9Fairness').value,
-      deterministic: byId('autoPlanV9Determinism').value === 'deterministic',
-      infeasibilityMode: byId('autoPlanV9Infeasibility').value,
-      repairOnEdit: byId('autoPlanV9RepairOnEdit').value === 'on',
-      explanationDepth: byId('autoPlanV9Explanation').value,
-      cpSatFairnessWeight: Number(byId('autoPlanV9FairnessWeight').value) || 90,
-      protectBaseline: byId('autoPlanV9ProtectBaseline').value === 'on',
-      cpSatPerturbationWeight: Number(byId('autoPlanV9PerturbationWeight').value) || 0,
-      relaxationDepth: byId('autoPlanV9RelaxationDepth').value,
-      musAutoRelax: byId('autoPlanV9MusAutoRelax').value === 'on'
+      solverBackend: valueOf('autoPlanV9SolverBackend', saved.solverBackend || 'auto'),
+      exactness: valueOf('autoPlanV9Exactness', saved.exactness || 'strict'),
+      cpSatTimeBudgetSeconds: Number(valueOf('autoPlanV9TimeBudget', saved.cpSatTimeBudgetSeconds)) || 10,
+      cpSatWorkers: workers === '' || workers === null ? null : Number(workers),
+      cpSatWarmStart: valueOf('autoPlanV9WarmStart', saved.cpSatWarmStart || 'heuristic'),
+      fairnessProfile: valueOf('autoPlanV9Fairness', saved.fairnessProfile || 'leximin'),
+      deterministic: valueOf('autoPlanV9Determinism', saved.deterministic === false ? 'variable' : 'deterministic') === 'deterministic',
+      infeasibilityMode: valueOf('autoPlanV9Infeasibility', saved.infeasibilityMode || 'mus'),
+      repairOnEdit: valueOf('autoPlanV9RepairOnEdit', saved.repairOnEdit === false ? 'off' : 'on') === 'on',
+      explanationDepth: valueOf('autoPlanV9Explanation', saved.explanationDepth || 'detailed'),
+      cpSatFairnessWeight: Number(valueOf('autoPlanV9FairnessWeight', saved.cpSatFairnessWeight)) || 90,
+      protectBaseline: valueOf('autoPlanV9ProtectBaseline', saved.protectBaseline === false ? 'off' : 'on') === 'on',
+      cpSatPerturbationWeight: Number(valueOf('autoPlanV9PerturbationWeight', saved.cpSatPerturbationWeight)) || 0,
+      relaxationDepth: valueOf('autoPlanV9RelaxationDepth', saved.relaxationDepth || 'deep'),
+      musAutoRelax: valueOf('autoPlanV9MusAutoRelax', saved.musAutoRelax === true ? 'on' : 'off') === 'on'
     };
     writeSettings(value);
     applyToState();
   };
 
-  dialog.querySelector('.auto-plan-field-grid').addEventListener('change', event => {
+  dialog.querySelector('.auto-plan-field-grid')?.addEventListener('change', event => {
     if (event.target.id?.startsWith('autoPlanV9')) persist();
   });
-  byId('autoPlanV9TimeBudget').addEventListener('input', () => {
-    byId('autoPlanV9TimeBudgetOut').textContent = `${byId('autoPlanV9TimeBudget').value} s`;
+  on('autoPlanV9TimeBudget', 'input', () => {
+    setText('autoPlanV9TimeBudgetOut', `${valueOf('autoPlanV9TimeBudget', budget)} s`);
   });
-  byId('autoPlanV9FairnessWeight').addEventListener('input', () => {
-    byId('autoPlanV9FairnessWeightOut').textContent = byId('autoPlanV9FairnessWeight').value;
+  on('autoPlanV9FairnessWeight', 'input', () => {
+    setText('autoPlanV9FairnessWeightOut', valueOf('autoPlanV9FairnessWeight', fairnessWeight));
   });
-  byId('autoPlanV9PerturbationWeight').addEventListener('input', () => {
-    byId('autoPlanV9PerturbationWeightOut').textContent = byId('autoPlanV9PerturbationWeight').value;
+  on('autoPlanV9PerturbationWeight', 'input', () => {
+    setText('autoPlanV9PerturbationWeightOut', valueOf('autoPlanV9PerturbationWeight', perturbationWeight));
   });
 
   applyToState();

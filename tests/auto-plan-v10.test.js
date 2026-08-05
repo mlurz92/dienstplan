@@ -106,6 +106,53 @@ test('Obergrenzen zählen Personen und nicht Personencodes', () => {
   }
 });
 
+test('Wochenend-, Samstags- und HG-Ziel messen die Spitzenlast einer Person, keine Konstante', () => {
+  const monthData = monthOf(2026, 9);
+  const built = model.buildPlanModel({ state: stateWith(monthData), monthData });
+  for (const key of ['weekend', 'saturday', 'hgBurden']) {
+    const terms = built.components[key].terms;
+    assert.equal(terms.length, 1, `${key}: genau eine Höchstlastvariable`);
+    const [variableIndex] = terms[0];
+    assert.equal(built.vars[variableIndex].name, `peak_${key}`);
+
+    // Die entscheidende Eigenschaft: Der Zielausdruck darf nicht die Summe
+    // aller Zuordnungsvariablen einer Kategorie sein. Die ist wegen
+    // Σ_p y[f][p] = 1 konstant, und die Stufe wäre wirkungslos.
+    const bounding = built.constraints.filter(constraint => constraint.id.startsWith(`peak_${key}_`));
+    assert.ok(bounding.length >= 2, `${key}: je Person eine Schranke`);
+    for (const constraint of bounding) {
+      assert.equal(constraint.terms[0][0], variableIndex);
+      assert.equal(constraint.terms[0][1], 1);
+      for (const [, coefficient] of constraint.terms.slice(1)) assert.equal(coefficient, -1);
+    }
+    // Jede Schranke gehört zu genau einer Person.
+    const owners = bounding.map(constraint => new Set(constraint.terms.slice(1)
+      .map(([index]) => built.vars[index].meta.staffId)));
+    for (const owner of owners) assert.equal(owner.size, 1);
+    assert.equal(new Set(owners.map(owner => [...owner][0])).size, owners.length);
+  }
+});
+
+test('ein Feld ohne jeden Kandidaten wird gemeldet statt das Modell unerfüllbar zu machen', () => {
+  const monthData = monthOf(2026, 9);
+  const state = stateWith(monthData);
+  // Alle Personen abwesend: Für jedes Feld ist niemand wählbar.
+  const isoDays = Object.keys(monthData.days);
+  for (const person of state.staff) {
+    monthData.absences[person.id] = Object.fromEntries(isoDays.map(iso => [iso, 'U']));
+  }
+  const built = model.buildPlanModel({ state, monthData });
+  assert.ok(built.uncoverableSlots.length > 0, 'unbesetzbare Felder werden ausgewiesen');
+  assert.ok(built.constraints.every(constraint => !constraint.id.startsWith('cover_empty_')),
+    'kein Constraint nagelt das globale Deckungsliteral auf 0 fest');
+  for (const constraint of built.constraints) {
+    if (constraint.terms.length !== 1) continue;
+    const [[variableIndex]] = constraint.terms;
+    assert.ok(!(variableIndex === built.relaxLiterals.coverage && constraint.ub === 0),
+      'das Deckungsliteral bleibt frei');
+  }
+});
+
 test('kein Constraint verwendet eine Big-M-Konstante', () => {
   const monthData = monthOf(2026, 9);
   const built = model.buildPlanModel({ state: stateWith(monthData), monthData });
@@ -197,6 +244,22 @@ test('die Solver-Brücke verwendet niemals notEquals', async () => {
     const calls = text.split('\n').filter(line => /\.notEquals\(/.test(line) && !/^\s*(\*|\/\/)/.test(line));
     assert.deepEqual(calls, [], `${name} darf notEquals nicht aufrufen`);
   }
+});
+
+test('das ausgelieferte Bündel ist selbsttragend und die WASM-Datei liegt daneben', async () => {
+  const bundle = await source('../vendor/cpsat-js/dist/cpsat-portable.bundle.js');
+  // Genau daran ist die Vorgängerfassung im Browser gescheitert: ein bloßer
+  // Bezeichner lässt sich ohne Import-Map nicht auflösen, und in einem
+  // Modul-Worker gilt die Import-Map des Dokuments ohnehin nicht.
+  const bareImports = [...bundle.matchAll(/\bfrom\s*["']([^"'.\/][^"']*)["']/g)]
+    .map(match => match[1])
+    .filter(specifier => !specifier.startsWith('node:'));
+  assert.deepEqual(bareImports, [], `nicht auflösbare Bezeichner im Bündel: ${bareImports.join(', ')}`);
+  await assert.doesNotReject(readFile(new URL('../vendor/cpsat-js/build/portable/cpsat.wasm', import.meta.url)),
+    'die relative WASM-Datei muss neben dem Bündel liegen');
+  const bridge = await source('../js/auto-plan-solver.js');
+  assert.match(bridge, /cpsat-portable\.bundle\.js\?v=\$\{VERSION_MARKER\}/,
+    'die lokale Quelle trägt die Versionsmarke, sonst liefert der Zwischenspeicher ein altes Bündel aus');
 });
 
 test('die defekte v9-Brücke ist entfernt', async () => {

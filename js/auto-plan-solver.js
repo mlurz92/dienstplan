@@ -32,7 +32,10 @@ const VERSION_MARKER = '20260806.1';
  * Laufzeit, offlinefähig, und mit `immutable`-Cache genau einmal geladen.
  */
 export const SOLVER_SOURCES = Object.freeze([
-  { id: 'cpsat-js', origin: 'local', url: '/vendor/cpsat-js/dist/cpsat-portable.bundle.js' },
+  // Das Bündel trägt dieselbe Versionsmarke wie alle übrigen Module: Ohne sie
+  // liefert ein Zwischenspeicher nach einem Neuvendoring das alte Bündel aus,
+  // während die Module bereits die neue Marke tragen.
+  { id: 'cpsat-js', origin: 'local', url: `/vendor/cpsat-js/dist/cpsat-portable.bundle.js?v=${VERSION_MARKER}` },
   { id: 'cpsat-js', origin: 'cdn', url: 'https://cdn.jsdelivr.net/npm/cpsat-js@1.3.0/+esm' }
 ]);
 
@@ -47,7 +50,7 @@ let loadDiagnostics = [];
  */
 export async function loadSolver({ signal = null, sources = SOLVER_SOURCES } = {}) {
   if (loader) return loader;
-  loader = (async () => {
+  const attempt = (async () => {
     loadDiagnostics = [];
     for (const candidate of sources) {
       if (signal?.aborted) return null;
@@ -69,7 +72,15 @@ export async function loadSolver({ signal = null, sources = SOLVER_SOURCES } = {
     }
     return null;
   })();
-  return loader;
+  loader = attempt;
+  // Ein Fehlschlag darf sich nicht einbrennen. Scheitert der Ladeversuch — der
+  // häufigste Grund ist ein kurzzeitig nicht erreichbares CDN oder ein Abbruch
+  // durch das Signal —, wird der Speicher wieder freigegeben, damit der nächste
+  // Lauf es erneut versuchen kann. Nur ein *erfolgreicher* Ladevorgang wird
+  // dauerhaft behalten; die WASM-Instanz ist zu teuer, um sie zu wiederholen.
+  const api = await attempt;
+  if (!api) loader = null;
+  return api;
 }
 
 export function solverDiagnostics() {
@@ -229,6 +240,10 @@ export function solveModel(model, api, {
       params.onSolution = solution => {
         try {
           onIncumbent({
+            // Ob überhaupt ein Ziel gesetzt ist, entscheidet darüber, ob eine
+            // geschlossene Lücke etwas bedeutet: Bei reiner Zulässigkeitssuche
+            // sind Zielwert und Schranke beide 0, die Lücke also trivial null.
+            hasObjective: Boolean(objectiveTerms && objectiveTerms.length),
             objectiveValue: Number(solution.objectiveValue ?? 0),
             bestBound: Number.isFinite(Number(solution.bestObjectiveBound)) ? Number(solution.bestObjectiveBound) : null,
             live: Boolean(solution.live),

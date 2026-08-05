@@ -400,6 +400,14 @@ async function runCascade({ model, api, config, signal, onProgress, onIncumbent 
   let hintValues = null;
   let bestValues = null;
   let leximinTop = null;
+  // Vollständigkeit der Kaskade. Sie ist die Voraussetzung dafür, einen Lauf
+  // überhaupt als beweisbar optimal ausweisen zu dürfen: Bricht eine Stufe ab —
+  // Zeitbudget erschöpft, Abbruch durch die Nutzerin, Stufe ohne Lösung —, dann
+  // wurde die lexikografische Ordnung nicht bis zum Ende durchlaufen, und das
+  // Ergebnis ist bestenfalls zulässig. Bis v10.4 stand das `break` *vor* dem
+  // `trace.push`; die abgebrochene Stufe fehlte damit in der Spur, und
+  // `trace.every(status === 'OPTIMAL')` bescheinigte fälschlich Optimalität.
+  let complete = true;
 
   await onProgress?.({
     phase: 'exact',
@@ -410,14 +418,34 @@ async function runCascade({ model, api, config, signal, onProgress, onIncumbent 
   });
 
   const totalUnits = stages.reduce((sum, stage) => sum + (stage.kind === 'leximin' ? config.leximinDepth : 1), 0) + 1;
-  const budgetPerUnit = Math.max(400, Math.floor((config.exactTimeBudgetSeconds * 1000) / Math.max(1, totalUnits)));
   let unit = 0;
   const progress = () => 0.30 + 0.42 * (unit / Math.max(1, totalUnits));
 
+  // ZEITBUDGET ALS ECHTE WANDUHR
+  //
+  // Bis v10.4 wurde das Budget einmal durch die Stufenzahl geteilt und nach
+  // unten auf 400 ms angehoben. Bei zwölf Stufen und fünf Sekunden Budget
+  // ergab das 12 × 400 ms = 4,8 s Rechenzeit *zusätzlich* zu allem anderen —
+  // das zugesagte Budget war strukturell nicht einzuhalten. Stattdessen läuft
+  // hier eine Frist: Jede Stufe bekommt den fairen Anteil der *verbleibenden*
+  // Zeit, nie mehr als übrig ist. Stufen, die früher fertig werden, verschenken
+  // ihren Rest damit automatisch an die folgenden.
+  const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  const deadline = now() + Math.max(500, config.exactTimeBudgetSeconds * 1000);
+  const remainingMs = () => Math.max(0, deadline - now());
+  const nextSliceMs = () => {
+    const unitsLeft = Math.max(1, totalUnits - unit);
+    const remaining = remainingMs();
+    // 120 ms ist die kleinste Scheibe, in der CP-SAT das Modell überhaupt
+    // aufbaut; darunter ist ein Aufruf nur Verwaltungsaufwand.
+    return Math.min(remaining, Math.max(120, Math.floor(remaining / unitsLeft)));
+  };
+
   const solveStep = (label, options) => {
+    const timeLimitMs = nextSliceMs();
     unit += 1;
     return solveModel(model, api, {
-      timeLimitMs: budgetPerUnit,
+      timeLimitMs,
       workers: 1,
       extraVars: scaffold.extraVars,
       fixedValues,
@@ -439,7 +467,14 @@ async function runCascade({ model, api, config, signal, onProgress, onIncumbent 
   hintValues = feasibility.values;
 
   for (const stage of stages) {
-    if (signal?.aborted) break;
+    if (signal?.aborted) { complete = false; break; }
+    if (remainingMs() < 120) {
+      // Frist erschöpft: Der Vorschlag bleibt gültig, aber die Ordnung wurde
+      // nicht bis zum Ende durchlaufen — also kein Optimalitätsnachweis.
+      trace.push({ id: stage.id, label: stage.label, status: 'BUDGET_EXHAUSTED', value: null, bound: null, wallTimeMs: 0 });
+      complete = false;
+      break;
+    }
     if (stage.kind === 'leximin') {
       // Ebene 1: Höchstlast senken.
       await onProgress?.({ phase: 'exact', stage: 'cp-sat', progress: progress(), message: 'Leximin 1: Höchstlast wird gesenkt', cpSatPhase: 'fairness' });
@@ -448,7 +483,11 @@ async function runCascade({ model, api, config, signal, onProgress, onIncumbent 
         extraConstraints: [...carried, ...bind],
         objectiveTerms: [[scaffold.lmaxIndex, 1]]
       });
-      if (!accept(first)) break;
+      if (!accept(first)) {
+        trace.push({ id: 'fairness:1', label: 'Leximin · Höchstlast', status: first.statusName, value: null, bound: null, wallTimeMs: first.wallTimeMs });
+        complete = false;
+        break;
+      }
       leximinTop = Math.round(first.objectiveValue);
       carried.push(...bind, { id: 'leximin_fix_max', group: 'leximin', terms: [[scaffold.lmaxIndex, 1]], lb: scaffold.extraVars[0].lb, ub: leximinTop, enforce: null });
       bestValues = first.values;
@@ -457,7 +496,8 @@ async function runCascade({ model, api, config, signal, onProgress, onIncumbent 
 
       // Ebene 2..k: Überschuss über absteigende Schwellen minimieren.
       for (let level = 1; level < config.leximinDepth; level += 1) {
-        if (signal?.aborted) break;
+        if (signal?.aborted) { complete = false; break; }
+        if (remainingMs() < 120) { complete = false; break; }
         const threshold = leximinTop - level * model.loadScale;
         if (threshold <= scaffold.extraVars[0].lb) break;
         const row = scaffold.excess[level - 1];
@@ -473,7 +513,11 @@ async function runCascade({ model, api, config, signal, onProgress, onIncumbent 
           extraConstraints: [...carried, ...excessConstraints],
           objectiveTerms: objective
         });
-        if (!accept(step)) break;
+        if (!accept(step)) {
+          trace.push({ id: `fairness:${level + 1}`, label: `Leximin · Rang ${level + 1}`, status: step.statusName, value: null, bound: null, wallTimeMs: step.wallTimeMs });
+          complete = false;
+          break;
+        }
         carried.push(...excessConstraints, {
           id: `leximin_fix_${level}`, group: 'leximin', terms: objective,
           lb: 0, ub: Math.round(step.objectiveValue), enforce: null
@@ -498,7 +542,11 @@ async function runCascade({ model, api, config, signal, onProgress, onIncumbent 
       extraConstraints: [...carried],
       objectiveTerms: stage.terms
     });
-    if (!accept(step)) break;
+    if (!accept(step)) {
+      trace.push({ id: stage.id, label: stage.label, status: step.statusName, value: null, bound: null, wallTimeMs: step.wallTimeMs });
+      complete = false;
+      break;
+    }
     const [low] = termBounds(stage.terms, allVars);
     carried.push({
       id: `fix_${stage.id}`, group: 'stage', terms: stage.terms,
@@ -512,7 +560,7 @@ async function runCascade({ model, api, config, signal, onProgress, onIncumbent 
     });
   }
 
-  return { values: bestValues, trace, infeasible: false, stages, leximinTop };
+  return { values: bestValues, trace, infeasible: false, stages, leximinTop, complete };
 
   function accept(result) {
     return result.statusName === 'OPTIMAL' || result.statusName === 'FEASIBLE';
@@ -827,7 +875,11 @@ export async function constructAutoPlan(parameters) {
     available: true,
     loadedFrom: { id: api.id, origin: api.origin, url: api.url },
     model: model.counts,
-    carryOver: [...model.carryOver.entries()].map(([staffId, value]) => ({ staffId, value: Number(value.toFixed(3)) }))
+    carryOver: [...model.carryOver.entries()].map(([staffId, value]) => ({ staffId, value: Number(value.toFixed(3)) })),
+    // Felder, für die niemand wählbar ist, bleiben leer. Sie sind kein
+    // Modellfehler und dürfen den Lauf nicht unerfüllbar machen — sie gehören
+    // aber ausgewiesen, weil sie fachlich zu klären sind.
+    uncoverable: model.uncoverableSlots || []
   };
 
   await onProgress?.({
@@ -848,6 +900,7 @@ export async function constructAutoPlan(parameters) {
       incumbent: {
         objectiveValue: update.objectiveValue,
         bestBound: update.bestBound,
+        hasObjective: update.hasObjective === true,
         stage: update.stageLabel || null,
         assignments
       }
@@ -859,7 +912,15 @@ export async function constructAutoPlan(parameters) {
   const certifiedStages = cascade.trace.filter(entry => entry.status === 'OPTIMAL').length;
   exactInfo.certifiedStages = certifiedStages;
   exactInfo.status = cascade.infeasible ? 'INFEASIBLE' : cascade.trace.at(-1)?.status || 'UNKNOWN';
-  exactInfo.optimal = !cascade.infeasible && cascade.trace.length > 0 && cascade.trace.every(entry => entry.status === 'OPTIMAL');
+  // Optimalität setzt dreierlei voraus: das Modell war lösbar, die Kaskade lief
+  // vollständig durch (kein Abbruch, kein erschöpftes Budget), und *jede*
+  // ausgeführte Stufe schloss mit Beweis. Fehlt eines davon, ist der Vorschlag
+  // zulässig, aber nicht zertifiziert.
+  exactInfo.complete = cascade.complete !== false;
+  exactInfo.optimal = !cascade.infeasible
+    && exactInfo.complete
+    && cascade.trace.length > 0
+    && cascade.trace.every(entry => entry.status === 'OPTIMAL');
   exactInfo.wallTimeMs = cascade.trace.reduce((sum, entry) => sum + (entry.wallTimeMs || 0), 0);
 
   let conflict = null;

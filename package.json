@@ -10,11 +10,9 @@
     "test:e2e": "playwright test",
     "verify": "npm run check && npm test && npm run test:e2e",
     "deploy-note": "Deploy via Cloudflare Pages from GitHub repository root",
-    "vendor:cpsat": "esbuild vendor/cpsat-js/dist/index.portable.js --bundle --format=esm --platform=browser --target=es2022 --external:node:* --legal-comments=none --outfile=vendor/cpsat-js/dist/cpsat-portable.bundle.js"
+    "vendor:cpsat": "npx --yes esbuild@0.25.10 vendor/cpsat-js/dist/index.portable.js --bundle --format=esm --platform=browser --target=es2022 --external:node:* --legal-comments=none --outfile=vendor/cpsat-js/dist/cpsat-portable.bundle.js"
   },
   "devDependencies": {
-    "@playwright/test": "1.61.1",
-    "esbuild": "0.25.10",
-    "or-tools-wasm": "0.9.1"
+    "@playwright/test": "1.61.1"
   }
 }

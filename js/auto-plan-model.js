@@ -50,7 +50,13 @@ export const MODEL_REVISION = 10;
  */
 export const RELAX_GROUPS = Object.freeze({
   coverage: { label: 'Vollständige Besetzung', priority: 0, weight: 1000 },
-  qualification: { label: 'Qualifikation und Verfügbarkeit', priority: 1, weight: 900 },
+  // Qualifikation ist die einzige *strukturelle* Gruppe: Sie wird nicht durch
+  // Constraints ausgedrückt, sondern dadurch, dass für unzulässige Paare aus
+  // Feld und Person gar keine Variable entsteht (Kandidatenmengen kommen
+  // unverändert aus `basicallyEligiblePeers`). Sie ist damit nicht relaxierbar
+  // und erscheint folgerichtig nie in einer Korrekturmenge — die Gruppe bleibt
+  // im Verzeichnis, weil Diagnosetexte und Oberfläche sie benennen.
+  qualification: { label: 'Qualifikation und Verfügbarkeit', priority: 1, weight: 900, structural: true },
   exclusivity: { label: 'Keine Doppelbelegung am selben Tag', priority: 2, weight: 800 },
   rest: { label: 'Ruhezeit zwischen Bereitschaftsdiensten', priority: 3, weight: 700 },
   sequence: { label: 'Hintergrunddienst vor Bereitschaftsdienst', priority: 4, weight: 600 },
@@ -279,6 +285,8 @@ export function buildPlanModel({
   //    Das Literal `r_coverage` erlaubt der Diagnose, die Bedingung testweise
   //    aufzugeben — im Regelfall ist es fest auf 1 gesetzt.
   const relaxLiterals = {};
+  /** Felder ohne jeden zulässigen Kandidaten – sie bleiben leer und werden gemeldet. */
+  const uncoverableSlots = [];
   for (const [group, meta] of Object.entries(RELAX_GROUPS)) {
     relaxLiterals[group] = addVar(`relax_${group}`, 0, 1, { relaxGroup: group, weight: meta.weight });
   }
@@ -288,10 +296,14 @@ export function buildPlanModel({
     if (!terms.length) {
       // Ein Feld ohne jeden Kandidaten ist kein Modellfehler, sondern eine
       // fachliche Aussage: Hier kann niemand eingeteilt werden.
-      constraints.push({
-        id: `cover_empty_${slot.key}`, group: 'coverage', terms: [[relaxLiterals.coverage, 1]],
-        lb: 0, ub: 0, detail: `Für ${slot.key} ist niemand wählbar.`, enforce: null
-      });
+      //
+      // Bis v10.4 wurde dafür das *globale* Deckungsliteral auf 0 festgenagelt.
+      // Weil die Kaskade dieses Literal auf 1 fixiert, machte ein einziges
+      // unbesetzbares Feld das gesamte Modell unerfüllbar — und die Diagnose
+      // meldete „Vollständige Besetzung verletzt" statt des einen Tages, um den
+      // es geht. Das Feld wird jetzt aus dem Modell genommen und gesondert
+      // ausgewiesen; alle übrigen Felder bleiben lösbar.
+      uncoverableSlots.push({ key: slot.key, dateIso: slot.dateIso, role: slot.role });
       return;
     }
     addConstraint(`cover_${slot.key}`, 'coverage', terms, 1, 1,
@@ -464,20 +476,67 @@ export function buildPlanModel({
     components.bdTarget.terms.push([deviation, 1]);
   }
 
-  // 11c. Wochenend-, Samstags- und HG-Last als lineare Zählterme.
-  slots.forEach((slot, index) => {
-    const weekday = weekdayOf(slot.dateIso);
-    for (const variableIndex of assign[index].values()) {
-      if (slot.role === 'hg') {
-        components.hgBurden.terms.push([variableIndex, 1]);
-        if (isWeekendIso(slot.dateIso)) components.weekend.terms.push([variableIndex, 1]);
+  // 11c. Wochenend-, Samstags- und HG-Last.
+  //
+  // ACHTUNG, hier lag bis v10.4 ein stiller Fehler: Die Summe über *alle*
+  // Zuordnungsvariablen einer Kategorie ist wegen der Deckungsgleichung
+  // Σ_p y[f][p] = 1 eine Konstante — sie zählt schlicht die Felder, nicht die
+  // Belastung einer Person. Drei Kaskadenstufen minimierten damit eine
+  // unveränderliche Zahl und waren wirkungslos. Fachlich gemeint ist die
+  // *Verteilung*: niemand soll deutlich mehr Wochenenden, Samstage oder
+  // Hintergrunddienste tragen als die Übrigen. Das ist ein Minimax-Ziel und
+  // wird hier als Höchstlastvariable je Kategorie formuliert:
+  //
+  //     max_k ≥ Σ_f∈k y[f][p] + fix_k(p)   für jede Person p
+  //
+  // Minimiert die Kaskade max_k, drückt sie die Spitzenbelastung — und weil
+  // die Gesamtsumme fest ist, zieht das die Verteilung zur Gleichverteilung.
+  const categoryCounters = new Map(
+    ['weekend', 'saturday', 'hgBurden'].map(key => [key, new Map(staffIds.map(id => [id, { terms: [], fixed: 0 }]))])
+  );
+  const pushCategory = (key, staffId, variableIndex) => {
+    const entry = categoryCounters.get(key).get(staffId);
+    if (!entry) return;
+    if (variableIndex === undefined) entry.fixed += 1;
+    else entry.terms.push([variableIndex, 1]);
+  };
+  for (const dateIso of days) {
+    const weekend = isWeekendIso(dateIso);
+    const isSaturday = weekdayOf(dateIso) === 6;
+    const day = baseline?.days?.[dateIso] || {};
+    for (const staffId of staffIds) {
+      const bd = varOf(dateIso, 'bd', staffId);
+      const hg = varOf(dateIso, 'hg', staffId);
+      const bdActive = bd !== undefined || day.bd === staffId;
+      const hgActive = hg !== undefined || day.hg === staffId;
+      if (hgActive) {
+        pushCategory('hgBurden', staffId, hg);
+        if (weekend) pushCategory('weekend', staffId, hg);
       }
-      if (slot.role === 'bd') {
-        if (isWeekendIso(slot.dateIso)) components.weekend.terms.push([variableIndex, 1]);
-        if (weekday === 6) components.saturday.terms.push([variableIndex, 1]);
+      if (bdActive) {
+        if (weekend) pushCategory('weekend', staffId, bd);
+        if (isSaturday) pushCategory('saturday', staffId, bd);
       }
     }
-  });
+  }
+  for (const [key, perPerson] of categoryCounters) {
+    // Ohne freie Variablen ist die Kategorie vollständig fixiert; eine
+    // Höchstlastvariable wäre dann eine Konstante und der Aufwand unnötig.
+    const movable = [...perPerson.values()].some(entry => entry.terms.length > 0);
+    if (!movable) continue;
+    const bound = days.length * 2;
+    const peak = addVar(`peak_${key}`, 0, bound, { category: key });
+    for (const [staffId, entry] of perPerson) {
+      if (!entry.terms.length && !entry.fixed) continue;
+      // peak − Σ terms ≥ fixed  ⇔  peak ≥ Σ terms + fixed
+      addConstraint(`peak_${key}_${staffId}`, 'coverage',
+        [[peak, 1], ...entry.terms.map(([variableIndex]) => [variableIndex, -1])],
+        entry.fixed, bound,
+        `Höchstlast ${OBJECTIVE_COMPONENTS[key]}: ${staffId} bleibt unter der Spitze.`, null);
+    }
+    components[key].terms.push([peak, 1]);
+    components[key].peakVariable = peak;
+  }
 
   // 11d. Wochenendkette Fr-BD · Sa vollständig frei · So-BD (Regelwerk v4.10).
   //      chain ≥ y_fri + (1 − y_satBD) + (1 − y_satHG) + y_sun − 3
@@ -574,6 +633,7 @@ export function buildPlanModel({
     relaxLiterals,
     hintPairs,
     fixedAssignments: fixedAssignments || null,
+    uncoverableSlots,
     counts
   };
 }

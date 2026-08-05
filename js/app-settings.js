@@ -143,7 +143,7 @@ function dialogMarkup() {
               </select>
             </label>
             <label><span>Zeitbudget der Kaskade</span><small>2 bis 60 Sekunden, anteilig auf die Stufen verteilt. Bei 60 offenen Feldern ist jede Stufe meist in Millisekunden beweisbar optimal.</small>
-              <span class="settings-number"><input id="settingsCpSatBudget" type="number" min="2" max="60" step="1"><b>s</b></span>
+              <span class="settings-number"><input id="settingsCpSatBudget" type="number" min="1" max="60" step="1"><b>s</b></span>
             </label>
             <label><span>Warmstart</span><small>Die Heuristik-Startbelegung wird der exakten Suche als Lösungshinweis übergeben.</small>
               <select id="settingsCpSatWarmStart"><option value="heuristic">Heuristik-Hinweis</option><option value="none">Ohne Hinweis</option></select>

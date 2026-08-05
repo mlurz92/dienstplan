@@ -97,6 +97,42 @@ dunklem Grund (gemessene 1,3:1).
 - Lastskalierung in Zehnteln statt Hundertsteln; bei Hundertsteln erreicht die
   Höchstlaststufe in vertretbarer Zeit keinen Beweis mehr.
 
+### Zweite Prüfrunde – Befunde und Korrekturen
+
+- **Drei Kaskadenstufen waren wirkungslos.** Wochenend-, Samstags- und
+  HG-Last wurden als Summe *aller* Zuordnungsvariablen der jeweiligen
+  Kategorie minimiert. Wegen der Deckungsgleichung `Σ_p y[f][p] = 1` ist diese
+  Summe eine Konstante — sie zählt Felder, nicht Belastung. Fachlich gemeint
+  ist die Verteilung, deshalb steht dort jetzt je Kategorie eine
+  Höchstlastvariable mit `max_k ≥ Σ_{f∈k} y[f][p]` für jede Person.
+- **Falsche Optimalitätsbescheinigung.** Das `break` einer abgebrochenen Stufe
+  stand vor dem Eintrag in die Spur; die Stufe fehlte damit in der Prüfung
+  „alle Stufen OPTIMAL". Abbrüche werden jetzt mit ihrem Status protokolliert,
+  und ein Lauf gilt nur als beweisbar optimal, wenn die Kaskade auch
+  vollständig durchlief.
+- **Zeitbudget als echte Wanduhr.** Die alte Aufteilung hob jede Stufe auf
+  mindestens 400 ms an; bei zwölf Stufen war das zugesagte Budget strukturell
+  nicht einzuhalten. Jede Stufe erhält jetzt den fairen Anteil der
+  *verbleibenden* Zeit, und früh fertige Stufen verschenken ihren Rest.
+- **Ein unbesetzbares Feld machte den ganzen Monat unlösbar**, weil dafür das
+  globale Deckungsliteral auf 0 festgenagelt wurde. Solche Felder werden jetzt
+  aus dem Modell genommen und gesondert ausgewiesen.
+- **Zustandsbanner über der Leinwand.** „Algorithmuszustand" und Engine-Badge
+  hingen als `position: absolute` über der Animation und verdeckten in der
+  Orbit-Ansicht die Zeichnung. Die Canvas-Zone ist jetzt ein Grid mit drei
+  Zeilen; ein Playwright-Test misst die Rechtecke in beiden Visualisierungen.
+- **Die Animation kristallisierte sofort:** Die Lücke zwischen Zielwert und
+  Schranke ist bei der zielfreien Zulässigkeitssuche trivial null. Sie zählt
+  jetzt nur noch für Stufen mit Zielfunktion.
+- **Ein fehlgeschlagener Solver-Ladeversuch brannte sich ein** — der Speicher
+  wird bei Misserfolg wieder freigegeben, nur Erfolge bleiben.
+- **Entfernte Bedienelemente rissen das Speichern mit.** Die Studioschicht
+  v10.5 entfernt wirkungslose v9-Regler; deren unbewachte Zugriffe sind jetzt
+  tolerant und erhalten den zuletzt gespeicherten Wert.
+- Das lokale WASM-Bündel trägt die Versionsmarke der übrigen Module; ein Test
+  belegt, dass es keine bloßen Bezeichner mehr enthält und die WASM-Datei
+  danebenliegt.
+
 ### Mathematisches Audit der Heuristik
 
 - **UCB-Normierung:** Der Ausbeutungsterm der kostenbewussten Operatorwahl war

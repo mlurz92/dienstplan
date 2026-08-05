@@ -188,3 +188,62 @@ for (const scheme of ['light', 'dark']) {
     expect(contrastFindings, `Zu geringer Lesekontrast: ${JSON.stringify(contrastFindings.slice(0, 12), null, 2)}`).toEqual([]);
   });
 }
+
+/**
+ * Regression: Bis v10.4 hing das Banner „Algorithmuszustand" als
+ * `position: absolute` über der Leinwand. In der Kristall-Ansicht fiel das
+ * nicht auf, in der Orbit-Ansicht verdeckte es die Animation. Der Test misst
+ * die Rechtecke beider Elemente in beiden Visualisierungen und verlangt, dass
+ * sie sich nicht schneiden.
+ */
+for (const visual of ['crystal', 'orbit']) {
+  test(`Algorithmuszustand überlagert die Leinwand nicht · ${visual}`, async ({ page }) => {
+    test.setTimeout(120000);
+    await page.goto('/');
+    await page.waitForSelector('#autoPlanBtn', { timeout: 30000 });
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.click('#autoPlanBtn');
+    await page.waitForSelector('#autoPlanDialog[open]', { timeout: 30000 });
+    // Die Laufansicht erscheint erst im Zustand „läuft"; der Dialog wird dafür
+    // aus der Parametrierung in den Laufzustand versetzt, ohne eine echte
+    // Optimierung zu starten — geprüft wird Geometrie, nicht Rechenergebnis.
+    await page.evaluate(mode => {
+      document.documentElement.dataset.autoPlanVisual = mode;
+      const dialog = document.getElementById('autoPlanDialog');
+      dialog.classList.remove('is-configuring');
+      dialog.classList.add('is-running');
+      dialog.dataset.phase = 'analysis';
+      const config = document.getElementById('autoPlanConfig');
+      if (config) config.hidden = true;
+      const stage = document.getElementById('autoPlanStage');
+      if (stage) stage.hidden = false;
+    }, visual);
+    await page.waitForTimeout(700);
+
+    const geometry = await page.evaluate(() => {
+      const box = element => {
+        if (!element) return null;
+        const rect = element.getBoundingClientRect();
+        return { top: rect.top, left: rect.left, right: rect.right, bottom: rect.bottom, width: rect.width, height: rect.height };
+      };
+      return {
+        canvas: box(document.getElementById('autoPlanCanvas')),
+        narrative: box(document.getElementById('autoPlanPhaseNarrative')),
+        badge: box(document.querySelector('.auto-plan-visual .auto-plan-engine-badge'))
+      };
+    });
+
+    expect(geometry.canvas, 'Leinwand ist sichtbar').toBeTruthy();
+    expect(geometry.canvas.width).toBeGreaterThan(40);
+    expect(geometry.canvas.height).toBeGreaterThan(40);
+
+    const overlaps = (a, b) => a && b
+      && a.left < b.right - 0.5 && b.left < a.right - 0.5
+      && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5;
+
+    expect(overlaps(geometry.canvas, geometry.narrative),
+      `Zustandsbanner schneidet die Leinwand: ${JSON.stringify(geometry, null, 2)}`).toBe(false);
+    expect(overlaps(geometry.canvas, geometry.badge),
+      `Engine-Badge schneidet die Leinwand: ${JSON.stringify(geometry, null, 2)}`).toBe(false);
+  });
+}

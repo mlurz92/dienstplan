@@ -425,24 +425,34 @@ Cloudflare Pages wird aus dem Repository-Root gebaut. Das KV-Binding lautet `DIE
 ## 10. Projektstruktur v10.5
 
 ```text
-js/auto-planner-v9.js         hybride exakte Orchestrierung (CP-SAT + Fallback)
-js/auto-plan-cp-sat.js        CP-SAT-Modellbau, Solver-Loader, Phasen, echte MUS-Diagnose
-js/auto-plan-studio-v9.js     v9-Regler, Tooltips (Katalog + Fallback), Layout, Exaktheitsnachweis
-js/auto-planner-v8-5.js       strikte Eskalation und verbindlicher Phasenvertrag
-js/auto-plan-studio-v8-5.js   Profile, Phasentheater und Ergebnisprotokoll
-js/app-theme-v8-5.js          persistenter Hell-/Dunkelcontroller (Start: hell)
-js/rich-tooltip-v8-5.js       zentrale ARIA-Tooltips
-js/ui-v8-5.js                 Command-Bar-, Bootstrap- und Performance-Integration
-app-v8-5.css                  adaptive Farb- und Oberflächentoken
-toolbar-v8-5.css              rechter Theme-/Einstellungsblock
-auto-plan-studio-v8-5.css     v8.5-Studiozustände
-auto-plan-studio-v9.css       Modal-Fit-Layout, kollabierbare v9-Sektion, Dark-Mode, Animation
-vendor/cpsat-js/              lokal ausgelieferter CP-SAT-Solver (portable, MIT)
-_headers                      COOP/COEP für multithreaded WebAssembly
-tests/auto-plan-v8-5.test.js  Solver- und Integrationsverträge
-tests/auto-plan-v9.test.js    CP-SAT-Modell-, MUS- und v9-Verträge
-tests/e2e/v8-5-shell.spec.js  Browser-, Bootstrap- und Observer-Regressionen
+js/auto-plan-model.js              Boolean-One-Hot-Modell (solverfrei, in Node testbar)
+js/auto-plan-solver.js             Brücke zur CP-SAT-WebAssembly-Bindung
+js/auto-planner-v10.js             lexikografische Kaskade, Leximin, MCS-Diagnose, Reparatur
+js/auto-plan-crystallize.js        Kristallisations-Animation mit farbabhängigem Glow
+js/auto-plan-studio-v10.js         Studio v10.5: Akkordeon, Stufenrangfolge, Tooltips
+js/auto-plan-studio-v9.js          Regler der Vorgängerstufe, Exaktheitsnachweis
+js/auto-planner-v8-5.js            Heuristik: Warmstart, Rückfallebene, Phasenvertrag
+js/auto-plan-studio-v8-5.js        Profile, Phasentheater und Ergebnisprotokoll
+js/app-theme-v8-5.js               persistenter Hell-/Dunkelcontroller (Start: hell)
+js/rich-tooltip-v8-5.js            zentrale ARIA-Tooltips
+js/ui-v8-5.js                      Command-Bar-, Bootstrap- und Performance-Integration
+app-v8-5.css                       adaptive Farb- und Oberflächentoken
+toolbar-v8-5.css                   rechter Theme-/Einstellungsblock
+auto-plan-studio-v8-5.css          v8.5-Studiozustände
+auto-plan-studio-v9.css            Modal-Fit-Layout, kollabierbare Sektion, Animation
+auto-plan-studio-v10.css           Akkordeon, Laufansicht, Überlaufhärtung, Dark-Mode
+vendor/cpsat-js/                   lokal ausgelieferter CP-SAT-Solver (portable, Apache-2.0)
+_headers                           Cache- und Sicherheitskopfzeilen (bewusst ohne COEP)
+tests/auto-plan-v8-5.test.js       Solver- und Integrationsverträge
+tests/auto-plan-v10.test.js        Modell-, Kaskaden-, Leximin- und Kennzahlenverträge
+tests/e2e/v8-5-shell.spec.js       Browser-, Bootstrap- und Observer-Regressionen
+tests/e2e/layout-contrast-v10-5.spec.js  Überlappungsfreiheit und WCAG-AA-Kontrast
 ```
+
+`js/auto-planner-v9.js` und `js/auto-plan-cp-sat.js` sind in v10.5 entfallen:
+Die alte Bindung erkannte den Solver am bloßen Vorhandensein zweier Namen und
+wählte deshalb stets die falsche; der exakte Pfad lief in der Auslieferung nie.
+Modell, Brücke und Orchestrierung sind seither drei getrennte Module.
 
 ---
 
