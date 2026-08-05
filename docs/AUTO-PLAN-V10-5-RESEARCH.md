@@ -1,5 +1,20 @@
 # Auto-Plan v10.5 — Forschungsbericht, Audit und Implementierungsplan
 
+> **Hinweis zum Stand dieses Dokuments.** Der Bericht wurde als Entscheidungs-
+> vorlage geschrieben und anschließend **umgesetzt**. Er beschreibt seither den
+> gebauten Zustand, nicht mehr einen Vorschlag. Alle Anmerkungen aus dem
+> Code-Review sind eingearbeitet — Vorzeichen des Fairness-Gedächtnisses,
+> Leximin-Formulierung ohne Big-M, Benennung der Minimax-Stufe, Gruppen- und
+> Reglerzahlen, Messumgebung, Symbolvergabe (`d` für die Leximin-Tiefe, `m` für
+> das Carry-over-Fenster), COEP gegenüber der `or-tools-wasm`-Reserve, das
+> Abnahmekriterium von P6 und die Dateiliste von `npm run check`.
+>
+> An einer Stelle weicht die Umsetzung bewusst von der Empfehlung des Reviews
+> ab: Für P0 wurde nicht das Umschreiben der Bezeichner in den Vendor-Dateien
+> gewählt, sondern ein **selbsttragendes Bündel**. Begründung und die
+> Auflösung des Widerspruchs zu „kein Build-Schritt" stehen unverändert in P0;
+> der Weg ist im Hauptthread und im echten Modul-Worker verifiziert.
+
 **Stand:** 2026-08-05 · **Status:** Entscheidungsvorlage
 **Gegenstand:** Automatische Verteilung offener Bereitschafts- (BD) und Hintergrunddienste (HG)
 **Rahmen:** ausschließlich kostenfreie Bausteine · Rechnung im Browser · Hosting Cloudflare Pages · Speicher Workers KV
