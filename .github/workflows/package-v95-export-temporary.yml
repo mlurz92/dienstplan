@@ -1,0 +1,91 @@
+name: Package v9.5 source export
+
+on:
+  push:
+    branches:
+      - agent/v9-5-final-export
+
+permissions:
+  contents: write
+
+concurrency:
+  group: package-v95-source-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - name: Reproducible dependency install
+        run: npm ci
+      - name: Syntax, build and Node regression suite
+        run: |
+          set -euo pipefail
+          npm run check
+          npm run build
+          npm test
+      - name: Chromium regression suite
+        run: |
+          set -euo pipefail
+          npx playwright install --with-deps chromium
+          npm run test:e2e
+      - name: Assemble clean release tree and validation record
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .release-tree .export
+          mkdir -p .release-tree/dienstplanRAD-v0.9.5-engine-9.5
+          rsync -a ./ .release-tree/dienstplanRAD-v0.9.5-engine-9.5/ \
+            --exclude='.git/' \
+            --exclude='node_modules/' \
+            --exclude='.release-tree/' \
+            --exclude='.export/' \
+            --exclude='playwright-report/' \
+            --exclude='test-results/' \
+            --exclude='.github/workflows/diagnose-e2e-v95-temporary.yml' \
+            --exclude='.github/workflows/package-v95-export-temporary.yml' \
+            --exclude='docs/diagnostics/'
+          cd .release-tree/dienstplanRAD-v0.9.5-engine-9.5
+          sed -i 's/> \*\*Regelwerk:\*\* Eignungsregeln `v4\.9`/> **Regelwerk:** Eignungsregeln `v4.10`/' README.md
+          cat > docs/VALIDATION-v9.5.md <<EOF
+          # Validierung Auto-Plan v9.5
+
+          Quellstand: \`${GITHUB_SHA}\`
+
+          Erfolgreich im isolierten GitHub-Actions-Exportlauf ausgeführt:
+
+          - \`npm ci\`
+          - \`npm run check\`
+          - \`npm run build\`
+          - \`npm test\`
+          - \`npx playwright install --with-deps chromium\`
+          - \`npm run test:e2e\`
+
+          Der Export enthält weder Git-Metadaten noch \`node_modules\`, Testreports oder temporäre Diagnose-/Packaging-Workflows.
+          EOF
+          cd ..
+          zip -X -q -r dienstplanRAD-v0.9.5-engine-9.5.zip dienstplanRAD-v0.9.5-engine-9.5
+          sha256sum dienstplanRAD-v0.9.5-engine-9.5.zip > dienstplanRAD-v0.9.5-engine-9.5.zip.sha256
+          mkdir -p ../.export
+          base64 -w 0 dienstplanRAD-v0.9.5-engine-9.5.zip | split -b 180000 -d -a 3 - ../.export/dienstplanRAD-v0.9.5-engine-9.5.zip.b64.part-
+          cp dienstplanRAD-v0.9.5-engine-9.5.zip.sha256 ../.export/
+          wc -c dienstplanRAD-v0.9.5-engine-9.5.zip > ../.export/archive-size.txt
+          find ../.export -maxdepth 1 -type f -printf '%f %s\n' | sort > ../.export/parts-manifest.txt
+      - name: Commit deterministic export segments
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .export
+          git commit -m 'TEMP: publish deterministic v9.5 source export segments'
+          git push origin HEAD:agent/v9-5-final-export
