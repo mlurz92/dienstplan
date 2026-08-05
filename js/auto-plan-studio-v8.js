@@ -19,10 +19,10 @@
  * Alles hier ist additiv. Fällt diese Schicht aus, bleibt ein vollständig
  * bedienbares Studio zurück.
  */
-import './auto-plan-studio-v7-5.js?v=20260805.1';
-import { AUTO_PLAN_STAGES } from './auto-planner-v8.js?v=20260805.1';
+import './auto-plan-studio-v7-5.js?v=20260806.1';
+import { AUTO_PLAN_STAGES } from './auto-planner-v8.js?v=20260806.1';
 
-const RELEASE = '20260805.1';
+const RELEASE = '20260806.1';
 
 function addStylesheet() {
   if (document.querySelector('link[data-auto-plan-v8-style]')) return;

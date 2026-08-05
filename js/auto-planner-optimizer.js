@@ -56,7 +56,7 @@ import {
   listOpenSlots,
   listProposedAssignments,
   planningContextFor
-} from './auto-planner-engine.js?v=20260805.1';
+} from './auto-planner-engine.js?v=20260806.1';
 import {
   buildLedger,
   ledgerApply,
@@ -64,8 +64,8 @@ import {
   lubyValue,
   monthDatesOf,
   nextPlanVersion
-} from './auto-plan-index.js?v=20260805.1';
-import { createPacer, createTicker, now } from './cooperative-scheduling.js?v=20260805.1';
+} from './auto-plan-index.js?v=20260806.1';
+import { createPacer, createTicker, now } from './cooperative-scheduling.js?v=20260806.1';
 import {
   basicallyEligiblePeers,
   evaluateCandidate,
@@ -73,7 +73,7 @@ import {
   parseIso,
   setPeerGroupCacheToken,
   toLocalIso
-} from './rules.js?v=20260805.1';
+} from './rules.js?v=20260806.1';
 
 const ROLE_ORDER = Object.freeze(['bd', 'hg']);
 const LEVEL_RANK = Object.freeze({ green: 0, yellow: 1, orange: 2, red: 3, gray: 4 });

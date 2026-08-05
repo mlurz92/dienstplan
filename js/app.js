@@ -1,14 +1,14 @@
-import { ABSENCE_TYPES, MONTH_NAMES, OPTION_TYPES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, normalizeBackupPayload, toIsoDate } from './defaults.js?v=20260805.1';
-import { state, bootstrapState, buildBackupPayload, flushLocalMonthWrites, getMonthData, getMonthLabel, isMonthDirty, isMonthMergeSafe, loadMonth, markBootstrapDirty, markBootstrapSynced, markMonthDirty, markMonthSynced, persistDirtyState, persistMonth, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260805.1';
-import { api } from './api.js?v=20260805.1';
-import { applyMonthTheme, prefersReducedMotion, resolveThemeYear } from './theme.js?v=20260805.1';
-import { applySpectrumProfile } from './color-director.js?v=20260805.1';
-import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260805.1';
-import { assignmentLabel, buildStats, clearedMonthData, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getEffectiveAbsence, getPlanningStaff, getOptions, getRoleProperties, getPreference, getStaffById, isExternalAssignment, labelForAbsence, labelForOption, labelForPreference, monthContentSummary, setAbsence, setAssignment, setOptions, setPreference, toggleOption, weekdayLabel } from './rules.js?v=20260805.1';
-import { getRbnOptions, isRbnValueAllowed, isSecondRbnAvailable, rbnDisplayName } from './rbn.js?v=20260805.1';
-import { additionalReasons, buildPickerModel, filterPickerModel, flattenPickerModel, loadSummary, nextSelectableIndex, primaryReason } from './picker-view.js?v=20260805.1';
-import { analyzeWorkbook } from './excel-import.js?v=20260805.1';
-import { applyApplicationSettings } from './app-settings.js?v=20260805.1';
+import { ABSENCE_TYPES, MONTH_NAMES, OPTION_TYPES, PREFERENCE_TYPES, SHEET_NAMES, createEmptyMonth, normalizeBackupPayload, toIsoDate } from './defaults.js?v=20260806.1';
+import { state, bootstrapState, buildBackupPayload, flushLocalMonthWrites, getMonthData, getMonthLabel, isMonthDirty, isMonthMergeSafe, loadMonth, markBootstrapDirty, markBootstrapSynced, markMonthDirty, markMonthSynced, persistDirtyState, persistMonth, scheduleSave, setMonthData, warmAdjacentMonths } from './state.js?v=20260806.1';
+import { api } from './api.js?v=20260806.1';
+import { applyMonthTheme, prefersReducedMotion, resolveThemeYear } from './theme.js?v=20260806.1';
+import { applySpectrumProfile } from './color-director.js?v=20260806.1';
+import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseIsoDate as parseIsoLocal, toIsoDay as toIsoLocal } from './holidays.js?v=20260806.1';
+import { assignmentLabel, buildStats, clearedMonthData, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getEffectiveAbsence, getPlanningStaff, getOptions, getRoleProperties, getPreference, getStaffById, isExternalAssignment, labelForAbsence, labelForOption, labelForPreference, monthContentSummary, setAbsence, setAssignment, setOptions, setPreference, toggleOption, weekdayLabel } from './rules.js?v=20260806.1';
+import { getRbnOptions, isRbnValueAllowed, isSecondRbnAvailable, rbnDisplayName } from './rbn.js?v=20260806.1';
+import { additionalReasons, buildPickerModel, filterPickerModel, flattenPickerModel, loadSummary, nextSelectableIndex, primaryReason } from './picker-view.js?v=20260806.1';
+import { analyzeWorkbook } from './excel-import.js?v=20260806.1';
+import { applyApplicationSettings } from './app-settings.js?v=20260806.1';
 
 const $ = selector => document.querySelector(selector);
 

@@ -39,10 +39,10 @@
  * Anzeigestrang weiter.
  */
 
-import { buildAutoPlan } from './auto-planner.js?v=20260805.1';
-import { planProfileIds } from './auto-planner-engine.js?v=20260805.1';
+import { buildAutoPlan } from './auto-planner.js?v=20260806.1';
+import { planProfileIds } from './auto-planner-engine.js?v=20260806.1';
 
-const WORKER_URL = '/js/auto-plan-worker.js?v=20260805.1';
+const WORKER_URL = '/js/auto-plan-worker.js?v=20260806.1';
 
 export function createAutoPlanExecutionPlan({
   hardwareConcurrency = 2,

@@ -1,7 +1,7 @@
 /** Auto-Plan Studio v7 – adaptive portfolio controls and execution telemetry. */
-import './auto-plan-studio-v6.js?v=20260805.1';
+import './auto-plan-studio-v6.js?v=20260806.1';
 
-const RELEASE = '20260805.1';
+const RELEASE = '20260806.1';
 
 function addStylesheet() {
   if (document.querySelector('link[data-auto-plan-v7-style]')) return;

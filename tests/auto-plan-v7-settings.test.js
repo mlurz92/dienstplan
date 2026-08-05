@@ -35,20 +35,19 @@ test('v7 settings defaults are complete and safe', () => {
     portfolioDiversity: true,
     solverBackend: 'auto',
     cpSatTimeBudgetSeconds: 10,
-    cpSatWorkers: null,
     cpSatWarmStart: 'heuristic',
-    fairnessProfile: 'leximin',
     deterministic: true,
-    infeasibilityMode: 'mus',
     repairOnEdit: true,
     explanationDepth: 'detailed',
-    cpSatFairnessWeight: 90,
     protectBaseline: true,
-    cpSatPerturbationWeight: 45,
-    cpSatCtLeadershipWeight: 70,
-    cpSatWeekendChainWeight: 100,
     relaxationDepth: 'deep',
-    musAutoRelax: false
+    stageOrder: ['fairness', 'wishes', 'bdTarget', 'weekendChain', 'weekend', 'saturday', 'hgBurden', 'ctLeadership'],
+    leximinDepth: 3,
+    hgLoadPercent: 60,
+    carryOverWindow: 3,
+    carryOverPercent: 50,
+    stabilityLevel: 'tiebreak',
+    conflictMode: 'show'
   });
 });
 

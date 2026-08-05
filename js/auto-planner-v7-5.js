@@ -1,7 +1,7 @@
 /** Auto-Plan v7.5 – wahrer Portfoliofortschritt und gehärteter Lebenszyklus. */
-import * as V7 from './auto-planner-v7.js?v=20260805.1';
+import * as V7 from './auto-planner-v7.js?v=20260806.1';
 
-export * from './auto-planner-v7.js?v=20260805.1';
+export * from './auto-planner-v7.js?v=20260806.1';
 
 export const AUTO_PLAN_REVISION = 7.5;
 

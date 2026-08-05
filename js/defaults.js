@@ -48,20 +48,23 @@ export const DEFAULT_SETTINGS = Object.freeze({
     portfolioDiversity: true,
     solverBackend: 'auto',
     cpSatTimeBudgetSeconds: 10,
-    cpSatWorkers: null,
     cpSatWarmStart: 'heuristic',
-    fairnessProfile: 'leximin',
     deterministic: true,
-    infeasibilityMode: 'mus',
     repairOnEdit: true,
     explanationDepth: 'detailed',
-    cpSatFairnessWeight: 90,
     protectBaseline: true,
-    cpSatPerturbationWeight: 45,
-    cpSatCtLeadershipWeight: 70,
-    cpSatWeekendChainWeight: 100,
     relaxationDepth: 'deep',
-    musAutoRelax: false
+    // v10.5: Die Stufenreihenfolge ist die ehrliche Form der Gewichtung.
+    // Gewichte über unvergleichbare Ziele waren Scheingenauigkeit – und in der
+    // Vorgängerfassung zusätzlich wirkungslos, weil je Stufe genau eine
+    // Komponente mit einheitlichem Gewicht minimiert wurde.
+    stageOrder: Object.freeze(['fairness', 'wishes', 'bdTarget', 'weekendChain', 'weekend', 'saturday', 'hgBurden', 'ctLeadership']),
+    leximinDepth: 3,
+    hgLoadPercent: 60,
+    carryOverWindow: 3,
+    carryOverPercent: 50,
+    stabilityLevel: 'tiebreak',
+    conflictMode: 'show'
   })
 });
 
@@ -161,6 +164,21 @@ function normalizedBoolean(value, fallback, field, strict) {
   return fallback;
 }
 
+/**
+ * Stufenreihenfolge der exakten Kaskade.
+ *
+ * Sie ersetzt die früheren Zielgewichte. Unbekannte Kennungen werden verworfen,
+ * fehlende hinten angefügt: Eine gespeicherte Reihenfolge aus einer älteren
+ * Fassung bleibt damit gültig, ohne je eine Stufe zu verlieren.
+ */
+const STAGE_IDS = Object.freeze(['fairness', 'wishes', 'bdTarget', 'weekendChain', 'weekend', 'saturday', 'hgBurden', 'ctLeadership']);
+
+function normalizedStageOrder(value, fallback) {
+  const source = Array.isArray(value) ? value.filter(id => STAGE_IDS.includes(id)) : [];
+  const unique = [...new Set(source)];
+  return Object.freeze([...unique, ...(fallback || STAGE_IDS).filter(id => !unique.includes(id))]);
+}
+
 function normalizedEnum(value, allowed, fallback, field, strict) {
   if (allowed.has(value)) return value;
   if (strict && value !== undefined) throw new Error(`„${field}“ enthält einen nicht unterstützten Wert.`);
@@ -228,20 +246,19 @@ export function normalizeSettings(value, { strict = false } = {}) {
       portfolioDiversity: normalizedBoolean(autoPlan.portfolioDiversity, DEFAULT_SETTINGS.autoPlan.portfolioDiversity, 'settings.autoPlan.portfolioDiversity', strict),
       solverBackend: normalizedEnum(autoPlan.solverBackend, new Set(['auto', 'cp-sat-exact', 'cp-sat-lns', 'heuristic-alns']), DEFAULT_SETTINGS.autoPlan.solverBackend, 'settings.autoPlan.solverBackend', strict),
       cpSatTimeBudgetSeconds: normalizedBoundedInteger(autoPlan.cpSatTimeBudgetSeconds, DEFAULT_SETTINGS.autoPlan.cpSatTimeBudgetSeconds, 1, 60, 'settings.autoPlan.cpSatTimeBudgetSeconds', strict),
-      cpSatWorkers: normalizedBoundedInteger(autoPlan.cpSatWorkers, DEFAULT_SETTINGS.autoPlan.cpSatWorkers, 1, 8, 'settings.autoPlan.cpSatWorkers', strict, true),
       cpSatWarmStart: normalizedEnum(autoPlan.cpSatWarmStart, new Set(['heuristic', 'none']), DEFAULT_SETTINGS.autoPlan.cpSatWarmStart, 'settings.autoPlan.cpSatWarmStart', strict),
-      fairnessProfile: normalizedEnum(autoPlan.fairnessProfile, new Set(['leximin', 'spread', 'variance', 'owa']), DEFAULT_SETTINGS.autoPlan.fairnessProfile, 'settings.autoPlan.fairnessProfile', strict),
       deterministic: normalizedBoolean(autoPlan.deterministic, DEFAULT_SETTINGS.autoPlan.deterministic, 'settings.autoPlan.deterministic', strict),
-      infeasibilityMode: normalizedEnum(autoPlan.infeasibilityMode, new Set(['mus', 'relax', 'report']), DEFAULT_SETTINGS.autoPlan.infeasibilityMode, 'settings.autoPlan.infeasibilityMode', strict),
       repairOnEdit: normalizedBoolean(autoPlan.repairOnEdit, DEFAULT_SETTINGS.autoPlan.repairOnEdit, 'settings.autoPlan.repairOnEdit', strict),
       explanationDepth: normalizedEnum(autoPlan.explanationDepth, new Set(['short', 'detailed', 'llm']), DEFAULT_SETTINGS.autoPlan.explanationDepth, 'settings.autoPlan.explanationDepth', strict),
-      cpSatFairnessWeight: normalizedBoundedInteger(autoPlan.cpSatFairnessWeight, DEFAULT_SETTINGS.autoPlan.cpSatFairnessWeight, 1, 100, 'settings.autoPlan.cpSatFairnessWeight', strict),
       protectBaseline: normalizedBoolean(autoPlan.protectBaseline, DEFAULT_SETTINGS.autoPlan.protectBaseline, 'settings.autoPlan.protectBaseline', strict),
-      cpSatPerturbationWeight: normalizedBoundedInteger(autoPlan.cpSatPerturbationWeight, DEFAULT_SETTINGS.autoPlan.cpSatPerturbationWeight, 0, 100, 'settings.autoPlan.cpSatPerturbationWeight', strict),
-      cpSatCtLeadershipWeight: normalizedBoundedInteger(autoPlan.cpSatCtLeadershipWeight, DEFAULT_SETTINGS.autoPlan.cpSatCtLeadershipWeight, 0, 100, 'settings.autoPlan.cpSatCtLeadershipWeight', strict),
-      cpSatWeekendChainWeight: normalizedBoundedInteger(autoPlan.cpSatWeekendChainWeight, DEFAULT_SETTINGS.autoPlan.cpSatWeekendChainWeight, 0, 200, 'settings.autoPlan.cpSatWeekendChainWeight', strict),
       relaxationDepth: normalizedEnum(autoPlan.relaxationDepth, new Set(['shallow', 'deep']), DEFAULT_SETTINGS.autoPlan.relaxationDepth, 'settings.autoPlan.relaxationDepth', strict),
-      musAutoRelax: normalizedBoolean(autoPlan.musAutoRelax, DEFAULT_SETTINGS.autoPlan.musAutoRelax, 'settings.autoPlan.musAutoRelax', strict)
+      stageOrder: normalizedStageOrder(autoPlan.stageOrder, DEFAULT_SETTINGS.autoPlan.stageOrder),
+      leximinDepth: normalizedBoundedInteger(autoPlan.leximinDepth, DEFAULT_SETTINGS.autoPlan.leximinDepth, 1, 8, 'settings.autoPlan.leximinDepth', strict),
+      hgLoadPercent: normalizedBoundedInteger(autoPlan.hgLoadPercent, DEFAULT_SETTINGS.autoPlan.hgLoadPercent, 0, 100, 'settings.autoPlan.hgLoadPercent', strict),
+      carryOverWindow: normalizedBoundedInteger(autoPlan.carryOverWindow, DEFAULT_SETTINGS.autoPlan.carryOverWindow, 0, 6, 'settings.autoPlan.carryOverWindow', strict),
+      carryOverPercent: normalizedBoundedInteger(autoPlan.carryOverPercent, DEFAULT_SETTINGS.autoPlan.carryOverPercent, 0, 100, 'settings.autoPlan.carryOverPercent', strict),
+      stabilityLevel: normalizedEnum(autoPlan.stabilityLevel, new Set(['off', 'tiebreak', 'strict']), DEFAULT_SETTINGS.autoPlan.stabilityLevel, 'settings.autoPlan.stabilityLevel', strict),
+      conflictMode: normalizedEnum(autoPlan.conflictMode, new Set(['report', 'show', 'apply']), DEFAULT_SETTINGS.autoPlan.conflictMode, 'settings.autoPlan.conflictMode', strict)
     }
   };
 }

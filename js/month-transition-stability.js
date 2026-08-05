@@ -1,5 +1,5 @@
-import { applyMonthTheme } from './theme.js?v=20260805.1';
-import { applySpectrumProfile, spectrumMotionIsRunning } from './color-director.js?v=20260805.1';
+import { applyMonthTheme } from './theme.js?v=20260806.1';
+import { applySpectrumProfile, spectrumMotionIsRunning } from './color-director.js?v=20260806.1';
 
 /**
  * Führt die konkurrierenden Farbsignale eines Monatswechsels zu genau einem

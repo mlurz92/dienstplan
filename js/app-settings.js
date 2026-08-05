@@ -14,10 +14,10 @@
  *
  * Die drei Abschnitte folgen der Gliederung des Einstellungsschemas.
  */
-import { DEFAULT_SETTINGS, normalizeSettings } from './defaults.js?v=20260805.1';
-import { markBootstrapDirty, persistBootstrap, state } from './state.js?v=20260805.1';
+import { DEFAULT_SETTINGS, normalizeSettings } from './defaults.js?v=20260806.1';
+import { markBootstrapDirty, persistBootstrap, state } from './state.js?v=20260806.1';
 
-const RELEASE = '20260805.1';
+const RELEASE = '20260806.1';
 const byId = id => document.getElementById(id);
 
 function addStylesheet() {
@@ -48,7 +48,7 @@ function dialogMarkup() {
       <nav class="settings-tabs" role="tablist" aria-label="Einstellungsbereiche">
         <button type="button" role="tab" id="settingsTabAppearance" aria-controls="settingsPanelAppearance" aria-selected="true" data-settings-tab="appearance">Darstellung</button>
         <button type="button" role="tab" id="settingsTabWorkflow" aria-controls="settingsPanelWorkflow" aria-selected="false" tabindex="-1" data-settings-tab="workflow">Arbeitsweise</button>
-        <button type="button" role="tab" id="settingsTabAutoPlan" aria-controls="settingsPanelAutoPlan" aria-selected="false" tabindex="-1" data-settings-tab="autoplan">Auto-Plan v9</button>
+        <button type="button" role="tab" id="settingsTabAutoPlan" aria-controls="settingsPanelAutoPlan" aria-selected="false" tabindex="-1" data-settings-tab="autoplan">Auto-Plan v10</button>
       </nav>
 
       <div class="settings-body">
@@ -97,8 +97,8 @@ function dialogMarkup() {
 
         <section class="settings-section settings-section--accent" role="tabpanel" id="settingsPanelAutoPlan" aria-labelledby="settingsTabAutoPlan" data-settings-panel="autoplan" hidden>
           <div class="settings-section-heading">
-            <span class="settings-section-icon" aria-hidden="true">v9</span>
-            <div><h3>Auto-Plan Engine v9</h3><p>Sichere Voreinstellungen für neue Läufe; im Studio bleibt jeder Wert pro Lauf änderbar.</p></div>
+            <span class="settings-section-icon" aria-hidden="true">v10</span>
+            <div><h3>Auto-Plan Engine v10</h3><p>Sichere Voreinstellungen für neue Läufe; im Studio bleibt jeder Wert pro Lauf änderbar.</p></div>
           </div>
           <div class="settings-grid settings-grid--three">
             <label><span>Leistungsprofil</span><small>Steuert das geräteabhängige Worker-Budget und die für die Oberfläche reservierten Kerne.</small>
@@ -131,39 +131,47 @@ function dialogMarkup() {
 
           <div class="settings-section-heading" style="margin-top:20px">
             <span class="settings-section-icon" aria-hidden="true">≈</span>
-            <div><h3>Exakte Suche (v9)</h3><p>CP-SAT löst den Monat im Browser; ohne verfügbares WebAssembly übernimmt die Heuristik vollständig.</p></div>
+            <div><h3>Exakte Suche (v10)</h3><p>CP-SAT löst den Monat im Browser als boolesches Zuordnungsmodell; ohne verfügbares WebAssembly übernimmt die Heuristik vollständig.</p></div>
           </div>
           <div class="settings-grid settings-grid--three">
-            <label><span>Solver-Backend</span><small>Automatisch versucht CP-SAT und fällt bei Nichtverfügbarkeit auf die Heuristik zurück.</small>
+            <label><span>Solver-Backend</span><small>Automatisch versucht die exakte Suche und fällt bei Nichtverfügbarkeit auf die Heuristik zurück.</small>
               <select id="settingsSolverBackend">
                 <option value="auto">Automatisch · empfohlen</option>
-                <option value="cp-sat-exact">CP-SAT exakt</option>
-                <option value="cp-sat-lns">CP-SAT + LNS</option>
-                <option value="heuristic-alns">Heuristik v8.5</option>
+                <option value="cp-sat-exact">Exakt (CP-SAT)</option>
+                <option value="cp-sat-lns">Exakt mit Nachbarschaftssuche</option>
+                <option value="heuristic-alns">Nur Heuristik</option>
               </select>
             </label>
-            <label><span>CP-SAT-Zeitbudget</span><small>1 bis 60 Sekunden für die lexikografischen Phasen; bei 62 Feldern ist OPTIMAL meist in unter einer Sekunde erreicht.</small>
-              <span class="settings-number"><input id="settingsCpSatBudget" type="number" min="1" max="60" step="1"><b>s</b></span>
+            <label><span>Zeitbudget der Kaskade</span><small>2 bis 60 Sekunden, anteilig auf die Stufen verteilt. Bei 60 offenen Feldern ist jede Stufe meist in Millisekunden beweisbar optimal.</small>
+              <span class="settings-number"><input id="settingsCpSatBudget" type="number" min="2" max="60" step="1"><b>s</b></span>
             </label>
-            <label><span>CP-SAT-Worker</span><small>Parallele Such-Threads; benötigt Cross-Origin-Isolation (COOP/COEP) und freie Kerne.</small>
-              <select id="settingsCpSatWorkers"><option value="">Automatisch</option>${Array.from({ length: 8 }, (_, index) => `<option value="${index + 1}">${index + 1}</option>`).join('')}</select>
-            </label>
-            <label><span>Warmstart</span><small>Die Heuristik-Startbelegung prunt die exakte Suche als Lösungshinweis.</small>
+            <label><span>Warmstart</span><small>Die Heuristik-Startbelegung wird der exakten Suche als Lösungshinweis übergeben.</small>
               <select id="settingsCpSatWarmStart"><option value="heuristic">Heuristik-Hinweis</option><option value="none">Ohne Hinweis</option></select>
             </label>
-            <label><span>Fairness-Profil</span><small>Leximin maximiert zuerst die am schwächsten gestellte Person – das robusteste Maß gegen Ausreißer.</small>
-              <select id="settingsFairnessProfile">
-                <option value="leximin">Leximin (Maximin zuerst)</option>
-                <option value="spread">Spannweite</option>
-                <option value="variance">Varianz</option>
-                <option value="owa">OWA</option>
+            <label><span>Leximin-Tiefe</span><small>Wie viele Ränge des sortierten Lastvektors exakt festgezurrt werden. Ein Rang senkt die Höchstlast, jeder weitere die nächste Stufe darunter.</small>
+              <span class="settings-number"><input id="settingsLeximinDepth" type="number" min="1" max="8" step="1"><b>Ränge</b></span>
+            </label>
+            <label><span>HG-Gewicht in der Last</span><small>Wie stark ein Hintergrunddienst gegenüber einem Bereitschaftsdienst als Belastung zählt.</small>
+              <span class="settings-number"><input id="settingsHgLoadPercent" type="number" min="0" max="100" step="5"><b>%</b></span>
+            </label>
+            <label><span>Fairness-Gedächtnis</span><small>Länge des Rückblicks auf abgeschlossene Monate. Null schaltet die monatsübergreifende Fairness ab.</small>
+              <span class="settings-number"><input id="settingsCarryOverWindow" type="number" min="0" max="6" step="1"><b>Monate</b></span>
+            </label>
+            <label><span>Gewicht des Gedächtnisses</span><small>Wie stark ein Vorsprung aus den Vormonaten den Startwert der Lastverteilung anhebt.</small>
+              <span class="settings-number"><input id="settingsCarryOverPercent" type="number" min="0" max="100" step="5"><b>%</b></span>
+            </label>
+            <label><span>Stabilität gegenüber dem Warmstart</span><small>Wie stark der Vorschlag am Ausgangsplan festhält, wenn mehrere Lösungen gleich gut sind.</small>
+              <select id="settingsStabilityLevel">
+                <option value="off">Aus</option>
+                <option value="tiebreak">Bei Gleichstand · empfohlen</option>
+                <option value="strict">Streng – Stabilität zuerst</option>
               </select>
             </label>
-            <label><span>Bei Unzulässigkeit</span><small>Ursachenanalyse benennt die kleinste Konfliktgruppe; Relaxierung weicht Gruppen schrittweise auf.</small>
-              <select id="settingsInfeasibilityMode">
-                <option value="mus">Ursachenanalyse</option>
-                <option value="relax">Ursachen + Relaxierung</option>
+            <label><span>Bei Unlösbarkeit</span><small>Die Korrekturmengen-Diagnose nennt in einem Lauf, welche Regelgruppen aufgegeben werden müssten.</small>
+              <select id="settingsConflictMode">
                 <option value="report">Nur melden</option>
+                <option value="show">Korrekturmenge anzeigen · empfohlen</option>
+                <option value="apply">Korrekturmenge anwenden</option>
               </select>
             </label>
             <label><span>Erklärungstiefe</span><small>Kurz, ausführlich mit Regel-Kennungen oder optional LLM-gestützt.</small>
@@ -230,10 +238,13 @@ function populate(settings) {
   byId('settingsAllowRed').checked = normalized.autoPlan.allowRedFallback;
   byId('settingsSolverBackend').value = normalized.autoPlan.solverBackend;
   byId('settingsCpSatBudget').value = String(normalized.autoPlan.cpSatTimeBudgetSeconds);
-  byId('settingsCpSatWorkers').value = normalized.autoPlan.cpSatWorkers ?? '';
   byId('settingsCpSatWarmStart').value = normalized.autoPlan.cpSatWarmStart;
-  byId('settingsFairnessProfile').value = normalized.autoPlan.fairnessProfile;
-  byId('settingsInfeasibilityMode').value = normalized.autoPlan.infeasibilityMode;
+  byId('settingsLeximinDepth').value = String(normalized.autoPlan.leximinDepth);
+  byId('settingsHgLoadPercent').value = String(normalized.autoPlan.hgLoadPercent);
+  byId('settingsCarryOverWindow').value = String(normalized.autoPlan.carryOverWindow);
+  byId('settingsCarryOverPercent').value = String(normalized.autoPlan.carryOverPercent);
+  byId('settingsStabilityLevel').value = normalized.autoPlan.stabilityLevel;
+  byId('settingsConflictMode').value = normalized.autoPlan.conflictMode;
   byId('settingsExplanationDepth').value = normalized.autoPlan.explanationDepth;
   byId('settingsDeterministic').checked = normalized.autoPlan.deterministic;
   byId('settingsRepairOnEdit').checked = normalized.autoPlan.repairOnEdit;
@@ -269,10 +280,13 @@ function readForm() {
       allowRedFallback: byId('settingsAllowRed').checked,
       solverBackend: byId('settingsSolverBackend').value,
       cpSatTimeBudgetSeconds: Number(byId('settingsCpSatBudget').value),
-      cpSatWorkers: valueOrNull(byId('settingsCpSatWorkers').value),
       cpSatWarmStart: byId('settingsCpSatWarmStart').value,
-      fairnessProfile: byId('settingsFairnessProfile').value,
-      infeasibilityMode: byId('settingsInfeasibilityMode').value,
+      leximinDepth: Number(byId('settingsLeximinDepth').value),
+      hgLoadPercent: Number(byId('settingsHgLoadPercent').value),
+      carryOverWindow: Number(byId('settingsCarryOverWindow').value),
+      carryOverPercent: Number(byId('settingsCarryOverPercent').value),
+      stabilityLevel: byId('settingsStabilityLevel').value,
+      conflictMode: byId('settingsConflictMode').value,
       explanationDepth: byId('settingsExplanationDepth').value,
       deterministic: byId('settingsDeterministic').checked,
       repairOnEdit: byId('settingsRepairOnEdit').checked

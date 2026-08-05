@@ -29,9 +29,9 @@
  *    Tagespaket. Ein als nicht weiter verbesserbar ausgewiesener Plan enthält
  *    damit keine Verbesserung mehr, die die Suche selbst kennt.
  */
-import * as V75 from './auto-planner-v7-5.js?v=20260805.1';
+import * as V75 from './auto-planner-v7-5.js?v=20260806.1';
 
-export * from './auto-planner-v7-5.js?v=20260805.1';
+export * from './auto-planner-v7-5.js?v=20260806.1';
 
 export const AUTO_PLAN_REVISION = 8;
 export const AUTO_PLAN_ENGINE_ID = 'v8-incremental-constraint-observatory';

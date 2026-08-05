@@ -17,11 +17,11 @@
  *    sondern scrollt intern. Dark-Mode-Kontraste werden angehoben.
  */
 
-import { AUTO_PLAN_STAGES, isCpSatReady } from './auto-planner.js?v=20260805.1';
-import { state } from './state.js?v=20260805.1';
-import { setRichTooltip } from './rich-tooltip-v8-5.js?v=20260805.1';
+import { AUTO_PLAN_STAGES, isCpSatReady } from './auto-planner.js?v=20260806.1';
+import { state } from './state.js?v=20260806.1';
+import { setRichTooltip } from './rich-tooltip-v8-5.js?v=20260806.1';
 
-const RELEASE = '20260805.1';
+const RELEASE = '20260806.1';
 const STORAGE_KEY = 'dienstplanrad:autoplan-v9-studio';
 
 const BACKEND_LABELS = Object.freeze({
