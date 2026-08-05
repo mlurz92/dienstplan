@@ -9,8 +9,10 @@
  */
 
 import * as V95 from './auto-planner-v9-5.js?v=20260805.1';
+import { reconcileV95Certification } from './auto-plan-certification-v9-5.js?v=20260805.2';
 
 export * from './auto-planner-v9-5.js?v=20260805.1';
+export { reconcileV95Certification } from './auto-plan-certification-v9-5.js?v=20260805.2';
 
 function isTerminal(update) {
   return update?.phase === 'complete' || update?.phase === 'blocked';
@@ -36,10 +38,10 @@ async function reportTerminal(onProgress, result) {
 }
 
 export async function perfectAutoPlan(parameters) {
-  const result = await V95.perfectAutoPlan({
+  const result = reconcileV95Certification(await V95.perfectAutoPlan({
     ...parameters,
     onProgress: relayWithoutTerminal(parameters?.onProgress)
-  });
+  }));
   await reportTerminal(parameters?.onProgress, result);
   return result;
 }
