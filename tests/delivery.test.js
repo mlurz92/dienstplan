@@ -121,10 +121,10 @@ test('legacy service workers are neutralized before versioned application assets
 
 /**
  * v9.5 ist bewusst eine additive Kompatibilitätsschicht: Der unveränderte
- * Anwendungsshell bleibt auf dem ausgerollten Basistoken, während ausschließlich
- * die neuen v9.5-Einstiegspunkte und ihre gegenseitigen Imports einen eigenen
- * Token tragen. Damit werden bestehende, breit getestete Module nicht künstlich
- * neu adressiert, die geänderten Engine-/Studio-Dateien aber sicher invalidiert.
+ * Anwendungsshell bleibt auf dem ausgerollten Basistoken. Die reguläre v9.5-
+ * Schicht verwendet ihren Releasetoken; gezielte additive Hotfixmodule dürfen
+ * einen eigenen, ausdrücklich geprüften Patchtoken tragen. So wird nur der
+ * tatsächlich geänderte Browsercode sicher invalidiert.
  */
 test('the compatibility shell and additive v9.5 layer use only their declared cache tokens', async () => {
   const { readdir } = await import('node:fs/promises');
@@ -136,16 +136,17 @@ test('the compatibility shell and additive v9.5 layer use only their declared ca
   const releaseSources = [sources[0], ...await Promise.all(moduleFiles.map(read))];
   const tokens = releaseSources.flatMap(source =>
     [...source.matchAll(/\?v=([a-z0-9.-]+)/gi)].map(match => match[1]));
-  const allowed = new Set(['20260803.4', '20260805.1']);
+  const allowed = new Set(['20260803.4', '20260805.1', '20260805.2']);
 
   assert.ok(tokens.length >= 50, 'entry assets and the full module graph need version tokens');
   assert.ok(tokens.every(token => allowed.has(token)), `unerwarteter Release-Token: ${[...new Set(tokens)].filter(token => !allowed.has(token)).join(', ')}`);
-  assert.deepEqual([...new Set(tokens)].sort(), [...allowed].sort(), 'Basis- und v9.5-Schicht müssen beide ausdrücklich vorkommen');
+  assert.deepEqual([...new Set(tokens)].sort(), [...allowed].sort(), 'Basis-, v9.5- und Hotfix-Schicht müssen ausdrücklich vorkommen');
 
   const publicPlanner = await read('js/auto-planner.js');
   const autoPlanUi = await read('js/auto-plan-ui.js');
   assert.match(publicPlanner, /auto-planner-v9-5-runtime\.js\?v=20260805\.1/);
   assert.match(autoPlanUi, /auto-plan-studio-v9-5\.js\?v=20260805\.1/);
+  assert.match(autoPlanUi, /auto-plan-studio-v9-5-polish\.js\?v=20260805\.2/);
 
   for (let index = 1; index < files.length; index += 1) {
     const localImports = [...sources[index].matchAll(/from\s+['"](\.\/[^'"]+)['"]/g)].map(match => match[1]);
