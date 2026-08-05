@@ -227,15 +227,15 @@ html[data-color-scheme="dark"] .auto-plan-dialog[data-v9-layout="1"] .auto-plan-
  */
 .auto-plan-dialog[data-v9-layout="1"] #autoPlanConfig {
   display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(340px, .62fr);
+  grid-template-columns: minmax(0, .85fr) minmax(380px, 1.15fr);
   grid-template-rows: auto auto;
   grid-template-areas:
     "hero limits"
     "validation limits";
-  gap: var(--flow-group);
+  gap: 9px;
   align-content: start;
 }
-.auto-plan-dialog[data-v9-layout="1"] .auto-plan-config-hero { grid-area: hero; align-self: start; }
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-config-hero { grid-area: hero; align-self: start; min-width: 0; }
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-panel {
   grid-area: limits;
   align-self: stretch;
@@ -246,11 +246,34 @@ html[data-color-scheme="dark"] .auto-plan-dialog[data-v9-layout="1"] .auto-plan-
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-scroll {
   flex: 1 1 auto;
   min-height: 0;
-  overflow-y: auto;
+  overflow: auto;
   scrollbar-gutter: stable;
   scrollbar-width: thin;
 }
 .auto-plan-dialog[data-v9-layout="1"] #autoPlanValidation { grid-area: validation; align-self: start; }
+
+/* Limits-Tabelle: volle Containerbreite, festes Spaltenraster, schmalere
+   Zahlenfelder. Die Personenspalte nimmt den Rest und darf umbrechen. */
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-table {
+  min-width: 0;
+  width: 100%;
+  table-layout: fixed;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-table th,
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-table td {
+  padding: 3px 4px;
+  height: 26px;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-table th:first-child,
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-table td:first-child {
+  width: auto;
+  white-space: normal;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-table th:not(:first-child),
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-table td:not(:first-child) {
+  width: 58px;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-table input { min-height: 26px; }
 
 /* Dichtes Feldraster: mehr Einstellungen auf einen Blick. */
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-field-grid {
@@ -262,13 +285,6 @@ html[data-color-scheme="dark"] .auto-plan-dialog[data-v9-layout="1"] .auto-plan-
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-field input[type="number"],
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-field input[type="range"] { min-height: 30px; }
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-context-list { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
-
-/* Kompakte Obergrenzen-Tabelle. */
-.auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-table th,
-.auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-table td { padding: 3px 5px; height: 26px; }
-.auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-table th:not(:first-child),
-.auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-table td:not(:first-child) { width: 74px; }
-.auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-table input { min-height: 26px; }
 
 /* ------------------------------------------------------- v9-Phasen-Ribbon */
 
