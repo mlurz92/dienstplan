@@ -270,14 +270,75 @@ html[data-color-scheme="dark"] .auto-plan-dialog[data-v9-layout="1"] .auto-plan-
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-table td:not(:first-child) { width: 74px; }
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-table input { min-height: 26px; }
 
+/* ------------------------------------------------------- v9-Phasen-Ribbon */
+
+/* Acht Stufen beanspruchen im v9-Kopfband mehr Platz als die sechs der
+   früheren Generation. Die Kacheln werden schmaler und dichter, damit sie
+   ohne übermäßig hohen Header in zwei Reihen Platz finden. */
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v8-stages {
+  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+  gap: .35rem;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v8-stages li {
+  padding: .38rem .55rem .38rem 1.45rem;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v8-stages li::before {
+  inline-size: .82rem;
+  block-size: .82rem;
+  font-size: .55rem;
+  inset-block-start: .38rem;
+  inset-inline-start: .38rem;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v8-stages b {
+  font-size: .68rem;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v8-stages small {
+  font-size: .6rem;
+}
+
+/* Der dekorative Orbit-Kreis des Ribbons ragte um 150 px nach oben; die
+   Animation rotiert trotz Entfernung aus dem sichtbaren Bereich sinnlos
+   weiter. Er wird jetzt an den unteren rechten Rand gesetzt – sichtbar und
+   ohne seitliches Überlappen der Laufansicht. */
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-ribbon::after {
+  inset: auto -10px -6px auto;
+  width: 170px;
+  height: 170px;
+}
+
+/* ------------------------------------------------------- Theater-Karten */
+
+/* Die exakte Suche hat acht Etappen; 96 px pro Karte schnitt lange deutsche
+   Titel ab. 130 px lassen genug Platz, und `text-overflow:ellipsis` sichert
+   für die Bremsgrenzen ab. */
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-theatre ol {
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 6px;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-theatre li {
+  min-height: 58px;
+  padding: 7px;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-theatre li b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: .7rem;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-theatre li small {
+  font-size: .58rem;
+}
+
 /* --------------------------------------------------------- Laufansicht v9 */
 
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-stage {
   min-height: 0;
+  align-items: start;
   grid-template-columns: minmax(300px, .8fr) minmax(420px, 1.2fr);
 }
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-visual { min-height: 210px; max-height: 250px; }
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-console {
+  min-width: 0;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   align-content: start;
   min-height: 0;
@@ -292,14 +353,6 @@ html[data-color-scheme="dark"] .auto-plan-dialog[data-v9-layout="1"] .auto-plan-
   height: auto;
   overflow-y: auto;
 }
-.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-theatre ol {
-  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
-  gap: 6px;
-}
-.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-theatre li { min-height: 58px; padding: 7px; }
-.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-theatre li b { font-size: .7rem; }
-.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-theatre li small { font-size: .58rem; }
-
 /* ------------------------------------------------------------- Ergebnis v9 */
 
 .auto-plan-dialog[data-v9-layout="1"] #autoPlanResult .auto-plan-card { padding-block: 10px; }

@@ -556,9 +556,10 @@ function upgradeTheatre(dialog) {
     ol.innerHTML = AUTO_PLAN_STAGES.map((stage, index) =>
       `<li data-index="${index}" data-stage="${stage.id}"><i></i><div><b>${stage.title}</b><small>${stage.detail}</small></div><span>offen</span></li>`).join('');
   }
-  // Die Stufenliste im Kopfband (Ribbon) stammt aus der v8-Ära und trägt noch
-  // die alten Stufentitel. Sie wird auf denselben achtstufigen Vertrag gehoben.
-  const ribbonStages = dialog.querySelector('#autoPlanV8Ribbon .auto-plan-v8-stages');
+  // Die Stufenliste im Kopfband (Ribbon): Flexibler Selektor, der jedes Ribbon-ID
+  // (v8, v8.5) abdeckt, damit die 8 v9-Stufen sichtbar werden – egal welches Ribbon
+  // das Dialog trägt.
+  const ribbonStages = dialog.querySelector('#autoPlanV8Ribbon .auto-plan-v8-stages, #autoPlanV85Ribbon .auto-plan-v8-stages, .auto-plan-v85-ribbon .auto-plan-v8-stages');
   if (ribbonStages) {
     ribbonStages.innerHTML = AUTO_PLAN_STAGES.map(stage =>
       `<li data-stage="${stage.id}"><b>${stage.title}</b><small>${stage.detail}</small></li>`).join('');
