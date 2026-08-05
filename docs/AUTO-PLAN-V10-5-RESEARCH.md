@@ -522,7 +522,30 @@ Reihenfolge ist bindend: jedes Paket ist für sich lauffähig und testbar.
 
 ## 15. Studio-Einstellungen v10.5
 
-**Entfernt** (wirkungslos): neun `cpSat*Weight`-Regler, `fairnessProfile` mit den Attrappen-Profilen, `cpSatWorkers` (portabel immer 1).
+**Bestandsaufnahme der `cpSat*Weight`-Schlüssel** (Stand v10, vor dieser Änderung) — die Behauptung „neun Regler entfernen“ ist ungenau, da nur zwei davon überhaupt als Bedienelement existieren:
+
+| Schlüssel | Bedienelement im Studio? | Verankert in `DEFAULT_SETTINGS`/`normalizeSettings`? | Sonstiger Fundort |
+|---|---|---|---|
+| `cpSatFairnessWeight` | ja — Regler „Fairness-Gewicht“ (`js/auto-plan-studio-v9.js:241`) | ja (`js/defaults.js:58`, `238`) | Inline-Fallback `js/auto-plan-cp-sat.js:334` |
+| `cpSatPerturbationWeight` | ja — Regler „Minimal-Perturbation-Gewicht“ (`js/auto-plan-studio-v9.js:257`) | ja (`js/defaults.js:60`, `240`) | Inline-Fallback `js/auto-plan-cp-sat.js:342` |
+| `cpSatCtLeadershipWeight` | nein, kein UI-Regler | ja (`js/defaults.js:61`, `241`) | Inline-Fallback `js/auto-plan-cp-sat.js:340` |
+| `cpSatWeekendChainWeight` | nein, kein UI-Regler | ja (`js/defaults.js:62`, `242`) | Inline-Fallback `js/auto-plan-cp-sat.js:341` |
+| `cpSatWishWeight` | nein, kein UI-Regler | nein — nur Inline-Default | `js/auto-plan-cp-sat.js:335` |
+| `cpSatBdTargetWeight` | nein, kein UI-Regler | nein — nur Inline-Default | `js/auto-plan-cp-sat.js:336` |
+| `cpSatWeekendWeight` | nein, kein UI-Regler | nein — nur Inline-Default | `js/auto-plan-cp-sat.js:337` |
+| `cpSatSaturdayWeight` | nein, kein UI-Regler | nein — nur Inline-Default | `js/auto-plan-cp-sat.js:338` |
+| `cpSatHgWeight` | nein, kein UI-Regler | nein — nur Inline-Default | `js/auto-plan-cp-sat.js:339` |
+
+Tatsächlich sind also nur **zwei** der neun Schlüssel als Studio-Regler sichtbar (`cpSatFairnessWeight`, `cpSatPerturbationWeight`); zwei weitere sind reine, im UI nicht erreichbare Einstellungsfelder (`cpSatCtLeadershipWeight`, `cpSatWeekendChainWeight`); die restlichen fünf existieren ausschließlich als Inline-Defaults im Modellbau (`cpSatWishWeight`, `cpSatBdTargetWeight`, `cpSatWeekendWeight`, `cpSatSaturdayWeight`, `cpSatHgWeight`) und tauchen in keiner Persistenzstruktur auf. **Entfernt** wird damit nicht „ein Regler“, sondern der gesamte Satz von neun Gewichts-Schlüsseln inklusive ihrer heterogenen Verankerung — plus `fairnessProfile` mit den Attrappen-Profilen und `cpSatWorkers` (portabel immer 1).
+
+**Migrationspunkte (P7) — jeder muss angefasst werden, sonst bleibt ein Schlüssel in der Oberfläche oder in der Validierung zurück:**
+
+1. **`js/defaults.js`** — Entfernen der vier verankerten Schlüssel (`cpSatFairnessWeight`, `cpSatPerturbationWeight`, `cpSatCtLeadershipWeight`, `cpSatWeekendChainWeight`) sowie `fairnessProfile` und `cpSatWorkers` aus **beiden** Stellen: dem Literal in `DEFAULT_SETTINGS` (Zeilen 58–62) **und** der Feld-für-Feld-Validierung in `normalizeSettings` (Zeilen 238–242). Ein Entfernen an nur einer der beiden Stellen lässt das Schema und den tatsächlichen Default divergieren.
+2. **`js/app-settings.js`** — die Einstellungen-Ansicht liest/schreibt `fairnessProfile` über das Select `settingsFairnessProfile` (Zeile 155/235/274); dieses DOM-Element und die zugehörige Lese-/Schreib-Logik müssen mitentfernt bzw. auf die neuen Kaskade/Leximin-Felder umgestellt werden.
+3. **`js/auto-plan-studio-v9.js`** — die beiden tatsächlichen UI-Regler `autoPlanV9FairnessWeight` (Zeile 241) und `autoPlanV9PerturbationWeight` (Zeile 257) inklusive ihrer `<output>`-Anzeige und Event-Bindung entfernen bzw. durch die neuen Regler aus Abschnitt 15 ersetzen.
+4. **`js/auto-plan-cp-sat.js`** — die Inline-Fallback-Defaults für alle neun Gewichte (Zeilen 334–342) entfallen mit dem Modul selbst (P0–P2 ersetzen `auto-plan-cp-sat.js` durch `js/auto-plan-model.js`); falls Teile vorübergehend weiterleben, müssen die Fallbacks synchron mit Punkt 1 entfernt werden, damit keine tote Referenz auf einen nicht mehr existierenden Settings-Schlüssel bleibt.
+5. **Bereits gespeicherte Workers-KV-Einstellungen** — Bestandsdatensätze unter `app:settings` können die alten Schlüssel noch enthalten. `normalizeSettings` muss beim Lesen (`onRequestGet`) unbekannte/entfernte Schlüssel stillschweigend ignorieren (kein `strict`), damit alte Datensätze nicht das Laden blockieren; ein einmaliger Migrationslauf, der die alten Schlüssel beim nächsten `PUT` herausfiltert, ist vorzusehen.
+6. **`functions/api/settings.js`** — der `PUT`-Handler ruft `normalizeSettings(..., { strict: true })` auf (Zeile 14). Solange die alten Schlüssel dort noch als bekannt geführt werden, akzeptiert die strikte Validierung Alt-Payloads mit `fairnessProfile`/`cpSatWorkers`/den neun Gewichten weiterhin fehlerfrei; nach der Entfernung aus `js/defaults.js` müssen Alt-Payloads mit diesen Schlüsseln entweder toleriert (Schlüssel ignorieren) oder mit einer klaren Fehlermeldung abgelehnt werden — beides muss bewusst entschieden und getestet werden, sonst schlägt `PUT /api/settings` für jeden Client mit altem Client-Cache plötzlich fehl.
 
 **Neu bzw. neu belegt** — jeder Regler verändert nachweislich das Ergebnis:
 
