@@ -12,7 +12,7 @@
 
 import { setRichTooltip } from './rich-tooltip-v8-5.js?v=20260803.4';
 
-const RELEASE = '20260805.3';
+const RELEASE = '20260805.2';
 let themeHome = null;
 let activeDialog = null;
 let lastResult = null;
