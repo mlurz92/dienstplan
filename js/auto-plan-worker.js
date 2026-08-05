@@ -12,6 +12,7 @@
  */
 
 import { constructAutoPlan, perfectAutoPlan } from './auto-planner-v9-5.js?v=20260805.1';
+import { reconcileV95Certification } from './auto-plan-certification-v9-5.js?v=20260805.2';
 
 /**
  * Fortschrittsmeldungen tragen am Ende teilweise das vollständige Ergebnis.
@@ -52,7 +53,13 @@ self.addEventListener('message', async event => {
       return;
     }
     if (type === 'perfect') {
-      const result = await perfectAutoPlan({ state, runConfig, constructed, progressFloor, onProgress: report });
+      const result = reconcileV95Certification(await perfectAutoPlan({
+        state,
+        runConfig,
+        constructed,
+        progressFloor,
+        onProgress: report
+      }));
       self.postMessage({ type: 'done', runId, result });
       return;
     }
