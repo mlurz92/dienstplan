@@ -12,7 +12,7 @@
  */
 
 import { constructAutoPlan, perfectAutoPlan } from './auto-planner-v9-5.js?v=20260805.1';
-import { reconcileV95Certification } from './auto-plan-certification-v9-5.js?v=20260805.2';
+import { reconcileV95Certification } from './auto-plan-certification-v9-5.mjs?v=20260805.2';
 
 /**
  * Fortschrittsmeldungen tragen am Ende teilweise das vollständige Ergebnis.
