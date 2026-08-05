@@ -36,6 +36,8 @@ Die Vorgabe „die Engine auf v9.5 heben“ ist nominell bereits erfüllt — **
 
 Das Problem ist für einen exakten Solver **klein**. Beweisbare Optimalität ist in unter einer halben Sekunde erreichbar. Die heutige Engine erreicht sie nie — nicht wegen der Problemgröße, sondern wegen fünf konkreter Modellierungs- und Bindungsfehler.
 
+*Hinweis zur obigen Tabelle: Die Messumgebung (Build portable/threaded, `numWorkers`, Node vs. Browser-Worker, Läufe/Median) wurde nicht vollständig protokolliert — Details, Einordnung und offener Nachmess-Punkt in Abschnitt 13.*
+
 **Kosten:** null. Jede empfohlene Komponente ist MIT/Apache-2.0 und läuft im Browser.
 
 ---
@@ -178,7 +180,7 @@ Der Gewinn ist nicht Bequemlichkeit, sondern **Ausdrucksmächtigkeit**: Kardinal
 
 **Modellgröße hier:** 60 Felder × Ø 6,2 Kandidaten ≈ **372 Binärvariablen** — gegenüber 56 Integer- plus **1.016 Hilfsvariablen** und 1.984 Constraints im heutigen Modell. Kleiner, korrekter, schneller.
 
-**Gemessen:** `OPTIMAL` in 218 ms (Zulässigkeit), 188 ms (Minimax BD-Last), 445 ms (drei lexikografische Stufen).
+**Gemessen:** `OPTIMAL` in 218 ms (Zulässigkeit), 188 ms (Minimax BD-Last), 445 ms (drei lexikografische Stufen). *Einzellauf ohne vollständig protokollierte Umgebung — Einordnung, Vorbehalt gegenüber dem empfohlenen portablen Browser-Pfad und offener Nachmess-Punkt in Abschnitt 13.*
 
 **Eignung:** Bibliothek ist bereits vendorisiert, Apache-2.0, kostenfrei, läuft portabel ohne Cross-Origin-Isolation. **Keine Alternative kommt näher heran.**
 
@@ -449,7 +451,7 @@ Alle Aussagen dieses Berichts über den Ist-Zustand wurden ausgeführt, nicht ge
 | Gewichte | distinkte Gewichte je Zielkomponente gezählt | überall **genau 1** → Skalierung wirkungslos |
 | Zweigwahl | `normalizeSolverApi`-Bedingung gegen die realen `cpsat-js`-Exporte | erster Zweig greift, zweiter ist tot |
 | Modellgröße | `buildCpSatModel` auf 28-Tage-Monat | 56 Variablen, **1.016 Hilfsvariablen, 1.984 Constraints** |
-| Neues Modell | Prototyp gegen echtes `cpsat-js`-WASM, 30 Tage/60 Felder/8 Personen | `OPTIMAL` 218 ms · Minimax BD-Last `OPTIMAL` 188 ms (Bound = Wert) · Kaskade 445 ms |
+| Neues Modell | Prototyp gegen echtes `cpsat-js`-WASM, 30 Tage/60 Felder/8 Personen | `OPTIMAL` 218 ms · Minimax BD-Last `OPTIMAL` 188 ms (Bound = Wert) · Kaskade 445 ms *(Messumgebung unvollständig protokolliert — siehe Hinweis unten)* |
 | MCS-Diagnose | 8 Relaxationsliterale, künstlich unerfüllbar | `FEASIBLE` in 15 s, 5/8 aufgegeben — **nicht beweisbar minimal** |
 | Inkumbenten-Stream | `onSolution` mit `numWorkers: 1` | feuert **live** während des Solves (`live: true`) |
 | **or-tools-wasm / COEP (offen)** | README-Nachschlag des CDN-Reserve-Builds gegen die COEP-Entfernung aus §12 | README fordert explizit `Cross-Origin-Opener-Policy: same-origin` + `Cross-Origin-Embedder-Policy: require-corp` für den multithreaded Build („Browser builds require cross-origin isolation headers for WebAssembly threads“) — **Konflikt bestätigt**, deshalb Verwurf in §10.5. **Vor P0 im Ziel-Deployment zu bestätigen**, siehe Aktionspunkt unten |
@@ -460,6 +462,12 @@ Alle Aussagen dieses Berichts über den Ist-Zustand wurden ausgeführt, nicht ge
 - **Bestehen-Kriterium (Pass):** Entweder (a) der Build wird nirgends mehr referenziert (Konsequenz aus §10.5 — dann ist dieser Punkt durch Codeentfernung erledigt und nur noch als Nichtbenutzung zu bestätigen), oder (b) er initialisiert nachweislich ohne `SharedArrayBuffer`/`crossOriginIsolated` und ohne Worker-Startfehler in der Konsole.
 - **Durchfallen-Kriterium (Fail):** Der Build wirft beim Laden/Initialisieren einen Fehler, der auf fehlende Cross-Origin-Isolation zurückgeht (z. B. `SharedArrayBuffer is not defined`, Worker-Startabbruch), **während** er im Code noch als Fallback erreichbar ist.
 - **Konsequenz bei Fail, falls der Reservepfad entgegen §10.5 doch beibehalten werden soll:** COEP darf dann nicht global entfernt werden; stattdessen entweder (i) COEP nur für ein isoliertes Iframe/eigenständiges Dokument setzen, das ausschließlich den `or-tools-wasm`-Pfad lädt, oder (ii) den Reservepfad endgültig streichen. Letzteres ist die in diesem Bericht getroffene Empfehlung.
+
+> **Messumgebungs-Hinweis zur Zeile „Neues Modell" (Selbstkritik).** Diese Zeile trägt die Kernaussage des Berichts — „beweisbar optimal in unter einer halben Sekunde" (Abschnitt 20) —, wurde beim Prototyping jedoch **ohne vollständige Angabe der Laufzeitumgebung** protokolliert. Nicht dokumentiert sind: der verwendete `cpsat-js`-Build (**portable vs. threaded**), die `numWorkers`-Einstellung, der Host (**Node.js vs. Browser-Web-Worker**, ggf. Node-Version), die CPU/das Testgerät sowie Anzahl und Streuung der Läufe — es handelt sich um einen **Einzellauf**, keinen Median.
+>
+> Das ist keine Nebensächlichkeit: Abschnitt 10.1 misst am 512-Variablen-Referenzmodell einen Faktor von **≈ 9,4×** zwischen portable (4.065 ms) und threaded (431 ms) — threaded ist deutlich schneller. Wurde der Prototyp mit dem threaded-Build oder unter Node.js gemessen (ohne den Overhead und die Sandbox-Beschränkungen eines Browser-Web-Workers), dann **validiert die Zahl nicht direkt** den in Teil D empfohlenen **portablen** Browser-Pfad, auf dem die gesamte Empfehlung dieses Berichts ruht.
+>
+> **Konsequenz:** Bis zur Nachmessung ist die Zeile als **plausibler Beleg der Größenordnung**, nicht als validierte Laufzeitgarantie für den empfohlenen Pfad zu lesen. **Offener Punkt (aufzunehmen in Abschnitt 14, spätestens P2/P3):** Prototyp erneut ausführen — explizit mit `cpsat-js` **portable**, `numWorkers: 1`, in einem echten Browser-**Web-Worker** (nicht Node.js), unter Angabe von CPU/Testgerät, über **mindestens 10 Läufe**, mit Median und Spannweite (Min–Max) statt eines Einzelwerts. Diese Nachmessung ist Voraussetzung, bevor die Aussage „beweisbar optimal in unter einer halben Sekunde" als für den portablen In-Browser-Pfad validiert gelten darf.
 
 **Zwei API-Fallen von `cpsat-js`, die im Plan berücksichtigt sein müssen:**
 
@@ -499,6 +507,7 @@ Reihenfolge ist bindend: jedes Paket ist für sich lauffähig und testbar.
 - Zeitbudget pro Stufe proportional, mit Restverteilung nach vorne (frühe Stufen sind wichtiger).
 - Abbruchsignal respektieren, Zwischenstand bleibt gültig.
 - **Test:** Kaskade auf Fixtures; jede Stufe muss `OPTIMAL` mit `bound == value` melden; Stufe *n* darf Stufe *n−1* nicht verschlechtern.
+- **Offener Punkt (aus Abschnitt 13):** Die Prototyp-Messung (218 ms / 188 ms / 445 ms) erneut ausführen — `cpsat-js` **portable**, `numWorkers: 1`, echter Browser-Web-Worker (nicht Node.js), CPU/Gerät benannt, **≥ 10 Läufe** mit Median und Spannweite. Erst danach gilt die Laufzeitaussage als für den empfohlenen Pfad validiert; die Testfixtures aus P3 können dafür als Grundlage dienen.
 
 ### P4 — Leximin + Carry-over
 - `L_p = Σ BD + α·Σ HG + λ·Rückstand_p(k Monate)`.
@@ -755,6 +764,6 @@ Robustheit: Anteil der (Person, Tag)-Paare, deren fiktiver Ausfall keine rote Be
 
 Die Engine v9.5 ist als **Architektur** richtig gedacht und als **Modell** falsch gebaut. Die fünf nachgewiesenen Defekte sind keine Feinheiten: Sie machen den exakten Kern in der Auslieferung wirkungslos, und die Anwendung liefert seit dem v9-Release ausschließlich Heuristik-Ergebnisse — verpackt in ein Exaktheitsversprechen, das nie eingelöst wird.
 
-Die gute Nachricht ist die Größenordnung. Dieses Problem hat 60 offene Felder und 8 planbare Personen. Der korrigierte Boolean-Ansatz löst es **beweisbar optimal in unter einer halben Sekunde**, lexikografisch über drei Zielstufen, mit passender unterer Schranke — gemessen, im Browser-WASM, kostenfrei. Der Aufwand liegt nicht in der Rechenleistung, sondern in einer sauberen Modellierung, die es hier bislang nicht gab.
+Die gute Nachricht ist die Größenordnung. Dieses Problem hat 60 offene Felder und 8 planbare Personen. Der korrigierte Boolean-Ansatz löst es **beweisbar optimal in unter einer halben Sekunde**, lexikografisch über drei Zielstufen, mit passender unterer Schranke — gemessen gegen echtes `cpsat-js`-WASM, kostenfrei. Der Aufwand liegt nicht in der Rechenleistung, sondern in einer sauberen Modellierung, die es hier bislang nicht gab. **Vorbehalt:** Diese Messung ist ein Einzellauf ohne vollständig protokollierte Laufzeitumgebung (Build, `numWorkers`, Host, Läufe/Median — Abschnitt 13); sie belegt die Größenordnung, validiert aber noch nicht abschließend den für Teil D empfohlenen portablen In-Browser-Pfad. Die dort verlangte Nachmessung ist offener Punkt vor Abschluss von P2/P3 (Abschnitt 14).
 
 **v10.5 sollte deshalb kein weiteres Verfahren hinzufügen, sondern das richtige Verfahren erstmals korrekt umsetzen** — und dabei drei Dinge nachholen, die dem Ganzen erst Wert geben: eine Gerechtigkeitsordnung, die diesen Namen verdient (Leximin über Monatsgrenzen hinweg), eine Konfliktdiagnose, die sagt, was zu tun ist (MCS), und eine Oberfläche, deren Regler und deren Animation zeigen, was wirklich passiert.
