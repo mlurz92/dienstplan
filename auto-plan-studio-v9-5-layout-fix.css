@@ -1,14 +1,31 @@
 /*
  * Narrow-viewport hardening for Auto-Plan Studio v9.5.
  *
- * The legacy configuration hero uses two columns down to 760 px. On phone
- * widths the first column can collapse to a zero-width grid track while the
- * limits card occupies the available width. v9.5 keeps both sections in the
- * normal document flow and lets only their own scroll containers overflow.
+ * The legacy configuration shell uses a two-column grid. On phone widths its
+ * hero column could collapse to zero while the employee-limit panel occupied
+ * the available width. v9.5 keeps hero, validation and limits in normal flow,
+ * with the active section scrolling inside the fixed modal body.
  */
 
 @media (max-width: 760px) {
+  .auto-plan-dialog[data-v95-layout="1"] #autoPlanConfig {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: auto auto auto !important;
+    grid-template-areas:
+      "hero"
+      "validation"
+      "limits" !important;
+    align-content: start;
+    gap: 10px;
+    width: 100%;
+    min-width: 0;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+  }
+
   .auto-plan-dialog[data-v95-layout="1"] .auto-plan-config-hero {
+    grid-area: hero !important;
     display: grid !important;
     grid-template-columns: minmax(0, 1fr) !important;
     align-items: start;
@@ -16,6 +33,21 @@
     width: 100%;
     min-width: 0;
     overflow: visible;
+  }
+
+  .auto-plan-dialog[data-v95-layout="1"] #autoPlanValidation {
+    grid-area: validation !important;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .auto-plan-dialog[data-v95-layout="1"] .auto-plan-limit-panel {
+    grid-area: limits !important;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    min-height: 220px;
+    overflow: hidden;
   }
 
   .auto-plan-dialog[data-v95-layout="1"] .auto-plan-config-hero > * {
@@ -40,15 +72,10 @@
     min-height: 34px;
   }
 
-  .auto-plan-dialog[data-v95-layout="1"] .auto-plan-limit-panel {
-    min-width: 0;
-    max-width: 100%;
-    overflow: hidden;
-  }
-
   .auto-plan-dialog[data-v95-layout="1"] .auto-plan-limit-scroll {
     width: 100%;
     max-width: 100%;
+    min-height: 180px;
     overflow-x: auto !important;
     overflow-y: visible;
     overscroll-behavior-inline: contain;
