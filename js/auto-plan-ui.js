@@ -11,4 +11,4 @@ import './auto-plan-studio-v8-5.js?v=20260803.4';
 import './auto-plan-studio-v9.js?v=20260803.4';
 import './auto-plan-studio-v9-5.js?v=20260805.1';
 import './auto-plan-studio-v9-5-layout-fix.js?v=20260805.1';
-import './auto-plan-studio-v9-5-polish.js?v=20260805.2';
+import './auto-plan-studio-v9-5-polish.js?v=20260805.3';
