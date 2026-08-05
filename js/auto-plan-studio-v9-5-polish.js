@@ -12,7 +12,7 @@
 
 import { setRichTooltip } from './rich-tooltip-v8-5.js?v=20260803.4';
 
-const RELEASE = '20260805.2';
+const RELEASE = '20260805.3';
 let themeHome = null;
 let activeDialog = null;
 let lastResult = null;
@@ -104,21 +104,37 @@ function bindDialog(dialog) {
   syncOpenState();
 }
 
+function synchronizeThemeToggle() {
+  const dialog = byId('autoPlanDialog');
+  if (!dialog) return;
+  bindDialog(dialog);
+  if (dialog.open) installThemeToggle(dialog);
+  else restoreThemeToggle(dialog);
+}
+
 function initialize() {
   const install = event => {
     const dialog = event?.detail?.dialog || byId('autoPlanDialog');
     if (dialog) bindDialog(dialog);
+    queueMicrotask(synchronizeThemeToggle);
   };
 
   window.addEventListener('autoplanstudioready', install);
   install();
 
-  // Defensive late-binding for pages where the studio template is inserted
-  // after this additive module has already initialized.
-  new MutationObserver(() => {
-    const dialog = byId('autoPlanDialog');
-    if (dialog) bindDialog(dialog);
-  }).observe(document.body, { childList: true, subtree: true });
+  // The native showModal() call makes every element outside the dialog inert.
+  // A capture listener schedules synchronization after the trigger's own click
+  // handler has opened the dialog, so the real theme button is a descendant of
+  // the modal before the browser processes the next user interaction.
+  document.addEventListener('click', event => {
+    if (!(event.target instanceof Element) || !event.target.closest('#autoPlanBtn')) return;
+    queueMicrotask(synchronizeThemeToggle);
+  }, { capture: true });
+
+  // Defensive late binding also covers pages where either the toolbar button or
+  // the studio template is inserted after this additive module initialized.
+  new MutationObserver(() => synchronizeThemeToggle())
+    .observe(document.body, { childList: true, subtree: true });
 
   window.addEventListener('autoplanresult', event => {
     settleResultTitle(event.detail || null);
