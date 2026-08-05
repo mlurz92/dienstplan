@@ -1,39 +1,34 @@
 /**
- * Auto-Plan Studio v9.5 – final interaction polish.
+ * Auto-Plan Studio v9.5 – final interaction and result-semantics polish.
  *
- * - Keeps the global pictographic theme switch usable while the native modal
- *   dialog is open by moving the original button into the dialog header and
- *   restoring it afterwards. The existing event handlers and accessibility
- *   state remain attached to the same DOM node.
- * - Restores the explicit safety title for complete proposals containing red,
- *   confirmation-required exceptions. The proof panel independently states
- *   whether the result is model-optimal or merely the best found solution.
+ * A native modal dialog promotes only itself and its descendants to the top
+ * layer. The global appearance button is therefore moved into the open dialog
+ * and restored to its original toolbar position when the dialog closes.
+ *
+ * Result titles are resolved after all legacy/v9/v9.5 result listeners. Safety
+ * always wins over solver status: a complete plan with red, confirmable
+ * exceptions must never be presented as an ordinary rule-clean proposal.
  */
 
 import { setRichTooltip } from './rich-tooltip-v8-5.js?v=20260803.4';
 
-const RELEASE = '20260805.1';
+const RELEASE = '20260805.2';
 let themeHome = null;
 let activeDialog = null;
+let lastResult = null;
 
 function byId(id) {
   return document.getElementById(id);
 }
 
 function closeButtonOf(dialog) {
-  return dialog.querySelector([
-    '#autoPlanCloseBtn',
-    '.auto-plan-close',
-    '.auto-plan-close-button',
-    'button[data-action="close"]',
-    'button[aria-label*="schließ" i]',
-    '.auto-plan-header button:last-of-type'
-  ].join(','));
+  return dialog?.querySelector('#autoPlanCloseBtn, .auto-plan-close, .auto-plan-close-button, button[data-action="close"]');
 }
 
-function restoreThemeToggle() {
+function restoreThemeToggle(dialog = activeDialog) {
   const button = byId('themeModeBtn');
   if (!button || !themeHome?.parent?.isConnected) return;
+  if (dialog && activeDialog && dialog !== activeDialog) return;
   const { parent, nextSibling } = themeHome;
   if (nextSibling?.parentNode === parent) parent.insertBefore(button, nextSibling);
   else parent.append(button);
@@ -45,62 +40,89 @@ function restoreThemeToggle() {
 function installThemeToggle(dialog) {
   const button = byId('themeModeBtn');
   const header = dialog?.querySelector('.auto-plan-header');
-  if (!button || !header) return;
+  if (!button || !header || !dialog.open) return;
+
   if (!dialog.contains(button)) {
-    themeHome ||= { parent: button.parentNode, nextSibling: button.nextSibling };
+    themeHome = {
+      parent: button.parentNode,
+      nextSibling: button.nextSibling
+    };
     const closeButton = closeButtonOf(dialog);
     if (closeButton?.parentNode) closeButton.parentNode.insertBefore(button, closeButton);
     else header.append(button);
   }
+
   button.classList.add('auto-plan-modal-theme-toggle', 'tool-action--icon-only-v95');
   setRichTooltip(button, button.getAttribute('aria-label') || 'Hell-/Dunkelmodus wechseln.');
   activeDialog = dialog;
-
-  if (dialog.dataset.v95ThemeRestoreBound !== 'true') {
-    dialog.dataset.v95ThemeRestoreBound = 'true';
-    dialog.addEventListener('close', restoreThemeToggle);
-    dialog.addEventListener('cancel', () => queueMicrotask(restoreThemeToggle));
-  }
 }
 
-function setResultTitle(result) {
-  const title = byId('autoPlanResultTitle');
-  if (!title || !result) return;
-  const redCount = Number(result.metrics?.red || result.redViolations?.length || 0);
-  if (result.requiresConfirmation === true || redCount > 0) {
-    title.textContent = 'Vollständige Belegung mit roten Ausnahmen';
-    return;
-  }
-  title.textContent = result.certified === true
+function hasConfirmableRed(result) {
+  const redViolations = Array.isArray(result?.redViolations) ? result.redViolations.length : 0;
+  const metricRed = Number(result?.metrics?.red || 0);
+  return result?.requiresConfirmation === true || redViolations > 0 || metricRed > 0;
+}
+
+function authoritativeResultTitle(result) {
+  if (!result?.complete) return 'Keine vollständige technisch wählbare Belegung';
+  if (hasConfirmableRed(result)) return 'Vollständige Belegung mit roten Ausnahmen';
+  return result?.certified === true
     ? 'Modelloptimaler, vollständig regelgeprüfter Vorschlag'
     : 'Bester gefundener, vollständig regelgeprüfter Vorschlag';
 }
 
-function enhance(dialog) {
-  if (!dialog) return;
-  installThemeToggle(dialog);
+function applyResultTitle(result = lastResult) {
+  const title = byId('autoPlanResultTitle');
+  if (!title || !result) return;
+  const expected = authoritativeResultTitle(result);
+  if (title.textContent !== expected) title.textContent = expected;
+}
+
+function settleResultTitle(result) {
+  lastResult = result;
+  // Other compatibility layers queue their own first-level microtasks. The
+  // nested microtask is deliberately last without introducing a timer or race.
+  queueMicrotask(() => queueMicrotask(() => applyResultTitle(result)));
+}
+
+function bindDialog(dialog) {
+  if (!dialog || dialog.dataset.v95PolishBound === 'true') return;
+  dialog.dataset.v95PolishBound = 'true';
   dialog.dataset.v95Polish = RELEASE;
+
+  const syncOpenState = () => {
+    if (dialog.open) installThemeToggle(dialog);
+    else restoreThemeToggle(dialog);
+  };
+
+  new MutationObserver(records => {
+    if (records.some(record => record.attributeName === 'open')) syncOpenState();
+  }).observe(dialog, { attributes: true, attributeFilter: ['open'] });
+
+  dialog.addEventListener('close', () => restoreThemeToggle(dialog));
+  dialog.addEventListener('cancel', () => queueMicrotask(() => restoreThemeToggle(dialog)));
+  syncOpenState();
 }
 
 function initialize() {
-  const ready = event => {
+  const install = event => {
     const dialog = event?.detail?.dialog || byId('autoPlanDialog');
-    if (dialog) queueMicrotask(() => enhance(dialog));
+    if (dialog) bindDialog(dialog);
   };
-  window.addEventListener('autoplanstudioready', ready);
-  const existing = byId('autoPlanDialog');
-  if (existing?.open) enhance(existing);
+
+  window.addEventListener('autoplanstudioready', install);
+  install();
+
+  // Defensive late-binding for pages where the studio template is inserted
+  // after this additive module has already initialized.
+  new MutationObserver(() => {
+    const dialog = byId('autoPlanDialog');
+    if (dialog) bindDialog(dialog);
+  }).observe(document.body, { childList: true, subtree: true });
 
   window.addEventListener('autoplanresult', event => {
-    queueMicrotask(() => setResultTitle(event.detail || null));
+    settleResultTitle(event.detail || null);
   });
-
-  // Defensive recovery when a legacy close path removes the open attribute
-  // without dispatching the native close event.
-  const observer = new MutationObserver(() => {
-    if (activeDialog && !activeDialog.open) restoreThemeToggle();
-  });
-  observer.observe(document.documentElement, { attributes: true, childList: true, subtree: true });
 }
 
 if (typeof document !== 'undefined') {
