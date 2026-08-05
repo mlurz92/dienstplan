@@ -1,0 +1,49 @@
+name: Diagnose v9.5 browser suite
+
+on:
+  push:
+    branches:
+      - agent/auto-plan-v9-5-correct-engine
+
+permissions:
+  contents: read
+
+concurrency:
+  group: diagnose-v95-browser-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser-shard:
+    name: Browser shard ${{ matrix.shard }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ['1/4', '2/4', '3/4', '4/4']
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Run isolated browser shard
+        shell: bash
+        run: |
+          set -o pipefail
+          npx playwright test \
+            --shard=${{ matrix.shard }} \
+            --workers=1 \
+            --retries=0 \
+            --reporter=line \
+            --trace=off 2>&1 | tee e2e-${{ strategy.job-index }}.log
+      - name: Upload concise diagnostic log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-shard-${{ strategy.job-index }}-log
+          path: e2e-${{ strategy.job-index }}.log
+          if-no-files-found: error
+          retention-days: 2
