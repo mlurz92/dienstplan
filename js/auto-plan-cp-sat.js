@@ -675,7 +675,8 @@ export function buildCpSatModel({ state, monthData, baseline = monthData, config
 
   // 8b. Minimal-Perturbation: Abweichung vom Heuristik-Hinweis (ehrt manuelle
   // Edits, da die Heuristik bestehende Belegungen übernimmt) möglichst vermeiden.
-  if (Number(weights.perturbation) > 0) {
+  // Aktiv nur, wenn der Stabilitätsschutz (protectBaseline) eingeschaltet ist.
+  if (Number(weights.perturbation) > 0 && config.protectBaseline !== false) {
     for (const [variableIndex, personValue] of Object.entries(hintMap)) {
       const idx = Number(variableIndex);
       if (idx >= variables.length) continue;

@@ -370,7 +370,13 @@ label { display: grid; gap: .3rem; color: var(--muted); font-size: .9rem; }
 }
 
 .topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--radius); }
-.brand-block { display: flex; gap: 10px; align-items: center; }
+/* Die Kopfleiste klippt ihren Inhalt (`.glass-panel { overflow: hidden }`).
+   Ohne `min-width: 0` schrumpft der Markenblock nicht unter seine
+   Inhaltsbreite: Zwischen etwa 1000 und 1200 px schob er die Monats- und
+   Statusbedienung aus der Leiste, statt seinen eigenen Text umbrechen zu
+   lassen. */
+.brand-block { display: flex; gap: 10px; align-items: center; min-width: 0; }
+.brand-block > div { min-width: 0; }
 .brand-mark {
   width: 40px; height: 40px; display: grid; place-items: center; border-radius: 10px;
   background:
@@ -398,6 +404,10 @@ h3 { font-size: 1.05rem; }
 .sheet-layout { min-width: 0; }
 .sheet-panel { border-radius: var(--radius); padding: 12px; }
 .sheet-heading { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; margin-bottom: 8px; }
+/* Gleiche Begründung wie beim Markenblock: Titelspalte und Legende dürfen
+   schrumpfen, sonst schiebt die längere von beiden die andere aus der
+   klippenden Monatskarte. */
+.sheet-heading > *, .section-title-row > * { min-width: 0; }
 .legend-stack { display: grid; justify-items: end; gap: 4px; }
 .calendar-legend, .rule-legend { display: flex; gap: 9px; align-items: center; flex-wrap: wrap; color: #5f6975; font-size: .74rem; }
 .month-palette-label {
@@ -541,6 +551,9 @@ h3 { font-size: 1.05rem; }
 }
 .dialog-card.wide { width: min(1120px, calc(100vw - 2rem)); }
 .dialog-header { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; margin-bottom: 10px; }
+/* Die Textspalte des Dialogkopfes muss umbrechen dürfen, sonst drückt eine
+   lange Beschreibung die Schließen-Schaltfläche über den Kartenrand hinaus. */
+.dialog-header > div { min-width: 0; }
 .dialog-header p { color: var(--muted); margin: 3px 0 0; }
 .close-btn { flex-shrink: 0; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 10px; padding: 0; }
@@ -706,6 +719,7 @@ h3 { font-size: 1.05rem; }
 .day-meta-list { display: grid; gap: 6px; max-height: 62vh; overflow: auto; }
 .day-meta-row { padding: 7px; border-radius: 9px; background: rgba(255,255,255,.58); border: 1px solid rgba(151,163,176,.45); display: grid; gap: 5px; box-shadow: inset 0 1px 0 rgba(255,255,255,.82); }
 .row-title { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+.row-title > * { min-width: 0; }
 .meta-group { display: flex; gap: 4px; flex-wrap: wrap; }
 .meta-chip { padding: 4px 6px; border-radius: 7px; background: rgba(255,255,255,.72); border: 1px solid rgba(141,153,166,.48); cursor: pointer; color: var(--muted); }
 .meta-chip.active { color: var(--text); border-color: var(--month-accent); background: color-mix(in srgb, var(--month-accent) 14%, white); }

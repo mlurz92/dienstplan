@@ -64,6 +64,9 @@ html.reduce-motion *, html.reduce-motion *::before, html.reduce-motion *::after 
 
 .settings-tabs button {
   flex: 1 1 0;
+  /* Ohne dies verhindert die automatische Mindestbreite das Schrumpfen; die
+     Reiterleiste schob sich auf schmalen Fenstern über den Dialogrand hinaus. */
+  min-inline-size: 0;
   appearance: none;
   border: 0;
   background: transparent;
@@ -87,6 +90,17 @@ html.reduce-motion *, html.reduce-motion *::before, html.reduce-motion *::after 
   color: var(--month-ink, #1b4a6d);
   background: white;
   box-shadow: 0 1px 3px rgb(15 30 45 / .14), 0 0 0 1px color-mix(in srgb, var(--month-accent, #4f8fbd) 26%, transparent);
+}
+
+/* Im Dunkelmodus ist die weiße Fläche des gewählten Reiters eine helle Insel –
+   und ohne Monatsfarbsystem („neutral“, dann schreibt kein Modul mehr eine
+   Inline-Tinte) löst `--month-ink` auf `--v85-text` auf: fast weißer Text auf
+   Weiß, rund 1,05:1. Der gewählte Reiter bekommt deshalb die dunkle Fläche der
+   Oberfläche und ihren hellen Text. */
+html[data-color-scheme="dark"] .settings-tabs button[aria-selected="true"] {
+  color: var(--v85-text, #f3f6f9);
+  background: color-mix(in srgb, var(--month-accent, #4f8fbd) 24%, #1a222c);
+  box-shadow: 0 1px 3px rgb(0 0 0 / .45), 0 0 0 1px color-mix(in srgb, var(--month-accent, #4f8fbd) 42%, transparent);
 }
 
 .settings-tabs button:focus-visible {

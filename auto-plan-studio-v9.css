@@ -51,6 +51,56 @@
   box-shadow: 0 0 6px color-mix(in srgb, var(--month-accent) 50%, transparent);
 }
 
+/* Kollabierbare „v9 · Exakte Engine“-Sektion: Alle v9-Regler liegen in einem
+   aufklappbaren Feld, damit das Parameterraster bei Bedarf Platz freigibt und
+   keine Einstellung abgeschnitten wird. */
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v9-advanced {
+  grid-column: 1 / -1;
+  border: 1px solid color-mix(in srgb, var(--month-accent) 30%, transparent);
+  border-radius: var(--app-radius-sm);
+  background: color-mix(in srgb, var(--month-accent) 4%, #fff);
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v9-advanced > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+  list-style: none;
+  color: var(--ap-accent-strong);
+  font-size: .66rem;
+  font-weight: 750;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v9-advanced > summary::-webkit-details-marker { display: none; }
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v9-advanced > summary::before {
+  content: '▸';
+  display: inline-block;
+  transition: transform .18s cubic-bezier(.22, 1, .36, 1);
+  color: var(--muted);
+  font-size: .6rem;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v9-advanced[open] > summary::before { transform: rotate(90deg); }
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v9-advanced > summary small {
+  color: var(--muted);
+  font-size: .58rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v9-advanced-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(172px, 1fr));
+  gap: 8px 10px;
+  padding: 2px 10px 10px;
+}
+html[data-color-scheme="dark"] .auto-plan-dialog[data-v9-layout="1"] .auto-plan-v9-advanced {
+  background: color-mix(in srgb, #1a222c 92%, var(--month-accent) 8%);
+  border-color: color-mix(in srgb, #5f6b77 55%, var(--month-accent) 45%);
+}
+
 /* ------------------------------------------------------- Exaktheitsnachweis */
 
 .auto-plan-v9-result { padding: 0; }

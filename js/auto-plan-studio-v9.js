@@ -146,6 +146,9 @@ function installV9Controls(dialog) {
   if (!grid) return;
 
   const markup = `
+    <details class="auto-plan-v9-advanced" open>
+      <summary><span>v9 · Exakte Engine</span><small>Einklappen schafft Platz im Studio</small></summary>
+      <div class="auto-plan-v9-advanced-grid">
     <label class="auto-plan-field auto-plan-field--v9">
       <span>Solver-Backend</span>
       <select id="autoPlanV9SolverBackend">
@@ -271,7 +274,9 @@ function installV9Controls(dialog) {
         <option value="on">Relaxieren + Vorschlag</option>
       </select>
       <small>Kleinste Konfliktursache sofort aufweichen</small>
-    </label>`;
+    </label>
+      </div>
+    </details>`;
 
   const holder = document.createElement('template');
   holder.innerHTML = markup;
@@ -366,6 +371,30 @@ function installCatalogTooltips(dialog) {
   for (const [selector, text] of Object.entries(CONSOLE_TOOLTIPS)) {
     const element = dialog.querySelector(selector);
     if (element) setRichTooltip(element, text);
+  }
+}
+
+/**
+ * Fallback für jedes noch unkommentierte Bedienelement: Jedes Eingabefeld im
+ * Dialog bekommt eine erklärende Kurzbeschreibung, abgeleitet aus dem
+ * zugehörigen Label – auch für dynamisch erzeugte Grenzwert-Zeilen, deren
+ * Eingaben keinen festen Selektor haben.
+ */
+function ensureFieldTooltips(dialog) {
+  for (const control of dialog.querySelectorAll('select, input, button, textarea')) {
+    if (control.disabled || control.dataset.tooltip || control.getAttribute('title')) continue;
+    if (control.id && TOOLTIP_CATALOG[`#${control.id}`]) {
+      setRichTooltip(control, TOOLTIP_CATALOG[`#${control.id}`]);
+      continue;
+    }
+    const field = control.closest('label.auto-plan-field, .auto-plan-field, .auto-plan-limit-cell');
+    const labelText = field?.querySelector(':scope > span')?.textContent?.trim()
+      || field?.textContent?.trim()
+      || control.getAttribute('aria-label')
+      || control.id
+      || 'Steuerfeld';
+    const safe = labelText.replace(/\s+/g, ' ').slice(0, 120);
+    setRichTooltip(control, `Einstellung: ${safe}`);
   }
 }
 
@@ -562,6 +591,7 @@ function enhance(dialog) {
   upgradeIdentity(dialog);
   installV9Controls(dialog);
   installCatalogTooltips(dialog);
+  ensureFieldTooltips(dialog);
   installV9RunStrip(dialog);
   installV9ResultPanel(dialog);
   upgradeTheatre(dialog);

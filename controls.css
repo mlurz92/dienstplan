@@ -267,6 +267,11 @@
   flex-direction: column;
   gap: 6px;
   padding: 7px;
+  /* Das Menü wird unter der Auslöser-Schaltfläche verankert. Enthält es alle
+     Gruppen, überschritt es auf flachen Fenstern den unteren Bildrand; die
+     letzten Einträge waren dann nicht erreichbar. */
+  max-block-size: calc(100dvh - 4.5rem);
+  overflow-y: auto;
   border-radius: 13px;
   border: 1px solid color-mix(in srgb, var(--month-accent) 26%, rgba(154,166,179,.5));
   background: linear-gradient(180deg, #fff, color-mix(in srgb, var(--month-accent) 7%, #f7f9fc));
