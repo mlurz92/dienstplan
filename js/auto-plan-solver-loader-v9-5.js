@@ -9,7 +9,7 @@
  */
 
 export const V95_SOLVER_LOAD_ORDER = Object.freeze([
-  Object.freeze({ id: 'or-tools-wasm', source: 'local', url: '/vendor/or-tools-wasm/cp-sat/index.js', version: '0.9.1' }),
+  Object.freeze({ id: 'or-tools-wasm', source: 'local', url: '/vendor/or-tools-wasm/cp-sat.js', version: '0.9.1' }),
   Object.freeze({ id: 'or-tools-wasm', source: 'cdn', url: 'https://cdn.jsdelivr.net/npm/or-tools-wasm@0.9.1/cp-sat/+esm', version: '0.9.1' }),
   Object.freeze({ id: 'cpsat-js', source: 'cdn', url: 'https://cdn.jsdelivr.net/npm/cpsat-js@1.0.0/+esm', version: '1.0.0' })
 ]);
