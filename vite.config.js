@@ -7,54 +7,29 @@ const isolationHeaders = {
   'Cross-Origin-Embedder-Policy': 'require-corp'
 };
 
-function libraryBuild({ entry, outDir, fileName, inlineDynamicImports = false }) {
-  return {
-    optimizeDeps: {
-      include: ['protobufjs'],
-      exclude: ['or-tools-wasm']
+export default defineConfig({
+  server: {
+    headers: isolationHeaders
+  },
+  preview: {
+    headers: isolationHeaders
+  },
+  build: {
+    target: 'es2022',
+    outDir: resolve(root, 'vendor/floating-ui'),
+    emptyOutDir: false,
+    sourcemap: false,
+    minify: true,
+    lib: {
+      entry: resolve(root, 'js/floating-ui-vendor-entry.ts'),
+      formats: ['es'],
+      fileName: () => 'floating-ui-dom.js'
     },
-    worker: {
-      format: 'es'
-    },
-    server: {
-      headers: isolationHeaders
-    },
-    preview: {
-      headers: isolationHeaders
-    },
-    build: {
-      target: 'es2022',
-      outDir: resolve(root, outDir),
-      emptyOutDir: false,
-      sourcemap: false,
-      minify: true,
-      assetsDir: 'assets',
-      lib: {
-        entry: resolve(root, entry),
-        formats: ['es'],
-        fileName: () => fileName
-      },
-      rolldownOptions: {
-        output: {
-          ...(inlineDynamicImports ? { inlineDynamicImports: true } : {}),
-          entryFileNames: fileName,
-          chunkFileNames: 'assets/[name]-[hash].js',
-          assetFileNames: 'assets/[name]-[hash][extname]'
-        }
+    rolldownOptions: {
+      output: {
+        codeSplitting: false,
+        entryFileNames: 'floating-ui-dom.js'
       }
     }
-  };
-}
-
-export default defineConfig(({ mode }) => mode === 'solver'
-  ? libraryBuild({
-      entry: 'js/or-tools-vendor-entry.ts',
-      outDir: 'vendor/or-tools-wasm',
-      fileName: 'cp-sat.js'
-    })
-  : libraryBuild({
-      entry: 'js/floating-ui-vendor-entry.ts',
-      outDir: 'vendor/floating-ui',
-      fileName: 'floating-ui-dom.js',
-      inlineDynamicImports: true
-    }));
+  }
+});
