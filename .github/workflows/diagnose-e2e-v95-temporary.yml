@@ -6,7 +6,7 @@ on:
       - agent/auto-plan-v9-5-correct-engine
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: diagnose-v95-browser-${{ github.ref }}
@@ -14,6 +14,7 @@ concurrency:
 
 jobs:
   browser-shard:
+    if: github.actor != 'github-actions[bot]'
     name: Browser shard ${{ matrix.shard }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -30,6 +31,7 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - name: Run isolated browser shard
+        continue-on-error: true
         shell: bash
         run: |
           set -o pipefail
@@ -47,3 +49,49 @@ jobs:
           path: e2e-${{ strategy.job-index }}.log
           if-no-files-found: error
           retention-days: 2
+
+  publish-summary:
+    if: always() && github.actor != 'github-actions[bot]'
+    name: Publish concise browser diagnostics
+    needs: browser-shard
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout v9.5 branch head
+        uses: actions/checkout@v6
+        with:
+          ref: agent/auto-plan-v9-5-correct-engine
+          fetch-depth: 1
+      - name: Download shard logs
+        uses: actions/download-artifact@v8
+        with:
+          pattern: e2e-shard-*-log
+          path: .diagnostics
+          merge-multiple: true
+      - name: Assemble deterministic summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p docs/diagnostics
+          {
+            echo '# Auto-Plan v9.5 browser diagnostics'
+            echo
+            echo "Commit: ${GITHUB_SHA}"
+            echo
+            for file in .diagnostics/e2e-*.log; do
+              echo "## $(basename "$file")"
+              echo '```text'
+              cat "$file"
+              echo '```'
+              echo
+            done
+          } > docs/diagnostics/e2e-v9.5-latest.md
+      - name: Persist diagnostic summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/diagnostics/e2e-v9.5-latest.md
+          git commit -m "Record concise v9.5 browser diagnostics"
+          git push origin HEAD:agent/auto-plan-v9-5-correct-engine
