@@ -310,11 +310,35 @@ html[data-color-scheme="dark"] .auto-plan-dialog[data-v9-layout="1"] .auto-plan-
 /* Der dekorative Orbit-Kreis des Ribbons ragte um 150 px nach oben; die
    Animation rotiert trotz Entfernung aus dem sichtbaren Bereich sinnlos
    weiter. Er wird jetzt an den unteren rechten Rand gesetzt – sichtbar und
-   ohne seitliches Überlappen der Laufansicht. */
+   ohne seitliches Überlappen der Laufansicht. Er liegt z-index-mäßig HINTER
+   der Beschriftung, damit „Hybrid Exact Observatory · v9“ weder überlagert
+   noch vom Ribbon-Overflow abgeschnitten wird. */
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-ribbon::after {
   inset: auto -10px -6px auto;
-  width: 170px;
-  height: 170px;
+  width: 150px;
+  height: 150px;
+  z-index: 0;
+  opacity: .5;
+  pointer-events: none;
+}
+/* Beschriftung des Ribbons: im Fluss belassen, aber über dem Dekor­kreis
+   angeordnet und mehrazeilig – so wird der Titel nie überlagert oder
+   abgeschnitten. */
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-ribbon {
+  padding: 10px 16px;
+  min-height: 54px;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-ribbon > b,
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-ribbon > small,
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-ribbon > strong {
+  position: relative;
+  z-index: 1;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-ribbon b {
+  display: block;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.15;
 }
 
 /* ------------------------------------------------------- Theater-Karten */
@@ -341,15 +365,24 @@ html[data-color-scheme="dark"] .auto-plan-dialog[data-v9-layout="1"] .auto-plan-
 }
 
 /* --------------------------------------------------------- Laufansicht v9
-   Vertikale Stapelung: Canvas oben (volle Breite), darunter die Console mit
-   Theater, Log und Live-Metriken. Keine Spalten mehr – alles nutzt die
-   gesamte Dialogbreite. */
+   Responsives Raster: Breite Viewports zeigen Animation (Visual) und
+   Algorithmuszustand (Console) NEBENEINANDER, schmale Viewports STAPELN sie
+   (Visual oben, Console darunter). So überlagert der Algorithmuszustand die
+   Animation under keinem Fall – er steht garantiert unter oder neben ihr. */
 
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-stage {
   min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
+}
+@media (min-width: 880px) {
+  .auto-plan-dialog[data-v9-layout="1"] .auto-plan-stage {
+    grid-template-columns: minmax(260px, 1fr) minmax(300px, 1.05fr);
+    grid-template-rows: minmax(0, 1fr);
+    align-items: stretch;
+  }
 }
 
 /* ---------------------------------------------------- V9 Reinzeichnung
@@ -368,6 +401,8 @@ html[data-color-scheme="dark"] .auto-plan-dialog[data-v9-layout="1"] .auto-plan-
    position:absolute mehr – der Canvas ist ein normales Flex-Kind. */
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-visual {
   position: relative;
+  isolation: isolate;
+  z-index: 0;
   overflow: hidden;
   width: 100%;
   min-height: 230px;
@@ -387,12 +422,15 @@ html[data-color-scheme="dark"] .auto-plan-dialog[data-v9-layout="1"] .auto-plan-
 /* Console: Flex-Column mit Strip/Theater/Log/Metriken. Jedes Kind
    min-height:0, damit nichts ausbricht. */
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-console {
+  position: relative;
+  z-index: 1;
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  overflow: auto;
 }
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-console > * {
   min-width: 0;
