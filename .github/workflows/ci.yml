@@ -15,58 +15,31 @@ permissions:
 
 jobs:
   verify:
+    name: Build, Regeln und Browser
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: npm
-      - name: Bootstrap exact lockfile for v9.5 toolchain
-        run: npm install --package-lock-only --ignore-scripts
-      - run: npm ci
-      - run: npm run check
-      - run: npm run build
-      - run: npm test
-      - name: Append README toolchain documentation
-        run: node scripts/append-readme-v95-tooling.mjs
-      - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e
-      - name: Generated v9.5 assets
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: v95-generated-assets
-          path: |
-            package-lock.json
-            README.md
-            vendor/floating-ui
-            vendor/or-tools-wasm
-          if-no-files-found: error
-          retention-days: 7
-      - name: Vollständigen Repository-Snapshot erzeugen
-        if: always()
-        shell: bash
-        run: |
-          tar \
-            --exclude='./.git' \
-            --exclude='./node_modules' \
-            --exclude='./playwright-report' \
-            --exclude='./test-results' \
-            --exclude='./dienstplan-v9.5-repository.tar.gz' \
-            -czf dienstplan-v9.5-repository.tar.gz .
-      - name: Vollständigen Repository-Snapshot sichern
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: dienstplan-v9.5-repository
-          path: dienstplan-v9.5-repository.tar.gz
-          if-no-files-found: error
-          retention-days: 7
-          compression-level: 0
+      - name: Abhängigkeiten reproduzierbar installieren
+        run: npm ci
+      - name: Syntax und Lieferumfang prüfen
+        run: npm run check
+      - name: Vendor-Build und Typprüfung
+        run: npm run build
+      - name: Node-Regressionen
+        timeout-minutes: 20
+        run: npm test
+      - name: Chromium installieren
+        run: npx playwright install --with-deps chromium
+      - name: Browser-Regressionen
+        timeout-minutes: 10
+        run: npm run test:e2e
       - name: Playwright-Diagnostik sichern
-        if: always()
+        if: failure()
         uses: actions/upload-artifact@v7
         with:
           name: playwright-diagnostics
