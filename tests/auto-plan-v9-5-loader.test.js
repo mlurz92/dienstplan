@@ -94,7 +94,7 @@ test('Konstruktor-Bindungen bleiben als zweiter kompatibler API-Pfad verfügbar'
 
 test('Ladereihenfolge ist versionsfixiert und priorisiert das lokale Worker-Asset', () => {
   assert.equal(loader.V95_SOLVER_LOAD_ORDER[0].source, 'local');
-  assert.equal(loader.V95_SOLVER_LOAD_ORDER[0].url, '/vendor/or-tools-wasm/cp-sat/index.js');
+  assert.equal(loader.V95_SOLVER_LOAD_ORDER[0].url, '/vendor/or-tools-wasm/cp-sat.js');
   assert.deepEqual(
     loader.V95_SOLVER_LOAD_ORDER.map(candidate => candidate.version),
     ['0.9.1', '0.9.1', '1.0.0']
