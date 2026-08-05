@@ -1,6 +1,7 @@
 /** Accessible explanatory tooltips for toolbar, dialogs and Auto-Plan controls. */
 
 const TOOLTIP_ID = 'appRichTooltip';
+const FLOATING_UI_URL = '/vendor/floating-ui/floating-ui-dom.js';
 const SELECTOR = '[data-tooltip], .toolbar [title], .topbar [title], .auto-plan-dialog [title], .settings-dialog [title]';
 const registry = new WeakMap();
 let host = null;
@@ -9,6 +10,8 @@ let showTimer = 0;
 let hideTimer = 0;
 let observer = null;
 let delegatesBound = false;
+let floatingPromise = null;
+let stopAutoUpdate = null;
 
 function enabled() {
   return document.documentElement.dataset.richTooltips !== 'false';
@@ -62,7 +65,19 @@ function describedBy(element, add) {
   else element.removeAttribute('aria-describedby');
 }
 
-function position(element) {
+function loadFloatingUi() {
+  if (floatingPromise) return floatingPromise;
+  floatingPromise = import(FLOATING_UI_URL)
+    .then(module => {
+      const complete = ['computePosition', 'autoUpdate', 'offset', 'flip', 'shift']
+        .every(name => typeof module?.[name] === 'function');
+      return complete ? module : null;
+    })
+    .catch(() => null);
+  return floatingPromise;
+}
+
+function fallbackPosition(element) {
   if (!host || host.hidden || !element?.isConnected) return;
   const anchor = element.getBoundingClientRect();
   const tip = host.getBoundingClientRect();
@@ -73,6 +88,52 @@ function position(element) {
   let top = anchor.bottom + gap;
   if (top + tip.height > window.innerHeight - margin) top = Math.max(margin, anchor.top - tip.height - gap);
   host.style.translate = `${Math.round(left)}px ${Math.round(top)}px`;
+}
+
+async function position(element) {
+  if (!host || host.hidden || !element?.isConnected || element !== active) return;
+  const floating = await loadFloatingUi();
+  if (!floating || !host || host.hidden || element !== active) {
+    fallbackPosition(element);
+    return;
+  }
+  try {
+    const result = await floating.computePosition(element, host, {
+      strategy: 'fixed',
+      placement: 'bottom',
+      middleware: [
+        floating.offset(10),
+        floating.flip({ padding: 10 }),
+        floating.shift({ padding: 10 })
+      ]
+    });
+    if (host.hidden || element !== active) return;
+    host.style.translate = `${Math.round(result.x)}px ${Math.round(result.y)}px`;
+    host.dataset.placement = result.placement;
+  } catch {
+    fallbackPosition(element);
+  }
+}
+
+function stopPositioning() {
+  if (typeof stopAutoUpdate === 'function') stopAutoUpdate();
+  stopAutoUpdate = null;
+}
+
+function startPositioning(element) {
+  stopPositioning();
+  requestAnimationFrame(() => position(element));
+  loadFloatingUi().then(floating => {
+    if (!floating || active !== element || host?.hidden) return;
+    stopPositioning();
+    stopAutoUpdate = floating.autoUpdate(element, host, () => position(element), {
+      ancestorScroll: true,
+      ancestorResize: true,
+      elementResize: true,
+      layoutShift: true,
+      animationFrame: false
+    });
+  });
 }
 
 function show(element) {
@@ -86,7 +147,7 @@ function show(element) {
   host.textContent = text;
   host.hidden = false;
   describedBy(element, true);
-  requestAnimationFrame(() => position(element));
+  startPositioning(element);
 }
 
 function scheduleShow(element, immediate = false) {
@@ -98,9 +159,13 @@ function scheduleShow(element, immediate = false) {
 function hide() {
   clearTimeout(showTimer);
   clearTimeout(hideTimer);
+  stopPositioning();
   if (active) describedBy(active, false);
   active = null;
-  if (host) host.hidden = true;
+  if (host) {
+    host.hidden = true;
+    delete host.dataset.placement;
+  }
 }
 
 function scheduleHide() {
@@ -134,8 +199,14 @@ function bindDelegates() {
   document.addEventListener('keydown', event => {
     if (event.key === 'Escape' && active) hide();
   });
-  window.addEventListener('scroll', hide, true);
-  window.addEventListener('resize', hide);
+  // Floating UI autoUpdate follows scroll, resize and layout shifts. The
+  // fallback path is repositioned explicitly without dismissing the tooltip.
+  window.addEventListener('scroll', () => {
+    if (active) position(active);
+  }, true);
+  window.addEventListener('resize', () => {
+    if (active) position(active);
+  });
   window.addEventListener('appsettingschange', () => {
     scan();
     if (!enabled()) hide();

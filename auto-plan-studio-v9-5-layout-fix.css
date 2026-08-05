@@ -1,0 +1,137 @@
+/*
+ * Narrow-viewport hardening for Auto-Plan Studio v9.5.
+ *
+ * The legacy configuration shell uses a two-column grid. On phone widths its
+ * hero column could collapse to zero while the employee-limit panel occupied
+ * the available width. v9.5 keeps hero, validation and limits in normal flow,
+ * with the active section scrolling inside the fixed modal body.
+ */
+
+@media (max-width: 760px) {
+  .auto-plan-dialog[data-v95-layout="1"] #autoPlanConfig {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: auto auto auto !important;
+    grid-template-areas:
+      "hero"
+      "validation"
+      "limits" !important;
+    align-content: start;
+    gap: 10px;
+    width: 100%;
+    min-width: 0;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+  }
+
+  .auto-plan-dialog[data-v95-layout="1"] .auto-plan-config-hero {
+    grid-area: hero !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    align-items: start;
+    gap: 10px;
+    width: 100%;
+    min-width: 0;
+    overflow: visible;
+  }
+
+  .auto-plan-dialog[data-v95-layout="1"] #autoPlanValidation {
+    grid-area: validation !important;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .auto-plan-dialog[data-v95-layout="1"] .auto-plan-limit-panel {
+    grid-area: limits !important;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    min-height: 220px;
+    overflow: hidden;
+  }
+
+  .auto-plan-dialog[data-v95-layout="1"] .auto-plan-config-hero > * {
+    grid-column: 1 !important;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .auto-plan-dialog[data-v95-layout="1"] .auto-plan-field-grid {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .auto-plan-dialog[data-v95-layout="1"] .auto-plan-field,
+  .auto-plan-dialog[data-v95-layout="1"] .auto-plan-field :is(input, select, textarea, output) {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .auto-plan-dialog[data-v95-layout="1"] .auto-plan-field :is(input, select, textarea) {
+    min-height: 34px;
+  }
+
+  .auto-plan-dialog[data-v95-layout="1"] .auto-plan-limit-scroll {
+    width: 100%;
+    max-width: 100%;
+    min-height: 180px;
+    overflow-x: auto !important;
+    overflow-y: visible;
+    overscroll-behavior-inline: contain;
+    scrollbar-gutter: stable;
+  }
+
+  .auto-plan-dialog[data-v95-layout="1"] .auto-plan-limit-scroll table {
+    min-width: 680px;
+  }
+}
+
+@media (max-width: 420px) {
+  .auto-plan-dialog[data-v95-layout="1"] #autoPlanConfig {
+    padding-inline: 6px;
+  }
+
+  .auto-plan-dialog[data-v95-layout="1"] .auto-plan-config-hero,
+  .auto-plan-dialog[data-v95-layout="1"] .auto-plan-field-grid {
+    gap: 7px;
+  }
+
+  .auto-plan-dialog[data-v95-layout="1"] .auto-plan-field {
+    padding-inline: 8px;
+  }
+}
+
+/*
+ * The native modal top layer makes the surrounding command bar inert. The
+ * original pictographic theme toggle is therefore moved into this header while
+ * the studio is open. Explicit grid tracks keep it separate from the close
+ * action at every viewport width and preserve a reliable pointer target.
+ */
+.auto-plan-dialog[data-v95-layout="1"] .auto-plan-header {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+}
+
+.auto-plan-dialog[data-v95-layout="1"] .auto-plan-headline {
+  grid-column: 1;
+  min-width: 0;
+}
+
+.auto-plan-dialog[data-v95-layout="1"] .auto-plan-modal-theme-toggle {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: center;
+  justify-self: end;
+  position: relative;
+  z-index: 22;
+  margin: 0;
+}
+
+.auto-plan-dialog[data-v95-layout="1"] .auto-plan-close {
+  grid-column: 3;
+  grid-row: 1;
+  align-self: center;
+  position: relative;
+  z-index: 22;
+}

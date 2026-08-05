@@ -1,30 +1,23 @@
 /**
  * Rechenkern des Auto-Plans als eigener Arbeitsstrang.
  *
- * Der Lauf wandert vollständig aus dem Anzeigestrang heraus. Das hat zwei
- * Wirkungen, die sich mit Taktung allein nicht erreichen lassen:
+ * Der Lauf wandert vollständig aus dem Anzeigestrang heraus. Das hält
+ * Fortschritt, Animation und Abbruch im Hauptthread reaktionsfähig und gibt der
+ * Suche im Worker die vollständige Rechenzeit.
  *
- * 1. **Die Oberfläche bleibt frei.** Fortschrittsbalken, Animation und
- *    Abbruchschalter laufen im Anzeigestrang weiter, während hier gerechnet
- *    wird. Es gibt keinen Wettbewerb mehr um dieselbe Schleife.
- * 2. **Die Rechnung wird schneller.** Im Anzeigestrang musste sie regelmäßig
- *    bis zum nächsten Bildaufbau abgeben und verlor dadurch einen erheblichen
- *    Teil ihrer Zeit ans Warten. Hier gibt es nichts zu zeichnen; der Lauf
- *    nutzt seine Zeit vollständig zum Suchen.
- *
- * Fachlich ändert sich nichts: Es laufen dieselben Module mit derselben
- * Regelengine. Eine zweite, vereinfachte Regelfassung gibt es bewusst nicht.
- *
- * Abgebrochen wird von außen durch Beenden des Arbeitsstrangs; ein
- * Abbruchsignal lässt sich nicht über die Strangs hinweg reichen.
+ * Der Worker importiert bewusst die interne v9.5-Pipeline statt des öffentlichen
+ * Runtime-Adapters: Die fachliche Pipeline meldet Zwischenstände, der Runner
+ * veröffentlicht nach der abschließenden `done`-Nachricht genau einen
+ * terminalen Ergebniszustand. So existiert im UI kein doppeltes `complete`.
  */
 
-import { constructAutoPlan, perfectAutoPlan } from './auto-planner.js?v=20260803.4';
+import { constructAutoPlan, perfectAutoPlan } from './auto-planner-v9-5.js?v=20260805.1';
+import { reconcileV95Certification } from './auto-plan-certification-v9-5.mjs?v=20260805.2';
 
 /**
- * Fortschrittsmeldungen tragen am Ende das vollständige Ergebnis. Über die
- * Strangs hinweg wäre das eine unnötige zweite Kopie des gesamten Monats – die
- * Endmeldung liefert es ohnehin.
+ * Fortschrittsmeldungen tragen am Ende teilweise das vollständige Ergebnis.
+ * Über die Workergrenze wäre das eine unnötige zweite Kopie des gesamten
+ * Monats; die `constructed`- beziehungsweise `done`-Nachricht liefert es einmal.
  */
 function withoutResult(update) {
   if (!update || update.result === undefined) return update;
@@ -32,21 +25,26 @@ function withoutResult(update) {
   return rest;
 }
 
+function nonTerminalReport(runId) {
+  return update => {
+    if (update?.phase === 'complete' || update?.phase === 'blocked') return;
+    self.postMessage({ type: 'progress', runId, update: withoutResult(update) });
+  };
+}
+
 /**
  * Zwei Aufträge, die der Anzeigestrang getrennt vergibt:
  *
- * - `construct` baut den Monat einmal auf. Das Ergebnis geht zurück und wird
- *   an alle Perfektionsläufe verteilt.
- * - `perfect` verbessert diesen Aufbau mit eigenem Startwert. Mehrere Stränge
- *   tun das gleichzeitig; der beste Vorschlag gewinnt.
- *
- * Die Trennung vermeidet, dass jeder Strang denselben Aufbau erneut rechnet.
+ * - `construct` baut den Monat einmal mit dem v8.5-Heuristikportfolio auf;
+ * - `perfect` verbessert den Gewinner. Nur der führende Strang startet den
+ *   globalen Boolean-CP-SAT-/LNS-Pfad, weitere Stränge bleiben diversifizierte
+ *   Heuristikläufe.
  */
 self.addEventListener('message', async event => {
   const request = event.data;
   if (!request) return;
   const { type, runId, state, monthData, year, month, runConfig, constructed, progressFloor } = request;
-  const report = update => self.postMessage({ type: 'progress', runId, update: withoutResult(update) });
+  const report = nonTerminalReport(runId);
 
   try {
     if (type === 'construct') {
@@ -55,13 +53,16 @@ self.addEventListener('message', async event => {
       return;
     }
     if (type === 'perfect') {
-      const result = await perfectAutoPlan({ state, runConfig, constructed, progressFloor, onProgress: report });
+      const result = reconcileV95Certification(await perfectAutoPlan({
+        state,
+        runConfig,
+        constructed,
+        progressFloor,
+        onProgress: report
+      }));
       self.postMessage({ type: 'done', runId, result });
       return;
     }
-    // Ein unbekannter Auftrag darf nicht stillschweigend verschluckt werden:
-    // der Anzeigestrang wartet sonst bis zum Zeitlimit auf eine Antwort, die
-    // nie kommt. Lieber sofort und benennbar scheitern.
     throw new Error(`Unbekannter Auftrag "${String(type)}"`);
   } catch (error) {
     self.postMessage({

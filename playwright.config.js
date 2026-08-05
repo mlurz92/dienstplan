@@ -4,6 +4,11 @@ import { defineConfig } from '@playwright/test';
  * In abgeschotteten Umgebungen liegt bereits ein Chromium bereit, das nicht der
  * von Playwright erwarteten Revision entspricht. `PLAYWRIGHT_CHROMIUM_EXECUTABLE`
  * erlaubt es, genau dieses zu verwenden, statt einen Download zu erzwingen.
+ *
+ * Auf CI laufen Testdateien mit zwei vollständig isolierten Workern parallel.
+ * Tests innerhalb einer Datei bleiben durch `fullyParallel: false` geordnet.
+ * Das halbiert die Gesamtlaufzeit, ohne zustandsabhängige Testfolgen innerhalb
+ * einer Spezifikation zu verändern.
  */
 const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE || undefined;
 
@@ -11,7 +16,7 @@ export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: false,
   retries: process.env.CI ? 1 : 0,
-  workers: 1,
+  workers: process.env.CI ? 2 : 1,
   reporter: process.env.CI ? 'github' : 'list',
   use: {
     baseURL: 'http://127.0.0.1:4173',

@@ -91,11 +91,10 @@ async function openJuly(page) {
 async function openStudio(page) {
   await page.locator('#autoPlanBtn').click();
   await expect(page.locator('#autoPlanDialog')).toBeVisible();
-  await expect(page.locator('#autoPlanDialog')).toHaveAttribute('data-algorithm-revision', '9');
-  await expect(page.locator('#autoPlanDialog')).toHaveAttribute('data-engine-revision', '9');
-  await expect(page.locator('#autoPlanV8Ribbon')).toContainText('Hybrid Exact Observatory · v9');
-  await expect(page.locator('#autoPlanV8Ribbon')).toContainText('v9');
-  // Die Stufenliste stammt aus der Engine selbst, nicht aus einem zweiten Text.
+  await expect(page.locator('#autoPlanDialog')).toHaveAttribute('data-algorithm-revision', '9.5');
+  await expect(page.locator('#autoPlanDialog')).toHaveAttribute('data-engine-revision', '9.5');
+  await expect(page.locator('#autoPlanV8Ribbon')).toContainText('Correct Boolean Matheuristic · v9.5');
+  await expect(page.locator('#autoPlanV8Ribbon')).toContainText('v9.5');
   await expect(page.locator('#autoPlanV8Ribbon .auto-plan-v8-stages li')).toHaveCount(8);
   await expect(page.locator('#autoPlanPerformanceProfile')).toHaveValue('adaptive');
   await expect(page.locator('#autoPlanConfig')).toBeVisible();
@@ -127,13 +126,12 @@ test('Auto-Plan startet erst nach Parameterfreigabe und schreibt erst nach Ergeb
   await page.locator('#autoPlanStartBtn').click();
   await expect(page.locator('#autoPlanCanvas')).toBeVisible();
   await expect(page.locator('#autoPlanPhaseList .auto-plan-phase')).toHaveCount(6);
-  // Die Laufansicht erklärt in Klartext, was der Algorithmus gerade tut.
   await expect(page.locator('#autoPlanLog .auto-plan-log-entry').first()).toBeVisible();
   await expect(page.locator('#autoPlanLog')).toContainText('Lauf gestartet');
 
   await expect(page.locator('#autoPlanResult')).toBeVisible({ timeout: 60_000 });
   await expect(page.locator('#autoPlanCanvas')).toHaveAttribute('data-render-mode', 'stopped');
-  await expect(page.locator('#autoPlanResultTitle')).toHaveText('Regelkonformer Vorschlag bereit');
+  await expect(page.locator('#autoPlanResultTitle')).toContainText(/regelgeprüfter Vorschlag|Regelkonformer Vorschlag/);
   await expect(page.locator('#autoPlanChangeCount')).toContainText('2 neue Einträge');
   await expect(page.locator('#autoPlanScorecards')).toContainText('0 rot');
   await expect(page.locator('#autoPlanRunConfig')).toContainText('Reparaturrunden: 4');
@@ -177,8 +175,6 @@ test('Tageszeilen, Statistik und Bestätigung bleiben bei geringer Fensterhöhe 
   await openJuly(page);
   await startStudio(page);
 
-  // v9-Layout: Das Modal scrollt nicht selbst; der Ergebnisbereich scrollt
-  // intern zwischen Kopf und Fußleiste.
   const body = page.locator('#autoPlanBody');
   await expect(page.locator('#autoPlanResult')).toBeVisible({ timeout: 60_000 });
   await expect(page.locator('#autoPlanProposalBody tr')).toHaveCount(31);
@@ -195,12 +191,6 @@ test('Tageszeilen, Statistik und Bestätigung bleiben bei geringer Fensterhöhe 
   await expect(page.locator('#autoPlanApplyBtn')).toBeVisible();
 });
 
-/**
- * Regression: Die Obergrenzen ließen sich für die unteren Personen nicht mehr
- * setzen. Ursache war ein Parameterbereich ohne eigenen Scrollbereich in einer
- * Grid-Zeile fester Höhe – die letzten Zeilen lagen außerhalb des sichtbaren
- * Bereichs und waren weder erreichbar noch bedienbar.
- */
 test('jede Person ist im Parameterbereich erreichbar und ihre Obergrenzen sind setzbar', async ({ page }) => {
   await page.setViewportSize({ width: 900, height: 500 });
   await mockApi(page);

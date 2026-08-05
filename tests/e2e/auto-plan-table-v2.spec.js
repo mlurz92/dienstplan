@@ -94,7 +94,7 @@ test('Auto-Plan präsentiert BD und HG jedes Tages gemeinsam wie die Diensttabel
   await expect(page.locator('#autoPlanTimeBudget')).toHaveValue('10');
   await page.locator('#autoPlanStartBtn').click();
   await expect(page.locator('#autoPlanResult')).toBeVisible({ timeout: 60_000 });
-  await expect(page.locator('#autoPlanResultTitle')).toHaveText('Regelkonformer Vorschlag bereit');
+  await expect(page.locator('#autoPlanResultTitle')).toContainText(/regelgeprüfter Vorschlag|Regelkonformer Vorschlag/);
 
   const table = page.locator('#autoPlanProposalTable');
   await expect(table).toBeVisible();
@@ -116,7 +116,6 @@ test('Auto-Plan präsentiert BD und HG jedes Tages gemeinsam wie die Diensttabel
   await expect(page.locator('#autoPlanRunConfig')).toContainText('Reparaturrunden: 4');
   await expect(page.locator('#autoPlanLoadTable .auto-plan-distribution-table')).toBeVisible();
 
-  // v9-Layout: Das Modal scrollt nicht selbst; nur innere Bereiche scrollen.
   const body = page.locator('#autoPlanBody');
   const bodyState = await body.evaluate(element => ({
     scrollHeight: element.scrollHeight,

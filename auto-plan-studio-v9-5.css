@@ -1,0 +1,999 @@
+/**
+ * Auto-Plan Studio v9.5
+ *
+ * Ziele:
+ * - Das Modal selbst scrollt niemals. Kopf, Arbeitsbereich und Fuß bleiben im
+ *   Viewport; ausschließlich Konfiguration, Laufansicht, Ergebnis und Log
+ *   besitzen kontrollierte interne Scrollbereiche.
+ * - Alle Grid-/Flex-Kinder dürfen auf null schrumpfen. Lange Beschriftungen,
+ *   technische IDs und Tabellen erzeugen keine Überlagerung.
+ * - Dunkle Oberflächen verwenden solide, kontrastreiche Flächen statt schwer
+ *   lesbarer Transparenz über wechselnden Monatsfarben.
+ * - Die Animation visualisiert reale Phasenereignisse und verändert weder
+ *   Solverzeit noch Layoutgeometrie.
+ */
+
+.auto-plan-dialog[data-v95-layout="1"] {
+  --v95-surface: #f7f9fc;
+  --v95-surface-raised: #ffffff;
+  --v95-surface-muted: #edf2f7;
+  --v95-ink: #16202a;
+  --v95-muted: #526170;
+  --v95-border: #aebbc8;
+  --v95-focus: #075ea8;
+  --v95-green-bg: #d9f5e2;
+  --v95-green-fg: #075f2b;
+  --v95-blue-bg: #dceeff;
+  --v95-blue-fg: #074d83;
+  --v95-yellow-bg: #fff1bf;
+  --v95-yellow-fg: #654a00;
+  --v95-orange-bg: #ffe0c2;
+  --v95-orange-fg: #743500;
+  --v95-red-bg: #ffe0e0;
+  --v95-red-fg: #861616;
+  --v95-gray-bg: #e5eaf0;
+  --v95-gray-fg: #35424e;
+  width: min(1480px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  height: min(94dvh, 980px);
+  max-height: 94dvh;
+  min-height: min(620px, 94dvh);
+  overflow: hidden !important;
+  overscroll-behavior: none;
+  color: var(--v95-ink);
+}
+
+.auto-plan-dialog[data-v95-layout="1"] .auto-plan-shell {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--v95-surface);
+}
+
+.auto-plan-dialog[data-v95-layout="1"] .auto-plan-header,
+.auto-plan-dialog[data-v95-layout="1"] .auto-plan-footer {
+  position: relative;
+  z-index: 20;
+  flex: none;
+  min-width: 0;
+  background: color-mix(in srgb, var(--v95-surface-raised) 95%, var(--month-accent) 5%);
+}
+
+.auto-plan-dialog[data-v95-layout="1"] .auto-plan-header {
+  border-bottom: 1px solid var(--v95-border);
+}
+
+.auto-plan-dialog[data-v95-layout="1"] .auto-plan-footer {
+  border-top: 1px solid var(--v95-border);
+  box-shadow: 0 -10px 24px rgb(27 39 51 / 8%);
+}
+
+.auto-plan-dialog[data-v95-layout="1"] .auto-plan-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden !important;
+  padding-bottom: 0;
+}
+
+.auto-plan-dialog[data-v95-layout="1"] #autoPlanConfig,
+.auto-plan-dialog[data-v95-layout="1"] #autoPlanStage,
+.auto-plan-dialog[data-v95-layout="1"] #autoPlanResult {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  max-height: none;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scroll-padding-block: 72px 84px;
+}
+
+.auto-plan-dialog[data-v95-layout="1"] #autoPlanConfig[hidden],
+.auto-plan-dialog[data-v95-layout="1"] #autoPlanStage[hidden],
+.auto-plan-dialog[data-v95-layout="1"] #autoPlanResult[hidden] {
+  display: none !important;
+}
+
+.auto-plan-dialog[data-v95-layout="1"] *,
+.auto-plan-dialog[data-v95-layout="1"] *::before,
+.auto-plan-dialog[data-v95-layout="1"] *::after {
+  box-sizing: border-box;
+}
+
+.auto-plan-dialog[data-v95-layout="1"] :is(
+  .auto-plan-card,
+  .auto-plan-panel,
+  .auto-plan-console,
+  .auto-plan-visual,
+  .auto-plan-field-grid,
+  .auto-plan-result-grid,
+  .auto-plan-proposal-wrap,
+  .auto-plan-table-wrap,
+  .auto-plan-v95-result,
+  .auto-plan-v95-alternatives,
+  .auto-plan-v95-alternative-grid
+) {
+  min-width: 0;
+  min-height: 0;
+}
+
+/* ------------------------------------------------------------- Konfiguration */
+
+.auto-plan-dialog[data-v95-layout="1"] .auto-plan-field-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(210px, 1fr));
+  gap: 10px;
+  align-items: stretch;
+}
+
+.auto-plan-dialog[data-v95-layout="1"] .auto-plan-field {
+  min-width: 0;
+  overflow: visible;
+}
+
+.auto-plan-dialog[data-v95-layout="1"] .auto-plan-field > span,
+.auto-plan-dialog[data-v95-layout="1"] .auto-plan-field > small,
+.auto-plan-dialog[data-v95-layout="1"] .auto-plan-field option,
+.auto-plan-dialog[data-v95-layout="1"] .auto-plan-field output {
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.auto-plan-dialog[data-v95-layout="1"] .auto-plan-field :is(select, input, textarea) {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.auto-plan-dialog[data-v95-layout="1"] .auto-plan-range {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(44px, auto);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+
+.auto-plan-field--v95 {
+  position: relative;
+  border-color: color-mix(in srgb, var(--month-accent) 35%, var(--v95-border));
+  background: color-mix(in srgb, var(--v95-surface-raised) 94%, var(--month-accent) 6%);
+}
+
+.auto-plan-field--v95::before {
+  content: '9.5';
+  position: absolute;
+  inset: 6px 7px auto auto;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: var(--v95-blue-bg);
+  color: var(--v95-blue-fg);
+  font-size: .52rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+}
+
+/* --------------------------------------------------------- Ergebnis/Nachweis */
+
+.auto-plan-v95-result {
+  margin: 0 0 12px;
+  border: 1px solid var(--v95-border);
+  background: var(--v95-surface-raised);
+}
+
+.auto-plan-v95-proof {
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  background: color-mix(in srgb, var(--v95-surface-raised) 94%, var(--month-accent) 6%);
+  border-bottom: 1px solid var(--v95-border);
+  backdrop-filter: blur(12px);
+}
+
+.auto-plan-v95-status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 27px;
+  padding: 3px 10px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: .65rem;
+  font-weight: 800;
+  letter-spacing: .035em;
+  text-transform: uppercase;
+  white-space: normal;
+  text-align: center;
+}
+.auto-plan-v95-status.optimal { background: var(--v95-green-bg); color: var(--v95-green-fg); }
+.auto-plan-v95-status.feasible { background: var(--v95-blue-bg); color: var(--v95-blue-fg); }
+.auto-plan-v95-status.warning { background: var(--v95-yellow-bg); color: var(--v95-yellow-fg); }
+.auto-plan-v95-status.infeasible { background: var(--v95-red-bg); color: var(--v95-red-fg); }
+.auto-plan-v95-status.unavailable { background: var(--v95-gray-bg); color: var(--v95-gray-fg); }
+
+.auto-plan-v95-result-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(135px, 1fr));
+  gap: 8px;
+  padding: 12px;
+}
+
+.auto-plan-v95-result-grid > div {
+  min-width: 0;
+  padding: 8px 9px;
+  border: 1px solid var(--v95-border);
+  border-radius: 9px;
+  background: var(--v95-surface-muted);
+}
+
+.auto-plan-v95-result-grid span,
+.auto-plan-v95-result-grid b {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.auto-plan-v95-result-grid span {
+  color: var(--v95-muted);
+  font-size: .57rem;
+  font-weight: 750;
+  letter-spacing: .055em;
+  text-transform: uppercase;
+}
+
+.auto-plan-v95-result-grid b {
+  margin-top: 3px;
+  color: var(--v95-ink);
+  font-size: .75rem;
+  line-height: 1.28;
+}
+
+.auto-plan-v95-trace {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0 12px 12px;
+  list-style: none;
+}
+
+.auto-plan-v95-trace li {
+  display: grid;
+  grid-template-columns: minmax(145px, 1fr) auto minmax(240px, 1.35fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--v95-border);
+  border-radius: 8px;
+  background: var(--v95-surface-muted);
+}
+
+.auto-plan-v95-trace li > span {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--v95-ink);
+  font-size: .69rem;
+  font-weight: 700;
+}
+
+.auto-plan-v95-trace li > span i {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: var(--v95-gray-bg);
+  color: var(--v95-gray-fg);
+  font-size: .58rem;
+  font-style: normal;
+}
+
+.auto-plan-v95-trace li.is-proven > span i {
+  background: var(--v95-green-bg);
+  color: var(--v95-green-fg);
+}
+
+.auto-plan-v95-trace li b {
+  color: var(--v95-blue-fg);
+  font-size: .63rem;
+}
+
+.auto-plan-v95-trace li small {
+  min-width: 0;
+  color: var(--v95-muted);
+  font-size: .61rem;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.auto-plan-v95-lns,
+.auto-plan-v95-conflict,
+.auto-plan-v95-alternatives {
+  margin: 0 12px 12px;
+  padding: 10px;
+  border: 1px solid var(--v95-border);
+  border-radius: 10px;
+  background: var(--v95-surface-muted);
+}
+
+.auto-plan-v95-lns header,
+.auto-plan-v95-alternatives > header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 5px 12px;
+  align-items: baseline;
+}
+
+.auto-plan-v95-lns header span,
+.auto-plan-v95-alternatives > header span,
+.auto-plan-v95-conflict > span {
+  color: var(--v95-blue-fg);
+  font-size: .61rem;
+  font-weight: 800;
+  letter-spacing: .055em;
+  text-transform: uppercase;
+}
+
+.auto-plan-v95-lns header b,
+.auto-plan-v95-alternatives > header small {
+  color: var(--v95-muted);
+  font-size: .65rem;
+}
+
+.auto-plan-v95-lns-track {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12px, 1fr));
+  gap: 4px;
+  margin-top: 8px;
+  min-height: 12px;
+}
+
+.auto-plan-v95-lns-track i {
+  display: block;
+  height: 8px;
+  border-radius: 999px;
+  background: #8998a7;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 16%);
+}
+
+.auto-plan-v95-lns-track i.is-improved {
+  background: #138a48;
+  box-shadow: 0 0 8px rgb(19 138 72 / 34%);
+}
+
+.auto-plan-v95-conflict {
+  border-color: #d99191;
+  background: #fff2f2;
+  color: #531919;
+}
+
+.auto-plan-v95-conflict p,
+.auto-plan-v95-conflict li,
+.auto-plan-v95-conflict summary {
+  overflow-wrap: anywhere;
+  font-size: .68rem;
+}
+
+.auto-plan-v95-conflict code {
+  color: #671b1b;
+  font-size: .62rem;
+}
+
+.auto-plan-v95-alternative-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.auto-plan-v95-alternative-grid article {
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid var(--v95-border);
+  border-radius: 9px;
+  background: var(--v95-surface-raised);
+}
+
+.auto-plan-v95-alternative-grid article > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 8px;
+}
+
+.auto-plan-v95-alternative-grid article > div b {
+  color: var(--v95-ink);
+  font-size: .72rem;
+}
+
+.auto-plan-v95-alternative-grid article > div span {
+  color: var(--v95-muted);
+  font-size: .59rem;
+}
+
+.auto-plan-v95-alternative-grid dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+  margin: 8px 0 0;
+}
+
+.auto-plan-v95-alternative-grid dl > div {
+  min-width: 0;
+  padding: 5px 6px;
+  border-radius: 6px;
+  background: var(--v95-surface-muted);
+}
+
+.auto-plan-v95-alternative-grid dt {
+  color: var(--v95-muted);
+  font-size: .54rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.auto-plan-v95-alternative-grid dd {
+  margin: 2px 0 0;
+  color: var(--v95-ink);
+  font-size: .64rem;
+  overflow-wrap: anywhere;
+}
+
+/* ------------------------------------------------------- Tabellen/Scrollen */
+
+.auto-plan-dialog[data-v95-layout="1"] :is(.auto-plan-proposal-wrap, .auto-plan-table-wrap) {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  scrollbar-gutter: stable;
+}
+
+.auto-plan-dialog[data-v95-layout="1"] :is(.auto-plan-proposal-table, .auto-plan-distribution-table) {
+  min-width: 760px;
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.auto-plan-dialog[data-v95-layout="1"] :is(.auto-plan-proposal-table, .auto-plan-distribution-table) th,
+.auto-plan-dialog[data-v95-layout="1"] :is(.auto-plan-proposal-table, .auto-plan-distribution-table) td {
+  overflow-wrap: anywhere;
+}
+
+.auto-plan-dialog[data-v95-layout="1"] :is(.auto-plan-proposal-table, .auto-plan-distribution-table) thead th {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  background: #e8eef5;
+  color: #1a3349;
+  border-color: #9dadbb;
+}
+
+/* --------------------------------------------------------- Festes Logfenster */
+
+.auto-plan-dialog[data-v95-layout="1"] .auto-plan-stage,
+.auto-plan-dialog[data-v95-layout="1"] .auto-plan-console {
+  min-width: 0;
+  min-height: 0;
+}
+
+.auto-plan-dialog[data-v95-layout="1"] .auto-plan-console {
+  display: grid;
+  grid-template-rows: auto auto minmax(160px, 1fr) auto;
+  align-content: stretch;
+  max-height: 100%;
+  overflow: hidden;
+}
+
+.auto-plan-dialog[data-v95-layout="1"] .auto-plan-log {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  height: clamp(150px, 24dvh, 230px) !important;
+  min-height: 130px;
+  max-height: 230px;
+  overflow: hidden !important;
+  background: var(--v95-surface-raised);
+}
+
+.auto-plan-dialog[data-v95-layout="1"] .auto-plan-log-stream {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto !important;
+  max-height: none !important;
+  overflow-x: hidden;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scroll-behavior: smooth;
+}
+
+.auto-plan-dialog[data-v95-layout="1"] .auto-plan-log-entry {
+  overflow-wrap: anywhere;
+}
+
+/* -------------------------------------------------------------- Animation */
+
+.auto-plan-dialog[data-v95-layout="1"] .auto-plan-visual {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.auto-plan-dialog[data-v95-layout="1"] .auto-plan-visual::before,
+.auto-plan-dialog[data-v95-layout="1"] .auto-plan-visual::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.auto-plan-dialog[data-v95-layout="1"] .auto-plan-visual::before {
+  inset: -45%;
+  border-radius: 44%;
+  opacity: .32;
+  background:
+    conic-gradient(from calc(var(--v95-progress, 0) * 1turn),
+      transparent 0 18%,
+      color-mix(in srgb, var(--month-accent) 50%, transparent) 24%,
+      transparent 31% 58%,
+      color-mix(in srgb, var(--month-accent-strong) 32%, transparent) 66%,
+      transparent 73% 100%);
+  animation: v95-orbit 9s linear infinite;
+}
+
+.auto-plan-dialog[data-v95-layout="1"] .auto-plan-visual::after {
+  inset: 9%;
+  border: 1px solid color-mix(in srgb, var(--month-accent) 40%, transparent);
+  border-radius: 50%;
+  opacity: .6;
+  box-shadow:
+    0 0 0 18px color-mix(in srgb, var(--month-accent) 5%, transparent),
+    0 0 46px color-mix(in srgb, var(--month-accent) 18%, transparent);
+  animation: v95-breathe 2.4s ease-in-out infinite;
+}
+
+.auto-plan-dialog[data-v95-layout="1"][data-v95-stage="model"] .auto-plan-visual::before {
+  background:
+    repeating-linear-gradient(90deg, transparent 0 17px, color-mix(in srgb, var(--month-accent) 20%, transparent) 18px 19px),
+    repeating-linear-gradient(0deg, transparent 0 17px, color-mix(in srgb, var(--month-accent) 20%, transparent) 18px 19px);
+  border-radius: 0;
+  animation: v95-matrix 2.8s linear infinite;
+}
+
+.auto-plan-dialog[data-v95-layout="1"][data-v95-stage="exact"] .auto-plan-visual::after {
+  border-radius: 42% 58% 49% 51%;
+  animation: v95-solver-pulse 1.35s ease-in-out infinite, v95-orbit 7s linear infinite reverse;
+}
+
+.auto-plan-dialog[data-v95-layout="1"][data-v95-stage="lns"] .auto-plan-visual::before {
+  inset: -10%;
+  border-radius: 50%;
+  background: radial-gradient(circle,
+    transparent 0 18%,
+    color-mix(in srgb, var(--month-accent) 12%, transparent) 19% 27%,
+    transparent 28% 42%,
+    color-mix(in srgb, var(--month-accent-strong) 14%, transparent) 43% 51%,
+    transparent 52%);
+  animation: v95-lns-wave 1.8s ease-out infinite;
+}
+
+.auto-plan-dialog[data-v95-layout="1"][data-v95-stage="audit"] .auto-plan-visual::after,
+.auto-plan-dialog[data-v95-layout="1"][data-v95-stage="certify"] .auto-plan-visual::after {
+  border-color: #198a4b;
+  box-shadow: 0 0 0 18px rgb(25 138 75 / 7%), 0 0 48px rgb(25 138 75 / 24%);
+  animation: v95-audit 1.5s ease-in-out infinite;
+}
+
+.auto-plan-dialog[data-v95-layout="1"] .auto-plan-v9-run-strip[data-v95-stage] {
+  position: relative;
+  overflow: hidden;
+  border-color: color-mix(in srgb, var(--month-accent) 42%, var(--v95-border));
+  background: var(--v95-surface-raised);
+}
+
+.auto-plan-dialog[data-v95-layout="1"] .auto-plan-v9-run-strip[data-v95-stage]::after {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 -42%;
+  width: 36%;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--month-accent) 22%, #fff), transparent);
+  animation: v95-sheen 2.1s ease-in-out infinite;
+}
+
+.auto-plan-dialog[data-v95-layout="1"] .is-v95-active {
+  border-color: color-mix(in srgb, var(--month-accent) 72%, #17405f) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--month-accent) 15%, transparent), 0 6px 18px rgb(27 39 51 / 10%);
+  animation: v95-phase-active 1.45s ease-in-out infinite;
+}
+
+.auto-plan-dialog[data-v95-layout="1"] .auto-plan-log-entry:last-child {
+  animation: v95-log-arrive .32s ease-out both;
+}
+
+@keyframes v95-orbit {
+  to { transform: rotate(1turn); }
+}
+@keyframes v95-breathe {
+  0%, 100% { transform: scale(.96); opacity: .38; }
+  50% { transform: scale(1.04); opacity: .78; }
+}
+@keyframes v95-matrix {
+  from { transform: translate3d(-18px, -18px, 0); opacity: .18; }
+  50% { opacity: .42; }
+  to { transform: translate3d(18px, 18px, 0); opacity: .18; }
+}
+@keyframes v95-solver-pulse {
+  0%, 100% { transform: scale(.9); opacity: .35; }
+  50% { transform: scale(1.08); opacity: .88; }
+}
+@keyframes v95-lns-wave {
+  from { transform: scale(.72); opacity: .75; }
+  to { transform: scale(1.35); opacity: 0; }
+}
+@keyframes v95-audit {
+  0%, 100% { transform: rotate(-2deg) scale(.98); opacity: .5; }
+  50% { transform: rotate(2deg) scale(1.035); opacity: .88; }
+}
+@keyframes v95-sheen {
+  0% { transform: translateX(0); opacity: 0; }
+  18% { opacity: .8; }
+  70%, 100% { transform: translateX(420%); opacity: 0; }
+}
+@keyframes v95-phase-active {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-1px); }
+}
+@keyframes v95-log-arrive {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ------------------------------------------------------------ Fokus/Tooltip */
+
+.auto-plan-dialog[data-v95-layout="1"] :is(button, input, select, textarea, summary, [role="button"]):focus-visible {
+  outline: 3px solid var(--v95-focus) !important;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--v95-focus) 18%, transparent) !important;
+}
+
+.app-rich-tooltip {
+  max-width: min(420px, calc(100vw - 20px));
+  max-height: min(42dvh, 320px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  z-index: 1000000;
+  color: #fff;
+  background: #142331;
+  border: 1px solid #6f8799;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 34%);
+}
+
+.tool-action--icon-only-v95 {
+  aspect-ratio: 1;
+  min-width: 34px;
+  width: 34px;
+  padding-inline: 0 !important;
+}
+
+.tool-action--icon-only-v95 > :not(.tool-icon):not(.visually-hidden) {
+  display: none !important;
+}
+
+/* ------------------------------------------------------------- Dark mode */
+
+html[data-color-scheme="dark"] .auto-plan-dialog[data-v95-layout="1"] {
+  --v95-surface: #0d141b;
+  --v95-surface-raised: #17212b;
+  --v95-surface-muted: #222f3b;
+  --v95-ink: #f3f7fa;
+  --v95-muted: #c3ced8;
+  --v95-border: #667b8d;
+  --v95-focus: #78c5ff;
+  --v95-green-bg: #123f27;
+  --v95-green-fg: #a5f0bf;
+  --v95-blue-bg: #143d60;
+  --v95-blue-fg: #b5e0ff;
+  --v95-yellow-bg: #4c3d0e;
+  --v95-yellow-fg: #ffe596;
+  --v95-orange-bg: #512b10;
+  --v95-orange-fg: #ffd0a2;
+  --v95-red-bg: #551c20;
+  --v95-red-fg: #ffb7ba;
+  --v95-gray-bg: #33424f;
+  --v95-gray-fg: #edf4f8;
+  color: var(--v95-ink);
+}
+
+html[data-color-scheme="dark"] .auto-plan-dialog[data-v95-layout="1"] :is(
+  .auto-plan-shell,
+  .auto-plan-card,
+  .auto-plan-panel,
+  .auto-plan-console,
+  .auto-plan-visual,
+  .auto-plan-log,
+  .auto-plan-switch,
+  .auto-plan-field,
+  .auto-plan-live-metrics > div,
+  .auto-plan-search-metrics > div,
+  .auto-plan-scorecard > *,
+  .auto-plan-assignment-cell,
+  .auto-plan-confirm-note,
+  .auto-plan-red-item,
+  .auto-plan-v9-run-strip,
+  .auto-plan-v95-result
+) {
+  color: var(--v95-ink);
+  background-color: var(--v95-surface-raised);
+  border-color: var(--v95-border);
+}
+
+html[data-color-scheme="dark"] .auto-plan-dialog[data-v95-layout="1"] :is(
+  p, small, time, dt,
+  .auto-plan-field small,
+  .auto-plan-card p,
+  .auto-plan-header p,
+  .auto-plan-cell-state,
+  .auto-plan-context-list span,
+  .auto-plan-live-metrics span,
+  .auto-plan-search-metrics span,
+  .auto-plan-run-config span,
+  .auto-plan-confirm-note,
+  .auto-plan-log-entry time
+) {
+  color: var(--v95-muted) !important;
+}
+
+html[data-color-scheme="dark"] .auto-plan-dialog[data-v95-layout="1"] :is(
+  h1, h2, h3, h4, b, strong, label > span,
+  .auto-plan-section-title,
+  .auto-plan-cell-reasons,
+  .auto-plan-row-review,
+  .auto-plan-log-entry,
+  .auto-plan-assignment-cell
+) {
+  color: var(--v95-ink);
+}
+
+html[data-color-scheme="dark"] .auto-plan-dialog[data-v95-layout="1"] :is(input, select, textarea) {
+  color: #f7fafc;
+  background: #101a23;
+  border-color: #7e93a5;
+  color-scheme: dark;
+}
+
+html[data-color-scheme="dark"] .auto-plan-dialog[data-v95-layout="1"] :is(input, select, textarea)::placeholder {
+  color: #aebcc8;
+  opacity: 1;
+}
+
+html[data-color-scheme="dark"] .auto-plan-dialog[data-v95-layout="1"] option {
+  color: #f7fafc;
+  background: #101a23;
+}
+
+html[data-color-scheme="dark"] .auto-plan-dialog[data-v95-layout="1"] :is(
+  .auto-plan-row-status.fixed,
+  .auto-plan-source-pill,
+  .auto-plan-cell-state i.fixed,
+  .auto-plan-assignment-cell.open,
+  .auto-plan-v9-status.unavailable
+) {
+  color: #f2f7fa !important;
+  background: #354655 !important;
+  border-color: #8ea0ae !important;
+  opacity: 1 !important;
+}
+
+html[data-color-scheme="dark"] .auto-plan-dialog[data-v95-layout="1"] .auto-plan-row-status:not(.yellow):not(.orange):not(.red):not(.fixed) {
+  color: #b5f4ca !important;
+  background: #16462b !important;
+  border-color: #57aa75 !important;
+}
+
+html[data-color-scheme="dark"] .auto-plan-dialog[data-v95-layout="1"] .auto-plan-row-status.yellow {
+  color: #ffeb9f !important;
+  background: #4c3b0c !important;
+  border-color: #c7a33e !important;
+}
+
+html[data-color-scheme="dark"] .auto-plan-dialog[data-v95-layout="1"] .auto-plan-row-status.orange {
+  color: #ffd2aa !important;
+  background: #572c0e !important;
+  border-color: #cc7940 !important;
+}
+
+html[data-color-scheme="dark"] .auto-plan-dialog[data-v95-layout="1"] .auto-plan-row-status.red {
+  color: #ffc0c3 !important;
+  background: #5b1c21 !important;
+  border-color: #d2676d !important;
+}
+
+html[data-color-scheme="dark"] .auto-plan-dialog[data-v95-layout="1"] :is(.auto-plan-proposal-table, .auto-plan-distribution-table) {
+  color: var(--v95-ink);
+  background: #121b24;
+}
+
+html[data-color-scheme="dark"] .auto-plan-dialog[data-v95-layout="1"] :is(.auto-plan-proposal-table, .auto-plan-distribution-table) thead th {
+  color: #f4f8fb !important;
+  background: #263746 !important;
+  border-color: #758a9b !important;
+}
+
+html[data-color-scheme="dark"] .auto-plan-dialog[data-v95-layout="1"] :is(.auto-plan-proposal-table, .auto-plan-distribution-table) tbody tr {
+  color: var(--v95-ink);
+  background: #17212b;
+}
+
+html[data-color-scheme="dark"] .auto-plan-dialog[data-v95-layout="1"] :is(.auto-plan-proposal-table, .auto-plan-distribution-table) tbody tr:nth-child(even) {
+  background: #1d2934;
+}
+
+html[data-color-scheme="dark"] .auto-plan-dialog[data-v95-layout="1"] :is(.auto-plan-proposal-table, .auto-plan-distribution-table) tbody tr.saturday-row {
+  background: #2f2948 !important;
+}
+
+html[data-color-scheme="dark"] .auto-plan-dialog[data-v95-layout="1"] :is(.auto-plan-proposal-table, .auto-plan-distribution-table) tbody tr.sunday-row {
+  background: #42243b !important;
+}
+
+html[data-color-scheme="dark"] .auto-plan-dialog[data-v95-layout="1"] :is(.auto-plan-proposal-table, .auto-plan-distribution-table) tbody tr.holiday-row {
+  background: #47321c !important;
+}
+
+html[data-color-scheme="dark"] .auto-plan-dialog[data-v95-layout="1"] :is(.auto-plan-proposal-table, .auto-plan-distribution-table) td {
+  color: #edf3f7;
+  border-color: #53697a;
+}
+
+html[data-color-scheme="dark"] .auto-plan-v95-conflict {
+  color: #ffd7d9;
+  background: #42191d;
+  border-color: #c76b71;
+}
+
+html[data-color-scheme="dark"] .auto-plan-v95-conflict code {
+  color: #ffd0d2;
+}
+
+html[data-color-scheme="dark"] .app-rich-tooltip {
+  color: #fff;
+  background: #081018;
+  border-color: #8195a5;
+}
+
+/* ------------------------------------------------------- Kleine Viewports */
+
+@media (max-width: 1180px) {
+  .auto-plan-dialog[data-v95-layout="1"] .auto-plan-field-grid {
+    grid-template-columns: repeat(2, minmax(210px, 1fr));
+  }
+  .auto-plan-v95-result-grid {
+    grid-template-columns: repeat(2, minmax(135px, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .auto-plan-dialog[data-v95-layout="1"] {
+    width: calc(100vw - 8px);
+    max-width: calc(100vw - 8px);
+    height: calc(100dvh - 8px);
+    max-height: calc(100dvh - 8px);
+    min-height: 0;
+    border-radius: 12px;
+  }
+
+  .auto-plan-dialog[data-v95-layout="1"] .auto-plan-field-grid,
+  .auto-plan-v95-result-grid,
+  .auto-plan-v95-alternative-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .auto-plan-v95-trace li {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .auto-plan-v95-trace li small {
+    grid-column: 1 / -1;
+    text-align: left;
+  }
+
+  .auto-plan-dialog[data-v95-layout="1"] .auto-plan-header {
+    padding-block: 7px;
+  }
+
+  .auto-plan-dialog[data-v95-layout="1"] .auto-plan-footer {
+    gap: 5px;
+    padding: 7px;
+  }
+
+  .auto-plan-dialog[data-v95-layout="1"] .auto-plan-footer button {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .auto-plan-dialog[data-v95-layout="1"] .auto-plan-log {
+    height: clamp(130px, 21dvh, 180px) !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .auto-plan-dialog[data-v95-layout="1"] {
+    width: 100vw;
+    max-width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
+  }
+
+  .auto-plan-dialog[data-v95-layout="1"] .auto-plan-body {
+    padding-inline: 4px;
+  }
+
+  .auto-plan-dialog[data-v95-layout="1"] .auto-plan-field-grid {
+    gap: 7px;
+  }
+
+  .auto-plan-v95-result-grid,
+  .auto-plan-v95-trace,
+  .auto-plan-v95-lns,
+  .auto-plan-v95-conflict,
+  .auto-plan-v95-alternatives {
+    margin-inline: 6px;
+  }
+
+  .auto-plan-v95-result-grid {
+    padding-inline: 6px;
+  }
+
+  .auto-plan-v95-proof {
+    align-items: flex-start;
+  }
+
+  .auto-plan-v95-status {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .auto-plan-dialog[data-v95-layout="1"] .auto-plan-range {
+    grid-template-columns: minmax(0, 1fr) 52px;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .auto-plan-dialog[data-v95-layout="1"] {
+    --v95-border: currentColor;
+  }
+  .auto-plan-dialog[data-v95-layout="1"] :is(.auto-plan-card, .auto-plan-field, input, select, button, .auto-plan-assignment-cell) {
+    border-width: 2px;
+  }
+}
+
+@media (forced-colors: active) {
+  .auto-plan-dialog[data-v95-layout="1"] *,
+  .auto-plan-dialog[data-v95-layout="1"] *::before,
+  .auto-plan-dialog[data-v95-layout="1"] *::after {
+    forced-color-adjust: auto;
+  }
+  .auto-plan-dialog[data-v95-layout="1"] .auto-plan-visual::before,
+  .auto-plan-dialog[data-v95-layout="1"] .auto-plan-visual::after {
+    display: none;
+  }
+}

@@ -64,11 +64,12 @@ function withWeekdayHgBeforeBdConflict(evaluation) {
  * diese Policy wieder freigeschaltet oder in eine bestätigbare Auswahl verwandelt.
  */
 
-const GAP_REASON = 'Fr-BD · Sa frei · So-BD (Wochenend-BD mit freiem Samstag)';
+const GAP_REASON = 'Fr-BD · Sa frei · So-BD (Freitag-BD, Samstag frei, Sonntag-BD; Wochenend-BD mit freiem Samstag)';
 const GAP_LEGACY_REASONS = new Set([
   'Fr-BD · Sa frei · So-BD',
   'BD am Freitag mit freiem Samstag vor BD am Sonntag',
   'Wochenend-BD mit freiem Samstag (Fr-BD, Sa frei, So-BD)',
+  'Fr-BD · Sa frei · So-BD (Wochenend-BD mit freiem Samstag): rote Wochenendkette mit freiem Samstag.',
   `${GAP_REASON}: rote Wochenendkette mit freiem Samstag.`
 ]);
 
@@ -105,7 +106,7 @@ function weekendGapBdConflict({ state, dateIso, role, staffId }) {
 
 function withWeekendGapConflict(evaluation) {
   if (!evaluation || evaluation.canSelect === false) return evaluation;
-  if (evaluation.meta?.weekendGap) return evaluation;
+  if (evaluation.meta?.weekendGap || evaluation.meta?.splitWeekendBd) return evaluation;
   const reasonDetails = (Array.isArray(evaluation.reasonDetails) ? evaluation.reasonDetails : [])
     .filter(item => !GAP_LEGACY_REASONS.has(item?.text));
   reasonDetails.unshift({
@@ -127,6 +128,8 @@ function withWeekendGapConflict(evaluation) {
       confirmationType: 'special',
       selectionPolicy: 'special',
       weekendGap: true,
+      // Alias für v9-/v9.5-Telemetrie und gespeicherte Diagnoseansichten.
+      splitWeekendBd: true,
       priorConfirmationType: priorType || null
     }
   };

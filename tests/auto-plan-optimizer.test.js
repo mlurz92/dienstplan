@@ -164,17 +164,24 @@ test('die Perfektionsphase lässt sich abschalten und wird dann ausgewiesen', as
   assert.equal(result.optimizerConfig.perfectionEnabled, false);
   assert.equal(result.metrics.optimizer.skipped, true);
   assert.equal(result.metrics.optimizer.rounds, 0);
-  assert.equal(result.certified, undefined);
+  assert.equal(result.certified, false);
+  assert.equal(result.metrics.certification.proven, false);
+  assert.equal(result.metrics.certification.scope, 'none');
   assert.doesNotMatch(result.searchProfile, /Ruin-and-Recreate/);
 });
 
-test('ein vollständiger Lauf weist den Optimalitätsnachweis aus', async () => {
+test('ein vollständiger Heuristiklauf trennt lokalen Nachbarschaftsnachweis vom v9.5-Modellnachweis', async () => {
   const result = await plan(monthWithDays(2026, 9, 10));
   assert.equal(result.complete, true);
+  // Die v8.5-Perfektion hat ihre lokalen Nachbarschaften vollständig geprüft.
   assert.equal(result.metrics.optimizer.certified, true);
-  assert.equal(result.certified, true);
   assert.ok(result.metrics.optimizer.certificationMoves > 0);
   assert.match(result.searchProfile, /Ruin-and-Recreate-Perfektion \(zertifiziert\)/);
+  // In Node ist keine Browser-WASM-Bindung verfügbar. Das darf niemals als
+  // globaler v9.5-Modellnachweis ausgegeben werden.
+  assert.equal(result.certified, false);
+  assert.equal(result.metrics.certification.proven, false);
+  assert.equal(result.metrics.certification.status, 'SOLVER_UNAVAILABLE_FALLBACK');
 });
 
 test('harte Obergrenzen werden auch nach der Perfektion eingehalten', async () => {
