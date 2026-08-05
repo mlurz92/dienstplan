@@ -95,7 +95,7 @@ Der zweite, in `AUTO-PLAN-V9.5-FINAL.md` als „kritischer Brücken-Fix“ besch
 
 Verschärfend: `_headers` setzt global `Cross-Origin-Embedder-Policy: require-corp`. Das ist die richtige Wahl für den *threaded* Build — es stellt aber jede Fremdressource unter CORP/CORS-Vorbehalt. Der klassische `<script src="https://cdn.sheetjs.com/…">` in `index.html` trägt **kein** `crossorigin`-Attribut und wird deshalb im No-CORS-Modus geladen; unter `require-corp` ist das nur zulässig, wenn die Gegenstelle `Cross-Origin-Resource-Policy: cross-origin` sendet. Das ist eine Abhängigkeit von fremder Header-Politik an einer Stelle, an der der Excel-Import hängt. **Zu prüfen und zu entkoppeln.**
 
-### 2.5 Defekt 5 — Sieben von zehn Studio-Reglern sind mathematisch wirkungslos
+### 2.5 Defekt 5 — Alle neun `cpSat*Weight`-Gewichte sind mathematisch wirkungslos
 
 Die Phasenordnung `FOCUS_PHASE_ORDER` minimiert **je Phase genau eine Komponente allein**. Innerhalb jeder Komponente tragen alle Terme dasselbe Gewicht — gemessen:
 
