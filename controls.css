@@ -1,0 +1,429 @@
+/* Kompakte, semantisch gruppierte Aktionsleiste. Separates Stylesheet, damit
+   die umfangreiche Tabellen- und Druckgestaltung in styles.css unberührt bleibt. */
+
+.toolbar.toolbar-organized {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px;
+  /* Die Leiste klippt weiterhin: Solange eine Dichtestufe noch nicht bestimmt
+     ist, darf überstehender Inhalt weder sichtbar werden noch die Seite
+     waagerecht scrollen lassen. Das Überlaufmenü umgeht die Klippung über
+     `position: fixed`; dafür muss das Paint-Containment der Glaspanels hier
+     entfallen, denn Containment klippt auch fest positionierte Nachfahren. */
+  position: relative;
+  overflow: hidden;
+  contain: none;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Die Gruppen schrumpfen bewusst nicht. Nur so überläuft die Leiste messbar,
+   wenn eine Dichtestufe zu breit ist – und nur so kann die Messung überhaupt
+   eine passende Stufe finden, statt die Schaltflächen zu zerdrücken. */
+.toolbar-section {
+  flex: 0 0 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px;
+  border: 1px solid color-mix(in srgb, var(--month-accent) 17%, rgba(154,166,179,.46));
+  border-radius: 11px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.91), rgba(245,248,251,.80)),
+    color-mix(in srgb, var(--month-accent) 4%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.98),
+    0 1px 2px rgba(9,14,20,.07);
+}
+
+.toolbar-section-label {
+  flex: 0 0 auto;
+  padding: 0 3px 0 4px;
+  color: #697480;
+  font-size: .57rem;
+  font-weight: 720;
+  line-height: 1;
+  letter-spacing: .075em;
+  text-transform: uppercase;
+  user-select: none;
+}
+
+.toolbar-actions {
+  min-width: 0;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 3px;
+}
+
+.toolbar .tool-action,
+.toolbar-overflow-panel .tool-action,
+.toolbar .file-btn.tool-action,
+.toolbar-overflow-panel .file-btn.tool-action{
+  flex: 0 0 auto;
+  white-space: nowrap;
+  min-width: 32px;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0 8px;
+  border-radius: 8px;
+  color: #28323d;
+  font-size: .76rem;
+  font-weight: 620;
+  line-height: 1;
+  white-space: nowrap;
+  background: linear-gradient(180deg, rgba(255,255,255,.98), rgba(241,245,249,.91));
+  border: 1px solid color-mix(in srgb, var(--month-accent) 13%, rgba(142,155,169,.43));
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 1px 2px rgba(9,14,20,.07);
+  transition: transform .15s ease, border-color .15s ease, background .15s ease, box-shadow .15s ease, color .15s ease;
+}
+
+.toolbar .tool-action::before,
+.toolbar-overflow-panel .tool-action::before,
+.toolbar .file-btn.tool-action::before,
+.toolbar-overflow-panel .file-btn.tool-action::before{
+  display: none;
+}
+
+.toolbar .tool-action:hover,
+.toolbar-overflow-panel .tool-action:hover,
+.toolbar .file-btn.tool-action:hover,
+.toolbar-overflow-panel .file-btn.tool-action:hover{
+  transform: translateY(-1px);
+  color: #15202b;
+  border-color: color-mix(in srgb, var(--month-accent) 44%, rgba(142,155,169,.45));
+  background: linear-gradient(180deg, #fff, color-mix(in srgb, var(--month-accent) 9%, #f5f8fb));
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 3px 8px rgba(9,14,20,.10),
+    0 0 12px color-mix(in srgb, var(--month-glow) 24%, transparent);
+}
+
+.toolbar .tool-action:active,
+.toolbar-overflow-panel .tool-action:active,
+.toolbar .file-btn.tool-action:active,
+.toolbar-overflow-panel .file-btn.tool-action:active{
+  transform: translateY(0);
+  box-shadow: inset 0 1px 2px rgba(9,14,20,.10);
+}
+
+.toolbar .tool-action--accent,
+.toolbar-overflow-panel .tool-action--accent{
+  color: var(--month-accent-strong);
+  border-color: color-mix(in srgb, var(--month-accent) 39%, rgba(142,155,169,.42));
+  background: linear-gradient(180deg, #fff, color-mix(in srgb, var(--month-accent) 13%, #f6f9fb));
+}
+
+.toolbar .tool-action--quiet,
+.toolbar-overflow-panel .tool-action--quiet{
+  color: #52606d;
+}
+
+.toolbar .tool-action--danger,
+.toolbar-overflow-panel .tool-action--danger{
+  color: #8e2830;
+  border-color: rgba(174,83,91,.27);
+  background: linear-gradient(180deg, #fff, rgba(250,239,240,.91));
+}
+
+.toolbar .tool-action--danger:hover,
+.toolbar-overflow-panel .tool-action--danger:hover{
+  color: #751d25;
+  border-color: rgba(174,83,91,.48);
+  background: linear-gradient(180deg, #fff, rgba(249,229,231,.94));
+}
+
+.tool-icon {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tool-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Die einzelne App-Aktion bleibt in der Action Bar als vertrautes Zahnrad
+   kompakt. Volltext und Gruppentitel bleiben für Screenreader erhalten und
+   erscheinen wieder, sobald die Gruppe in das Überlaufmenü wandert. */
+.toolbar .toolbar-section--application .toolbar-section-label,
+.toolbar .toolbar-section--application .tool-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.toolbar .toolbar-section--application .tool-action {
+  width: 34px;
+  min-width: 34px;
+  padding: 0;
+}
+
+.toolbar .tool-action--file,
+.toolbar-overflow-panel .tool-action--file{
+  position: relative;
+  cursor: pointer;
+}
+
+.toolbar .tool-action--file input[type="file"],
+.toolbar-overflow-panel .tool-action--file input[type="file"]{
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.toolbar .tool-action--file:focus-visible,
+.toolbar-overflow-panel .tool-action--file:focus-visible,
+.toolbar .tool-action:focus-visible,
+.toolbar-overflow-panel .tool-action:focus-visible{
+  outline: var(--app-focus-ring) solid var(--month-accent-strong);
+  outline-offset: var(--app-focus-offset);
+}
+
+/* --------------------------------------------------------------------------
+   Dichtestufen
+
+   Die Stufe wird gemessen, nicht geraten: js/ui-controls.js probiert von der
+   reichsten Stufe abwärts und nimmt die erste, die vollständig hineinpasst.
+   Feste Viewport-Schwellen hatten die drei Gruppen zwischen 1120 px und 1400 px
+   einander überlagern und Beschriftungen abschneiden lassen.
+   -------------------------------------------------------------------------- */
+
+.toolbar[data-toolbar-density="groups"] .toolbar-section-label,
+.toolbar[data-toolbar-density="secondary"] .toolbar-section-label,
+.toolbar[data-toolbar-density="icons"] .toolbar-section-label,
+.toolbar[data-toolbar-density="overflow"] .toolbar-section-label {
+  display: none;
+}
+
+/* Zuerst geben die nachgeordneten Gruppen ihre Beschriftung ab; die
+   Planungsaktionen bleiben am längsten lesbar. */
+.toolbar[data-toolbar-density="secondary"] .toolbar-section--data .tool-label,
+.toolbar[data-toolbar-density="secondary"] .toolbar-section--output .tool-label,
+.toolbar[data-toolbar-density="icons"] .tool-label,
+.toolbar[data-toolbar-density="overflow"] .toolbar-section--planning .tool-label,
+.toolbar[data-toolbar-density="overflow"] .tool-action--overflow .tool-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.toolbar[data-toolbar-density="secondary"] .toolbar-section--data .tool-action,
+.toolbar[data-toolbar-density="secondary"] .toolbar-section--output .tool-action,
+.toolbar[data-toolbar-density="icons"] .tool-action,
+.toolbar[data-toolbar-density="icons"] .file-btn.tool-action,
+.toolbar[data-toolbar-density="overflow"] .toolbar-section--planning .tool-action,
+.toolbar[data-toolbar-density="overflow"] .tool-action--overflow {
+  width: 34px;
+  min-width: 34px;
+  padding: 0;
+}
+
+/* Überlaufmenü ------------------------------------------------------------ */
+
+.toolbar-overflow { position: relative; flex: 0 0 auto; display: none; align-items: center; }
+.toolbar[data-toolbar-density="overflow"] .toolbar-overflow { display: flex; }
+
+.toolbar-overflow-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 2147482500;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 7px;
+  /* Das Menü wird unter der Auslöser-Schaltfläche verankert. Enthält es alle
+     Gruppen, überschritt es auf flachen Fenstern den unteren Bildrand; die
+     letzten Einträge waren dann nicht erreichbar. */
+  max-block-size: calc(100dvh - 4.5rem);
+  overflow-y: auto;
+  border-radius: 13px;
+  border: 1px solid color-mix(in srgb, var(--month-accent) 26%, rgba(154,166,179,.5));
+  background: linear-gradient(180deg, #fff, color-mix(in srgb, var(--month-accent) 7%, #f7f9fc));
+  box-shadow: 0 18px 44px rgba(9,14,20,.24), 0 2px 6px rgba(9,14,20,.12);
+  animation: toolbar-overflow-in .16s cubic-bezier(.22, 1, .36, 1);
+}
+.toolbar-overflow-panel[hidden] { display: none; }
+
+@keyframes toolbar-overflow-in {
+  from { opacity: 0; transform: translateY(-5px) scale(.985); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Im Menü ist Platz: dort tragen alle Aktionen wieder ihre Beschriftung und
+   stehen als lesbare Liste untereinander. */
+.toolbar-overflow-panel .toolbar-section {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 3px;
+  border: none;
+  background: none;
+  box-shadow: none;
+  padding: 0;
+}
+.toolbar-overflow-panel .toolbar-section + .toolbar-section {
+  padding-top: 6px;
+  border-top: 1px solid rgba(154,166,179,.34);
+}
+.toolbar-overflow-panel .toolbar-actions { flex-direction: column; align-items: stretch; gap: 3px; }
+.toolbar-overflow-panel .tool-action,
+.toolbar-overflow-panel .file-btn.tool-action {
+  width: 100%;
+  min-width: 168px;
+  justify-content: flex-start;
+  padding: 0 10px;
+}
+.toolbar-overflow-panel .tool-label {
+  position: static;
+  width: auto;
+  height: auto;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+}
+
+/* Sehr schmale Geräte: Die Planungsaktionen dürfen die Breite ausnutzen,
+   das Menü bleibt rechts angeschlagen. */
+/* Letzte Stufe: Selbst wenn die Planungsgruppe nicht mehr vollständig passt,
+   bleibt sie in der Leiste – dann darf sie als einzige schrumpfen. */
+.toolbar[data-toolbar-density="overflow"] .toolbar-section--planning {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+@media (max-width: 460px) {
+  .toolbar.toolbar-organized { gap: 5px; }
+  .toolbar-overflow-panel { max-width: calc(100vw - 1.5rem); }
+  .toolbar[data-toolbar-density="overflow"] .toolbar-section--planning .toolbar-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toolbar .tool-action,
+  .toolbar .file-btn.tool-action {
+    transition: none;
+  }
+  .toolbar .tool-action:hover,
+  .toolbar .file-btn.tool-action:hover {
+    transform: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Stabiler Monatswechsel
+   --------------------------------------------------------------------------
+
+   app.js setzt die neue Tabelle bereits vollständig, bevor die historische
+   Richtungsanimation startet. Deren Startframe hatte opacity: 0 und ließ den
+   eben sichtbaren Plan deshalb noch einmal verschwinden. Die Spektrumebene
+   beendet parallel jeden Farbverlauf atomar; diese Regeln entfernen den zweiten
+   visuellen Zwischenzustand auch aus Überschrift, Tabelle und Statistik. */
+.month-enter-next,
+.month-enter-prev {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+  will-change: auto !important;
+}
+
+body.month-content-transition .month-palette-label {
+  animation: none !important;
+  filter: none !important;
+}
+
+/* ==========================================================================
+   Fixiertes Zahnrad der Aktionsleiste
+   ==========================================================================
+
+   Die Einstellungen sind der einzige Zugang, der in jeder Dichtestufe an
+   derselben Stelle bleiben muss. Er steht deshalb außerhalb der Gruppen und
+   außerhalb des Überlaufmenüs, als quadratische Symbolschaltfläche am rechten
+   Abschluss der Leiste. Die Beschriftung bleibt für Vorlesewerkzeuge erhalten;
+   sichtbar ist nur das Zahnrad. */
+
+.toolbar .tool-action--pinned {
+  margin-inline-start: auto;
+  flex: 0 0 auto;
+}
+
+.toolbar .tool-action--icon-only {
+  inline-size: 2.5rem;
+  padding-inline: 0;
+  justify-content: center;
+  border-radius: 999px;
+}
+
+.toolbar .tool-action--icon-only .visually-hidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.toolbar .tool-action--gear .tool-icon {
+  transition: transform .45s cubic-bezier(.32, .72, 0, 1);
+}
+
+.toolbar .tool-action--gear:hover .tool-icon,
+.toolbar .tool-action--gear:focus-visible .tool-icon {
+  transform: rotate(45deg);
+}
+
+:root.reduce-motion .toolbar .tool-action--gear .tool-icon,
+:root[data-motion="reduced"] .toolbar .tool-action--gear .tool-icon {
+  transition: none;
+}
+
+/* In der engsten Stufe zieht alles Übrige ins Menü; das Zahnrad bleibt und
+   rückt an die Überlauf-Schaltfläche heran. */
+.toolbar[data-toolbar-density="overflow"] .tool-action--pinned,
+.toolbar[data-toolbar-density="icons"] .tool-action--pinned {
+  margin-inline-start: .35rem;
+}
+
+.toolbar[data-toolbar-density="overflow"] .toolbar-overflow {
+  margin-inline-start: auto;
+}

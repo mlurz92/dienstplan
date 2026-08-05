@@ -1,0 +1,44 @@
+feature: Auto-Plan v7
+risk: high
+layers:
+  unit: true
+  integration: true
+  contract: false
+  e2e: true
+  smoke: true
+  property: true
+contract_skip_reason: Frontend, Worker und Cloudflare-Funktionen teilen versionierte JSON-Strukturen im selben Repository; externe Consumer existieren nicht.
+cases:
+  - id: settings-defaults
+    layer: unit
+    behavior: Fehlende Einstellungen werden vollständig und migrationssicher auf das v7-Schema ergänzt.
+  - id: settings-validation
+    layer: unit
+    behavior: Unzulässige Leistungs-, Darstellungs- und Auto-Plan-Werte werden verworfen oder im nicht-strikten Modus sicher begrenzt.
+  - id: worker-budget
+    layer: unit
+    behavior: Kernzahl, Gerätespeicher, Problemgröße und Leistungsprofil ergeben ein begrenztes, erklärbares Worker-Budget.
+  - id: global-mrv
+    layer: integration
+    behavior: Die Konstruktion wählt den engsten offenen Dienst rollenübergreifend zuerst.
+  - id: hard-constraints
+    layer: property
+    behavior: Generierte Monatsvarianten verändern keine Fixpunkte und liefern nie graue oder unzulässige Übernahmen.
+  - id: zero-red-escalation
+    layer: integration
+    behavior: Strikte Suche und Rescue laufen vollständig vor einem erlaubten Minimal-Rot-Fallback.
+  - id: adaptive-operators
+    layer: integration
+    behavior: Operatoren werden nach Qualitätsgewinn pro Rechenaufwand ausgewählt und bleiben explorierbar.
+  - id: settings-dialog
+    layer: e2e
+    behavior: Das Zahnrad öffnet einen nativen modalen Dialog mit korrektem Fokus, Speichern, Zurücksetzen und Escape-Verhalten.
+  - id: studio-v7
+    layer: e2e
+    behavior: Das Studio zeigt Leistungsprofil, Worker-Plan und verständliche v7-Lauftelemetrie responsiv und barrierearm.
+  - id: application-start
+    layer: smoke
+    behavior: Die Anwendung startet mit lokalem oder serverseitigem Settingsbestand und alle Hauptaktionen bleiben erreichbar.
+performance_validation:
+  ci: Arbeitsmengen, Cachetreffer und Suchtelemetrie statt instabiler Wandzeitgrenzen.
+  local: Repräsentative Monate werden gegen die dokumentierte v6-Baseline vermessen.

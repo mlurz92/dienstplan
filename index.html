@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DienstplanRAD</title>
+  <meta name="application-name" content="DienstplanRAD" />
+  <meta name="apple-mobile-web-app-title" content="DienstplanRAD" />
+  <meta name="theme-color" content="#0b0f14" />
+  <!--
+    Auslieferungsstempel. Er macht von außen prüfbar, welcher Stand tatsächlich
+    online ist – mit einem einzigen Aufruf:
+
+        curl -s https://dienstplanrad.pages.dev/ | grep dienstplanrad-build
+
+    Der Anlass ist konkret: Die Seite lief über lange Zeit auf einem Stand, dem
+    das Monatsfarbsystem vollständig fehlte, weil das Hosting einen anderen
+    Zweig als main auslieferte. Von außen war das nicht zu erkennen, weil die
+    Anwendung im Übrigen normal funktionierte.
+  -->
+  <meta name="dienstplanrad-build" content="20260806.1" />
+  <script>
+    (() => {
+      const cachePrefix = 'dienstplanrad';
+      const cleanupKey = 'dienstplanrad:legacy-cleanup';
+      const reloadKey = 'dienstplanrad:legacy-reload';
+
+      const istEigenerWorker = registration => {
+        const worker = registration.active || registration.waiting || registration.installing;
+        if (!worker) return false;
+        try {
+          return new URL(worker.scriptURL, location.href).pathname === '/sw.js';
+        } catch {
+          return false;
+        }
+      };
+
+      const wirdVonWorkerBedient = 'serviceWorker' in navigator && navigator.serviceWorker.controller !== null;
+
+      const unregister = 'serviceWorker' in navigator
+        ? navigator.serviceWorker.getRegistrations()
+            .then(registrations => Promise.all(registrations.filter(istEigenerWorker).map(registration => registration.unregister())))
+        : Promise.resolve();
+      const clearCaches = 'caches' in window
+        ? caches.keys()
+            .then(keys => Promise.all(keys.filter(key => key.startsWith(cachePrefix)).map(key => caches.delete(key))))
+        : Promise.resolve();
+
+      const schonNeugestartet = (() => {
+        try { return sessionStorage.getItem(reloadKey) === '1'; } catch { return true; }
+      })();
+
+      window.__dienstplanLegacyCleanup = Promise.allSettled([unregister, clearCaches]).then(() => {
+        if (!wirdVonWorkerBedient || schonNeugestartet) return { neustart: false };
+        try { sessionStorage.setItem(reloadKey, '1'); } catch { return { neustart: false }; }
+        location.reload();
+        return { neustart: true };
+      });
+      document.documentElement.dataset.assetCleanup = cleanupKey;
+    })();
+  </script>
+  <link rel="icon" href="/icons/icon.svg?icon=algorithm-spectrum-2" type="image/svg+xml" sizes="any" />
+  <link rel="icon" href="/icons/icon-32.png?icon=algorithm-spectrum-2" type="image/png" sizes="32x32" />
+  <link rel="shortcut icon" href="/icons/icon-32.png?icon=algorithm-spectrum-2" type="image/png" />
+  <link rel="apple-touch-icon" href="/icons/icon-180.png?icon=algorithm-spectrum-2" sizes="180x180" />
+  <link rel="manifest" href="/manifest.webmanifest?manifest=algorithm-spectrum-2" />
+  <link rel="stylesheet" href="/styles.css?v=20260806.1" />
+  <link rel="stylesheet" href="/controls.css?v=20260806.1" />
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" defer></script>
+  <script type="module" src="/js/app.js?v=20260806.1"></script>
+  <script type="module" src="/js/ui-controls.js?v=20260806.1"></script>
+  <script type="module" src="/js/auto-plan-ui.js?v=20260806.1"></script>
+  <script type="module">
+    document.addEventListener('DOMContentLoaded', () => {
+      const reasons = document.getElementById('conflictReasons');
+      const comment = document.getElementById('conflictComment');
+      const confirmButton = document.getElementById('confirmConflictBtn');
+      const label = document.getElementById('conflictCommentLabel');
+      const heading = document.querySelector('#conflictDialog .dialog-header h3');
+      if (!reasons || !comment || !confirmButton || !label || !heading) return;
+
+      const isSpecial = () => [...reasons.querySelectorAll('.small-chip')]
+        .some(chip => chip.textContent?.trim() === 'Besondere Bestätigung erforderlich');
+
+      const syncConfirmationMode = () => {
+        const special = isSpecial();
+        comment.required = special;
+        comment.setCustomValidity('');
+        label.firstChild.textContent = special ? 'Begründender Kommentar, erforderlich' : 'Kommentar, optional';
+        heading.textContent = special ? 'Besondere rote Bestätigung' : 'Roter Konflikt';
+      };
+
+      new MutationObserver(syncConfirmationMode).observe(reasons, { childList: true, subtree: true });
+      comment.addEventListener('input', () => comment.setCustomValidity(''));
+      confirmButton.addEventListener('click', event => {
+        syncConfirmationMode();
+        if (!isSpecial() || comment.value.trim()) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        comment.setCustomValidity('Für diese besondere Ausnahme ist ein begründender Kommentar erforderlich.');
+        comment.reportValidity();
+        comment.focus();
+      }, true);
+    });
+  </script>
+</head>
+<body>
+  <div class="ambient-layer" aria-hidden="true">
+    <span class="ambient-orb ambient-orb-one"></span>
+    <span class="ambient-orb ambient-orb-two"></span>
+    <span class="ambient-orb ambient-orb-three"></span>
+  </div>
+  <div class="app-shell">
+    <header class="topbar glass-panel">
+      <div class="brand-block">
+        <img class="brand-mark" src="/icons/icon.svg?icon=algorithm-spectrum-2" alt="" aria-hidden="true" draggable="false" />
+        <div>
+          <div class="eyebrow">Klinik für Radiologie und Nuklearmedizin</div>
+          <h1>DienstplanRAD</h1>
+          <div class="subline">Regelgestützte Dienstplanung · Auto-Plan · Cloud-Synchronisierung</div>
+        </div>
+      </div>
+      <div class="topbar-controls">
+        <div class="month-selector glass-inset">
+          <button id="prevMonthBtn" class="icon-btn" title="Vormonat">‹</button>
+          <select id="monthSelect"></select>
+          <select id="yearSelect"></select>
+          <button id="nextMonthBtn" class="icon-btn" title="Folgemonat">›</button>
+        </div>
+        <div class="status-wrap glass-inset">
+          <span class="status-dot" id="statusDot"></span>
+          <span id="saveStatus">Lädt …</span>
+        </div>
+      </div>
+    </header>
+
+    <section class="toolbar glass-panel" aria-label="Werkzeugleiste">
+      <div class="toolbar-group">
+        <button id="todayBtn">Aktueller Monat</button>
+        <button id="absenceManagerBtn">Abwesenheiten</button>
+        <button id="preferenceManagerBtn">Dienstwünsche / Optionen</button>
+        <button id="clearMonthBtn" class="secondary">Monat leeren</button>
+        <button id="reloadBtn">Serverstand neu laden</button>
+      </div>
+      <div class="toolbar-group">
+        <label class="file-btn">
+          Excel importieren
+          <input id="excelImportInput" type="file" accept=".xlsx,.xls" hidden />
+        </label>
+        <button id="exportExcelBtn">Excel exportieren</button>
+        <button id="exportPdfBtn">PDF exportieren</button>
+        <button id="exportJsonBtn">JSON sichern</button>
+        <label class="file-btn secondary">
+          JSON laden
+          <input id="jsonImportInput" type="file" accept="application/json" hidden />
+        </label>
+        <button id="settingsBtn">Einstellungen</button>
+      </div>
+    </section>
+
+    <main class="sheet-layout">
+      <section class="sheet-panel glass-panel">
+        <div class="sheet-heading">
+          <div>
+            <div class="eyebrow">Bereitschaftsdienstplan</div>
+            <h2 id="monthTitle">Monat</h2>
+          </div>
+          <div class="legend-stack">
+            <span id="monthPaletteLabel" class="month-palette-label">Monatskontrast</span>
+            <div class="legend compact-legend rule-legend">
+              <span><i class="legend-swatch green"></i> geeignet</span>
+              <span><i class="legend-swatch yellow"></i> Hinweis</span>
+              <span><i class="legend-swatch orange"></i> Konflikt</span>
+              <span><i class="legend-swatch gray"></i> nicht wählbar</span>
+              <span><i class="legend-swatch red"></i> Bestätigung</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="plan-table-wrap" id="printArea">
+          <table class="plan-table excel-plan" id="planTable">
+            <thead>
+              <tr>
+                <th class="day-number-col">Tag</th>
+                <th class="weekday-col">Wochentag</th>
+                <th>BD</th>
+                <th>HG</th>
+                <th>RBN</th>
+                <th>2. RBN</th>
+                <th class="absence-col">Urlaub / FZA</th>
+                <th class="preference-col">Kein Dienst / Wünsche / Optionen</th>
+              </tr>
+            </thead>
+            <tbody id="planTableBody"></tbody>
+          </table>
+        </div>
+
+        <section class="below-plan">
+          <div class="section-title-row">
+            <div>
+              <div class="eyebrow">Verteilung</div>
+              <h3>Statistik</h3>
+            </div>
+            <span class="section-note">Direkt aus dem Monatsplan berechnet</span>
+          </div>
+          <div id="statsGrid" class="stats-grid excel-stats"></div>
+
+          <div class="section-title-row issue-heading">
+            <div>
+              <div class="eyebrow">Prüfung</div>
+              <h3>Offene Punkte</h3>
+            </div>
+            <span class="section-note" id="issueSummary"></span>
+          </div>
+          <div id="issueList" class="issue-list"></div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="pickerDialog" class="app-dialog picker-dialog" aria-labelledby="pickerTitle" aria-describedby="pickerCurrent">
+    <form method="dialog" class="dialog-card picker-card">
+      <div class="picker-header">
+        <div class="picker-heading">
+          <span class="picker-role" id="pickerEyebrow"></span>
+          <h3 id="pickerTitle">Auswahl</h3>
+        </div>
+        <button class="icon-btn close-btn" value="cancel" aria-label="Auswahl schließen" title="Schließen">✕</button>
+        <p class="picker-current" id="pickerCurrent"></p>
+      </div>
+
+      <div class="picker-search">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.2-4.2"/></svg>
+        <input id="pickerSearch" type="text" role="combobox" autocomplete="off" spellcheck="false"
+               placeholder="Name tippen zum Filtern …" aria-label="Mitarbeitende filtern"
+               aria-controls="pickerList" aria-expanded="true" aria-autocomplete="list" />
+      </div>
+
+      <div id="pickerList" class="picker-list" role="listbox" aria-label="Mitarbeitende"></div>
+
+      <p class="picker-detail" id="pickerDetail" aria-live="polite"></p>
+      <p class="picker-note" id="pickerSubtitle"></p>
+
+      <div class="picker-footer">
+        <p class="picker-keys" aria-hidden="true">
+          <kbd>↑</kbd><kbd>↓</kbd> wählen · <kbd>⏎</kbd> übernehmen · <kbd>Esc</kbd> schließen
+        </p>
+        <menu class="dialog-actions">
+          <button value="cancel" class="secondary">Abbrechen</button>
+          <button id="clearAssignmentBtn" value="clear" class="secondary danger-ghost">Eintrag löschen</button>
+        </menu>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="dayMetaDialog" class="app-dialog">
+    <form method="dialog" class="dialog-card wide">
+      <div class="dialog-header">
+        <div>
+          <div class="eyebrow">Tagesbezogene Markierungen</div>
+          <h3 id="dayMetaTitle">Abwesenheiten und Wünsche</h3>
+          <p>Mehrfachauswahl pro Datum. Änderungen werden automatisch gespeichert.</p>
+        </div>
+        <button class="icon-btn close-btn" value="cancel">✕</button>
+      </div>
+      <div id="dayMetaList" class="day-meta-list"></div>
+      <menu class="dialog-actions">
+        <button value="cancel" class="secondary">Schließen</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <dialog id="batchDialog" class="app-dialog">
+    <form method="dialog" class="dialog-card wide">
+      <div class="dialog-header">
+        <div>
+          <div class="eyebrow" id="batchEyebrow">Komforteingabe</div>
+          <h3 id="batchTitle">Mehrere Tage markieren</h3>
+          <p id="batchSubtitle"></p>
+        </div>
+        <button class="icon-btn close-btn" value="cancel">✕</button>
+      </div>
+      <div class="batch-controls">
+        <label>Mitarbeitende
+          <select id="batchStaffSelect"></select>
+        </label>
+        <label>Typ
+          <select id="batchTypeSelect"></select>
+        </label>
+      </div>
+      <div id="batchDayGrid" class="batch-day-grid"></div>
+      <menu class="dialog-actions">
+        <button type="button" id="batchClearSelectionBtn" class="secondary">Auswahl zurücksetzen</button>
+        <button type="button" id="batchApplyBtn">Übernehmen</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <dialog id="conflictDialog" class="app-dialog">
+    <form method="dialog" class="dialog-card">
+      <div class="dialog-header">
+        <div>
+          <div class="eyebrow">Bestätigung erforderlich</div>
+          <h3>Roter Konflikt</h3>
+          <p id="conflictDialogText"></p>
+        </div>
+        <button class="icon-btn close-btn" value="cancel">✕</button>
+      </div>
+      <div class="conflict-reasons" id="conflictReasons"></div>
+      <label id="conflictCommentLabel">Kommentar, optional
+        <textarea id="conflictComment" rows="3" placeholder="z. B. mit Mitarbeitendem abgestimmt"></textarea>
+      </label>
+      <menu class="dialog-actions">
+        <button value="cancel" class="secondary">Abbrechen</button>
+        <button type="button" id="confirmConflictBtn">Trotzdem eintragen</button>
+      </menu>
+    </form>
+  </dialog>
+</body>
+</html>

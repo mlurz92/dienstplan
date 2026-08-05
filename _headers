@@ -1,0 +1,31 @@
+/
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/index.html
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/styles.css
+  Cache-Control: no-cache, must-revalidate
+
+/js/*
+  Cache-Control: no-cache, must-revalidate
+
+/vendor/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/*
+  X-Frame-Options: SAMEORIGIN
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: geolocation=(), microphone=(), camera=()
+  Cross-Origin-Opener-Policy: same-origin
+
+# Kein Cross-Origin-Embedder-Policy: require-corp.
+#
+# Die Vollisolierung wäre nur für den mehrfädigen WebAssembly-Build des Solvers
+# nötig. Ausgeliefert wird der portable Build: Er kommt ohne SharedArrayBuffer
+# aus und löst einen Monatsplan in Bruchteilen einer Sekunde. Der Preis der
+# Isolierung wäre dagegen real – jede Fremdressource ohne CORP-Kopfzeile würde
+# blockiert, darunter die Tabellenbibliothek des Excel-Imports. Isolierung, die
+# nichts einbringt und Funktionierendes gefährdet, gehört nicht in die
+# Auslieferung.

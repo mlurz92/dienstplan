@@ -1,0 +1,984 @@
+- generic [active] [ref=f1e1]:
+  - generic [ref=f1e2]:
+    - banner [ref=f1e3]:
+      - generic [ref=f1e6]:
+        - generic [ref=f1e7]: Klinik für Radiologie und Nuklearmedizin
+        - heading "DienstplanRAD" [level=1] [ref=f1e8]
+        - generic [ref=f1e9]: Regelgestützte Dienstplanung · Auto-Plan · Cloud-Synchronisierung
+      - generic [ref=f1e10]:
+        - generic [ref=f1e11]:
+          - button "Vorherigen Monat öffnen." [ref=f1e12] [cursor=pointer]
+          - combobox [ref=f1e15]:
+            - option "Januar"
+            - option "Februar"
+            - option "März"
+            - option "April"
+            - option "Mai"
+            - option "Juni"
+            - option "Juli"
+            - option "August" [selected]
+            - option "September"
+            - option "Oktober"
+            - option "November"
+            - option "Dezember"
+          - combobox [ref=f1e16]:
+            - option "2021"
+            - option "2022"
+            - option "2023"
+            - option "2024"
+            - option "2025"
+            - option "2026" [selected]
+            - option "2027"
+            - option "2028"
+            - option "2029"
+            - option "2030"
+            - option "2031"
+          - button "Nächsten Monat öffnen." [ref=f1e17] [cursor=pointer]
+        - generic [ref=f1e20]: Lädt Serverstand …
+    - region "DienstplanRAD Befehlsleiste" [ref=f1e23]:
+      - region "Planung" [ref=f1e24]:
+        - generic [ref=f1e25]:
+          - button "Aktueller Monat" [ref=f1e26] [cursor=pointer]:
+            - generic [ref=f1e30]: Heute
+          - button "Auto-Plan Studio öffnen, Parameter festlegen und alle offenen BD/HG optimieren" [ref=f1e31] [cursor=pointer]:
+            - generic [ref=f1e35]: Auto-Plan
+          - button "Abwesenheiten verwalten" [ref=f1e37] [cursor=pointer]:
+            - generic [ref=f1e40]: Abwesenheiten
+          - button "Dienstwünsche und Optionen verwalten" [ref=f1e41] [cursor=pointer]:
+            - generic [ref=f1e46]: Wünsche
+          - button "Sichtbaren Monat vollständig leeren" [ref=f1e47] [cursor=pointer]:
+            - generic [ref=f1e50]: Leeren
+      - region "Daten" [ref=f1e51]:
+        - generic [ref=f1e52]:
+          - button "Serverstand neu laden" [ref=f1e53] [cursor=pointer]:
+            - generic [ref=f1e57]: Neu laden
+          - button "Excel-Datei importieren" [ref=f1e58] [cursor=pointer]:
+            - generic [ref=f1e62]: Excel laden
+          - button "JSON-Sicherung laden" [ref=f1e63] [cursor=pointer]:
+            - generic [ref=f1e68]: Sicherung laden
+      - region "Ausgabe" [ref=f1e69]:
+        - generic [ref=f1e70]:
+          - button "Monatsplan als Excel exportieren" [ref=f1e71] [cursor=pointer]:
+            - generic [ref=f1e75]: Excel
+          - button "Monatsplan als PDF drucken" [ref=f1e76] [cursor=pointer]:
+            - generic [ref=f1e80]: PDF
+          - button "Vollständige JSON-Sicherung erstellen" [ref=f1e81] [cursor=pointer]:
+            - generic [ref=f1e86]: Sichern
+      - button "Zum dunklen Erscheinungsbild wechseln. Monatskontrast und Statusfarben bleiben erhalten." [ref=f1e87] [cursor=pointer]
+      - button "Einstellungen der Anwendung öffnen" [ref=f1e91] [cursor=pointer]:
+        - generic [ref=f1e95]: Einstellungen
+    - main [ref=f1e96]:
+      - generic [ref=f1e97]:
+        - generic [ref=f1e98]:
+          - generic [ref=f1e99]:
+            - generic [ref=f1e100]: Bereitschaftsdienstplan
+            - heading "August 2026" [level=2] [ref=f1e101]
+          - generic [ref=f1e102]:
+            - generic [ref=f1e103]: Monatskontrast · Pale Banana
+            - generic [ref=f1e104]:
+              - generic [ref=f1e105]: geeignet
+              - generic [ref=f1e107]: Hinweis
+              - generic [ref=f1e109]: Konflikt
+              - generic [ref=f1e111]: nicht wählbar
+              - generic [ref=f1e113]: Bestätigung
+        - table [ref=f1e116]:
+          - rowgroup [ref=f1e117]:
+            - row [ref=f1e118]:
+              - columnheader "Tag" [ref=f1e119]
+              - columnheader "Wochentag" [ref=f1e120]
+              - columnheader "BD" [ref=f1e121]
+              - columnheader "HG" [ref=f1e122]
+              - columnheader "RBN" [ref=f1e123]
+              - columnheader "2. RBN" [ref=f1e124]
+              - columnheader "Urlaub / FZA" [ref=f1e125]
+              - columnheader "Kein Dienst / Wünsche / Optionen" [ref=f1e126]
+          - rowgroup [ref=f1e127]:
+            - row "1 Samstag — offen — offen — auswählen — Abwesenheiten bearbeiten Dienstwünsche und Optionen bearbeiten" [ref=f1e128]:
+              - cell "1" [ref=f1e129]
+              - cell "Samstag" [ref=f1e130]
+              - cell [ref=f1e132]:
+                - button "— offen" [ref=f1e133] [cursor=pointer]:
+                  - generic [ref=f1e134]: —
+                  - generic [ref=f1e135]: offen
+              - cell [ref=f1e137]:
+                - button "— offen" [ref=f1e138] [cursor=pointer]:
+                  - generic [ref=f1e139]: —
+                  - generic [ref=f1e140]: offen
+              - cell [ref=f1e142]:
+                - combobox "RBN am 2026-08-01" [ref=f1e144]:
+                  - option "— auswählen —" [selected]
+                  - option "Schob"
+                  - option "Bailis"
+                  - option "Maybaum"
+                  - option "Schüngel"
+                  - option "Dalitz"
+                  - option "Martin"
+                  - option "El Houba"
+              - cell [ref=f1e145]
+              - cell [ref=f1e147]:
+                - button "Abwesenheiten bearbeiten" [ref=f1e148] [cursor=pointer]
+              - cell [ref=f1e149]:
+                - button "Dienstwünsche und Optionen bearbeiten" [ref=f1e150] [cursor=pointer]
+            - row "2 Sonntag — offen — offen — auswählen — Abwesenheiten bearbeiten Dienstwünsche und Optionen bearbeiten" [ref=f1e151]:
+              - cell "2" [ref=f1e152]
+              - cell "Sonntag" [ref=f1e153]
+              - cell [ref=f1e155]:
+                - button "— offen" [ref=f1e156] [cursor=pointer]:
+                  - generic [ref=f1e157]: —
+                  - generic [ref=f1e158]: offen
+              - cell [ref=f1e160]:
+                - button "— offen" [ref=f1e161] [cursor=pointer]:
+                  - generic [ref=f1e162]: —
+                  - generic [ref=f1e163]: offen
+              - cell [ref=f1e165]:
+                - combobox "RBN am 2026-08-02" [ref=f1e167]:
+                  - option "— auswählen —" [selected]
+                  - option "Schob"
+                  - option "Bailis"
+                  - option "Maybaum"
+                  - option "Schüngel"
+                  - option "Dalitz"
+                  - option "Martin"
+                  - option "El Houba"
+              - cell [ref=f1e168]
+              - cell [ref=f1e170]:
+                - button "Abwesenheiten bearbeiten" [ref=f1e171] [cursor=pointer]
+              - cell [ref=f1e172]:
+                - button "Dienstwünsche und Optionen bearbeiten" [ref=f1e173] [cursor=pointer]
+            - row "3 Montag — offen — offen — auswählen — Abwesenheiten bearbeiten Dienstwünsche und Optionen bearbeiten" [ref=f1e174]:
+              - cell "3" [ref=f1e175]
+              - cell "Montag" [ref=f1e176]
+              - cell [ref=f1e178]:
+                - button "— offen" [ref=f1e179] [cursor=pointer]:
+                  - generic [ref=f1e180]: —
+                  - generic [ref=f1e181]: offen
+              - cell [ref=f1e183]:
+                - button "— offen" [ref=f1e184] [cursor=pointer]:
+                  - generic [ref=f1e185]: —
+                  - generic [ref=f1e186]: offen
+              - cell [ref=f1e188]:
+                - combobox "RBN am 2026-08-03" [ref=f1e190]:
+                  - option "— auswählen —" [selected]
+                  - option "Schob"
+                  - option "Bailis"
+                  - option "Maybaum"
+                  - option "Schüngel"
+                  - option "Dalitz"
+                  - option "Martin"
+                  - option "El Houba"
+              - cell [ref=f1e191]
+              - cell [ref=f1e193]:
+                - button "Abwesenheiten bearbeiten" [ref=f1e194] [cursor=pointer]
+              - cell [ref=f1e195]:
+                - button "Dienstwünsche und Optionen bearbeiten" [ref=f1e196] [cursor=pointer]
+            - row "4 Dienstag — offen — offen — auswählen — Abwesenheiten bearbeiten Dienstwünsche und Optionen bearbeiten" [ref=f1e197]:
+              - cell "4" [ref=f1e198]
+              - cell "Dienstag" [ref=f1e199]
+              - cell [ref=f1e201]:
+                - button "— offen" [ref=f1e202] [cursor=pointer]:
+                  - generic [ref=f1e203]: —
+                  - generic [ref=f1e204]: offen
+              - cell [ref=f1e206]:
+                - button "— offen" [ref=f1e207] [cursor=pointer]:
+                  - generic [ref=f1e208]: —
+                  - generic [ref=f1e209]: offen
+              - cell [ref=f1e211]:
+                - combobox "RBN am 2026-08-04" [ref=f1e213]:
+                  - option "— auswählen —" [selected]
+                  - option "Schob"
+                  - option "Bailis"
+                  - option "Maybaum"
+                  - option "Schüngel"
+                  - option "Dalitz"
+                  - option "Martin"
+                  - option "El Houba"
+              - cell [ref=f1e214]
+              - cell [ref=f1e216]:
+                - button "Abwesenheiten bearbeiten" [ref=f1e217] [cursor=pointer]
+              - cell [ref=f1e218]:
+                - button "Dienstwünsche und Optionen bearbeiten" [ref=f1e219] [cursor=pointer]
+            - row "5 Mittwoch — offen — offen — auswählen — Abwesenheiten bearbeiten Dienstwünsche und Optionen bearbeiten" [ref=f1e220]:
+              - cell "5" [ref=f1e221]
+              - cell "Mittwoch" [ref=f1e222]
+              - cell [ref=f1e224]:
+                - button "— offen" [ref=f1e225] [cursor=pointer]:
+                  - generic [ref=f1e226]: —
+                  - generic [ref=f1e227]: offen
+              - cell [ref=f1e229]:
+                - button "— offen" [ref=f1e230] [cursor=pointer]:
+                  - generic [ref=f1e231]: —
+                  - generic [ref=f1e232]: offen
+              - cell [ref=f1e234]:
+                - combobox "RBN am 2026-08-05" [ref=f1e236]:
+                  - option "— auswählen —" [selected]
+                  - option "Schob"
+                  - option "Bailis"
+                  - option "Maybaum"
+                  - option "Schüngel"
+                  - option "Dalitz"
+                  - option "Martin"
+                  - option "El Houba"
+              - cell [ref=f1e237]
+              - cell [ref=f1e239]:
+                - button "Abwesenheiten bearbeiten" [ref=f1e240] [cursor=pointer]
+              - cell [ref=f1e241]:
+                - button "Dienstwünsche und Optionen bearbeiten" [ref=f1e242] [cursor=pointer]
+            - row "6 Donnerstag — offen — offen — auswählen — Abwesenheiten bearbeiten Dienstwünsche und Optionen bearbeiten" [ref=f1e243]:
+              - cell "6" [ref=f1e244]
+              - cell "Donnerstag" [ref=f1e245]
+              - cell [ref=f1e247]:
+                - button "— offen" [ref=f1e248] [cursor=pointer]:
+                  - generic [ref=f1e249]: —
+                  - generic [ref=f1e250]: offen
+              - cell [ref=f1e252]:
+                - button "— offen" [ref=f1e253] [cursor=pointer]:
+                  - generic [ref=f1e254]: —
+                  - generic [ref=f1e255]: offen
+              - cell [ref=f1e257]:
+                - combobox "RBN am 2026-08-06" [ref=f1e259]:
+                  - option "— auswählen —" [selected]
+                  - option "Schob"
+                  - option "Bailis"
+                  - option "Maybaum"
+                  - option "Schüngel"
+                  - option "Dalitz"
+                  - option "Martin"
+                  - option "El Houba"
+              - cell [ref=f1e260]
+              - cell [ref=f1e262]:
+                - button "Abwesenheiten bearbeiten" [ref=f1e263] [cursor=pointer]
+              - cell [ref=f1e264]:
+                - button "Dienstwünsche und Optionen bearbeiten" [ref=f1e265] [cursor=pointer]
+            - row "7 Freitag — offen — offen — auswählen — Abwesenheiten bearbeiten Dienstwünsche und Optionen bearbeiten" [ref=f1e266]:
+              - cell "7" [ref=f1e267]
+              - cell "Freitag" [ref=f1e268]
+              - cell [ref=f1e270]:
+                - button "— offen" [ref=f1e271] [cursor=pointer]:
+                  - generic [ref=f1e272]: —
+                  - generic [ref=f1e273]: offen
+              - cell [ref=f1e275]:
+                - button "— offen" [ref=f1e276] [cursor=pointer]:
+                  - generic [ref=f1e277]: —
+                  - generic [ref=f1e278]: offen
+              - cell [ref=f1e280]:
+                - combobox "RBN am 2026-08-07" [ref=f1e282]:
+                  - option "— auswählen —" [selected]
+                  - option "Schob"
+                  - option "Bailis"
+                  - option "Maybaum"
+                  - option "Schüngel"
+                  - option "Dalitz"
+                  - option "Martin"
+                  - option "El Houba"
+              - cell [ref=f1e283]
+              - cell [ref=f1e285]:
+                - button "Abwesenheiten bearbeiten" [ref=f1e286] [cursor=pointer]
+              - cell [ref=f1e287]:
+                - button "Dienstwünsche und Optionen bearbeiten" [ref=f1e288] [cursor=pointer]
+            - row "8 Samstag — offen — offen — auswählen — Abwesenheiten bearbeiten Dienstwünsche und Optionen bearbeiten" [ref=f1e289]:
+              - cell "8" [ref=f1e290]
+              - cell "Samstag" [ref=f1e291]
+              - cell [ref=f1e293]:
+                - button "— offen" [ref=f1e294] [cursor=pointer]:
+                  - generic [ref=f1e295]: —
+                  - generic [ref=f1e296]: offen
+              - cell [ref=f1e298]:
+                - button "— offen" [ref=f1e299] [cursor=pointer]:
+                  - generic [ref=f1e300]: —
+                  - generic [ref=f1e301]: offen
+              - cell [ref=f1e303]:
+                - combobox "RBN am 2026-08-08" [ref=f1e305]:
+                  - option "— auswählen —" [selected]
+                  - option "Schob"
+                  - option "Bailis"
+                  - option "Maybaum"
+                  - option "Schüngel"
+                  - option "Dalitz"
+                  - option "Martin"
+                  - option "El Houba"
+              - cell [ref=f1e306]
+              - cell [ref=f1e308]:
+                - button "Abwesenheiten bearbeiten" [ref=f1e309] [cursor=pointer]
+              - cell [ref=f1e310]:
+                - button "Dienstwünsche und Optionen bearbeiten" [ref=f1e311] [cursor=pointer]
+            - row "9 Sonntag — offen — offen — auswählen — Abwesenheiten bearbeiten Dienstwünsche und Optionen bearbeiten" [ref=f1e312]:
+              - cell "9" [ref=f1e313]
+              - cell "Sonntag" [ref=f1e314]
+              - cell [ref=f1e316]:
+                - button "— offen" [ref=f1e317] [cursor=pointer]:
+                  - generic [ref=f1e318]: —
+                  - generic [ref=f1e319]: offen
+              - cell [ref=f1e321]:
+                - button "— offen" [ref=f1e322] [cursor=pointer]:
+                  - generic [ref=f1e323]: —
+                  - generic [ref=f1e324]: offen
+              - cell [ref=f1e326]:
+                - combobox "RBN am 2026-08-09" [ref=f1e328]:
+                  - option "— auswählen —" [selected]
+                  - option "Schob"
+                  - option "Bailis"
+                  - option "Maybaum"
+                  - option "Schüngel"
+                  - option "Dalitz"
+                  - option "Martin"
+                  - option "El Houba"
+              - cell [ref=f1e329]
+              - cell [ref=f1e331]:
+                - button "Abwesenheiten bearbeiten" [ref=f1e332] [cursor=pointer]
+              - cell [ref=f1e333]:
+                - button "Dienstwünsche und Optionen bearbeiten" [ref=f1e334] [cursor=pointer]
+            - row "10 Montag — offen — offen — auswählen — Abwesenheiten bearbeiten Dienstwünsche und Optionen bearbeiten" [ref=f1e335]:
+              - cell "10" [ref=f1e336]
+              - cell "Montag" [ref=f1e337]
+              - cell [ref=f1e339]:
+                - button "— offen" [ref=f1e340] [cursor=pointer]:
+                  - generic [ref=f1e341]: —
+                  - generic [ref=f1e342]: offen
+              - cell [ref=f1e344]:
+                - button "— offen" [ref=f1e345] [cursor=pointer]:
+                  - generic [ref=f1e346]: —
+                  - generic [ref=f1e347]: offen
+              - cell [ref=f1e349]:
+                - combobox "RBN am 2026-08-10" [ref=f1e351]:
+                  - option "— auswählen —" [selected]
+                  - option "Schob"
+                  - option "Bailis"
+                  - option "Maybaum"
+                  - option "Schüngel"
+                  - option "Dalitz"
+                  - option "Martin"
+                  - option "El Houba"
+              - cell [ref=f1e352]
+              - cell [ref=f1e354]:
+                - button "Abwesenheiten bearbeiten" [ref=f1e355] [cursor=pointer]
+              - cell [ref=f1e356]:
+                - button "Dienstwünsche und Optionen bearbeiten" [ref=f1e357] [cursor=pointer]
+            - row "11 Dienstag — offen — offen — auswählen — Abwesenheiten bearbeiten Dienstwünsche und Optionen bearbeiten" [ref=f1e358]:
+              - cell "11" [ref=f1e359]
+              - cell "Dienstag" [ref=f1e360]
+              - cell [ref=f1e362]:
+                - button "— offen" [ref=f1e363] [cursor=pointer]:
+                  - generic [ref=f1e364]: —
+                  - generic [ref=f1e365]: offen
+              - cell [ref=f1e367]:
+                - button "— offen" [ref=f1e368] [cursor=pointer]:
+                  - generic [ref=f1e369]: —
+                  - generic [ref=f1e370]: offen
+              - cell [ref=f1e372]:
+                - combobox "RBN am 2026-08-11" [ref=f1e374]:
+                  - option "— auswählen —" [selected]
+                  - option "Schob"
+                  - option "Bailis"
+                  - option "Maybaum"
+                  - option "Schüngel"
+                  - option "Dalitz"
+                  - option "Martin"
+                  - option "El Houba"
+              - cell [ref=f1e375]
+              - cell [ref=f1e377]:
+                - button "Abwesenheiten bearbeiten" [ref=f1e378] [cursor=pointer]
+              - cell [ref=f1e379]:
+                - button "Dienstwünsche und Optionen bearbeiten" [ref=f1e380] [cursor=pointer]
+            - row "12 Mittwoch — offen — offen — auswählen — Abwesenheiten bearbeiten Dienstwünsche und Optionen bearbeiten" [ref=f1e381]:
+              - cell "12" [ref=f1e382]
+              - cell "Mittwoch" [ref=f1e383]
+              - cell [ref=f1e385]:
+                - button "— offen" [ref=f1e386] [cursor=pointer]:
+                  - generic [ref=f1e387]: —
+                  - generic [ref=f1e388]: offen
+              - cell [ref=f1e390]:
+                - button "— offen" [ref=f1e391] [cursor=pointer]:
+                  - generic [ref=f1e392]: —
+                  - generic [ref=f1e393]: offen
+              - cell [ref=f1e395]:
+                - combobox "RBN am 2026-08-12" [ref=f1e397]:
+                  - option "— auswählen —" [selected]
+                  - option "Schob"
+                  - option "Bailis"
+                  - option "Maybaum"
+                  - option "Schüngel"
+                  - option "Dalitz"
+                  - option "Martin"
+                  - option "El Houba"
+              - cell [ref=f1e398]
+              - cell [ref=f1e400]:
+                - button "Abwesenheiten bearbeiten" [ref=f1e401] [cursor=pointer]
+              - cell [ref=f1e402]:
+                - button "Dienstwünsche und Optionen bearbeiten" [ref=f1e403] [cursor=pointer]
+            - row "13 Donnerstag — offen — offen — auswählen — Abwesenheiten bearbeiten Dienstwünsche und Optionen bearbeiten" [ref=f1e404]:
+              - cell "13" [ref=f1e405]
+              - cell "Donnerstag" [ref=f1e406]
+              - cell [ref=f1e408]:
+                - button "— offen" [ref=f1e409] [cursor=pointer]:
+                  - generic [ref=f1e410]: —
+                  - generic [ref=f1e411]: offen
+              - cell [ref=f1e413]:
+                - button "— offen" [ref=f1e414] [cursor=pointer]:
+                  - generic [ref=f1e415]: —
+                  - generic [ref=f1e416]: offen
+              - cell [ref=f1e418]:
+                - combobox "RBN am 2026-08-13" [ref=f1e420]:
+                  - option "— auswählen —" [selected]
+                  - option "Schob"
+                  - option "Bailis"
+                  - option "Maybaum"
+                  - option "Schüngel"
+                  - option "Dalitz"
+                  - option "Martin"
+                  - option "El Houba"
+              - cell [ref=f1e421]
+              - cell [ref=f1e423]:
+                - button "Abwesenheiten bearbeiten" [ref=f1e424] [cursor=pointer]
+              - cell [ref=f1e425]:
+                - button "Dienstwünsche und Optionen bearbeiten" [ref=f1e426] [cursor=pointer]
+            - row "14 Freitag — offen — offen — auswählen — Abwesenheiten bearbeiten Dienstwünsche und Optionen bearbeiten" [ref=f1e427]:
+              - cell "14" [ref=f1e428]
+              - cell "Freitag" [ref=f1e429]
+              - cell [ref=f1e431]:
+                - button "— offen" [ref=f1e432] [cursor=pointer]:
+                  - generic [ref=f1e433]: —
+                  - generic [ref=f1e434]: offen
+              - cell [ref=f1e436]:
+                - button "— offen" [ref=f1e437] [cursor=pointer]:
+                  - generic [ref=f1e438]: —
+                  - generic [ref=f1e439]: offen
+              - cell [ref=f1e441]:
+                - combobox "RBN am 2026-08-14" [ref=f1e443]:
+                  - option "— auswählen —" [selected]
+                  - option "Schob"
+                  - option "Bailis"
+                  - option "Maybaum"
+                  - option "Schüngel"
+                  - option "Dalitz"
+                  - option "Martin"
+                  - option "El Houba"
+              - cell [ref=f1e444]
+              - cell [ref=f1e446]:
+                - button "Abwesenheiten bearbeiten" [ref=f1e447] [cursor=pointer]
+              - cell [ref=f1e448]:
+                - button "Dienstwünsche und Optionen bearbeiten" [ref=f1e449] [cursor=pointer]
+            - row "15 Samstag — offen — offen — auswählen — Abwesenheiten bearbeiten Dienstwünsche und Optionen bearbeiten" [ref=f1e450]:
+              - cell "15" [ref=f1e451]
+              - cell "Samstag" [ref=f1e452]
+              - cell [ref=f1e454]:
+                - button "— offen" [ref=f1e455] [cursor=pointer]:
+                  - generic [ref=f1e456]: —
+                  - generic [ref=f1e457]: offen
+              - cell [ref=f1e459]:
+                - button "— offen" [ref=f1e460] [cursor=pointer]:
+                  - generic [ref=f1e461]: —
+                  - generic [ref=f1e462]: offen
+              - cell [ref=f1e464]:
+                - combobox "RBN am 2026-08-15" [ref=f1e466]:
+                  - option "— auswählen —" [selected]
+                  - option "Schob"
+                  - option "Bailis"
+                  - option "Maybaum"
+                  - option "Schüngel"
+                  - option "Dalitz"
+                  - option "Martin"
+                  - option "El Houba"
+              - cell [ref=f1e467]
+              - cell [ref=f1e469]:
+                - button "Abwesenheiten bearbeiten" [ref=f1e470] [cursor=pointer]
+              - cell [ref=f1e471]:
+                - button "Dienstwünsche und Optionen bearbeiten" [ref=f1e472] [cursor=pointer]
+            - row "16 Sonntag — offen — offen — auswählen — Abwesenheiten bearbeiten Dienstwünsche und Optionen bearbeiten" [ref=f1e473]:
+              - cell "16" [ref=f1e474]
+              - cell "Sonntag" [ref=f1e475]
+              - cell [ref=f1e477]:
+                - button "— offen" [ref=f1e478] [cursor=pointer]:
+                  - generic [ref=f1e479]: —
+                  - generic [ref=f1e480]: offen
+              - cell [ref=f1e482]:
+                - button "— offen" [ref=f1e483] [cursor=pointer]:
+                  - generic [ref=f1e484]: —
+                  - generic [ref=f1e485]: offen
+              - cell [ref=f1e487]:
+                - combobox "RBN am 2026-08-16" [ref=f1e489]:
+                  - option "— auswählen —" [selected]
+                  - option "Schob"
+                  - option "Bailis"
+                  - option "Maybaum"
+                  - option "Schüngel"
+                  - option "Dalitz"
+                  - option "Martin"
+                  - option "El Houba"
+              - cell [ref=f1e490]
+              - cell [ref=f1e492]:
+                - button "Abwesenheiten bearbeiten" [ref=f1e493] [cursor=pointer]
+              - cell [ref=f1e494]:
+                - button "Dienstwünsche und Optionen bearbeiten" [ref=f1e495] [cursor=pointer]
+            - row "17 Montag — offen — offen — auswählen — Abwesenheiten bearbeiten Dienstwünsche und Optionen bearbeiten" [ref=f1e496]:
+              - cell "17" [ref=f1e497]
+              - cell "Montag" [ref=f1e498]
+              - cell [ref=f1e500]:
+                - button "— offen" [ref=f1e501] [cursor=pointer]:
+                  - generic [ref=f1e502]: —
+                  - generic [ref=f1e503]: offen
+              - cell [ref=f1e505]:
+                - button "— offen" [ref=f1e506] [cursor=pointer]:
+                  - generic [ref=f1e507]: —
+                  - generic [ref=f1e508]: offen
+              - cell [ref=f1e510]:
+                - combobox "RBN am 2026-08-17" [ref=f1e512]:
+                  - option "— auswählen —" [selected]
+                  - option "Schob"
+                  - option "Bailis"
+                  - option "Maybaum"
+                  - option "Schüngel"
+                  - option "Dalitz"
+                  - option "Martin"
+                  - option "El Houba"
+              - cell [ref=f1e513]
+              - cell [ref=f1e515]:
+                - button "Abwesenheiten bearbeiten" [ref=f1e516] [cursor=pointer]
+              - cell [ref=f1e517]:
+                - button "Dienstwünsche und Optionen bearbeiten" [ref=f1e518] [cursor=pointer]
+            - row "18 Dienstag — offen — offen — auswählen — Abwesenheiten bearbeiten Dienstwünsche und Optionen bearbeiten" [ref=f1e519]:
+              - cell "18" [ref=f1e520]
+              - cell "Dienstag" [ref=f1e521]
+              - cell [ref=f1e523]:
+                - button "— offen" [ref=f1e524] [cursor=pointer]:
+                  - generic [ref=f1e525]: —
+                  - generic [ref=f1e526]: offen
+              - cell [ref=f1e528]:
+                - button "— offen" [ref=f1e529] [cursor=pointer]:
+                  - generic [ref=f1e530]: —
+                  - generic [ref=f1e531]: offen
+              - cell [ref=f1e533]:
+                - combobox "RBN am 2026-08-18" [ref=f1e535]:
+                  - option "— auswählen —" [selected]
+                  - option "Schob"
+                  - option "Bailis"
+                  - option "Maybaum"
+                  - option "Schüngel"
+                  - option "Dalitz"
+                  - option "Martin"
+                  - option "El Houba"
+              - cell [ref=f1e536]
+              - cell [ref=f1e538]:
+                - button "Abwesenheiten bearbeiten" [ref=f1e539] [cursor=pointer]
+              - cell [ref=f1e540]:
+                - button "Dienstwünsche und Optionen bearbeiten" [ref=f1e541] [cursor=pointer]
+            - row "19 Mittwoch — offen — offen — auswählen — Abwesenheiten bearbeiten Dienstwünsche und Optionen bearbeiten" [ref=f1e542]:
+              - cell "19" [ref=f1e543]
+              - cell "Mittwoch" [ref=f1e544]
+              - cell [ref=f1e546]:
+                - button "— offen" [ref=f1e547] [cursor=pointer]:
+                  - generic [ref=f1e548]: —
+                  - generic [ref=f1e549]: offen
+              - cell [ref=f1e551]:
+                - button "— offen" [ref=f1e552] [cursor=pointer]:
+                  - generic [ref=f1e553]: —
+                  - generic [ref=f1e554]: offen
+              - cell [ref=f1e556]:
+                - combobox "RBN am 2026-08-19" [ref=f1e558]:
+                  - option "— auswählen —" [selected]
+                  - option "Schob"
+                  - option "Bailis"
+                  - option "Maybaum"
+                  - option "Schüngel"
+                  - option "Dalitz"
+                  - option "Martin"
+                  - option "El Houba"
+              - cell [ref=f1e559]
+              - cell [ref=f1e561]:
+                - button "Abwesenheiten bearbeiten" [ref=f1e562] [cursor=pointer]
+              - cell [ref=f1e563]:
+                - button "Dienstwünsche und Optionen bearbeiten" [ref=f1e564] [cursor=pointer]
+            - row "20 Donnerstag — offen — offen — auswählen — Abwesenheiten bearbeiten Dienstwünsche und Optionen bearbeiten" [ref=f1e565]:
+              - cell "20" [ref=f1e566]
+              - cell "Donnerstag" [ref=f1e567]
+              - cell [ref=f1e569]:
+                - button "— offen" [ref=f1e570] [cursor=pointer]:
+                  - generic [ref=f1e571]: —
+                  - generic [ref=f1e572]: offen
+              - cell [ref=f1e574]:
+                - button "— offen" [ref=f1e575] [cursor=pointer]:
+                  - generic [ref=f1e576]: —
+                  - generic [ref=f1e577]: offen
+              - cell [ref=f1e579]:
+                - combobox "RBN am 2026-08-20" [ref=f1e581]:
+                  - option "— auswählen —" [selected]
+                  - option "Schob"
+                  - option "Bailis"
+                  - option "Maybaum"
+                  - option "Schüngel"
+                  - option "Dalitz"
+                  - option "Martin"
+                  - option "El Houba"
+              - cell [ref=f1e582]
+              - cell [ref=f1e584]:
+                - button "Abwesenheiten bearbeiten" [ref=f1e585] [cursor=pointer]
+              - cell [ref=f1e586]:
+                - button "Dienstwünsche und Optionen bearbeiten" [ref=f1e587] [cursor=pointer]
+            - row "21 Freitag — offen — offen — auswählen — Abwesenheiten bearbeiten Dienstwünsche und Optionen bearbeiten" [ref=f1e588]:
+              - cell "21" [ref=f1e589]
+              - cell "Freitag" [ref=f1e590]
+              - cell [ref=f1e592]:
+                - button "— offen" [ref=f1e593] [cursor=pointer]:
+                  - generic [ref=f1e594]: —
+                  - generic [ref=f1e595]: offen
+              - cell [ref=f1e597]:
+                - button "— offen" [ref=f1e598] [cursor=pointer]:
+                  - generic [ref=f1e599]: —
+                  - generic [ref=f1e600]: offen
+              - cell [ref=f1e602]:
+                - combobox "RBN am 2026-08-21" [ref=f1e604]:
+                  - option "— auswählen —" [selected]
+                  - option "Schob"
+                  - option "Bailis"
+                  - option "Maybaum"
+                  - option "Schüngel"
+                  - option "Dalitz"
+                  - option "Martin"
+                  - option "El Houba"
+              - cell [ref=f1e605]
+              - cell [ref=f1e607]:
+                - button "Abwesenheiten bearbeiten" [ref=f1e608] [cursor=pointer]
+              - cell [ref=f1e609]:
+                - button "Dienstwünsche und Optionen bearbeiten" [ref=f1e610] [cursor=pointer]
+            - row "22 Samstag — offen — offen — auswählen — Abwesenheiten bearbeiten Dienstwünsche und Optionen bearbeiten" [ref=f1e611]:
+              - cell "22" [ref=f1e612]
+              - cell "Samstag" [ref=f1e613]
+              - cell [ref=f1e615]:
+                - button "— offen" [ref=f1e616] [cursor=pointer]:
+                  - generic [ref=f1e617]: —
+                  - generic [ref=f1e618]: offen
+              - cell [ref=f1e620]:
+                - button "— offen" [ref=f1e621] [cursor=pointer]:
+                  - generic [ref=f1e622]: —
+                  - generic [ref=f1e623]: offen
+              - cell [ref=f1e625]:
+                - combobox "RBN am 2026-08-22" [ref=f1e627]:
+                  - option "— auswählen —" [selected]
+                  - option "Schob"
+                  - option "Bailis"
+                  - option "Maybaum"
+                  - option "Schüngel"
+                  - option "Dalitz"
+                  - option "Martin"
+                  - option "El Houba"
+              - cell [ref=f1e628]
+              - cell [ref=f1e630]:
+                - button "Abwesenheiten bearbeiten" [ref=f1e631] [cursor=pointer]
+              - cell [ref=f1e632]:
+                - button "Dienstwünsche und Optionen bearbeiten" [ref=f1e633] [cursor=pointer]
+            - row "23 Sonntag — offen — offen — auswählen — Abwesenheiten bearbeiten Dienstwünsche und Optionen bearbeiten" [ref=f1e634]:
+              - cell "23" [ref=f1e635]
+              - cell "Sonntag" [ref=f1e636]
+              - cell [ref=f1e638]:
+                - button "— offen" [ref=f1e639] [cursor=pointer]:
+                  - generic [ref=f1e640]: —
+                  - generic [ref=f1e641]: offen
+              - cell [ref=f1e643]:
+                - button "— offen" [ref=f1e644] [cursor=pointer]:
+                  - generic [ref=f1e645]: —
+                  - generic [ref=f1e646]: offen
+              - cell [ref=f1e648]:
+                - combobox "RBN am 2026-08-23" [ref=f1e650]:
+                  - option "— auswählen —" [selected]
+                  - option "Schob"
+                  - option "Bailis"
+                  - option "Maybaum"
+                  - option "Schüngel"
+                  - option "Dalitz"
+                  - option "Martin"
+                  - option "El Houba"
+              - cell [ref=f1e651]
+              - cell [ref=f1e653]:
+                - button "Abwesenheiten bearbeiten" [ref=f1e654] [cursor=pointer]
+              - cell [ref=f1e655]:
+                - button "Dienstwünsche und Optionen bearbeiten" [ref=f1e656] [cursor=pointer]
+            - row "24 Montag — offen — offen — auswählen — Abwesenheiten bearbeiten Dienstwünsche und Optionen bearbeiten" [ref=f1e657]:
+              - cell "24" [ref=f1e658]
+              - cell "Montag" [ref=f1e659]
+              - cell [ref=f1e661]:
+                - button "— offen" [ref=f1e662] [cursor=pointer]:
+                  - generic [ref=f1e663]: —
+                  - generic [ref=f1e664]: offen
+              - cell [ref=f1e666]:
+                - button "— offen" [ref=f1e667] [cursor=pointer]:
+                  - generic [ref=f1e668]: —
+                  - generic [ref=f1e669]: offen
+              - cell [ref=f1e671]:
+                - combobox "RBN am 2026-08-24" [ref=f1e673]:
+                  - option "— auswählen —" [selected]
+                  - option "Schob"
+                  - option "Bailis"
+                  - option "Maybaum"
+                  - option "Schüngel"
+                  - option "Dalitz"
+                  - option "Martin"
+                  - option "El Houba"
+              - cell [ref=f1e674]
+              - cell [ref=f1e676]:
+                - button "Abwesenheiten bearbeiten" [ref=f1e677] [cursor=pointer]
+              - cell [ref=f1e678]:
+                - button "Dienstwünsche und Optionen bearbeiten" [ref=f1e679] [cursor=pointer]
+            - row "25 Dienstag — offen — offen — auswählen — Abwesenheiten bearbeiten Dienstwünsche und Optionen bearbeiten" [ref=f1e680]:
+              - cell "25" [ref=f1e681]
+              - cell "Dienstag" [ref=f1e682]
+              - cell [ref=f1e684]:
+                - button "— offen" [ref=f1e685] [cursor=pointer]:
+                  - generic [ref=f1e686]: —
+                  - generic [ref=f1e687]: offen
+              - cell [ref=f1e689]:
+                - button "— offen" [ref=f1e690] [cursor=pointer]:
+                  - generic [ref=f1e691]: —
+                  - generic [ref=f1e692]: offen
+              - cell [ref=f1e694]:
+                - combobox "RBN am 2026-08-25" [ref=f1e696]:
+                  - option "— auswählen —" [selected]
+                  - option "Schob"
+                  - option "Bailis"
+                  - option "Maybaum"
+                  - option "Schüngel"
+                  - option "Dalitz"
+                  - option "Martin"
+                  - option "El Houba"
+              - cell [ref=f1e697]
+              - cell [ref=f1e699]:
+                - button "Abwesenheiten bearbeiten" [ref=f1e700] [cursor=pointer]
+              - cell [ref=f1e701]:
+                - button "Dienstwünsche und Optionen bearbeiten" [ref=f1e702] [cursor=pointer]
+            - row "26 Mittwoch — offen — offen — auswählen — Abwesenheiten bearbeiten Dienstwünsche und Optionen bearbeiten" [ref=f1e703]:
+              - cell "26" [ref=f1e704]
+              - cell "Mittwoch" [ref=f1e705]
+              - cell [ref=f1e707]:
+                - button "— offen" [ref=f1e708] [cursor=pointer]:
+                  - generic [ref=f1e709]: —
+                  - generic [ref=f1e710]: offen
+              - cell [ref=f1e712]:
+                - button "— offen" [ref=f1e713] [cursor=pointer]:
+                  - generic [ref=f1e714]: —
+                  - generic [ref=f1e715]: offen
+              - cell [ref=f1e717]:
+                - combobox "RBN am 2026-08-26" [ref=f1e719]:
+                  - option "— auswählen —" [selected]
+                  - option "Schob"
+                  - option "Bailis"
+                  - option "Maybaum"
+                  - option "Schüngel"
+                  - option "Dalitz"
+                  - option "Martin"
+                  - option "El Houba"
+              - cell [ref=f1e720]
+              - cell [ref=f1e722]:
+                - button "Abwesenheiten bearbeiten" [ref=f1e723] [cursor=pointer]
+              - cell [ref=f1e724]:
+                - button "Dienstwünsche und Optionen bearbeiten" [ref=f1e725] [cursor=pointer]
+            - row "27 Donnerstag — offen — offen — auswählen — Abwesenheiten bearbeiten Dienstwünsche und Optionen bearbeiten" [ref=f1e726]:
+              - cell "27" [ref=f1e727]
+              - cell "Donnerstag" [ref=f1e728]
+              - cell [ref=f1e730]:
+                - button "— offen" [ref=f1e731] [cursor=pointer]:
+                  - generic [ref=f1e732]: —
+                  - generic [ref=f1e733]: offen
+              - cell [ref=f1e735]:
+                - button "— offen" [ref=f1e736] [cursor=pointer]:
+                  - generic [ref=f1e737]: —
+                  - generic [ref=f1e738]: offen
+              - cell [ref=f1e740]:
+                - combobox "RBN am 2026-08-27" [ref=f1e742]:
+                  - option "— auswählen —" [selected]
+                  - option "Schob"
+                  - option "Bailis"
+                  - option "Maybaum"
+                  - option "Schüngel"
+                  - option "Dalitz"
+                  - option "Martin"
+                  - option "El Houba"
+              - cell [ref=f1e743]
+              - cell [ref=f1e745]:
+                - button "Abwesenheiten bearbeiten" [ref=f1e746] [cursor=pointer]
+              - cell [ref=f1e747]:
+                - button "Dienstwünsche und Optionen bearbeiten" [ref=f1e748] [cursor=pointer]
+            - row "28 Freitag — offen — offen — auswählen — Abwesenheiten bearbeiten Dienstwünsche und Optionen bearbeiten" [ref=f1e749]:
+              - cell "28" [ref=f1e750]
+              - cell "Freitag" [ref=f1e751]
+              - cell [ref=f1e753]:
+                - button "— offen" [ref=f1e754] [cursor=pointer]:
+                  - generic [ref=f1e755]: —
+                  - generic [ref=f1e756]: offen
+              - cell [ref=f1e758]:
+                - button "— offen" [ref=f1e759] [cursor=pointer]:
+                  - generic [ref=f1e760]: —
+                  - generic [ref=f1e761]: offen
+              - cell [ref=f1e763]:
+                - combobox "RBN am 2026-08-28" [ref=f1e765]:
+                  - option "— auswählen —" [selected]
+                  - option "Schob"
+                  - option "Bailis"
+                  - option "Maybaum"
+                  - option "Schüngel"
+                  - option "Dalitz"
+                  - option "Martin"
+                  - option "El Houba"
+              - cell [ref=f1e766]
+              - cell [ref=f1e768]:
+                - button "Abwesenheiten bearbeiten" [ref=f1e769] [cursor=pointer]
+              - cell [ref=f1e770]:
+                - button "Dienstwünsche und Optionen bearbeiten" [ref=f1e771] [cursor=pointer]
+            - row "29 Samstag — offen — offen — auswählen — Abwesenheiten bearbeiten Dienstwünsche und Optionen bearbeiten" [ref=f1e772]:
+              - cell "29" [ref=f1e773]
+              - cell "Samstag" [ref=f1e774]
+              - cell [ref=f1e776]:
+                - button "— offen" [ref=f1e777] [cursor=pointer]:
+                  - generic [ref=f1e778]: —
+                  - generic [ref=f1e779]: offen
+              - cell [ref=f1e781]:
+                - button "— offen" [ref=f1e782] [cursor=pointer]:
+                  - generic [ref=f1e783]: —
+                  - generic [ref=f1e784]: offen
+              - cell [ref=f1e786]:
+                - combobox "RBN am 2026-08-29" [ref=f1e788]:
+                  - option "— auswählen —" [selected]
+                  - option "Schob"
+                  - option "Bailis"
+                  - option "Maybaum"
+                  - option "Schüngel"
+                  - option "Dalitz"
+                  - option "Martin"
+                  - option "El Houba"
+              - cell [ref=f1e789]
+              - cell [ref=f1e791]:
+                - button "Abwesenheiten bearbeiten" [ref=f1e792] [cursor=pointer]
+              - cell [ref=f1e793]:
+                - button "Dienstwünsche und Optionen bearbeiten" [ref=f1e794] [cursor=pointer]
+            - row "30 Sonntag — offen — offen — auswählen — Abwesenheiten bearbeiten Dienstwünsche und Optionen bearbeiten" [ref=f1e795]:
+              - cell "30" [ref=f1e796]
+              - cell "Sonntag" [ref=f1e797]
+              - cell [ref=f1e799]:
+                - button "— offen" [ref=f1e800] [cursor=pointer]:
+                  - generic [ref=f1e801]: —
+                  - generic [ref=f1e802]: offen
+              - cell [ref=f1e804]:
+                - button "— offen" [ref=f1e805] [cursor=pointer]:
+                  - generic [ref=f1e806]: —
+                  - generic [ref=f1e807]: offen
+              - cell [ref=f1e809]:
+                - combobox "RBN am 2026-08-30" [ref=f1e811]:
+                  - option "— auswählen —" [selected]
+                  - option "Schob"
+                  - option "Bailis"
+                  - option "Maybaum"
+                  - option "Schüngel"
+                  - option "Dalitz"
+                  - option "Martin"
+                  - option "El Houba"
+              - cell [ref=f1e812]
+              - cell [ref=f1e814]:
+                - button "Abwesenheiten bearbeiten" [ref=f1e815] [cursor=pointer]
+              - cell [ref=f1e816]:
+                - button "Dienstwünsche und Optionen bearbeiten" [ref=f1e817] [cursor=pointer]
+            - row "31 Montag — offen — offen — auswählen — Abwesenheiten bearbeiten Dienstwünsche und Optionen bearbeiten" [ref=f1e818]:
+              - cell "31" [ref=f1e819]
+              - cell "Montag" [ref=f1e820]
+              - cell [ref=f1e822]:
+                - button "— offen" [ref=f1e823] [cursor=pointer]:
+                  - generic [ref=f1e824]: —
+                  - generic [ref=f1e825]: offen
+              - cell [ref=f1e827]:
+                - button "— offen" [ref=f1e828] [cursor=pointer]:
+                  - generic [ref=f1e829]: —
+                  - generic [ref=f1e830]: offen
+              - cell [ref=f1e832]:
+                - combobox "RBN am 2026-08-31" [ref=f1e834]:
+                  - option "— auswählen —" [selected]
+                  - option "Schob"
+                  - option "Bailis"
+                  - option "Maybaum"
+                  - option "Schüngel"
+                  - option "Dalitz"
+                  - option "Martin"
+                  - option "El Houba"
+              - cell [ref=f1e835]
+              - cell [ref=f1e837]:
+                - button "Abwesenheiten bearbeiten" [ref=f1e838] [cursor=pointer]
+              - cell [ref=f1e839]:
+                - button "Dienstwünsche und Optionen bearbeiten" [ref=f1e840] [cursor=pointer]
+        - generic [ref=f1e841]:
+          - generic [ref=f1e842]:
+            - generic [ref=f1e843]:
+              - generic [ref=f1e844]: Verteilung
+              - heading "Statistik" [level=3] [ref=f1e845]
+            - generic [ref=f1e846]: Direkt aus dem Monatsplan berechnet
+          - table [ref=f1e848]:
+            - rowgroup [ref=f1e849]:
+              - row [ref=f1e850]:
+                - columnheader "Mitarbeitende" [ref=f1e851]
+                - columnheader "BD" [ref=f1e852]
+                - columnheader "HG" [ref=f1e853]
+                - columnheader "Wochenende" [ref=f1e854]
+                - columnheader "BD-Soll" [ref=f1e855]
+                - columnheader "Rest" [ref=f1e856]
+            - rowgroup [ref=f1e857]:
+              - row [ref=f1e858]:
+                - cell "Dr. Lurz" [ref=f1e859]
+                - cell "0" [ref=f1e860]
+                - cell "0" [ref=f1e861]
+                - cell "0" [ref=f1e862]
+                - cell "4" [ref=f1e863]
+                - cell "4" [ref=f1e864]
+              - row [ref=f1e865]:
+                - cell "Dr. Polednia" [ref=f1e866]
+                - cell "0" [ref=f1e867]
+                - cell "0" [ref=f1e868]
+                - cell "0" [ref=f1e869]
+                - cell "3" [ref=f1e870]
+                - cell "3" [ref=f1e871]
+              - row [ref=f1e872]:
+                - cell "Fr. Dalitz" [ref=f1e873]
+                - cell "0" [ref=f1e874]
+                - cell "0" [ref=f1e875]
+                - cell "0" [ref=f1e876]
+                - cell "4" [ref=f1e877]
+                - cell "4" [ref=f1e878]
+              - row [ref=f1e879]:
+                - cell "Dr. Becker" [ref=f1e880]
+                - cell "0" [ref=f1e881]
+                - cell "0" [ref=f1e882]
+                - cell "0" [ref=f1e883]
+                - cell "3" [ref=f1e884]
+                - cell "3" [ref=f1e885]
+              - row [ref=f1e886]:
+                - cell "Dr. Martin" [ref=f1e887]
+                - cell "0" [ref=f1e888]
+                - cell "0" [ref=f1e889]
+                - cell "0" [ref=f1e890]
+                - cell "4" [ref=f1e891]
+                - cell "4" [ref=f1e892]
+              - row [ref=f1e893]:
+                - cell "Hr. El Houba" [ref=f1e894]
+                - cell "0" [ref=f1e895]
+                - cell "0" [ref=f1e896]
+                - cell "0" [ref=f1e897]
+                - cell "4" [ref=f1e898]
+                - cell "4" [ref=f1e899]
+              - row [ref=f1e900]:
+                - cell "Fr. Licenji" [ref=f1e901]
+                - cell "0" [ref=f1e902]
+                - cell "0" [ref=f1e903]
+                - cell "0" [ref=f1e904]
+                - cell "4" [ref=f1e905]
+                - cell "4" [ref=f1e906]
+              - row [ref=f1e907]:
+                - cell "Hr. Sebastian" [ref=f1e908]
+                - cell "0" [ref=f1e909]
+                - cell "0" [ref=f1e910]
+                - cell "0" [ref=f1e911]
+                - cell "4" [ref=f1e912]
+                - cell "4" [ref=f1e913]
+              - row [ref=f1e914]:
+                - cell "Offen" [ref=f1e915]
+                - cell "31" [ref=f1e916]
+                - cell "31" [ref=f1e917]
+                - cell [ref=f1e918]
+                - cell [ref=f1e919]
+                - cell [ref=f1e920]
+          - generic [ref=f1e922]:
+            - generic [ref=f1e923]: Prüfung
+            - heading "Offene Punkte" [level=3] [ref=f1e924]
+  - text: ▸ v8.5 PFLICHT ✓ ✓

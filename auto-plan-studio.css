@@ -1,0 +1,955 @@
+/**
+ * Auto-Plan Studio – Oberfläche in der Designsprache der Anwendung.
+ *
+ * Das Studio war zuvor eine dunkle Insel mit eigener Farbwelt, eigenen Radien
+ * und eigener Typografie. Es sah aus wie ein fremdes Werkzeug, das zufällig im
+ * selben Fenster liegt. Diese Fassung verwendet ausschließlich die Token der
+ * Anwendung: helle Glasflächen mit Monatsfarbanteil, KSG-Schrift, die
+ * Radienleiter `--app-radius`, die Weißraumleiter `--flow-*` und die
+ * semantischen Bewertungsfarben `--green`, `--yellow`, `--orange`, `--red`.
+ * Bedienelemente erben bewusst von den globalen Regeln für `button`, `select`
+ * und `input` – sie sollen sich anfühlen wie überall sonst.
+ *
+ * Aufbau: Kopf, ein gemeinsamer Arbeitsbereich, Fußleiste. Genau ein
+ * senkrechter Scrollbereich; alle Abschnitte wachsen darin frei.
+ */
+
+/* ---------------------------------------------------- Auslöser in der Leiste */
+
+.auto-plan-trigger {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+.auto-plan-trigger .tool-icon { filter: drop-shadow(0 1px 1px color-mix(in srgb, var(--month-accent) 40%, transparent)); }
+.auto-plan-spark {
+  position: absolute;
+  width: 3px; height: 3px;
+  right: 7px; top: 6px;
+  border-radius: 50%;
+  background: var(--month-accent-strong);
+  box-shadow: 0 0 5px color-mix(in srgb, var(--month-accent) 70%, transparent);
+  animation: auto-plan-spark 3.2s ease-in-out infinite;
+}
+@keyframes auto-plan-spark {
+  0%, 100% { transform: scale(.6); opacity: .3; }
+  50% { transform: scale(1.25); opacity: .95; }
+}
+
+/* --------------------------------------------------------------- Dialoghülle */
+
+.auto-plan-dialog {
+  width: min(1220px, calc(100vw - 2rem));
+  max-width: none;
+  height: min(880px, calc(100dvh - 2rem));
+  max-height: calc(100dvh - 2rem);
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  overflow: visible;
+}
+.auto-plan-dialog::backdrop {
+  background: rgba(6, 10, 15, .48);
+  backdrop-filter: blur(9px) saturate(1.15);
+  animation: auto-plan-fade .32s ease both;
+}
+
+.auto-plan-shell {
+  --auto-progress: 0%;
+  --ap-accent: var(--month-accent);
+  --ap-accent-strong: var(--month-accent-strong);
+  --ap-ink: var(--month-ink);
+  --ap-rim: color-mix(in srgb, var(--month-accent) 24%, rgba(255, 255, 255, .86));
+  --ap-hairline: color-mix(in srgb, var(--month-accent) 18%, rgba(151, 163, 176, .42));
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  position: relative;
+  overflow: hidden;
+  border-radius: 17px;
+  border: 1px solid var(--ap-rim);
+  background:
+    linear-gradient(145deg,
+      color-mix(in srgb, var(--month-accent) 4%, #fff),
+      color-mix(in srgb, var(--month-accent) 9%, #f7f9fc));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .96),
+    0 24px 74px rgba(0, 0, 0, .34),
+    0 3px 10px rgba(0, 0, 0, .16);
+  animation: auto-plan-rise .34s cubic-bezier(.22, 1, .36, 1) both;
+}
+
+/*
+ * Die Phasen färben nicht die ganze Oberfläche um – das wäre in einer hellen,
+ * markengebundenen Anwendung unruhig. Sie verschieben nur den Akzent, den
+ * Fortschrittsbalken, Kernanzeige und Zeitstrahl tragen.
+ */
+.auto-plan-dialog[data-phase="repair"] .auto-plan-shell,
+.auto-plan-dialog[data-phase="polish"] .auto-plan-shell { --ap-accent: color-mix(in srgb, var(--month-accent) 62%, #7a5cc4); }
+.auto-plan-dialog[data-phase="perfect"] .auto-plan-shell { --ap-accent: color-mix(in srgb, var(--month-accent) 52%, #b8478f); }
+.auto-plan-dialog[data-phase="certify"] .auto-plan-shell,
+.auto-plan-dialog[data-phase="complete"] .auto-plan-shell { --ap-accent: var(--green); }
+.auto-plan-dialog[data-phase="blocked"] .auto-plan-shell { --ap-accent: var(--red); }
+
+/* ------------------------------------------------------------------ Kopfzeile */
+
+.auto-plan-header {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: start;
+  gap: 4px 12px;
+  padding: 13px 16px 11px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--month-accent) 15%, #fff), transparent);
+  border-bottom: 1px solid var(--ap-hairline);
+}
+.auto-plan-headline { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.auto-plan-kicker {
+  color: var(--ap-accent-strong);
+  font-size: .62rem;
+  font-weight: 700;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+.auto-plan-header h2 {
+  margin: 0;
+  font-size: 1.06rem;
+  line-height: 1.2;
+  letter-spacing: var(--tracking-title);
+}
+.auto-plan-header p { margin: 2px 0 0; color: var(--muted); font-size: .78rem; }
+.auto-plan-close { grid-column: 2; grid-row: 1 / span 2; align-self: center; flex-shrink: 0; }
+
+.auto-plan-progress-rail {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 3px;
+  background: color-mix(in srgb, var(--month-accent) 12%, rgba(255, 255, 255, .7));
+}
+.auto-plan-progress-rail i {
+  display: block;
+  width: var(--auto-progress);
+  height: 100%;
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--ap-accent) 70%, #fff),
+    var(--ap-accent),
+    var(--ap-accent-strong));
+  box-shadow: 0 0 8px color-mix(in srgb, var(--ap-accent) 45%, transparent);
+  transition: width .3s cubic-bezier(.2, .75, .25, 1);
+}
+
+/* --------------------------------------- Der eine gemeinsame Arbeitsbereich */
+
+.auto-plan-body {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--month-accent) 45%, #b9c4d0) transparent;
+  position: relative;
+  z-index: 1;
+  padding: var(--flow-group) 16px var(--flow-section);
+  gap: var(--flow-group);
+}
+
+.auto-plan-dialog.is-configuring #autoPlanStage,
+.auto-plan-dialog.is-configuring #autoPlanResult { display: none !important; }
+.auto-plan-dialog.is-running #autoPlanConfig,
+.auto-plan-dialog.is-running #autoPlanResult { display: none !important; }
+.auto-plan-dialog.show-result #autoPlanConfig,
+.auto-plan-dialog.show-result #autoPlanStage { display: none !important; }
+.auto-plan-dialog.is-configuring .auto-plan-start { display: inline-flex; }
+.auto-plan-dialog:not(.is-configuring) .auto-plan-start { display: none; }
+
+/* --------------------------------------------------------------------- Karten */
+
+.auto-plan-card {
+  position: relative;
+  padding: var(--flow-block) 13px;
+  border: 1px solid var(--ap-hairline);
+  border-radius: var(--app-radius);
+  background: linear-gradient(180deg, rgba(255, 255, 255, .97), rgba(248, 250, 253, .92));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), 0 1px 2px rgba(9, 14, 20, .06);
+}
+.auto-plan-card > header { margin-bottom: var(--flow-block); }
+.auto-plan-card header > span,
+.auto-plan-limit-head span {
+  display: block;
+  color: var(--ap-accent-strong);
+  font-size: .6rem;
+  font-weight: 700;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+.auto-plan-card h3 { margin: 3px 0 4px; font-size: .96rem; letter-spacing: var(--tracking-title); }
+.auto-plan-card p { margin: 0; color: var(--muted); font-size: .74rem; line-height: 1.5; }
+
+/* ---------------------------------------------------------------- Parameter */
+
+.auto-plan-config { display: grid; gap: var(--flow-group); }
+.auto-plan-config-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(228px, .5fr);
+  gap: var(--flow-block);
+  align-items: start;
+}
+.auto-plan-field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(196px, 1fr));
+  gap: var(--flow-block);
+}
+.auto-plan-field { display: grid; gap: var(--flow-tight); align-content: start; min-width: 0; }
+.auto-plan-field--wide { grid-column: 1 / -1; }
+.auto-plan-field > span { font-size: .74rem; font-weight: 700; letter-spacing: var(--tracking-small); }
+.auto-plan-field small { color: var(--muted); font-size: .66rem; line-height: 1.4; }
+.auto-plan-field select,
+.auto-plan-field input[type="number"] { min-height: 34px; }
+
+.auto-plan-range { display: flex; align-items: center; gap: 10px; }
+.auto-plan-range input[type="range"] {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 22px;
+  accent-color: var(--ap-accent-strong);
+  cursor: pointer;
+}
+.auto-plan-range output {
+  flex: 0 0 auto;
+  min-width: 82px;
+  padding: 5px 9px;
+  border: 1px solid color-mix(in srgb, var(--month-accent) 30%, rgba(151, 163, 176, .5));
+  border-radius: var(--app-radius-sm);
+  background: color-mix(in srgb, var(--month-accent) 10%, #fff);
+  color: var(--ap-ink);
+  font-size: .78rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--tracking-tabular);
+  text-align: center;
+}
+
+.auto-plan-switch-row { display: grid; gap: var(--flow-inner); margin-top: var(--flow-block); }
+.auto-plan-switch {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 9px 11px;
+  border: 1px solid var(--ap-hairline);
+  border-radius: var(--app-radius-sm);
+  background: rgba(255, 255, 255, .8);
+  font-size: .74rem;
+  line-height: 1.45;
+  cursor: pointer;
+}
+.auto-plan-switch:hover { border-color: color-mix(in srgb, var(--month-accent) 46%, rgba(151, 163, 176, .5)); }
+.auto-plan-switch input { flex: 0 0 auto; width: 16px; height: 16px; margin-top: 1px; accent-color: var(--ap-accent-strong); }
+
+.auto-plan-context-list { display: grid; gap: var(--flow-inner); }
+.auto-plan-context-list div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 9px;
+  border-radius: var(--app-radius-sm);
+  background: color-mix(in srgb, var(--month-accent) 7%, rgba(255, 255, 255, .85));
+}
+.auto-plan-context-list span { color: var(--muted); font-size: .72rem; }
+.auto-plan-context-list strong { font-size: .74rem; text-align: right; color: var(--ap-ink); }
+
+/* --------------------------------------------- Obergrenzen je Mitarbeitendem */
+
+.auto-plan-limit-panel { padding: 0; overflow: hidden; }
+.auto-plan-limit-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: var(--flow-block);
+  margin: 0;
+  padding: var(--flow-block) 13px;
+  border-bottom: 1px solid var(--ap-hairline);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--month-accent) 12%, #fff), transparent);
+}
+.auto-plan-limit-head h3 { margin: 3px 0 4px; font-size: .96rem; }
+.auto-plan-limit-head p { max-width: 640px; margin: 0; color: var(--muted); font-size: .72rem; line-height: 1.5; }
+.auto-plan-limit-tools { display: flex; gap: var(--flow-inner); }
+.auto-plan-mini { padding: .3rem .6rem; font-size: .72rem; font-weight: 700; }
+
+/*
+ * Der Tabellenbereich scrollt nur waagerecht und wächst senkrecht mit seinem
+ * Inhalt. Eine zweite senkrechte Scrollfläche machte genau die unteren Zeilen
+ * unerreichbar, um die es hier geht.
+ */
+.auto-plan-limit-scroll { overflow: visible; }
+.auto-plan-limit-table {
+  width: 100%;
+  min-width: 600px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: .76rem;
+}
+.auto-plan-limit-table th,
+.auto-plan-limit-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--month-accent) 12%, var(--ksg-table-line));
+  text-align: center;
+  white-space: nowrap;
+}
+.auto-plan-limit-table thead th {
+  position: sticky;
+  top: -1px;
+  z-index: 2;
+  background: color-mix(in srgb, var(--month-accent) 14%, #fff);
+  color: var(--ap-accent-strong);
+  font-size: .6rem;
+  font-weight: 700;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+.auto-plan-limit-table th:first-child,
+.auto-plan-limit-table td:first-child { text-align: left; }
+.auto-plan-limit-table tbody th { font-weight: 700; }
+.auto-plan-limit-table tbody th strong { display: block; font-weight: 750; }
+.auto-plan-limit-table tbody th small { display: block; margin-top: 1px; color: var(--muted); font-size: .62rem; font-weight: 400; }
+.auto-plan-limit-table tbody tr:nth-child(even) { background: color-mix(in srgb, var(--month-accent) 4%, transparent); }
+.auto-plan-limit-table tbody tr:hover { background: color-mix(in srgb, var(--month-accent) 10%, transparent); }
+.auto-plan-limit-table tbody tr.is-invalid { background: color-mix(in srgb, var(--red) 12%, transparent); }
+.auto-plan-limit-table tbody tr.is-invalid input { border-color: var(--red); }
+/* Wer im Monat an keinem Tag HG planen darf, ist als solcher erkennbar. */
+.auto-plan-limit-table tbody tr.is-hg-blocked td:nth-child(5) input { color: var(--muted); background: #f4f6f9; }
+.auto-plan-fixed-count { color: var(--muted); font-variant-numeric: tabular-nums; }
+.auto-plan-limit-table input {
+  width: 64px;
+  min-height: 30px;
+  padding: 3px 5px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+/*
+ * Die Zahlenspalten bekommen feste, schmale Breiten. Ohne sie verteilt der
+ * Tabellenalgorithmus die überschüssige Breite gleichmäßig, und die
+ * Eingabefelder stehen weit von ihrer Überschrift entfernt.
+ */
+.auto-plan-limit-table th:not(:first-child),
+.auto-plan-limit-table td:not(:first-child) { width: 96px; }
+.auto-plan-limit-table th:first-child,
+.auto-plan-limit-table td:first-child { width: auto; min-width: 150px; }
+
+.auto-plan-validation {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--green) 32%, transparent);
+  border-radius: var(--app-radius-sm);
+  background: color-mix(in srgb, var(--green) 8%, #fff);
+  color: color-mix(in srgb, var(--green) 82%, #000);
+  font-size: .74rem;
+  line-height: 1.5;
+}
+.auto-plan-validation::before {
+  content: "✓";
+  display: grid;
+  place-items: center;
+  flex: 0 0 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--green) 18%, #fff);
+  font-weight: 800;
+}
+.auto-plan-validation.invalid {
+  border-color: color-mix(in srgb, var(--red) 38%, transparent);
+  background: color-mix(in srgb, var(--red) 7%, #fff);
+  color: var(--red);
+}
+.auto-plan-validation.invalid::before { content: "!"; background: color-mix(in srgb, var(--red) 14%, #fff); }
+.auto-plan-validation ul { margin: 3px 0 0; padding-left: 16px; }
+
+/* ------------------------------------------------------------- Laufansicht */
+
+.auto-plan-config,
+.auto-plan-result { flex: 0 0 auto; }
+.auto-plan-stage {
+  flex: 1 1 auto;
+  min-height: 400px;
+  display: grid;
+  grid-template-columns: minmax(300px, .82fr) minmax(400px, 1.18fr);
+  gap: var(--flow-block);
+  align-items: stretch;
+}
+.auto-plan-visual,
+.auto-plan-console {
+  border: 1px solid var(--ap-hairline);
+  border-radius: var(--app-radius);
+  background: linear-gradient(180deg, rgba(255, 255, 255, .97), rgba(248, 250, 253, .92));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), 0 1px 2px rgba(9, 14, 20, .06);
+}
+.auto-plan-visual { position: relative; overflow: hidden; display: flex; flex-direction: column; }
+#autoPlanCanvas { flex: 1 1 auto; min-height: 0; min-width: 0; width: 100%; }
+.auto-plan-core {
+  order: 1;
+  position: static;
+  transform: none;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 12px 2px;
+  text-align: center;
+  pointer-events: none;
+}
+.auto-plan-core strong {
+  font-size: 1.3rem;
+  line-height: 1;
+  letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--ap-ink);
+}
+.auto-plan-core > span { color: var(--muted); font-size: .85rem; font-weight: 700; }
+.auto-plan-core small {
+  color: var(--ap-accent-strong);
+  font-size: .62rem;
+  font-weight: 750;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+.auto-plan-orbit-legend {
+  order: 3;
+  position: static;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 4px 12px 0;
+  pointer-events: none;
+}
+.auto-plan-orbit-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted);
+  font-size: .58rem;
+  font-weight: 700;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+.auto-plan-orbit-label::before {
+  content: '';
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  border: 1.5px solid var(--ap-accent);
+}
+.auto-plan-orbit-label--hg::before { background: var(--ap-accent); }
+.auto-plan-visual-foot {
+  order: 5;
+  position: static;
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 12px 6px;
+  color: var(--muted);
+  font-size: .66rem;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.auto-plan-console {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(140px, 1fr) auto;
+  gap: var(--flow-block);
+  padding: 13px;
+}
+
+.auto-plan-phase-list { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; }
+.auto-plan-phase {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 6px;
+  align-items: center;
+  padding: 7px 6px;
+  border: 1px solid var(--ap-hairline);
+  border-radius: var(--app-radius-sm);
+  background: rgba(255, 255, 255, .7);
+  transition: border-color .24s ease, background .24s ease, transform .24s ease;
+}
+.auto-plan-phase i {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #b6c0cb;
+}
+.auto-plan-phase span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: .68rem;
+  font-weight: 700;
+}
+.auto-plan-phase b {
+  grid-column: 2;
+  color: var(--muted);
+  font-size: .55rem;
+  font-weight: 700;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+.auto-plan-phase[data-state=active] {
+  border-color: color-mix(in srgb, var(--ap-accent) 55%, transparent);
+  background: color-mix(in srgb, var(--ap-accent) 12%, #fff);
+  transform: translateY(-1px);
+}
+.auto-plan-phase[data-state=active] i {
+  background: var(--ap-accent-strong);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ap-accent) 22%, transparent);
+  animation: auto-plan-pulse 1.3s ease-in-out infinite;
+}
+.auto-plan-phase[data-state=active] b { color: var(--ap-accent-strong); }
+.auto-plan-phase[data-state=done] i { background: var(--green); }
+.auto-plan-phase[data-state=done] b { color: var(--green); }
+
+/*
+ * Algorithmuskommentierung.
+ *
+ * Der wichtigste Teil der Laufansicht: eine mitlaufende Erklärung in Klartext,
+ * was der Algorithmus gerade tut und warum. Neue Zeilen erscheinen unten und
+ * gleiten ein; Verbesserungen sind farblich abgesetzt, damit der Fortschritt
+ * auch beim Überfliegen erkennbar bleibt.
+ */
+.auto-plan-log {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--ap-hairline);
+  border-radius: var(--app-radius-sm);
+  background: linear-gradient(180deg, rgba(255, 255, 255, .98), rgba(250, 252, 254, .94));
+  overflow: hidden;
+}
+.auto-plan-log-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--ap-hairline);
+  background: color-mix(in srgb, var(--month-accent) 8%, transparent);
+  color: var(--ap-accent-strong);
+  font-size: .6rem;
+  font-weight: 700;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+.auto-plan-log-head b { color: var(--muted); font-weight: 700; font-variant-numeric: tabular-nums; }
+.auto-plan-log-stream {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden auto;
+  padding: 6px 4px 6px 0;
+  scrollbar-width: thin;
+  scroll-behavior: smooth;
+}
+.auto-plan-log-entry {
+  display: grid;
+  grid-template-columns: 46px 12px 1fr;
+  align-items: baseline;
+  gap: 8px;
+  padding: 4px 10px 4px 8px;
+  font-size: .73rem;
+  line-height: 1.45;
+  animation: auto-plan-log-in .34s cubic-bezier(.22, 1, .36, 1) both;
+}
+.auto-plan-log-entry time { color: var(--muted); font-size: .64rem; font-variant-numeric: tabular-nums; }
+.auto-plan-log-entry i {
+  justify-self: center;
+  align-self: center;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #c2ccd6;
+  font-style: normal;
+}
+.auto-plan-log-entry span { min-width: 0; overflow-wrap: anywhere; }
+.auto-plan-log-entry b { font-weight: 750; color: var(--ap-ink); }
+.auto-plan-log-entry.is-phase { background: color-mix(in srgb, var(--month-accent) 6%, transparent); }
+.auto-plan-log-entry.is-phase i { background: var(--ap-accent-strong); }
+.auto-plan-log-entry.is-phase span { font-weight: 700; }
+.auto-plan-log-entry.is-gain i { background: var(--green); box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 18%, transparent); }
+.auto-plan-log-entry.is-gain b { color: var(--green); }
+.auto-plan-log-entry.is-warn i { background: var(--orange); }
+.auto-plan-log-entry.is-final { background: color-mix(in srgb, var(--green) 9%, transparent); }
+.auto-plan-log-entry.is-final i { background: var(--green); }
+.auto-plan-log-entry.is-blocked { background: color-mix(in srgb, var(--red) 8%, transparent); }
+.auto-plan-log-entry.is-blocked i { background: var(--red); }
+
+/*
+ * Die Klartextmeldung des Algorithmus bleibt für Vorlesewerkzeuge erhalten,
+ * auch wenn sie sichtbar in der Kommentierung aufgeht.
+ */
+.auto-plan-stage .visually-hidden {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.auto-plan-live-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.auto-plan-live-metrics > div {
+  padding: 7px 9px;
+  border: 1px solid var(--ap-hairline);
+  border-radius: var(--app-radius-sm);
+  background: rgba(255, 255, 255, .8);
+}
+.auto-plan-live-metrics span {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: .58rem;
+  font-weight: 700;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+.auto-plan-live-metrics strong {
+  display: block;
+  margin-top: 1px;
+  color: var(--ap-ink);
+  font-size: .95rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--tracking-tabular);
+}
+
+/* ------------------------------------------------------------ Ergebnisteil */
+
+.auto-plan-result { display: grid; gap: var(--flow-block); animation: auto-plan-fade .4s ease both; }
+.auto-plan-result-hero {
+  display: flex;
+  align-items: center;
+  gap: var(--flow-block);
+  padding: var(--flow-block) 14px;
+  border: 1px solid var(--ap-hairline);
+  border-radius: var(--app-radius);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--green) 8%, #fff), rgba(255, 255, 255, .9));
+}
+.auto-plan-dialog.requires-confirmation .auto-plan-result-hero { background: linear-gradient(180deg, color-mix(in srgb, var(--orange) 10%, #fff), rgba(255, 255, 255, .9)); }
+.auto-plan-dialog[data-phase="blocked"] .auto-plan-result-hero { background: linear-gradient(180deg, color-mix(in srgb, var(--red) 8%, #fff), rgba(255, 255, 255, .9)); }
+.auto-plan-result-hero h3 { margin: 2px 0 4px; font-size: 1.06rem; letter-spacing: var(--tracking-title); }
+.auto-plan-result-hero p { margin: 0; color: var(--muted); font-size: .78rem; line-height: 1.5; }
+.auto-plan-seal {
+  flex: 0 0 auto;
+  width: 52px;
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--green) 40%, transparent);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--green) 12%, #fff);
+  color: var(--green);
+  font-size: 1.5rem;
+}
+.auto-plan-seal.warning { border-color: color-mix(in srgb, var(--orange) 45%, transparent); background: color-mix(in srgb, var(--orange) 12%, #fff); color: var(--orange); font-size: 1.25rem; }
+.auto-plan-seal.failed { border-color: color-mix(in srgb, var(--red) 45%, transparent); background: color-mix(in srgb, var(--red) 10%, #fff); color: var(--red); }
+
+.auto-plan-run-config { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.auto-plan-run-config span {
+  padding: 3px 8px;
+  border: 1px solid var(--ap-hairline);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .8);
+  color: var(--muted);
+  font-size: .64rem;
+}
+.auto-plan-run-config b { color: var(--ap-ink); }
+
+.auto-plan-scorecards { display: grid; grid-template-columns: repeat(auto-fit, minmax(132px, 1fr)); gap: var(--flow-inner); }
+.auto-plan-scorecard {
+  padding: 9px 11px;
+  border: 1px solid var(--ap-hairline);
+  border-radius: var(--app-radius-sm);
+  background: linear-gradient(180deg, rgba(255, 255, 255, .96), rgba(248, 250, 253, .9));
+}
+.auto-plan-scorecard span {
+  display: block;
+  color: var(--muted);
+  font-size: .58rem;
+  font-weight: 700;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+.auto-plan-scorecard strong { display: block; margin-top: 2px; font-size: 1rem; color: var(--ap-ink); }
+.auto-plan-scorecard.verified strong { color: var(--green); }
+.auto-plan-scorecard.warning strong { color: var(--orange); }
+.auto-plan-scorecard.failed strong { color: var(--red); }
+
+.auto-plan-panel { padding: 0; overflow: visible; }
+.auto-plan-section-title {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 13px;
+  border-bottom: 1px solid var(--ap-hairline);
+  font-size: .74rem;
+  font-weight: 750;
+}
+.auto-plan-section-title b { color: var(--muted); font-size: .64rem; font-weight: 700; }
+
+.auto-plan-search-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(136px, 1fr)); gap: var(--flow-inner); padding: var(--flow-block) 13px; }
+.auto-plan-search-metrics > div {
+  padding: 7px 9px;
+  border: 1px solid var(--ap-hairline);
+  border-radius: var(--app-radius-sm);
+  background: rgba(255, 255, 255, .8);
+}
+.auto-plan-search-metrics span { display: block; color: var(--muted); font-size: .57rem; letter-spacing: var(--tracking-caps); text-transform: uppercase; }
+.auto-plan-search-metrics strong { display: block; margin-top: 1px; font-size: .84rem; font-variant-numeric: tabular-nums; color: var(--ap-ink); }
+.auto-plan-search-metrics .certify strong { color: var(--green); }
+
+/* --------------------------------- Vorschlag in der Form der Diensttabelle */
+
+.auto-plan-change-list { overflow: visible; }
+.auto-plan-proposal-table {
+  width: 100%;
+  min-width: 680px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: .76rem;
+}
+.auto-plan-proposal-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  padding: 8px 10px;
+  background: color-mix(in srgb, var(--month-accent) 14%, #fff);
+  border-bottom: 1px solid var(--ap-hairline);
+  color: var(--ap-accent-strong);
+  font-size: .59rem;
+  font-weight: 700;
+  letter-spacing: var(--tracking-caps);
+  text-align: left;
+  text-transform: uppercase;
+}
+.auto-plan-proposal-table td,
+.auto-plan-proposal-table tbody th {
+  padding: 5px 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--month-accent) 10%, var(--ksg-table-line));
+  vertical-align: top;
+  text-align: left;
+}
+/* Dieselbe Unterscheidung wie in der Diensttabelle. */
+.auto-plan-proposal-table tbody tr.saturday-row { background: var(--saturday-row-bg); }
+.auto-plan-proposal-table tbody tr.sunday-row { background: var(--sunday-row-bg); }
+.auto-plan-proposal-table tbody tr.holiday-row { background: var(--holiday-row-bg); }
+.auto-plan-proposal-table tbody tr:hover { background: color-mix(in srgb, var(--month-accent) 18%, #fff); }
+.auto-plan-day-number { width: 52px; white-space: nowrap; }
+.auto-plan-day-number strong { font-size: .88rem; font-variant-numeric: tabular-nums; }
+.auto-plan-weekday { width: 116px; white-space: nowrap; }
+.auto-plan-weekday span { font-weight: 700; }
+.auto-plan-weekday small { display: block; margin-top: 1px; color: var(--muted); font-size: .62rem; }
+.auto-plan-weekday .auto-plan-holiday-name { color: var(--orange); font-weight: 700; }
+
+.auto-plan-assignment-cell {
+  display: grid;
+  gap: 2px;
+  padding: 4px 7px;
+  border: 1px solid transparent;
+  border-radius: var(--app-radius-sm);
+  background: rgba(255, 255, 255, .7);
+}
+.auto-plan-assignment-cell.proposed { border-color: color-mix(in srgb, var(--month-accent) 34%, transparent); background: color-mix(in srgb, var(--month-accent) 10%, #fff); }
+.auto-plan-assignment-cell.yellow { border-color: color-mix(in srgb, var(--yellow) 38%, transparent); background: color-mix(in srgb, var(--yellow) 9%, #fff); }
+.auto-plan-assignment-cell.orange { border-color: color-mix(in srgb, var(--orange) 40%, transparent); background: color-mix(in srgb, var(--orange) 9%, #fff); }
+.auto-plan-assignment-cell.red { border-color: color-mix(in srgb, var(--red) 45%, transparent); background: color-mix(in srgb, var(--red) 8%, #fff); }
+.auto-plan-assignment-cell.open { opacity: .55; }
+.auto-plan-person-line { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
+.auto-plan-person-line strong { font-size: .78rem; }
+.auto-plan-source-pill {
+  flex: 0 0 auto;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--month-accent) 14%, #fff);
+  color: var(--ap-accent-strong);
+  font-size: .52rem;
+  font-weight: 750;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.auto-plan-cell-state { display: flex; align-items: center; gap: 4px; color: var(--muted); font-size: .6rem; }
+.auto-plan-cell-state i { width: 5px; height: 5px; border-radius: 50%; background: var(--green); }
+.auto-plan-assignment-cell.yellow .auto-plan-cell-state i { background: var(--yellow); }
+.auto-plan-assignment-cell.orange .auto-plan-cell-state i { background: var(--orange); }
+.auto-plan-assignment-cell.red .auto-plan-cell-state i { background: var(--red); }
+.auto-plan-assignment-cell.fixed .auto-plan-cell-state i { background: #9aa7b4; }
+.auto-plan-cell-reasons summary { color: var(--ap-accent-strong); font-size: .6rem; cursor: pointer; }
+.auto-plan-cell-reasons ul { margin: 3px 0 0; padding-left: 14px; color: var(--muted); font-size: .64rem; line-height: 1.45; }
+
+.auto-plan-row-review { display: grid; gap: 3px; }
+.auto-plan-row-status {
+  justify-self: start;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--green) 13%, #fff);
+  color: var(--green);
+  font-size: .6rem;
+  font-weight: 750;
+}
+.auto-plan-row-status.yellow { background: color-mix(in srgb, var(--yellow) 14%, #fff); color: var(--yellow); }
+.auto-plan-row-status.orange { background: color-mix(in srgb, var(--orange) 14%, #fff); color: var(--orange); }
+.auto-plan-row-status.red { background: color-mix(in srgb, var(--red) 12%, #fff); color: var(--red); }
+.auto-plan-row-status.fixed { background: rgba(0, 0, 0, .05); color: var(--muted); }
+.auto-plan-row-review details summary { color: var(--ap-accent-strong); font-size: .61rem; cursor: pointer; }
+.auto-plan-row-review details section { margin-top: 4px; }
+.auto-plan-row-review details strong { font-size: .62rem; }
+.auto-plan-row-review details ul { margin: 2px 0 0; padding-left: 14px; color: var(--muted); font-size: .62rem; line-height: 1.45; }
+.auto-plan-jump-highlight { outline: 2px solid var(--ap-accent-strong); outline-offset: -2px; }
+
+.auto-plan-load-table { overflow: visible; }
+.auto-plan-distribution-table { width: 100%; min-width: 520px; border-collapse: separate; border-spacing: 0; font-size: .76rem; }
+.auto-plan-distribution-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 8px 10px;
+  background: color-mix(in srgb, var(--month-accent) 14%, #fff);
+  border-bottom: 1px solid var(--ap-hairline);
+  color: var(--ap-accent-strong);
+  font-size: .59rem;
+  font-weight: 700;
+  letter-spacing: var(--tracking-caps);
+  text-align: right;
+  text-transform: uppercase;
+}
+.auto-plan-distribution-table thead th:first-child { text-align: left; }
+.auto-plan-distribution-table td,
+.auto-plan-distribution-table tbody th {
+  padding: 5px 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--month-accent) 10%, var(--ksg-table-line));
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.auto-plan-distribution-table tbody th { text-align: left; font-weight: 700; }
+.auto-plan-distribution-table i { color: #9aa7b4; font-style: normal; padding: 0 3px; }
+.auto-plan-distribution-table tr.on-target strong { color: var(--green); }
+.auto-plan-distribution-table tr.over-target strong { color: var(--red); }
+.auto-plan-distribution-table tr.under-target strong { color: var(--ap-accent-strong); }
+
+/* -------------------------------------------------- Rote Ausnahmen prüfen */
+
+.auto-plan-red-review {
+  padding: var(--flow-block) 13px;
+  border: 1px solid color-mix(in srgb, var(--orange) 38%, transparent);
+  border-radius: var(--app-radius);
+  background: color-mix(in srgb, var(--orange) 6%, #fff);
+}
+.auto-plan-red-review-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--flow-block); margin-bottom: var(--flow-block); }
+.auto-plan-red-review-head span { display: block; color: var(--orange); font-size: .6rem; font-weight: 700; letter-spacing: var(--tracking-caps); text-transform: uppercase; }
+.auto-plan-red-review-head h4 { margin: 2px 0 0; font-size: .95rem; }
+.auto-plan-red-review-head > strong { padding: 4px 9px; border: 1px solid color-mix(in srgb, var(--red) 34%, transparent); border-radius: 999px; background: color-mix(in srgb, var(--red) 9%, #fff); color: var(--red); font-size: .68rem; }
+.auto-plan-red-list { display: grid; gap: var(--flow-inner); }
+.auto-plan-red-item { display: grid; gap: var(--flow-inner); padding: 10px; border: 1px solid var(--ap-hairline); border-radius: var(--app-radius-sm); background: rgba(255, 255, 255, .9); }
+.auto-plan-red-item-main { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.auto-plan-red-item-main > div { display: grid; gap: 2px; }
+.auto-plan-red-item time { color: var(--muted); font-size: .64rem; }
+.auto-plan-red-item strong { font-size: .78rem; }
+.auto-plan-red-item-main > span { flex: 0 0 auto; padding: 3px 7px; border-radius: 999px; background: color-mix(in srgb, var(--red) 10%, #fff); color: var(--red); font-size: .56rem; font-weight: 750; text-transform: uppercase; }
+.auto-plan-red-item ul { margin: 0; padding-left: 16px; color: var(--muted); font-size: .7rem; line-height: 1.45; }
+.auto-plan-red-item-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.auto-plan-red-item-actions label { display: flex; align-items: center; gap: 7px; font-size: .7rem; cursor: pointer; }
+.auto-plan-red-item-actions input { width: 15px; height: 15px; accent-color: var(--orange); }
+.auto-plan-red-item-actions button { padding: .26rem .55rem; font-size: .68rem; }
+.auto-plan-comment-label { display: grid; gap: var(--flow-tight); margin-top: var(--flow-block); font-size: .7rem; font-weight: 700; }
+.auto-plan-comment-label textarea { resize: vertical; min-height: 52px; }
+.auto-plan-confirm-red {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin-top: var(--flow-block);
+  padding: 9px 11px;
+  border: 1px solid color-mix(in srgb, var(--orange) 34%, transparent);
+  border-radius: var(--app-radius-sm);
+  background: color-mix(in srgb, var(--orange) 8%, #fff);
+  font-size: .73rem;
+  line-height: 1.45;
+  cursor: pointer;
+}
+.auto-plan-confirm-red input { flex: 0 0 auto; width: 15px; height: 15px; margin-top: 1px; accent-color: var(--orange); }
+
+.auto-plan-confirm-note {
+  padding: 10px 12px;
+  border: 1px solid var(--ap-hairline);
+  border-radius: var(--app-radius-sm);
+  background: rgba(255, 255, 255, .8);
+  color: var(--muted);
+  font-size: .74rem;
+}
+
+/* -------------------------------------------------------------- Fußleiste */
+
+.auto-plan-footer {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--flow-inner);
+  padding: 10px 16px;
+  border-top: 1px solid var(--ap-hairline);
+  background: linear-gradient(0deg, color-mix(in srgb, var(--month-accent) 10%, #fff), transparent);
+}
+.auto-plan-start,
+.auto-plan-apply {
+  min-width: 188px;
+  border-color: color-mix(in srgb, var(--month-accent) 62%, rgba(150, 163, 178, .5));
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--month-accent) 16%, #fff),
+    color-mix(in srgb, var(--month-accent) 30%, #fff));
+  font-weight: 750;
+}
+.auto-plan-start:hover,
+.auto-plan-apply:hover { background: linear-gradient(180deg, color-mix(in srgb, var(--month-accent) 24%, #fff), color-mix(in srgb, var(--month-accent) 40%, #fff)); }
+.auto-plan-start:disabled,
+.auto-plan-apply:disabled { cursor: not-allowed; filter: saturate(.3); opacity: .6; }
+
+@keyframes auto-plan-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes auto-plan-rise { from { opacity: 0; transform: translateY(10px) scale(.994); } to { opacity: 1; transform: none; } }
+@keyframes auto-plan-pulse { 50% { transform: scale(1.35); opacity: .7; } }
+@keyframes auto-plan-log-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* ------------------------------------------------------------- Anpassungen */
+
+@media (max-width: 1040px) {
+  .auto-plan-config-hero { grid-template-columns: 1fr; }
+  .auto-plan-stage { grid-template-columns: 1fr; }
+  .auto-plan-visual { min-height: 300px; }
+  .auto-plan-limit-scroll,
+  .auto-plan-change-list,
+  .auto-plan-load-table { overflow-x: auto; }
+  .auto-plan-phase-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 700px) {
+  .auto-plan-dialog { width: 100vw; height: 100dvh; max-height: 100dvh; }
+  .auto-plan-shell { border-radius: 0; border: 0; }
+  .auto-plan-body { padding: var(--flow-block) 12px var(--flow-group); }
+  .auto-plan-footer { flex-wrap: wrap; padding: 9px 12px; }
+  .auto-plan-footer button { flex: 1 1 auto; }
+  .auto-plan-start, .auto-plan-apply { min-width: 0; }
+  .auto-plan-red-item-main { flex-direction: column; }
+  .auto-plan-live-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .auto-plan-shell,
+  .auto-plan-result,
+  .auto-plan-log-entry { animation: none !important; }
+  .auto-plan-spark,
+  .auto-plan-phase[data-state=active] i { animation: none !important; }
+  .auto-plan-phase,
+  .auto-plan-progress-rail i { transition-duration: .01ms !important; }
+  .auto-plan-log-stream { scroll-behavior: auto; }
+}
+@media print {
+  .auto-plan-dialog, .auto-plan-trigger { display: none !important; }
+}

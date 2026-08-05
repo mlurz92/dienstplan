@@ -1,0 +1,226 @@
+/* ==========================================================================
+   Auto-Plan Studio v8 – Incremental Constraint Observatory
+   ==========================================================================
+
+   Diese Datei ergänzt die tragende v5-Optik, sie ersetzt sie nicht. Drei
+   Bausteine kommen hinzu:
+
+   1. das Kopfband mit den Stufen eines Laufs,
+   2. die Spuren der parallel arbeitenden Stränge,
+   3. die Lerntafel der adaptiven Operatorwahl.
+
+   Alle drei folgen derselben Zurückhaltung wie der Rest der Anwendung: Die
+   Monatsfarbe trägt den Akzent, Flächen bleiben hell, Bewegung ist sparsam und
+   respektiert die Systempräferenz. */
+
+.auto-plan-v8-ribbon {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: .75rem 1rem;
+  align-items: center;
+}
+
+/* Die Stufenliste läuft über die volle Breite unter der Überschrift. */
+.auto-plan-v8-stages {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: .5rem;
+  margin: .25rem 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: auto-plan-stage;
+}
+
+.auto-plan-v8-stages li {
+  counter-increment: auto-plan-stage;
+  position: relative;
+  padding: .55rem .7rem .55rem 1.9rem;
+  border-radius: .7rem;
+  background: color-mix(in srgb, white 72%, transparent);
+  border: 1px solid color-mix(in srgb, var(--month-accent, #4f8fbd) 22%, transparent);
+}
+
+.auto-plan-v8-stages li::before {
+  content: counter(auto-plan-stage);
+  position: absolute;
+  inset-block-start: .55rem;
+  inset-inline-start: .6rem;
+  inline-size: 1.05rem;
+  block-size: 1.05rem;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  font-size: .66rem;
+  font-weight: 700;
+  color: white;
+  background: var(--month-accent, #4f8fbd);
+}
+
+.auto-plan-v8-stages b {
+  display: block;
+  font-size: .78rem;
+  line-height: 1.25;
+  color: var(--month-ink, #1b4a6d);
+}
+
+.auto-plan-v8-stages small {
+  display: block;
+  margin-block-start: .15rem;
+  font-size: .69rem;
+  line-height: 1.35;
+  color: color-mix(in srgb, currentColor 62%, transparent);
+}
+
+/* --------------------------------------------------------------------------
+   Spuren der Arbeitsstränge
+   --------------------------------------------------------------------------
+
+   Der Balken oben zeigt den Gesamtstand, diese Spuren zeigen die Verteilung
+   dahinter. Ein fertiger Strang bleibt sichtbar und wird gedämpft, statt zu
+   verschwinden — sonst sähe ein schrumpfendes Feld nach Verlust aus, obwohl es
+   Fortschritt ist. */
+
+.auto-plan-v8-lanes {
+  display: grid;
+  gap: .3rem;
+  margin-block: .55rem 0;
+}
+
+.auto-plan-v8-lane {
+  display: grid;
+  grid-template-columns: 5.2rem 1fr;
+  align-items: center;
+  gap: .55rem;
+  font-size: .7rem;
+  color: color-mix(in srgb, currentColor 66%, transparent);
+}
+
+.auto-plan-v8-lane i {
+  display: block;
+  block-size: .38rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--month-accent, #4f8fbd) 16%, transparent);
+  overflow: hidden;
+}
+
+.auto-plan-v8-lane b {
+  display: block;
+  block-size: 100%;
+  inline-size: 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--month-accent, #4f8fbd) 70%, white),
+    var(--month-accent, #4f8fbd));
+  transition: inline-size .32s cubic-bezier(.32, .72, 0, 1);
+}
+
+.auto-plan-v8-lane[data-done="true"] {
+  color: color-mix(in srgb, currentColor 42%, transparent);
+}
+
+.auto-plan-v8-lane[data-done="true"] b {
+  background: color-mix(in srgb, var(--month-accent, #4f8fbd) 38%, white);
+}
+
+/* --------------------------------------------------------------------------
+   Lerntafel der adaptiven Operatorwahl
+   -------------------------------------------------------------------------- */
+
+.auto-plan-v8-panel .auto-plan-section-title b {
+  font-variant-numeric: tabular-nums;
+}
+
+.auto-plan-v8-learning + .auto-plan-v8-learning {
+  margin-block-start: 1rem;
+  padding-block-start: 1rem;
+  border-block-start: 1px solid color-mix(in srgb, var(--month-accent, #4f8fbd) 16%, transparent);
+}
+
+.auto-plan-v8-learning > header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: .2rem .6rem;
+  margin-block-end: .5rem;
+}
+
+.auto-plan-v8-learning > header b {
+  font-size: .82rem;
+  color: var(--month-ink, #1b4a6d);
+}
+
+.auto-plan-v8-learning > header small {
+  font-size: .7rem;
+  color: color-mix(in srgb, currentColor 60%, transparent);
+}
+
+.auto-plan-v8-learning ol {
+  display: grid;
+  gap: .35rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.auto-plan-v8-learning li {
+  display: grid;
+  grid-template-columns: minmax(7.5rem, 10rem) minmax(3rem, 1fr) auto;
+  align-items: center;
+  gap: .6rem;
+}
+
+.auto-plan-v8-operator {
+  font-size: .76rem;
+  font-weight: 600;
+  color: var(--month-ink, #1b4a6d);
+}
+
+.auto-plan-v8-bar {
+  display: block;
+  block-size: .42rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--month-accent, #4f8fbd) 14%, transparent);
+  overflow: hidden;
+}
+
+.auto-plan-v8-bar i {
+  display: block;
+  block-size: 100%;
+  border-radius: 999px;
+  background: var(--month-accent, #4f8fbd);
+}
+
+.auto-plan-v8-figures {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.auto-plan-v8-figures b {
+  display: block;
+  font-size: .8rem;
+  color: var(--month-ink, #1b4a6d);
+}
+
+.auto-plan-v8-figures small {
+  display: block;
+  font-size: .66rem;
+  color: color-mix(in srgb, currentColor 58%, transparent);
+}
+
+/* Ohne Visualisierung bleibt die Fläche der Ringdarstellung leer. Statt eines
+   toten Rahmens rückt der Fortschrittskern dann in die Mitte. */
+.auto-plan-dialog[data-visualizer="off"] .auto-plan-visual canvas { display: none; }
+.auto-plan-dialog[data-visualizer="off"] .auto-plan-orbit-legend { display: none; }
+
+@media (max-width: 720px) {
+  .auto-plan-v8-learning li {
+    grid-template-columns: 1fr auto;
+  }
+  .auto-plan-v8-bar { grid-column: 1 / -1; }
+}
+
+:root.reduce-motion .auto-plan-v8-lane b,
+:root[data-motion="reduced"] .auto-plan-v8-lane b {
+  transition: none;
+}

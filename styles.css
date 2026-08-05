@@ -1,0 +1,1236 @@
+:root {
+  /* ------------------------------------------------------------------------
+     KSG-Markentoken (Designsystem §1, verbindlich)
+
+     Klinik für Radiologie und Nuklearmedizin, Klinikum St. Georg Leipzig.
+     Diese Werte sind gesetzt und werden nicht aus dem visuellen Eindruck
+     abgeleitet. KSG-Rot ist Wortmarke und belegter Status-/Akzentton, nie
+     beliebige Dekorfarbe und in der Fläche zurückhaltend.
+     ------------------------------------------------------------------------ */
+  --ksg-red: #E3000B;
+  --ksg-red-ink: #B80009;      /* dunklere Textvariante, 6,90:1 auf Weiß */
+  --ksg-gray: #555553;
+  --ksg-text-black: #000000;
+  --ksg-secondary-text: #595959;
+  --ksg-table-line: #BFBFBF;
+
+  /* ------------------------------------------------------------------------
+     App-Token (Designsystem §8)
+
+     Eigener Namensraum für Bildschirmoberflächen; bewusst getrennt von den
+     Dokument- und Web-Token, damit nichts davon je in eine Druckvorlage wandert.
+     ------------------------------------------------------------------------ */
+  --app-radius: 15px;
+  --app-radius-sm: 9px;
+  --app-elevation-1: 0 1px 2px rgba(9,14,20,.14), 0 7px 18px rgba(9,14,20,.08);
+  --app-elevation-2: 0 12px 34px rgba(0,0,0,.22), 0 2px 8px rgba(0,0,0,.12);
+  --app-focus-ring: 2px;
+  --app-focus-offset: 2px;
+
+  /* Weißraum-Leiter (§1b): zwischen Blöcken immer größer als innerhalb. */
+  --flow-tight: 4px;
+  --flow-inner: 6px;
+  --flow-block: 12px;
+  --flow-group: 20px;
+  --flow-section: 24px;
+  --flow-major: 32px;
+
+  /* Optische Laufweite je Größe (§1b) – Arial läuft groß zu weit, klein zu eng. */
+  --tracking-display: -.012em;
+  --tracking-title: -.006em;
+  --tracking-small: .012em;
+  --tracking-tabular: .02em;
+  --tracking-caps: .06em;
+
+  --bg: #0d1117;
+  --sheet: rgba(250,252,255,.84);
+  --sheet-solid: #f8fafc;
+  --line: rgba(17,24,39,.72);
+  --line-soft: rgba(125,136,150,.42);
+  --text: var(--ksg-text-black);
+  --muted: var(--ksg-secondary-text);
+  --green: #24764a;
+  --yellow: #986800;
+  --orange: #a94d00;
+  --red: var(--ksg-red-ink);
+  --month-accent: #4f8fbd;
+  --month-accent-strong: #1f5f8f;
+  --month-glow: rgba(78,151,205,.34);
+  --month-panel-tint: rgba(211,235,250,.24);
+  /* Startwerte für die erste Anzeige, bevor das Theme-Modul greift. Im Betrieb
+     schreibt js/theme.js hier fertige Farben als Inline-Style auf <html>. */
+  --month-ink: #1b4a6d;
+  --weekday-field-bg: color-mix(in srgb, var(--month-accent) 46%, white);
+  --saturday-row-bg: color-mix(in srgb, var(--month-accent) 14%, white);
+  --sunday-row-bg: color-mix(in srgb, var(--month-accent) 22%, white);
+  --holiday-row-bg: color-mix(in srgb, var(--month-accent) 30%, white);
+  --radius: var(--app-radius);
+  /* §1: Bildschirmschrift der Marke ist Arial. */
+  --font: Arial, "Helvetica Neue", Helvetica, "Liberation Sans", sans-serif;
+  color-scheme: light;
+}
+
+@property --month-accent { syntax: '<color>'; inherits: true; initial-value: #4f8fbd; }
+@property --month-accent-strong { syntax: '<color>'; inherits: true; initial-value: #1f5f8f; }
+@property --month-ink { syntax: '<color>'; inherits: true; initial-value: #1b4a6d; }
+@property --month-glow { syntax: '<color>'; inherits: true; initial-value: rgba(78,151,205,.34); }
+@property --month-panel-tint { syntax: '<color>'; inherits: true; initial-value: rgba(211,235,250,.24); }
+
+/* Der Monatsfarbverlauf wird von js/theme.js Frame für Frame geschrieben
+   (OKLab-Interpolation, zeitbasiert). Eine zusätzliche CSS-Transition auf
+   diesen Variablen würde gegen die Schleife arbeiten und den Verlauf
+   verschleppen – deshalb gibt es hier bewusst keine. */
+
+/* Der Sättigungspuls läuft bewusst nur auf dem kleinen Farb-Badge. Ein `filter`
+   auf der gesamten Plantabelle erzwingt in jedem Frame ein Neurastern der
+   kompletten Fläche und hat genau die Frames gekostet, die der Farbverlauf
+   braucht. Die Tabelle bewegt sich stattdessen ausschließlich über transform
+   und opacity – beides läuft im Compositor. */
+body.month-content-transition .month-palette-label {
+  animation: month-content-breathe 680ms cubic-bezier(.22, 1, .36, 1);
+}
+
+@keyframes month-content-breathe {
+  0% { filter: saturate(.92) brightness(.99); }
+  45% { filter: saturate(1.08) brightness(1.015); }
+  100% { filter: saturate(1) brightness(1); }
+}
+
+/* Richtungsabhängiger Monatswechsel: Inhalte gleiten sanft in Leserichtung ein. */
+.month-enter-next { animation: month-slide-in-next 520ms cubic-bezier(.22, 1, .36, 1) both; }
+.month-enter-prev { animation: month-slide-in-prev 520ms cubic-bezier(.22, 1, .36, 1) both; }
+
+@keyframes month-slide-in-next {
+  0% { opacity: 0; transform: translate3d(22px, 0, 0); }
+  100% { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes month-slide-in-prev {
+  0% { opacity: 0; transform: translate3d(-22px, 0, 0); }
+  100% { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+.month-enter-next, .month-enter-prev { will-change: transform, opacity; }
+
+/* Beim Monatswechsel übernimmt der Container die Bewegung – die gestaffelte
+   Zeilen-Einblendung wird dafür ausgesetzt. Beides gleichzeitig ließ die
+   Tabelle für rund 300 ms leer erscheinen (die letzte Zeile startet erst nach
+   90 ms + 31 × 7 ms), der Plan fiel mitten im Wechsel in ein Loch. Jetzt
+   gleitet eine bereits vollständig gesetzte Tabelle herein. Beim Erststart,
+   wo diese Klasse fehlt, bleibt der gestaffelte Aufbau erhalten. */
+body.month-content-transition .plan-table tbody tr { animation: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .month-enter-next, .month-enter-prev,
+  body.month-content-transition .month-palette-label { animation: none; }
+}
+
+/* Wer im Betriebssystem "Transparenz reduzieren" gesetzt hat, bekommt deckende
+   Flächen statt Milchglas. Das ist die von den Barrierefreiheits-Leitlinien
+   ausdrücklich geforderte Rücknahme des Effekts – dieselbe Einstellung, mit der
+   Apple die Liquid-Glass-Kritik beantwortet hat. Die Farbhierarchie und jede
+   Information bleiben dabei vollständig erhalten. */
+@media (prefers-reduced-transparency: reduce) {
+  .glass-panel, .dialog-card { background: #f4f7fa; }
+  /* Muss `.topbar.glass-panel` (0,2,0) schlagen, sonst bliebe die Leiste
+     durchsichtig – genau das, was diese Einstellung abwählt. */
+  .topbar.glass-panel, .toolbar.glass-panel { background: #f4f7fa; }
+  .glass-inset { background: #eef2f6; }
+  .sheet-panel { background: #ffffff; }
+  .ambient-layer { display: none; }
+  .app-dialog::backdrop { background: rgba(6,10,15,.78); backdrop-filter: none; }
+}
+
+@media print {
+  .month-enter-next, .month-enter-prev,
+  #monthTitle, #printArea, #statsGrid { animation: none !important; opacity: 1 !important; transform: none !important; }
+}
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; min-height: 100%; font-family: var(--font);
+  /* §1b verbindlich: Ziffern immer tabellarisch. Tages-, BD-, HG- und
+     Wochenendkolonnen fluchten dadurch exakt untereinander – bei
+     proportionalen Ziffern wandert die 1 aus der Spalte. */
+  font-variant-numeric: tabular-nums lining-nums;
+}
+html {
+  background: #0b0f14;
+}
+body {
+  position: relative;
+  isolation: isolate;
+  color: var(--text);
+  font-size: 14px;
+  background:
+    radial-gradient(circle at 12% -12%, var(--month-glow), transparent 36%),
+    radial-gradient(circle at 88% 2%, rgba(255,255,255,.13), transparent 27%),
+    linear-gradient(145deg, #0a0d12 0%, #151b23 48%, #0d1218 100%);
+  background-attachment: fixed;
+}
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+}
+body::before {
+  background:
+    linear-gradient(115deg, rgba(255,255,255,.08), transparent 24%, transparent 76%, rgba(255,255,255,.035)),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.012) 0 1px, transparent 1px 72px);
+  mask-image: linear-gradient(to bottom, #000, transparent 76%);
+}
+body::after {
+  inset: auto 0 0 0;
+  height: 34vh;
+  background: linear-gradient(to top, rgba(0,0,0,.30), transparent);
+}
+
+button, select, input, textarea { font: inherit; }
+button, .file-btn {
+  appearance: none;
+  position: relative;
+  overflow: hidden;
+  /* Weiße Schaltfläche mit präzisem Rand statt grauem Verlauf. Der frühere
+     Verlauf nach rgba(232,238,245,.68) las sich auf der Leiste als zweites,
+     dunkleres Grau – die Bedienelemente wirkten dadurch stumpf. */
+  border: 1px solid color-mix(in srgb, var(--month-accent) 18%, rgba(150,163,178,.62));
+  background: linear-gradient(180deg, #fff, color-mix(in srgb, var(--month-accent) 4%, #f7f9fb));
+  color: #17202a;
+  border-radius: 9px;
+  padding: .48rem .72rem;
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 1px 1px rgba(9,14,20,.10),
+    0 2px 6px rgba(9,14,20,.07);
+  transition: transform .16s ease, border-color .16s ease, background .16s ease, box-shadow .16s ease;
+}
+button::before, .file-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 54% 0;
+  background: linear-gradient(180deg, rgba(255,255,255,.48), rgba(255,255,255,.04));
+  pointer-events: none;
+}
+/* Beim Überfahren übernimmt die Monatsfarbe die Führung – erkennbar, aber ohne
+   Sprung in der Helligkeit. */
+button:hover, .file-btn:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--month-accent) 52%, rgba(150,163,178,.5));
+  background: linear-gradient(180deg, #fff, color-mix(in srgb, var(--month-accent) 11%, #fff));
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 2px 4px rgba(9,14,20,.13),
+    0 6px 14px color-mix(in srgb, var(--month-accent) 18%, rgba(9,14,20,.10));
+}
+button:active, .file-btn:active { transform: translateY(0); }
+button.secondary, .file-btn.secondary { background: linear-gradient(180deg, #fbfcfe, #eef1f5); }
+select, textarea, input[type="text"], input[list] {
+  width: 100%;
+  border: 1px solid rgba(94,107,121,.38);
+  border-radius: 8px;
+  /* Deckend weiß: Eingabefelder sind der Ort, an dem Lesbarkeit vor Optik geht. */
+  background: #fff;
+  color: var(--text);
+  padding: .45rem .55rem;
+  box-shadow: inset 0 1px 2px rgba(22,30,40,.08), 0 1px 0 rgba(255,255,255,.8);
+}
+/* §1b: sichtbarer Fokus 2 px mit 2 px Offset. */
+select:focus-visible, textarea:focus-visible, input:focus-visible, button:focus-visible, .file-btn:focus-within {
+  outline: var(--app-focus-ring) solid var(--month-accent-strong);
+  outline-offset: var(--app-focus-offset);
+}
+textarea { resize: vertical; }
+label { display: grid; gap: .3rem; color: var(--muted); font-size: .9rem; }
+
+.app-shell { max-width: 1720px; margin: 0 auto; padding: 12px; display: grid; gap: 9px; }
+
+/* --------------------------------------------------------------------------
+   Glasoptik – Kante statt Durchsichtigkeit
+   -------------------------------------------------------------------------- */
+
+.glass-panel,
+.glass-inset,
+.dialog-card {
+  --glass-rim: color-mix(in srgb, var(--month-accent) 26%, rgba(255,255,255,.72));
+}
+
+/* Milchglas nur dort, wo es etwas leistet – und das ist genau eine Stelle.
+
+   Vorher lag `backdrop-filter: blur(22px) saturate(1.42)` auf Kopfleiste,
+   Werkzeugleiste, Einfassungen, Dialogkarte und Monatsplakette. Das war in
+   zweifacher Hinsicht falsch:
+
+   OPTISCH: Die Flächen lagen bei 50 bis 80 Prozent Weiß über einem fast
+   schwarzen Hintergrund. Das Schwarz schlug als Grau durch, und die
+   Sättigungsanhebung verstärkte genau dieses Grau – ein matter Schleier ohne
+   Tiefe und ohne jeden Bezug zur Monatsfarbe der Tabelle darunter.
+
+   RECHNERISCH: Gemessen an dieser Oberfläche, fps während eines Monatswechsels:
+
+     blur(22px) saturate(1.42) ....... 15 fps
+     blur(10px) saturate(1.06) ....... 14 fps
+     ohne Weichzeichner .............. 19 fps
+
+   Der Radius ist also fast gleichgültig; die Kosten entstehen dadurch, dass der
+   Compositor in jedem Frame die Pixel hinter dem Element ausliest. Ein Viertel
+   der Bildrate für einen Effekt, der hinter einer nun 97,5 Prozent deckenden
+   Fläche ohnehin nichts mehr beiträgt.
+
+   Milchglas entsteht auch nicht durch Durchsichtigkeit, sondern durch die
+   Kante: Lichtlinie oben, feine Brechung unten, ein präziser, farbig gefasster
+   Rand. Das kostet nichts und liest sich sauberer.
+
+   Geblieben ist der Weichzeichner deshalb nur auf `.app-dialog::backdrop`
+   (weiter unten). Dort verschwimmt die gesamte Seite hinter einem geöffneten
+   Dialog – ein sichtbarer, sinnvoller Effekt, der ausschließlich läuft, solange
+   ein Dialog offen ist, und der die Arbeitsfläche gerade nicht animiert. */
+
+/* Die Chrome-Flächen: helles, fast deckendes Glas mit einer Dosis Monatsfarbe.
+   Der Farbanteil ist klein, aber entscheidend – er bindet Kopf- und
+   Werkzeugleiste an das Monatsblatt, statt sie als graue Platten davorzusetzen.
+
+   Die Doppelklasse ist zwingend, nicht kosmetisch: Beide Leisten tragen im
+   Markup zusätzlich `glass-panel`, und `.glass-panel` (0,1,0) steht weiter
+   unten in dieser Datei. Bei gleicher Spezifität gewinnt die spätere Regel –
+   ein einfaches `.topbar` bliebe also wirkungslos. Genau dieser Fehler hatte
+   zuvor schon die Wochentagsspalte farblos gelassen. */
+.topbar.glass-panel,
+.toolbar.glass-panel {
+  background:
+    linear-gradient(
+      168deg,
+      color-mix(in srgb, var(--month-accent) 5%, rgba(255,255,255,.975)),
+      color-mix(in srgb, var(--month-accent) 9%, rgba(250,252,254,.96))
+    );
+  border: 1px solid color-mix(in srgb, var(--month-accent) 22%, rgba(255,255,255,.86));
+  /* Enger, heller gestaffelter Schatten. Der frühere weiche, dunkle Schlagschatten
+     legte sich als Trübung über die eigene Fläche. */
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.98),
+    inset 0 -1px 0 color-mix(in srgb, var(--month-accent) 12%, rgba(83,96,110,.16)),
+    0 1px 2px rgba(9,14,20,.16),
+    0 10px 24px rgba(9,14,20,.14);
+}
+.topbar.glass-panel::after,
+.toolbar.glass-panel::after {
+  /* Die Lichtreflexion der großen Panels ist hier zu viel: Sie erzeugt auf der
+     schmalen Leiste eine sichtbare Kante quer über die Bedienelemente. */
+  background: linear-gradient(180deg, rgba(255,255,255,.34), transparent 58%);
+}
+
+.glass-panel {
+  position: relative;
+  overflow: hidden;
+  /* Paint-Containment isoliert das Neuzeichnen auf das Panel selbst. */
+  contain: paint;
+  background:
+    linear-gradient(140deg, rgba(255,255,255,.80), rgba(233,239,247,.70)),
+    var(--month-panel-tint);
+  border: 1px solid var(--glass-rim);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.96),
+    inset 0 -1px 0 rgba(83,96,110,.13),
+    0 12px 34px rgba(0,0,0,.22),
+    0 2px 8px rgba(0,0,0,.12);
+}
+
+/* Lichtkante oben plus feine Brechung an der Unterkante – zusammen ergibt das
+   die Anmutung einer Glasscheibe mit Dicke, ohne jeden Filter. */
+.glass-panel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.30), transparent 42%),
+    linear-gradient(0deg, color-mix(in srgb, var(--month-accent) 9%, transparent), transparent 16%);
+}
+.glass-panel > * { position: relative; z-index: 1; }
+
+/* Die Arbeitsfläche ist dichter als die Leisten: Sie trägt Inhalt, keine
+   Bedienung, und muss auch nach Stunden ruhig lesbar bleiben. */
+.sheet-panel {
+  background:
+    linear-gradient(147deg, rgba(255,255,255,.90), rgba(236,241,248,.84)),
+    var(--month-panel-tint);
+}
+/* Einfassungen liegen INNERHALB der Leisten, also auf hellem Grund. Sie dürfen
+   deshalb nicht durchsichtig sein – sonst mischen sie sich mit der Leiste zu
+   einem zweiten Grauton. Sie sind eine vertiefte, weiße Mulde. */
+.glass-inset {
+  background: linear-gradient(180deg, rgba(255,255,255,.97), rgba(248,250,253,.94));
+  border: 1px solid color-mix(in srgb, var(--month-accent) 16%, rgba(163,176,190,.5));
+  box-shadow:
+    inset 0 1px 2px color-mix(in srgb, var(--month-accent) 10%, rgba(17,24,39,.10)),
+    0 1px 0 rgba(255,255,255,.9);
+}
+
+.topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--radius); }
+/* Die Kopfleiste klippt ihren Inhalt (`.glass-panel { overflow: hidden }`).
+   Ohne `min-width: 0` schrumpft der Markenblock nicht unter seine
+   Inhaltsbreite: Zwischen etwa 1000 und 1200 px schob er die Monats- und
+   Statusbedienung aus der Leiste, statt seinen eigenen Text umbrechen zu
+   lassen. */
+.brand-block { display: flex; gap: 10px; align-items: center; min-width: 0; }
+.brand-block > div { min-width: 0; }
+.brand-mark {
+  width: 40px; height: 40px; display: grid; place-items: center; border-radius: 10px;
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.26), transparent 44%),
+    linear-gradient(150deg, var(--ksg-red), #A80008);
+  color: #fff; font-weight: 760; font-size: 12px; letter-spacing: var(--tracking-caps);
+  border: 1px solid rgba(255,255,255,.32);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.28), 0 6px 18px rgba(0,0,0,.28);
+}
+h1, h2, h3 { margin: 0; }
+h1 { font-size: 1.22rem; letter-spacing: var(--tracking-title); }
+h2 { font-size: 1.32rem; letter-spacing: var(--tracking-title); }
+h3 { font-size: 1.05rem; }
+.eyebrow { text-transform: uppercase; letter-spacing: var(--tracking-caps); font-size: .65rem; color: var(--ksg-secondary-text); margin-bottom: 2px; }
+.subline { color: #67717c; margin-top: 2px; font-size: .82rem; }
+.topbar-controls, .toolbar-group { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.month-selector { display: flex; align-items: center; gap: 4px; padding: 3px; border-radius: 10px; }
+.month-selector select { width: auto; min-width: 126px; padding: .38rem .5rem; background: rgba(255,255,255,.78); }
+.status-wrap { display: inline-flex; align-items: center; gap: 6px; min-width: 138px; padding: .42rem .6rem; border-radius: 10px; color: #5e6975; font-size: .82rem; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: #c99a1c; box-shadow: 0 0 10px currentColor; }
+.icon-btn { width: 32px; height: 30px; padding: 0; display: grid; place-items: center; }
+.toolbar { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding: 7px 9px; border-radius: var(--radius); }
+.toolbar button, .toolbar .file-btn { font-size: .82rem; padding: .42rem .62rem; }
+
+.sheet-layout { min-width: 0; }
+.sheet-panel { border-radius: var(--radius); padding: 12px; }
+.sheet-heading { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; margin-bottom: 8px; }
+/* Gleiche Begründung wie beim Markenblock: Titelspalte und Legende dürfen
+   schrumpfen, sonst schiebt die längere von beiden die andere aus der
+   klippenden Monatskarte. */
+.sheet-heading > *, .section-title-row > * { min-width: 0; }
+.legend-stack { display: grid; justify-items: end; gap: 4px; }
+.calendar-legend, .rule-legend { display: flex; gap: 9px; align-items: center; flex-wrap: wrap; color: #5f6975; font-size: .74rem; }
+.month-palette-label {
+  color: var(--month-accent-strong);
+  font-weight: 700;
+  background: color-mix(in srgb, var(--month-accent) 16%, #fff);
+  border: 1px solid color-mix(in srgb, var(--month-accent) 46%, #fff);
+  border-radius: 999px;
+  padding: 2px 7px;
+}
+.calendar-swatch, .legend-swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; margin-right: 3px; box-shadow: inset 0 1px 0 rgba(255,255,255,.55); }
+.calendar-swatch.saturday { background: var(--saturday-row-bg); border: 1px solid var(--month-accent); }
+.calendar-swatch.sunday { background: var(--sunday-row-bg); border: 1px solid var(--month-accent); }
+.calendar-swatch.holiday { background: var(--holiday-row-bg); border: 1px solid var(--month-ink); }
+.legend-swatch.green { background: #b9dfc8; border: 1px solid var(--green); }
+.legend-swatch.yellow { background: #fff0b3; border: 1px solid var(--yellow); }
+.legend-swatch.orange { background: #ffd8b8; border: 1px solid var(--orange); }
+.legend-swatch.red { background: #ffd1cc; border: 1px solid var(--red); }
+.legend-swatch.gray { background: #e6e9ed; border: 1px solid #aab1ba; }
+
+.plan-table-wrap {
+  overflow: auto;
+  contain: paint;
+  border: 1px solid color-mix(in srgb, var(--month-accent) 30%, rgba(15,23,42,.78));
+  border-radius: 7px;
+  background: rgba(255,255,255,.72);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.84), 0 4px 14px rgba(15,23,42,.12);
+}
+.plan-table { width: 100%; border-collapse: collapse; min-width: 1090px; table-layout: fixed; }
+.plan-table th, .plan-table td {
+  border-right: 1px solid rgba(28,35,44,.72);
+  border-bottom: 1px solid rgba(28,35,44,.72);
+  height: 30px; padding: 0; vertical-align: middle;
+  background: rgba(255,255,255,.78);
+  /* Kein background-Übergang: die Monatsfarbe wird pro Frame geschrieben,
+     eine Transition würde jeden Frame neu starten und den Verlauf verschleifen. */
+  transition: box-shadow .18s ease;
+}
+.plan-table th:last-child, .plan-table td:last-child { border-right: none; }
+.plan-table tr:last-child td { border-bottom: none; }
+.plan-table th {
+  position: sticky; top: 0; z-index: 3;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.97), rgba(224,231,239,.92));
+  text-align: left; padding: 5px 6px; font-size: .86rem; font-weight: 680;
+  color: var(--month-ink);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    inset 0 -2px 0 color-mix(in srgb, var(--month-accent) 55%, transparent);
+}
+.plan-table .day-number-col { width: 42px; text-align: center; }
+.plan-table .weekday-col { width: 154px; }
+.plan-table th:nth-child(3), .plan-table th:nth-child(4) { width: 145px; }
+.plan-table th:nth-child(5), .plan-table th:nth-child(6) { width: 125px; }
+.plan-table .absence-col { width: 220px; }
+.plan-table .preference-col { width: 230px; }
+/* Wichtig: Die Basisregel `.plan-table th, .plan-table td` hat die Spezifität
+   (0,1,1). Reine Klassenselektoren wie `.weekday-cell` (0,1,0) verlieren
+   dagegen – die Monatsfarbe der Wochentagsspalte kam deshalb nie an. Alle
+   Zellregeln sind daher konsequent auf `.plan-table td.<klasse>` (0,2,1)
+   hochgezogen, die Zeilentypen auf `.plan-table tr.<typ> td` (0,2,2). Damit
+   ist die Rangfolge Zelle < Zeilentyp eindeutig und unabhängig von der
+   Quellreihenfolge. */
+.plan-table td.date-cell { text-align: right; padding-right: 6px !important; font-weight: 700; color: var(--month-ink); background: rgba(255,255,255,.88); }
+
+/* Die Wochentagsspalte trägt die kräftige Nuance und behält sie in JEDER Zeile,
+   auch in Wochenend- und Feiertagszeilen. So entsteht ein durchgehender
+   senkrechter Anker, an dem die hellen waagerechten Wäschen entlanglaufen,
+   statt ihn zu unterbrechen. */
+.plan-table td.weekday-cell {
+  padding: 0 6px !important; font-weight: 700; color: var(--month-ink);
+  background: var(--weekday-field-bg);
+  box-shadow: inset 3px 0 0 var(--month-accent-strong);
+}
+.weekday-name { display: block; line-height: 1.05; }
+.holiday-name { display: block; margin-top: 1px; font-size: .61rem; font-weight: 700; color: inherit; opacity: .88; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plan-table tbody tr:hover td { filter: brightness(.985); }
+.plan-table tr.saturday-row td { background: var(--saturday-row-bg); }
+.plan-table tr.saturday-row td.date-cell { color: var(--month-ink); background: var(--saturday-row-bg); box-shadow: inset 4px 0 0 var(--month-accent); }
+.plan-table tr.sunday-row td { background: var(--sunday-row-bg); }
+.plan-table tr.sunday-row td.date-cell { color: var(--month-ink); background: var(--sunday-row-bg); box-shadow: inset 4px 0 0 var(--month-accent-strong); }
+.plan-table tr.holiday-row td { background: var(--holiday-row-bg); }
+.plan-table tr.holiday-row td.date-cell { color: var(--month-ink); background: var(--holiday-row-bg); box-shadow: inset 5px 0 0 var(--month-ink); }
+.plan-table tr.holiday-row td.weekday-cell { box-shadow: inset 3px 0 0 var(--month-ink); }
+
+.assignment-btn {
+  width: 100%; min-height: 29px; border: none; border-radius: 0; background: transparent;
+  padding: 3px 5px; display: flex; justify-content: space-between; align-items: center; text-align: left; box-shadow: none;
+}
+.assignment-btn::before, .cell-summary-button::before { display: none; }
+.assignment-btn:hover, .cell-summary-button:hover { transform: none; background: rgba(255,255,255,.36); box-shadow: inset 0 0 0 1px rgba(255,255,255,.5); }
+.assignment-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.assignment-badges { display: inline-flex; }
+.small-chip { display: inline-flex; align-items: center; padding: 1px 4px; border-radius: 4px; border: 1px solid #cbd0d6; font-size: .65rem; white-space: nowrap; background: rgba(255,255,255,.74); box-shadow: inset 0 1px 0 rgba(255,255,255,.8); }
+.small-chip.green { color: var(--green); border-color: #8bc5a2; background: rgba(238,248,242,.88); }
+.small-chip.yellow { color: var(--yellow); border-color: #e0c35b; background: rgba(255,248,220,.90); }
+.small-chip.orange { color: var(--orange); border-color: #e8a46d; background: rgba(255,240,228,.90); }
+.small-chip.red { color: var(--red); border-color: #e08e88; background: rgba(255,240,239,.90); }
+.small-chip.gray { color: #6b7480; border-color: #c3c9d1; background: rgba(244,246,249,.90); }
+.rbn-field { width: 100%; min-height: 29px; display: flex; align-items: center; }
+.rbn-input { width: 100%; height: 29px; border: none; border-radius: 0; background: transparent; padding: 3px 5px; box-shadow: none; }
+.rbn2-inactive-note { width: 100%; padding: 3px 5px; color: var(--muted); font-size: .72rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rbn-input:focus { outline: 2px solid color-mix(in srgb, var(--month-accent) 75%, white); outline-offset: -2px; background: rgba(255,255,255,.88); }
+.cell-summary-button { width: 100%; min-height: 29px; border: none; border-radius: 0; background: transparent; padding: 2px 4px; text-align: left; color: #30363d; font-size: .8rem; font-weight: 400; box-shadow: none; display: flex; flex-wrap: wrap; align-content: flex-start; align-items: flex-start; gap: 2px 3px; white-space: normal; overflow: hidden; }
+/* Chips statt Fließtext: Ab etwa drei Einträgen reichte eine Zeile nicht mehr
+   aus, der Rest verschwand hinter dem Überlauf und war nur im Tooltip lesbar. */
+.summary-entry { display: inline-flex; align-items: baseline; gap: 2px; max-width: 100%; padding: 0 3px; border-radius: 3px; background: rgba(255,255,255,.52); box-shadow: inset 0 0 0 1px rgba(255,255,255,.6); font-size: .7rem; line-height: 1.25; white-space: nowrap; }
+.absence-summary-name { font-weight: 700; }
+.absence-summary-detail { font-weight: 400; color: #4a525c; }
+
+.below-plan { margin-top: 12px; max-width: 920px; }
+.section-title-row { display: flex; justify-content: space-between; align-items: end; gap: 12px; margin-bottom: 5px; }
+.section-note { color: var(--muted); font-size: .76rem; }
+.excel-stats {
+  border: 1px solid rgba(20,28,38,.72);
+  border-radius: 7px;
+  overflow: hidden;
+  background: rgba(255,255,255,.70);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.85), 0 5px 16px rgba(15,23,42,.10);
+}
+.distribution-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.distribution-table th, .distribution-table td { border-right: 1px solid rgba(31,39,49,.66); border-bottom: 1px solid rgba(31,39,49,.66); padding: 4px 6px; height: 26px; text-align: left; background: rgba(255,255,255,.75); }
+.distribution-table th { background: linear-gradient(180deg, rgba(255,255,255,.94), rgba(225,232,240,.88)); font-weight: 680; }
+.distribution-table th:not(:first-child), .distribution-table td:not(:first-child) { text-align: center; width: 104px; }
+.distribution-table th:nth-child(5), .distribution-table td:nth-child(5),
+.distribution-table th:nth-child(6), .distribution-table td:nth-child(6) { width: 88px; }
+.distribution-table tr:last-child td { border-bottom: none; }
+.distribution-table th:last-child, .distribution-table td:last-child { border-right: none; }
+.distribution-table .open-row { font-weight: 750; background: rgba(255,225,229,.86); }
+.distribution-table .open-row td { background: transparent; }
+.distribution-table .over-target { color: var(--red); font-weight: 750; }
+
+.app-dialog { border: none; padding: 0; background: transparent; }
+.app-dialog::backdrop { background: rgba(6,10,15,.48); backdrop-filter: blur(9px) saturate(1.15); }
+.dialog-card {
+  width: min(900px, calc(100vw - 2rem)); border-radius: 17px; padding: 13px; color: var(--text);
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--month-accent) 4%, #fff), color-mix(in srgb, var(--month-accent) 9%, #f7f9fc));
+  border: 1px solid color-mix(in srgb, var(--month-accent) 24%, rgba(255,255,255,.86));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.96), 0 24px 74px rgba(0,0,0,.34), 0 3px 10px rgba(0,0,0,.16);
+}
+.dialog-card.wide { width: min(1120px, calc(100vw - 2rem)); }
+.dialog-header { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; margin-bottom: 10px; }
+/* Die Textspalte des Dialogkopfes muss umbrechen dürfen, sonst drückt eine
+   lange Beschreibung die Schließen-Schaltfläche über den Kartenrand hinaus. */
+.dialog-header > div { min-width: 0; }
+.dialog-header p { color: var(--muted); margin: 3px 0 0; }
+.close-btn { flex-shrink: 0; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 10px; padding: 0; }
+/* --------------------------------------------------------------------------
+   Dienst-Picker
+
+   Der Picker beantwortet mitten in der Planung genau eine Frage: Wer übernimmt
+   diesen Dienst? Er ist deshalb schmal, dicht und nach Entscheidungsnähe
+   sortiert – oben die klare Empfehlung, unten das, was ausdrücklich bestätigt
+   werden muss. Jede Zeile ist eine Zeile: Name, Funktion, Monatslast, wichtigste
+   Begründung, Bewertung. Die vollständige Begründung steht im Detailbereich
+   unter der Liste und wechselt mit der aktiven Zeile, ohne das Layout zu
+   verschieben.
+   -------------------------------------------------------------------------- */
+.picker-card { width: min(600px, calc(100vw - 2rem)); padding: 0; overflow: hidden; }
+
+.picker-header {
+  display: grid; grid-template-columns: 1fr auto; align-items: start; gap: 4px 10px;
+  padding: 11px 13px 9px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--month-accent) 15%, #fff), transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--month-accent) 20%, rgba(151,163,176,.4));
+}
+.picker-heading { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.picker-role {
+  font-size: .62rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--month-accent-strong);
+}
+.picker-header h3 { margin: 0; font-size: 1.02rem; line-height: 1.2; letter-spacing: .01em; }
+.picker-header .close-btn { grid-column: 2; grid-row: 1 / span 2; align-self: center; }
+.picker-current { grid-column: 1; margin: 0; font-size: .78rem; color: var(--muted); }
+.picker-current strong { color: var(--month-ink); font-weight: 700; }
+.picker-current.is-open { font-style: italic; }
+
+.picker-search { position: relative; margin: 9px 13px 7px; }
+.picker-search svg {
+  position: absolute; left: 9px; top: 50%; width: 15px; height: 15px; transform: translateY(-50%);
+  fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; pointer-events: none;
+}
+.picker-search input {
+  width: 100%; padding: 7px 10px 7px 30px; font-size: .85rem; border-radius: 9px;
+  border: 1px solid color-mix(in srgb, var(--month-accent) 22%, rgba(151,163,176,.5));
+  background: rgba(255,255,255,.9);
+}
+.picker-search input:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--month-accent) 62%, transparent); outline-offset: 1px;
+}
+
+/* Ziel ist die vollständige Übersicht: Die Liste ist so hoch, dass die gesamte
+   Belegschaft ohne Rollen sichtbar bleibt. Erst wenn selbst das nicht mehr in
+   das Fenster passt, wird gerollt – dann zeigt die Maske am unteren Rand an,
+   dass es weitergeht. */
+.picker-list {
+  display: grid; gap: 5px; max-height: min(72vh, 720px); overflow: auto;
+  padding: 0 13px 2px; scrollbar-gutter: stable;
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 14px), transparent);
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 14px), transparent);
+}
+.picker-group { display: grid; gap: 2px; }
+.picker-group-label {
+  position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 6px;
+  margin: 0; padding: 3px 2px 3px 0; font-size: .62rem; font-weight: 700;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--month-accent) 8%, #fbfcfe) 72%, transparent);
+}
+.picker-group-label::after { content: ''; flex: 1; height: 1px; background: rgba(151,163,176,.34); }
+.picker-group-count {
+  order: 3; padding: 0 5px; border-radius: 999px; font-size: .6rem; letter-spacing: .04em;
+  background: rgba(255,255,255,.8); border: 1px solid rgba(151,163,176,.38);
+}
+.picker-group--recommended .picker-group-label { color: var(--green); }
+.picker-group--confirm .picker-group-label { color: var(--red); }
+
+/* Eine Person = eine Zeile. Das hält die gesamte Belegschaft gleichzeitig im
+   Blick; die vollständige Begründung liegt im Detailbereich unter der Liste. */
+.picker-item {
+  display: grid; grid-template-columns: minmax(7.5rem, 12rem) minmax(0, 1fr) auto auto;
+  align-items: center; gap: 2px 9px; width: 100%; padding: 4px 9px; border-radius: 8px;
+  cursor: pointer; text-align: left; min-height: 30px;
+  border: 1px solid rgba(151,163,176,.38); border-left-width: 3px; border-left-color: #b9c0c9;
+  background: rgba(255,255,255,.66); box-shadow: inset 0 1px 0 rgba(255,255,255,.84);
+}
+.picker-item.green { border-left-color: var(--green); }
+.picker-item.yellow { border-left-color: #d2a21a; }
+.picker-item.orange { border-left-color: var(--orange); }
+.picker-item.red { border-left-color: var(--red); }
+/* Ausgeschlossen: nicht im Dienstpool oder zum Termin nicht aktiv. */
+.picker-item.gray { border-left-color: #aab1ba; opacity: .58; }
+.picker-item:hover:not(:disabled) { background: rgba(255,255,255,.92); }
+.picker-item.is-active:not(:disabled) {
+  background: linear-gradient(180deg, #fff, color-mix(in srgb, var(--month-accent) 9%, #fff));
+  border-color: color-mix(in srgb, var(--month-accent) 52%, rgba(151,163,176,.5));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.96), 0 0 0 2px color-mix(in srgb, var(--month-accent) 26%, transparent);
+}
+.picker-item:disabled { cursor: not-allowed; transform: none !important; box-shadow: none !important; }
+
+.picker-identity { grid-column: 1; grid-row: 1; display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.picker-item > .small-chip { grid-column: 4; grid-row: 1; justify-self: end; }
+.picker-name { font-weight: 680; min-width: 0; overflow-wrap: anywhere; }
+.picker-function { font-size: .66rem; letter-spacing: .04em; color: var(--muted); min-width: 0; overflow-wrap: anywhere; }
+.picker-assigned {
+  padding: 0 5px; border-radius: 999px; font-size: .6rem; font-weight: 700; letter-spacing: .05em;
+  color: var(--month-accent-strong); border: 1px solid color-mix(in srgb, var(--month-accent) 40%, transparent);
+  background: color-mix(in srgb, var(--month-accent) 13%, #fff); white-space: nowrap;
+}
+.picker-load {
+  grid-column: 3; grid-row: 1; display: inline-flex; align-items: baseline; gap: 3px; padding: 1px 6px; border-radius: 6px;
+  font-size: .68rem; font-variant-numeric: tabular-nums; color: var(--muted);
+  background: rgba(244,246,249,.9); border: 1px solid rgba(151,163,176,.34); white-space: nowrap;
+}
+.picker-load-role { font-size: .55rem; font-weight: 700; letter-spacing: .08em; opacity: .8; }
+.picker-load.is-exceeded { color: var(--red); border-color: #e5aca7; background: rgba(255,242,241,.92); }
+
+/* Zweite Zeile: wichtigste Begründung, alles Weitere als Zähler. */
+.picker-item .reasons {
+  grid-column: 2; grid-row: 1; display: flex; align-items: center; gap: 5px; min-width: 0;
+  color: var(--muted); font-size: .74rem; line-height: 1.25;
+}
+.picker-item .reason-lead { min-width: 0; overflow-wrap: anywhere; }
+.picker-item .reason-more {
+  flex-shrink: 0; padding: 0 4px; border-radius: 4px; font-size: .62rem;
+  border: 1px solid rgba(151,163,176,.4); background: rgba(255,255,255,.72);
+}
+
+.picker-empty { margin: 10px 2px; color: var(--muted); font-size: .82rem; text-align: center; }
+
+.picker-detail {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 6px;
+  margin: 7px 13px 0; padding: 6px 8px; min-height: 2.1rem; border-radius: 9px;
+  font-size: .74rem; color: var(--muted); line-height: 1.3;
+  background: rgba(247,249,251,.82); border: 1px solid rgba(151,163,176,.3);
+}
+.picker-detail[hidden] { display: none; }
+.picker-detail-name { font-weight: 700; color: var(--text); }
+.picker-detail-reason { padding: 0 5px; border-radius: 5px; background: rgba(255,255,255,.86); border: 1px solid rgba(151,163,176,.32); }
+
+.picker-note { margin: 6px 13px 0; font-size: .7rem; line-height: 1.35; color: var(--muted); }
+.picker-footer {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+  margin-top: 9px; padding: 8px 13px 11px;
+  border-top: 1px solid rgba(151,163,176,.3); background: rgba(255,255,255,.42);
+}
+.picker-keys { margin: 0; font-size: .68rem; color: var(--muted); }
+.picker-keys kbd {
+  display: inline-block; min-width: 15px; margin-right: 2px; padding: 0 4px; border-radius: 4px;
+  font: inherit; font-size: .64rem; text-align: center; color: var(--text);
+  background: rgba(255,255,255,.9); border: 1px solid rgba(151,163,176,.46); box-shadow: 0 1px 0 rgba(151,163,176,.4);
+}
+.picker-footer .dialog-actions { margin-top: 0; }
+.picker-footer .danger-ghost { color: var(--red); border-color: #e5aca7; }
+.picker-footer .danger-ghost[hidden] { display: none; }
+
+/* Auf schmalen Geräten reicht eine Zeile nicht für alle vier Spalten. Dann
+   rückt die Begründung unter den Namen, die Übersicht bleibt erhalten. */
+@media (max-width: 620px) {
+  .picker-keys { display: none; }
+  .picker-footer { justify-content: flex-end; }
+  .picker-item { grid-template-columns: minmax(0, 1fr) auto auto; grid-template-rows: auto auto; }
+  .picker-item > .small-chip { grid-column: 3; grid-row: 1; }
+  .picker-load { grid-column: 2; grid-row: 1; }
+  .picker-item .reasons { grid-column: 1 / -1; grid-row: 2; }
+}
+
+.day-meta-list { display: grid; gap: 6px; max-height: 62vh; overflow: auto; }
+.day-meta-row { padding: 7px; border-radius: 9px; background: rgba(255,255,255,.58); border: 1px solid rgba(151,163,176,.45); display: grid; gap: 5px; box-shadow: inset 0 1px 0 rgba(255,255,255,.82); }
+.row-title { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+.row-title > * { min-width: 0; }
+.meta-group { display: flex; gap: 4px; flex-wrap: wrap; }
+.meta-chip { padding: 4px 6px; border-radius: 7px; background: rgba(255,255,255,.72); border: 1px solid rgba(141,153,166,.48); cursor: pointer; color: var(--muted); }
+.meta-chip.active { color: var(--text); border-color: var(--month-accent); background: color-mix(in srgb, var(--month-accent) 14%, white); }
+.batch-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+.batch-day-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.batch-day { padding: 6px; min-height: 66px; border-radius: 8px; background: rgba(255,255,255,.68); border: 1px solid rgba(151,163,176,.48); cursor: pointer; display: grid; align-content: start; gap: 2px; }
+.batch-day.selected { border-color: var(--month-accent-strong); background: color-mix(in srgb, var(--month-accent) 20%, white); box-shadow: inset 0 0 0 1px var(--month-accent); }
+.batch-day.saturday { background: var(--saturday-row-bg); border-color: var(--month-accent); }
+.batch-day.sunday { background: var(--sunday-row-bg); border-color: var(--month-accent-strong); }
+.batch-day.holiday { background: var(--holiday-row-bg); border-color: var(--month-accent-strong); }
+.batch-day small { color: var(--muted); }
+.batch-holiday-name { color: var(--month-accent-strong) !important; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conflict-reasons { display: grid; gap: 4px; margin-bottom: 8px; }
+
+@media (max-width: 980px) {
+  .topbar, .toolbar, .sheet-heading { align-items: stretch; }
+  .topbar, .toolbar { flex-direction: column; }
+  .topbar-controls, .toolbar-group { width: 100%; }
+  /* Die organisierte Werkzeugleiste regelt ihre Dichte selbst (controls.css)
+     und bleibt deshalb auch schmal eine einzeilige Leiste. */
+  .toolbar.toolbar-organized { flex-direction: row; align-items: stretch; }
+  .month-selector { flex: 1; }
+  .month-selector select { flex: 1; min-width: 0; }
+  .legend-stack { justify-items: start; }
+  .rule-legend { display: none; }
+  .batch-controls { grid-template-columns: 1fr; }
+  .batch-day-grid { grid-template-columns: repeat(4, 1fr); }
+}
+
+
+
+/* --------------------------------------------------------------------------
+   Schwebende Aero-Peak-/Liquid-Glass-Verfeinerung
+   -------------------------------------------------------------------------- */
+
+.ambient-layer {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.ambient-orb {
+  position: absolute;
+  display: block;
+  border-radius: 50%;
+  /* Bewusst KEIN filter: blur(). Ein radialer Verlauf ist bereits weich; der
+     zusätzliche Weichzeichner kostete in der Messung 16 -> 22 fps, ohne
+     sichtbaren Gewinn. Die Verlaufsstopps übernehmen die Weichheit. */
+  opacity: .5;
+  mix-blend-mode: screen;
+  will-change: transform;
+  contain: strict;
+}
+
+.ambient-orb-one {
+  width: 34rem;
+  height: 34rem;
+  left: -12rem;
+  top: -15rem;
+  background: radial-gradient(circle at 38% 38%, color-mix(in srgb, var(--month-accent) 82%, white), color-mix(in srgb, var(--month-accent) 34%, transparent) 38%, transparent 72%);
+  animation: ambient-drift-one 18s ease-in-out infinite alternate;
+}
+
+.ambient-orb-two {
+  width: 26rem;
+  height: 26rem;
+  right: -7rem;
+  top: 6rem;
+  background: radial-gradient(circle at 50% 50%, var(--month-glow), color-mix(in srgb, var(--month-glow) 45%, transparent) 40%, transparent 74%);
+  animation: ambient-drift-two 22s ease-in-out infinite alternate;
+}
+
+.ambient-orb-three {
+  width: 30rem;
+  height: 30rem;
+  left: 38%;
+  bottom: -20rem;
+  background: radial-gradient(circle at 50% 50%, rgba(255,255,255,.16), rgba(255,255,255,.06) 42%, transparent 74%);
+  animation: ambient-drift-three 26s ease-in-out infinite alternate;
+}
+
+.app-shell {
+  position: relative;
+  perspective: 1400px;
+}
+
+.topbar,
+.toolbar,
+.sheet-panel {
+  transform-origin: 50% 0;
+  animation: glass-surface-enter .56s cubic-bezier(.22,.82,.34,1) both;
+}
+
+.toolbar { animation-delay: .055s; }
+.sheet-panel { animation-delay: .11s; }
+
+.topbar,
+.toolbar {
+  transition: transform .24s cubic-bezier(.22,.82,.34,1), box-shadow .24s ease, border-color .24s ease;
+}
+
+.topbar:hover,
+.toolbar:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255,255,255,.78);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.98),
+    inset 0 -1px 0 rgba(83,96,110,.11),
+    0 18px 44px rgba(0,0,0,.27),
+    0 4px 12px rgba(0,0,0,.15),
+    0 0 34px color-mix(in srgb, var(--month-glow) 38%, transparent);
+}
+
+.glass-panel::before {
+  content: "";
+  position: absolute;
+  inset: -45% -15% auto -15%;
+  height: 70%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(255,255,255,.34), transparent 69%);
+  pointer-events: none;
+  opacity: .75;
+  transform: translate3d(-8%, 0, 0);
+  animation: glass-reflection 12s ease-in-out infinite alternate;
+}
+
+.sheet-panel {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.97),
+    inset 0 -1px 0 rgba(83,96,110,.12),
+    0 22px 56px rgba(0,0,0,.25),
+    0 4px 14px rgba(0,0,0,.14),
+    0 0 46px color-mix(in srgb, var(--month-glow) 28%, transparent);
+}
+
+.month-palette-label {
+  display: inline-flex;
+  align-items: center;
+  min-height: 23px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  color: var(--month-accent-strong);
+  font-size: .69rem;
+  font-weight: 760;
+  letter-spacing: .045em;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.73), rgba(226,234,242,.48)),
+    var(--month-panel-tint);
+  border: 1px solid rgba(255,255,255,.66);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.95),
+    0 5px 14px rgba(8,13,19,.10),
+    0 0 14px color-mix(in srgb, var(--month-glow) 34%, transparent);
+}
+
+.plan-table-wrap {
+  transition: box-shadow .26s ease, border-color .26s ease;
+}
+
+.plan-table-wrap:hover {
+  border-color: color-mix(in srgb, var(--month-accent) 42%, rgba(20,28,38,.74));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.84),
+    0 13px 30px rgba(4,9,15,.17),
+    0 0 24px color-mix(in srgb, var(--month-glow) 23%, transparent);
+}
+
+.plan-table tbody tr {
+  animation: row-soft-arrive .30s cubic-bezier(.22,.82,.34,1) both;
+  animation-delay: calc(var(--row-index, 0) * 7ms + 90ms);
+  transition: filter .16s ease, transform .16s ease;
+}
+
+.plan-table tbody tr:hover {
+  position: relative;
+  z-index: 1;
+  transform: translateX(1px);
+  filter: saturate(1.025) brightness(1.012);
+}
+
+.saturday-row td,
+.sunday-row td,
+.holiday-row td {
+  background-image: linear-gradient(110deg, rgba(255,255,255,.14), transparent 46%, rgba(255,255,255,.07));
+  /* background-color folgt der Theme-Schleife direkt, ohne eigene Transition. */
+  transition: box-shadow .22s ease;
+}
+
+.assignment-btn,
+.cell-summary-button,
+.rbn-input {
+  transition: background .16s ease, box-shadow .16s ease, color .16s ease;
+}
+
+.assignment-btn:focus-visible,
+.cell-summary-button:focus-visible,
+.rbn-input:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--month-accent) 76%, white);
+  outline-offset: -2px;
+  background: rgba(255,255,255,.78);
+}
+
+.status-dot {
+  animation: status-breathe 2.4s ease-in-out infinite;
+}
+
+.app-dialog[open] .dialog-card {
+  animation: dialog-glass-open .25s cubic-bezier(.22,.82,.34,1) both;
+}
+
+.app-dialog[open]::backdrop {
+  animation: dialog-backdrop-open .22s ease both;
+}
+
+.picker-item,
+.day-meta-row,
+.batch-day,
+.meta-chip {
+  transition: transform .16s ease, box-shadow .16s ease, background .16s ease, border-color .16s ease;
+}
+
+.picker-item:hover,
+.day-meta-row:hover,
+.batch-day:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.94),
+    0 8px 18px rgba(9,14,20,.11);
+}
+
+.meta-chip:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--month-accent) 55%, rgba(141,153,166,.48));
+}
+
+@keyframes ambient-drift-one {
+  from { transform: translate3d(-2%, -1%, 0) scale(1); }
+  to { transform: translate3d(10%, 8%, 0) scale(1.08); }
+}
+
+@keyframes ambient-drift-two {
+  from { transform: translate3d(3%, -3%, 0) scale(.96); }
+  to { transform: translate3d(-11%, 10%, 0) scale(1.08); }
+}
+
+@keyframes ambient-drift-three {
+  from { transform: translate3d(-8%, 2%, 0) scale(1); }
+  to { transform: translate3d(12%, -7%, 0) scale(1.12); }
+}
+
+@keyframes glass-surface-enter {
+  from { opacity: 0; transform: translateY(10px) scale(.992); filter: blur(3px); }
+  to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+
+@keyframes glass-reflection {
+  from { transform: translate3d(-13%, -2%, 0) scale(.96); opacity: .48; }
+  to { transform: translate3d(10%, 5%, 0) scale(1.06); opacity: .82; }
+}
+
+@keyframes row-soft-arrive {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes status-breathe {
+  0%, 100% { transform: scale(.9); opacity: .72; box-shadow: 0 0 7px currentColor; }
+  50% { transform: scale(1.08); opacity: 1; box-shadow: 0 0 14px currentColor; }
+}
+
+@keyframes dialog-glass-open {
+  from { opacity: 0; transform: translateY(12px) scale(.975); filter: blur(3px); }
+  to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+
+@keyframes dialog-backdrop-open {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+}
+
+@media print {
+  .ambient-layer { display: none !important; }
+}
+
+/* --------------------------------------------------------------------------
+   Offene Punkte – sichtbare Sammelprüfung des Monats
+   -------------------------------------------------------------------------- */
+
+.issue-heading { margin-top: var(--flow-section); }
+.issue-list { margin-top: var(--flow-inner); }
+.issue-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--flow-tight);
+  max-height: 268px;
+  overflow: auto;
+  contain: paint;
+}
+.issue-item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--flow-inner);
+  padding: 5px 8px;
+  border-radius: 7px;
+  border: 1px solid rgba(15,23,42,.10);
+  background: rgba(255,255,255,.72);
+  border-left: 3px solid var(--ksg-table-line);
+  font-size: .78rem;
+}
+.issue-item.red { border-left-color: var(--ksg-red); background: rgba(255,244,243,.82); }
+.issue-item.orange { border-left-color: var(--orange); background: rgba(255,248,242,.82); }
+.issue-item.yellow { border-left-color: #d2a21a; }
+.issue-text { display: grid; gap: 1px; min-width: 0; }
+.issue-text strong { font-weight: 700; color: var(--text); }
+.issue-text span { color: var(--ksg-secondary-text); letter-spacing: var(--tracking-small); }
+.issue-empty {
+  margin: var(--flow-inner) 0 0;
+  color: var(--ksg-secondary-text);
+  font-size: .8rem;
+  letter-spacing: var(--tracking-small);
+}
+
+/* Im Druck steht der Plan selbst im Vordergrund. */
+@media print {
+  .issue-heading, .issue-list { display: none !important; }
+}
+
+/* --------------------------------------------------------------------------
+   Druck: ein vollständiger Monat auf genau einer DIN-A4-Seite hochkant.
+
+   Regeln, die das Layout tragen:
+   - Gedruckt werden ausschließlich Tag, Wochentag, BD, HG, RBN und 2. RBN;
+     die beiden Zusammenfassungsspalten entfallen.
+   - Die Statistik steht mit deutlichem Abstand unter dem Plan und ist auf
+     Mitarbeitende, BD und HG reduziert.
+   - Die Monatsfarben bleiben erhalten: Die früheren festen Blauwerte werden
+     nicht mehr erzwungen, stattdessen sorgt `print-color-adjust: exact` dafür,
+     dass die Flächen überhaupt gedruckt werden.
+   - Alle Höhen sind in Millimetern gesetzt, damit die Summe aus 31 Planzeilen,
+     Kopfzeile, Abstand und Statistik nachrechenbar innerhalb des Satzspiegels
+     bleibt (Satzspiegel 283 mm, Bedarf rund 262 mm inklusive Feiertagszeilen).
+   - Dieser Block steht bewusst am Dateiende: Er muss die später notierten
+     Glas- und Aero-Regeln überschreiben können, ohne überall !important zu
+     benötigen.
+   -------------------------------------------------------------------------- */
+@media print {
+  @page { size: A4 portrait; margin: 9mm 10mm; }
+
+  html, body { width: auto; height: auto; background: #fff !important; color: #000; background-attachment: scroll !important; isolation: auto; }
+  /* Verläufe, Filter und Containment zwingen Chromium sonst in eine
+     Rasterausgabe der gesamten Seite: unscharf und um ein Vielfaches größer. */
+  *, *::before, *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    filter: none !important;
+    mix-blend-mode: normal !important;
+    will-change: auto !important;
+    contain: none !important;
+    text-shadow: none !important;
+  }
+  body::before, body::after, .topbar, .toolbar, .ambient-layer { display: none !important; }
+  .glass-panel::after, .glass-panel::before { display: none !important; }
+  .app-shell { max-width: none; padding: 0; gap: 0; display: block; }
+  .sheet-layout { display: block; }
+  /* `overflow: hidden` plus Eckenrundung der Glaspanels schnitt im Druck
+     Buchstaben an den Ecken ab – erster Buchstabe des Monatstitels, letzte
+     Zeile der Statistik. Im Druck gibt es weder Rundung noch Beschnitt. */
+  .glass-panel, .sheet-panel {
+    backdrop-filter: none; box-shadow: none; border: none; background: #fff;
+    padding: 0; margin: 0; overflow: visible; border-radius: 0;
+  }
+
+  /* Der Ausdruck nutzt bewusst nicht die volle Satzbreite: Ein ruhiger
+     Seitenrand wirkt aufgeräumter und entspricht der bisherigen Vorlage. */
+  .app-shell, .sheet-layout, .sheet-panel { width: 168mm; margin-left: auto; margin-right: auto; }
+
+  /* Kopf ---------------------------------------------------------------- */
+  .sheet-heading {
+    display: flex; justify-content: space-between; align-items: flex-end; gap: 6mm;
+    margin: 0 0 3.4mm; padding: 0 0 1.6mm; border-bottom: .5mm solid var(--month-accent);
+  }
+  .sheet-heading .eyebrow {
+    display: block; margin: 0 0 .6mm; font-size: 7pt; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .16em; color: var(--month-accent-strong);
+  }
+  #monthTitle { font-size: 13pt; letter-spacing: .01em; margin: 0; line-height: 1.15; color: var(--month-ink); }
+  .legend-stack { display: block; }
+  .legend-stack .rule-legend, .legend-stack .calendar-legend { display: none !important; }
+  /* Zurückhaltend: keine Farbfläche, neutrale Kontur – die Beschriftung selbst
+     bleibt aber im Monatskontrast und benennt damit die Farbe, die sie trägt. */
+  .month-palette-label {
+    display: inline-block; font-size: 6pt; font-weight: 600; line-height: 1.2;
+    letter-spacing: .02em; padding: .5mm 2mm; border-radius: 999px;
+    color: var(--month-accent-strong);
+    background: none;
+    border: .18mm solid rgba(0,0,0,.3);
+  }
+
+  /* Planungstabelle ----------------------------------------------------- */
+  .plan-table-wrap { overflow: visible; box-shadow: none; border: .35mm solid var(--month-ink); border-radius: 0; background: #fff; }
+  .plan-table { min-width: 0; width: 100%; table-layout: fixed; font-size: 8pt; }
+  .plan-table th, .plan-table td { height: auto; padding: 0; border-color: rgba(0,0,0,.55); }
+  .plan-table th {
+    position: static; box-shadow: none; padding: 1mm 1.4mm; font-size: 8pt; line-height: 1.1;
+    background: color-mix(in srgb, var(--month-accent) 26%, #fff);
+    color: var(--month-ink); border-bottom: .35mm solid var(--month-ink);
+  }
+  .plan-table td { height: 5.6mm; }
+  .plan-table th:nth-child(1), .plan-table td:nth-child(1) { width: 7%; }
+  .plan-table th:nth-child(2), .plan-table td:nth-child(2) { width: 21%; }
+  .plan-table th:nth-child(3), .plan-table td:nth-child(3),
+  .plan-table th:nth-child(4), .plan-table td:nth-child(4) { width: 18%; }
+  .plan-table th:nth-child(5), .plan-table td:nth-child(5),
+  .plan-table th:nth-child(6), .plan-table td:nth-child(6) { width: 18%; }
+  /* Urlaub/FZA und Wünsche/Optionen gehören nicht auf den Aushang. */
+  .plan-table th:nth-child(7), .plan-table td:nth-child(7),
+  .plan-table th:nth-child(8), .plan-table td:nth-child(8) { display: none; }
+
+  .assignment-btn, .rbn-field, .rbn-input, .cell-summary-button {
+    min-height: 0; height: 5.6mm; font-size: 8pt; padding: 0 1.4mm; line-height: 1.1;
+  }
+  .rbn-input { appearance: none; -webkit-appearance: none; color: #000; }
+  /* Der Platzhalter „— auswählen —“ ist eine Bedienhilfe; auf dem Ausdruck
+     bleibt eine unbesetzte Rufbereitschaft schlicht leer. */
+  .rbn-input[data-rbn-empty="true"] { visibility: hidden; }
+  .rbn2-inactive-note { font-size: 6.6pt; padding: 0 1.4mm; color: #000; }
+  .assignment-btn { display: block; }
+  .assignment-badges, .small-chip { display: none !important; }
+  .weekday-name { line-height: 1.1; }
+  .holiday-name { font-size: 5.8pt; margin-top: 0; line-height: 1.05; }
+
+  /* Statistik ------------------------------------------------------------ */
+  .below-plan { width: 168mm; margin-left: auto; margin-right: auto; margin-top: 7mm; max-width: none; break-inside: avoid; page-break-inside: avoid; }
+  .below-plan .section-title-row { display: block; margin: 0 0 2mm; }
+  .below-plan .section-title-row .eyebrow, .below-plan .section-note { display: none; }
+  .below-plan h3 { font-size: 9.5pt; margin: 0; line-height: 1.15; color: var(--month-ink); }
+  .excel-stats { display: inline-block; width: auto; box-shadow: none; border: .35mm solid var(--month-ink); border-radius: 0; background: #fff; }
+  .distribution-table { width: 88mm; font-size: 8pt; }
+  .distribution-table th, .distribution-table td {
+    height: auto; padding: 0.75mm 1.6mm; border-color: rgba(0,0,0,.55); background: #fff; color: #000;
+  }
+  .distribution-table th {
+    font-weight: 700; color: var(--month-ink);
+    background: color-mix(in srgb, var(--month-accent) 26%, #fff);
+    border-bottom: .35mm solid var(--month-ink);
+  }
+  /* Nur Mitarbeitende, BD und HG. */
+  .distribution-table th:nth-child(n+4), .distribution-table td:nth-child(n+4) { display: none; }
+  .distribution-table th:first-child, .distribution-table td:first-child { width: 44mm; text-align: left; }
+  .distribution-table th:nth-child(2), .distribution-table td:nth-child(2),
+  .distribution-table th:nth-child(3), .distribution-table td:nth-child(3) { width: 22mm; text-align: center; }
+  .distribution-table th:nth-child(3), .distribution-table td:nth-child(3) { border-right: none; }
+  .distribution-table tbody tr:last-child td { border-bottom: none; }
+  .distribution-table .open-row td { background: color-mix(in srgb, var(--month-accent) 12%, #fff); font-weight: 700; }
+
+  /* Keine Verläufe, Filter oder Animationen im Druck. */
+  .plan-table tbody tr, .plan-table tbody tr td { animation: none !important; transition: none !important; filter: none !important; transform: none !important; }
+  .saturday-row td, .sunday-row td, .holiday-row td { background-image: none !important; }
+  .plan-table th, .distribution-table th { background-image: none !important; }
+  .month-enter-next, .month-enter-prev,
+  #monthTitle, #printArea, #statsGrid { animation: none !important; opacity: 1 !important; transform: none !important; }
+
+  .issue-heading, .issue-list { display: none !important; }
+}
+
+/* ==========================================================================
+   Darstellungseinstellungen
+   ==========================================================================
+
+   Die Einstellungen wirken ausschließlich über Datenattribute an der Wurzel.
+   Damit bleibt das Stylesheet die einzige Stelle, die über das Aussehen
+   entscheidet, und die Einstellungslogik muss keine Farben kennen. */
+
+/* Atmosphärischer Hintergrund abschaltbar. Auf schwacher Grafik ist das der
+   wirksamste einzelne Hebel für eine flüssige Oberfläche. */
+:root[data-ambient-backdrop="false"] .ambient-layer { display: none; }
+
+/* Ohne Wochenendhervorhebung tragen Samstag, Sonntag und Feiertag denselben
+   Grund wie ein Werktag; unterschieden werden sie dann allein über die
+   Wochentagsspalte und die Feiertagsbeschriftung. */
+:root[data-weekend-emphasis="false"] {
+  --saturday-row-bg: transparent;
+  --sunday-row-bg: transparent;
+  --holiday-row-bg: transparent;
+}
+
+:root[data-weekend-emphasis="false"] .plan-table tr.saturday-row td.date-cell,
+:root[data-weekend-emphasis="false"] .plan-table tr.sunday-row td.date-cell,
+:root[data-weekend-emphasis="false"] .plan-table tr.holiday-row td.date-cell {
+  box-shadow: none;
+}
+
+/* Umgekehrt verstärkt die Hervorhebung den Kontrast spürbar, damit ein
+   Wochenende auch auf einem blassen Bildschirm sofort auffällt. */
+:root[data-weekend-emphasis="true"] {
+  --saturday-row-bg: color-mix(in srgb, var(--month-accent) 18%, white);
+  --sunday-row-bg: color-mix(in srgb, var(--month-accent) 27%, white);
+  --holiday-row-bg: color-mix(in srgb, var(--month-accent) 36%, white);
+}

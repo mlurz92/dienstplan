@@ -1,0 +1,55 @@
+/* Rechter Befehlsblock der v8.5-Command-Bar. */
+.toolbar .tool-action--theme {
+  margin-inline-start: auto;
+}
+
+.toolbar .tool-action--theme + .tool-action--pinned {
+  margin-inline-start: 0;
+}
+
+.toolbar .tool-action--theme,
+.toolbar #settingsBtn {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 760px) {
+  .toolbar .tool-action--theme,
+  .toolbar #settingsBtn {
+    inline-size: 38px;
+    min-inline-size: 38px;
+    padding-inline: 0;
+  }
+}
+
+/* Letzte responsive Sicherheitsstufe: Im gemessenen Overflow-Modus bleiben
+   sämtliche Kernaktionen erreichbar, werden auf extrem schmalen Viewports aber
+   so verdichtet, dass weder Überlagerung noch horizontaler Seitenlauf entsteht. */
+@media (max-width: 380px) {
+  .toolbar.toolbar-organized[data-toolbar-density="overflow"] {
+    gap: 3px;
+    padding: 4px;
+  }
+
+  .toolbar.toolbar-organized[data-toolbar-density="overflow"] .toolbar-section--planning {
+    gap: 2px;
+    padding: 1px;
+  }
+
+  .toolbar.toolbar-organized[data-toolbar-density="overflow"] .toolbar-section--planning .toolbar-actions {
+    gap: 2px;
+  }
+
+  .toolbar.toolbar-organized[data-toolbar-density="overflow"] .toolbar-section--planning .tool-action,
+  .toolbar.toolbar-organized[data-toolbar-density="overflow"] .tool-action--overflow {
+    inline-size: 32px;
+    min-inline-size: 32px;
+    padding-inline: 0;
+  }
+
+  .toolbar.toolbar-organized[data-toolbar-density="overflow"] .tool-action--theme,
+  .toolbar.toolbar-organized[data-toolbar-density="overflow"] #settingsBtn {
+    inline-size: 34px;
+    min-inline-size: 34px;
+    padding-inline: 0;
+  }
+}

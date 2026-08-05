@@ -1,0 +1,284 @@
+/* DienstplanRAD v8.5 – adaptive Windows 11 / Chrome shell and colour schemes. */
+
+:root {
+  --v85-surface: color-mix(in oklab, white 92%, var(--month-accent) 8%);
+  --v85-surface-strong: color-mix(in oklab, white 97%, var(--month-accent) 3%);
+  --v85-surface-muted: color-mix(in oklab, white 84%, var(--month-accent) 16%);
+  --v85-border: color-mix(in oklab, #7d8995 64%, var(--month-accent) 36%);
+  --v85-text: #111820;
+  --v85-muted: #53606d;
+  --v85-shadow: 0 18px 48px rgba(23, 36, 49, .14), 0 2px 8px rgba(23, 36, 49, .08);
+  --v85-blur: 18px;
+  --v85-app-bg:
+    radial-gradient(circle at 11% -8%, color-mix(in oklab, var(--month-glow) 72%, transparent), transparent 34%),
+    radial-gradient(circle at 92% 4%, rgba(255,255,255,.88), transparent 28%),
+    linear-gradient(145deg, color-mix(in oklab, #edf3f7 91%, var(--month-accent) 9%), #dfe8ef);
+}
+
+html[data-color-scheme="dark"] {
+  --v85-surface: color-mix(in oklab, #151c24 91%, var(--month-accent) 9%);
+  --v85-surface-strong: color-mix(in oklab, #10161d 95%, var(--month-accent) 5%);
+  --v85-surface-muted: color-mix(in oklab, #202a35 87%, var(--month-accent) 13%);
+  --v85-border: color-mix(in oklab, #5f6b77 62%, var(--month-accent) 38%);
+  --v85-text: #f3f6f9;
+  --v85-muted: #b7c1cb;
+  --v85-shadow: 0 22px 58px rgba(0, 0, 0, .42), 0 2px 10px rgba(0, 0, 0, .28);
+  --v85-blur: 20px;
+  --v85-app-bg:
+    radial-gradient(circle at 10% -7%, color-mix(in oklab, var(--month-glow) 74%, transparent), transparent 34%),
+    radial-gradient(circle at 91% 2%, color-mix(in oklab, var(--month-accent) 15%, transparent), transparent 28%),
+    linear-gradient(145deg, #080c11, color-mix(in oklab, #111820 90%, var(--month-accent) 10%) 52%, #090e14);
+}
+
+html,
+body { background-color: color-mix(in oklab, var(--v85-surface-strong) 88%, black 12%); }
+
+body {
+  color: var(--v85-text);
+  background: var(--v85-app-bg);
+  background-attachment: fixed;
+  transition: background-color .28s ease, color .22s ease;
+}
+
+html[data-color-scheme="light"] body::before {
+  opacity: .44;
+  mix-blend-mode: multiply;
+}
+
+html[data-color-scheme="dark"] body::before { opacity: .7; }
+html[data-color-scheme="dark"] body::after { background: linear-gradient(to top, rgba(0,0,0,.44), transparent); }
+
+.glass-panel,
+.glass-inset,
+.dialog-card,
+.sheet-panel,
+.toolbar-section,
+.toolbar-overflow-panel {
+  color: var(--v85-text);
+  border-color: color-mix(in oklab, var(--v85-border) 58%, transparent);
+  background:
+    linear-gradient(180deg,
+      color-mix(in oklab, var(--v85-surface-strong) 94%, white 6%),
+      color-mix(in oklab, var(--v85-surface) 97%, var(--month-accent) 3%));
+  box-shadow: var(--v85-shadow);
+}
+
+html[data-color-scheme="dark"] .glass-panel,
+html[data-color-scheme="dark"] .glass-inset,
+html[data-color-scheme="dark"] .dialog-card,
+html[data-color-scheme="dark"] .sheet-panel,
+html[data-color-scheme="dark"] .toolbar-section,
+html[data-color-scheme="dark"] .toolbar-overflow-panel {
+  background:
+    linear-gradient(180deg,
+      color-mix(in oklab, var(--v85-surface-strong) 94%, white 6%),
+      color-mix(in oklab, var(--v85-surface) 96%, var(--month-accent) 4%));
+}
+
+@supports (backdrop-filter: blur(1px)) {
+  .topbar.glass-panel,
+  .toolbar.glass-panel,
+  .app-dialog .dialog-card {
+    backdrop-filter: blur(var(--v85-blur)) saturate(1.12);
+  }
+  html.is-scrolling .topbar.glass-panel,
+  html.is-scrolling .toolbar.glass-panel {
+    backdrop-filter: blur(8px) saturate(1.04);
+  }
+}
+
+.eyebrow,
+.toolbar-section-label,
+label,
+small,
+.muted,
+.status-wrap { color: var(--v85-muted); }
+
+h1, h2, h3, h4,
+.brand-block,
+.month-title,
+.month-header { color: var(--v85-text); }
+
+select,
+textarea,
+input[type="text"],
+input[type="number"],
+input[type="search"],
+input[list] {
+  color: var(--v85-text);
+  background: var(--v85-surface-strong);
+  border-color: color-mix(in oklab, var(--v85-border) 64%, transparent);
+  box-shadow: inset 0 1px 2px color-mix(in oklab, black 13%, transparent), 0 1px 0 color-mix(in oklab, white 35%, transparent);
+}
+
+select option { color: CanvasText; background: Canvas; }
+
+.toolbar.toolbar-organized {
+  align-items: center;
+  gap: 7px;
+  padding: 7px;
+  border-radius: 16px;
+}
+
+.toolbar-section {
+  box-shadow: inset 0 1px 0 color-mix(in oklab, white 48%, transparent), 0 1px 3px color-mix(in oklab, black 12%, transparent);
+}
+
+.toolbar .tool-action,
+.toolbar-overflow-panel .tool-action,
+.toolbar .file-btn.tool-action,
+.toolbar-overflow-panel .file-btn.tool-action {
+  min-inline-size: 34px;
+  min-block-size: 34px;
+  color: var(--v85-text);
+  border-color: color-mix(in oklab, var(--v85-border) 54%, transparent);
+  background: linear-gradient(180deg,
+    color-mix(in oklab, var(--v85-surface-strong) 96%, white 4%),
+    color-mix(in oklab, var(--v85-surface-muted) 88%, var(--month-accent) 12%));
+  box-shadow: inset 0 1px 0 color-mix(in oklab, white 54%, transparent), 0 1px 3px color-mix(in oklab, black 13%, transparent);
+  transition: transform .14s cubic-bezier(.2,.8,.2,1), border-color .16s ease, background-color .16s ease, box-shadow .16s ease;
+}
+
+.toolbar .tool-action:hover,
+.toolbar-overflow-panel .tool-action:hover,
+.toolbar .file-btn.tool-action:hover,
+.toolbar-overflow-panel .file-btn.tool-action:hover {
+  color: var(--v85-text);
+  transform: translateY(-1px);
+  border-color: color-mix(in oklab, var(--month-accent) 64%, var(--v85-border));
+  background: linear-gradient(180deg,
+    color-mix(in oklab, var(--v85-surface-strong) 86%, white 14%),
+    color-mix(in oklab, var(--v85-surface-muted) 78%, var(--month-accent) 22%));
+  box-shadow: inset 0 1px 0 color-mix(in oklab, white 62%, transparent), 0 6px 18px color-mix(in oklab, var(--month-glow) 44%, rgba(0,0,0,.16));
+}
+
+.toolbar .tool-action--accent {
+  color: color-mix(in oklab, var(--month-accent-strong) 78%, var(--v85-text));
+  border-color: color-mix(in oklab, var(--month-accent) 58%, var(--v85-border));
+}
+
+html[data-color-scheme="dark"] .toolbar .tool-action--accent {
+  color: color-mix(in oklab, var(--month-accent) 76%, white 24%);
+}
+
+.toolbar .tool-action--danger,
+.toolbar-overflow-panel .tool-action--danger { color: #c92f3b; }
+html[data-color-scheme="dark"] .toolbar .tool-action--danger,
+html[data-color-scheme="dark"] .toolbar-overflow-panel .tool-action--danger { color: #ff9299; }
+
+.tool-icon { inline-size: 17px; block-size: 17px; flex-basis: 17px; }
+.toolbar .tool-action--pinned { margin-inline-start: 0; }
+.toolbar .tool-action--theme { border-radius: 999px; }
+.toolbar .tool-action--theme + .tool-action--pinned { margin-inline-start: 0; }
+.toolbar .tool-action--theme .tool-label { max-inline-size: 4.3rem; }
+.toolbar .tool-action--icon-only { inline-size: 38px; block-size: 38px; }
+
+.toolbar-overflow-panel {
+  min-inline-size: 205px;
+  box-shadow: 0 24px 64px rgba(0,0,0,.3), 0 2px 10px rgba(0,0,0,.18);
+}
+
+#prevMonthBtn,
+#nextMonthBtn {
+  inline-size: 36px;
+  min-inline-size: 36px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+}
+
+#prevMonthBtn .tool-icon,
+#nextMonthBtn .tool-icon { inline-size: 19px; block-size: 19px; }
+
+.app-rich-tooltip {
+  position: fixed;
+  inset: 0 auto auto 0;
+  z-index: 2147483600;
+  max-inline-size: min(340px, calc(100vw - 20px));
+  padding: 9px 11px;
+  color: #f8fbff;
+  background: color-mix(in oklab, #10161e 92%, var(--month-accent) 8%);
+  border: 1px solid color-mix(in oklab, var(--month-accent) 38%, rgba(255,255,255,.24));
+  border-radius: 10px;
+  box-shadow: 0 14px 34px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.12);
+  font-size: .78rem;
+  font-weight: 560;
+  line-height: 1.42;
+  letter-spacing: .005em;
+  pointer-events: auto;
+  animation: app-tooltip-in .14s cubic-bezier(.2,.8,.2,1);
+}
+.app-rich-tooltip[hidden] { display: none; }
+@keyframes app-tooltip-in { from { opacity: 0; transform: translateY(-4px) scale(.985); } to { opacity: 1; transform: none; } }
+
+.plan-table,
+.plan-table th,
+.plan-table td,
+.auto-plan-proposal-table,
+.auto-plan-proposal-table th,
+.auto-plan-proposal-table td,
+.auto-plan-distribution-table,
+.auto-plan-distribution-table th,
+.auto-plan-distribution-table td {
+  color: var(--v85-text);
+  border-color: color-mix(in oklab, var(--v85-border) 55%, transparent);
+}
+
+html[data-color-scheme="dark"] .plan-table tbody tr:not(.saturday-row):not(.sunday-row):not(.holiday-row),
+html[data-color-scheme="dark"] .auto-plan-proposal-table tbody tr:not(.saturday-row):not(.sunday-row):not(.holiday-row) {
+  background: color-mix(in oklab, var(--v85-surface-strong) 96%, var(--month-accent) 4%);
+}
+
+html[data-color-scheme="dark"] .plan-table thead,
+html[data-color-scheme="dark"] .auto-plan-proposal-table thead,
+html[data-color-scheme="dark"] .auto-plan-distribution-table thead {
+  background: color-mix(in oklab, var(--v85-surface-muted) 76%, var(--month-accent) 24%);
+}
+
+html[data-color-scheme="dark"] .saturday-row { background: color-mix(in oklab, var(--v85-surface) 82%, var(--month-accent) 18%) !important; }
+html[data-color-scheme="dark"] .sunday-row { background: color-mix(in oklab, var(--v85-surface) 72%, var(--month-accent) 28%) !important; }
+html[data-color-scheme="dark"] .holiday-row { background: color-mix(in oklab, var(--v85-surface) 62%, var(--month-accent) 38%) !important; }
+
+.settings-color-scheme-field { order: -10; }
+
+@supports (content-visibility: auto) {
+  .below-plan,
+  .stats-grid,
+  .auto-plan-result .auto-plan-panel,
+  .auto-plan-result .auto-plan-red-review {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 360px;
+  }
+}
+
+.sheet-panel,
+.stats-grid > *,
+.auto-plan-card { contain: layout paint style; }
+.toolbar,
+.toolbar-overflow-panel { contain: none; }
+
+::view-transition-old(root),
+::view-transition-new(root) { animation-duration: .34s; animation-timing-function: cubic-bezier(.2,.8,.2,1); }
+::view-transition-old(root) { animation-name: v85-theme-out; }
+::view-transition-new(root) { animation-name: v85-theme-in; }
+@keyframes v85-theme-out { to { opacity: 0; filter: saturate(.82) brightness(.92); } }
+@keyframes v85-theme-in { from { opacity: 0; filter: saturate(1.12) brightness(1.05); } }
+
+@media (max-width: 760px) {
+  .toolbar .tool-action--theme .tool-label { position: absolute; inline-size: 1px; block-size: 1px; overflow: hidden; clip-path: inset(50%); }
+  .toolbar .tool-action--theme { inline-size: 38px; padding-inline: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root),
+  .app-rich-tooltip { animation: none !important; }
+  .toolbar .tool-action,
+  .toolbar .file-btn.tool-action { transition: none; }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .topbar.glass-panel,
+  .toolbar.glass-panel,
+  .app-dialog .dialog-card { backdrop-filter: none !important; }
+}

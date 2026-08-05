@@ -1,0 +1,221 @@
+/** Auto-Plan Studio v7.5 – truthful constraint observatory. */
+
+.auto-plan-dialog[data-algorithm-revision="7.5"] {
+  width: min(1400px, calc(100vw - 1.25rem));
+  height: min(950px, calc(100dvh - 1.25rem));
+  max-height: calc(100dvh - 1.25rem);
+  --ap-v75-accent: color-mix(in srgb, var(--month-accent, var(--ap-accent)) 74%, #76d7f1);
+  --ap-v75-violet: color-mix(in srgb, var(--month-accent, var(--ap-accent)) 58%, #8068d8);
+}
+
+.auto-plan-dialog[data-algorithm-revision="7.5"] .auto-plan-shell {
+  border-color: color-mix(in srgb, var(--ap-v75-accent) 34%, rgba(255, 255, 255, .88));
+  background:
+    radial-gradient(circle at 8% -12%, color-mix(in srgb, var(--ap-v75-accent) 14%, transparent), transparent 31%),
+    radial-gradient(circle at 96% 104%, color-mix(in srgb, var(--ap-v75-violet) 9%, transparent), transparent 29%),
+    linear-gradient(145deg, color-mix(in srgb, var(--month-accent) 3%, #fff), color-mix(in srgb, var(--month-accent) 9%, #f7f9fc));
+}
+
+.auto-plan-v7-5-ribbon {
+  border-color: color-mix(in srgb, var(--ap-v75-accent) 48%, var(--ap-line));
+  background:
+    linear-gradient(108deg, color-mix(in srgb, var(--ap-v75-accent) 15%, var(--ap-panel)), color-mix(in srgb, var(--ap-v75-violet) 7%, var(--ap-panel)) 56%, color-mix(in srgb, var(--green) 5%, var(--ap-panel)));
+}
+
+.auto-plan-v7-5-ribbon::before {
+  content: "";
+  position: absolute;
+  inset: auto 16px 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--ap-v75-accent), var(--ap-v75-violet), transparent);
+  opacity: .72;
+}
+
+.auto-plan-dialog[data-algorithm-revision="7.5"] .auto-plan-stage {
+  min-height: 500px;
+  grid-template-columns: minmax(390px, .94fr) minmax(490px, 1.06fr);
+}
+
+.auto-plan-dialog[data-algorithm-revision="7.5"] .auto-plan-visual {
+  isolation: isolate;
+  min-height: 500px;
+  border-color: color-mix(in srgb, var(--ap-v75-accent) 27%, var(--ap-hairline));
+  background:
+    linear-gradient(rgba(255, 255, 255, .79), rgba(249, 251, 254, .89)),
+    radial-gradient(circle at 50% 44%, color-mix(in srgb, var(--ap-v75-accent) 22%, #fff), #fff 61%);
+  box-shadow:
+    inset 0 1px rgba(255, 255, 255, .96),
+    inset 0 0 70px color-mix(in srgb, var(--ap-v75-accent) 6%, transparent),
+    0 18px 52px rgba(15, 28, 43, .09);
+}
+
+.auto-plan-dialog[data-algorithm-revision="7.5"] .auto-plan-visual::before,
+.auto-plan-dialog[data-algorithm-revision="7.5"] .auto-plan-visual::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: 50%;
+}
+
+.auto-plan-dialog[data-algorithm-revision="7.5"] .auto-plan-visual::before {
+  inset: 12% 14%;
+  background: conic-gradient(
+    from .12turn,
+    transparent 0 9%,
+    color-mix(in srgb, var(--ap-v75-accent) 23%, transparent) 13%,
+    transparent 18% 42%,
+    color-mix(in srgb, var(--ap-v75-violet) 18%, transparent) 47%,
+    transparent 53% 76%,
+    color-mix(in srgb, var(--green) 15%, transparent) 81%,
+    transparent 88% 100%);
+  filter: blur(17px);
+  opacity: .62;
+}
+
+.auto-plan-dialog[data-algorithm-revision="7.5"] .auto-plan-visual::after {
+  inset: 25%;
+  border: 1px solid color-mix(in srgb, var(--ap-v75-accent) 26%, transparent);
+  box-shadow:
+    0 0 0 22px color-mix(in srgb, var(--ap-v75-accent) 3%, transparent),
+    0 0 44px color-mix(in srgb, var(--ap-v75-accent) 13%, transparent),
+    inset 0 0 38px color-mix(in srgb, var(--ap-v75-violet) 8%, transparent);
+}
+
+.auto-plan-dialog.is-running[data-algorithm-revision="7.5"]:not([data-progress-stage="complete"]):has(#autoPlanCanvas[data-render-mode="full"]) .auto-plan-visual::before {
+  animation: auto-plan-v75-field-rotate 18s linear infinite;
+}
+
+.auto-plan-dialog.is-running[data-algorithm-revision="7.5"]:not([data-progress-stage="complete"]):has(#autoPlanCanvas[data-render-mode="balanced"]) .auto-plan-visual::before {
+  animation: auto-plan-v75-field-rotate 26s linear infinite;
+}
+
+.auto-plan-dialog.is-running[data-algorithm-revision="7.5"]:not([data-progress-stage="complete"]):has(#autoPlanCanvas[data-render-mode="constrained"]) .auto-plan-visual::before {
+  animation: auto-plan-v75-field-rotate 38s linear infinite;
+}
+
+.auto-plan-dialog[data-algorithm-revision="7.5"] #autoPlanCanvas { z-index: 1; }
+
+.auto-plan-dialog[data-algorithm-revision="7.5"] .auto-plan-core {
+  z-index: 3;
+  width: 112px;
+  min-height: 112px;
+  place-content: center;
+  border: 1px solid color-mix(in srgb, var(--ap-v75-accent) 28%, transparent);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ap-v75-accent) 5%, rgba(255, 255, 255, .82));
+  box-shadow:
+    0 0 0 8px color-mix(in srgb, var(--ap-v75-accent) 4%, transparent),
+    0 15px 38px rgba(15, 28, 43, .11),
+    inset 0 1px rgba(255, 255, 255, .96);
+  backdrop-filter: blur(10px) saturate(1.08);
+}
+
+.auto-plan-dialog[data-algorithm-revision="7.5"] .auto-plan-core strong {
+  font-size: 3rem;
+  background: linear-gradient(135deg, var(--ap-ink), var(--ap-v75-violet));
+  background-clip: text;
+  color: transparent;
+}
+
+.auto-plan-truth-strip {
+  position: absolute;
+  z-index: 4;
+  inset: 48px 11px auto;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  pointer-events: none;
+}
+
+.auto-plan-truth-strip > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  padding: 7px 8px;
+  border: 1px solid color-mix(in srgb, var(--ap-v75-accent) 18%, rgba(151, 163, 176, .34));
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .72);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 6px 20px rgba(15, 28, 43, .05);
+}
+
+.auto-plan-truth-strip span {
+  color: var(--muted);
+  font-size: .49rem;
+  font-weight: 760;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+
+.auto-plan-truth-strip strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--ap-ink);
+  font-size: .61rem;
+  line-height: 1.3;
+}
+
+.auto-plan-dialog[data-algorithm-revision="7.5"] .auto-plan-phase-narrative {
+  border-color: color-mix(in srgb, var(--ap-v75-accent) 27%, rgba(151, 163, 176, .38));
+  background: color-mix(in srgb, var(--ap-v75-accent) 4%, rgba(255, 255, 255, .86));
+}
+
+.auto-plan-dialog[data-algorithm-revision="7.5"] .auto-plan-console {
+  border-color: color-mix(in srgb, var(--ap-v75-violet) 16%, var(--ap-hairline));
+  box-shadow: inset 0 1px rgba(255, 255, 255, .95), 0 18px 52px rgba(15, 28, 43, .07);
+}
+
+.auto-plan-dialog[data-algorithm-revision="7.5"] .auto-plan-phase[data-state="active"] {
+  border-color: color-mix(in srgb, var(--ap-v75-accent) 38%, var(--ap-hairline));
+  background: color-mix(in srgb, var(--ap-v75-accent) 8%, #fff);
+}
+
+.auto-plan-dialog[data-algorithm-revision="7.5"] .auto-plan-log-entry.is-work:nth-last-child(-n+2) {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--ap-v75-accent) 5%, transparent), transparent);
+}
+
+@keyframes auto-plan-v75-field-rotate { to { transform: rotate(1turn); } }
+
+@media (max-width: 1100px) {
+  .auto-plan-dialog[data-algorithm-revision="7.5"] .auto-plan-stage { grid-template-columns: 1fr; }
+  .auto-plan-dialog[data-algorithm-revision="7.5"] .auto-plan-visual { min-height: 460px; }
+}
+
+@media (max-width: 760px) {
+  .auto-plan-dialog[data-algorithm-revision="7.5"] {
+    width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0;
+  }
+  .auto-plan-dialog[data-algorithm-revision="7.5"] .auto-plan-shell { border-radius: 0; border-inline: 0; }
+  .auto-plan-dialog[data-algorithm-revision="7.5"] .auto-plan-visual { min-height: 410px; }
+  .auto-plan-truth-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .auto-plan-truth-strip > div:last-child { grid-column: 1 / -1; }
+}
+
+@media (max-width: 520px) {
+  .auto-plan-dialog[data-algorithm-revision="7.5"] .auto-plan-visual { min-height: 370px; }
+  .auto-plan-truth-strip { inset-inline: 8px; }
+  .auto-plan-truth-strip > div { padding: 6px; }
+  .auto-plan-dialog[data-algorithm-revision="7.5"] .auto-plan-core { width: 98px; min-height: 98px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auto-plan-dialog.is-running[data-algorithm-revision="7.5"] .auto-plan-visual::before { animation: none; }
+}
+
+html.reduce-motion .auto-plan-dialog.is-running[data-algorithm-revision="7.5"] .auto-plan-visual::before { animation: none; }
+
+@media (forced-colors: active) {
+  .auto-plan-truth-strip > div,
+  .auto-plan-dialog[data-algorithm-revision="7.5"] .auto-plan-core,
+  .auto-plan-v7-5-ribbon {
+    color: CanvasText;
+    background: Canvas;
+    border-color: CanvasText;
+    forced-color-adjust: auto;
+  }
+  .auto-plan-dialog[data-algorithm-revision="7.5"] .auto-plan-core strong { color: CanvasText; background: none; }
+}

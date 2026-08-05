@@ -1,0 +1,350 @@
+/**
+ * DienstplanRAD v9 – globale Oberflächenkohärenz.
+ *
+ * Diese Datei wird von der Command-Bar-Schicht immer geladen und stellt drei
+ * Dinge sicher:
+ *
+ * 1. **Dunkelmodus-Kohärenz über alle Teile der Anwendung.** Die Legacy-Token
+ *    (--text, --muted, --panel, --surface, --border, --month-ink) werden im
+ *    Dunkelmodus auf die v8.5-Token abgebildet, damit Tabellen, Picker,
+ *    Dialoge, Einstellungen, Badges und Formulare dieselbe dunkle Fläche mit
+ *    lesbaren hellen Texten verwenden – statt einzelner heller Inseln.
+ * 2. **Theme-Umschalter als reines Piktogramm.** Der Schalter trägt nur das
+ *    Sonnen- bzw. Mondzeichen; eine Beschriftung wird unabhängig von der
+ *    Dichtestufe niemals eingeblendet.
+ * 3. **Ruhige, eindrucksvolle Animationen.** Die Suchstrahl-Glanzwelle, der
+ *    Phasenpuls und die Logzeilen laufen langsamer und weicher; bei
+ *    Systemvorgabe „Bewegung reduzieren“ werden sie vollständig angehalten.
+ */
+
+/* ------------------------------------------------- Theme-Umschalter (icon-only) */
+
+.toolbar .tool-action--theme .tool-label,
+.toolbar .tool-action--theme .tool-action__label {
+  display: none !important;
+}
+.toolbar .tool-action--theme {
+  min-inline-size: 38px;
+  inline-size: 38px;
+  padding-inline: 0;
+}
+
+/* ------------------------------------------------- Dunkelmodus: Token-Kohärenz */
+
+html[data-color-scheme="dark"] {
+  --text: var(--v85-text);
+  --muted: var(--v85-muted);
+  --panel: color-mix(in oklab, var(--v85-surface) 90%, black 10%);
+  --surface: color-mix(in oklab, var(--v85-surface-strong) 94%, black 6%);
+  --border: var(--v85-border);
+  --month-ink: var(--v85-text);
+  --ksg-text-black: var(--v85-text);
+  --ksg-secondary-text: var(--v85-muted);
+  --green: #6fd49a;
+  --yellow: #f0c75e;
+  --orange: #ffab6b;
+  --red: #ff9292;
+}
+
+/* Formularelemente überall auf dunkle Flächen heben. */
+html[data-color-scheme="dark"] select,
+html[data-color-scheme="dark"] input[type="number"],
+html[data-color-scheme="dark"] input[type="text"],
+html[data-color-scheme="dark"] input[type="search"],
+html[data-color-scheme="dark"] input[type="date"],
+html[data-color-scheme="dark"] textarea {
+  background: var(--v85-surface-strong);
+  color: var(--v85-text);
+  border-color: color-mix(in oklab, var(--v85-border) 72%, transparent);
+}
+html[data-color-scheme="dark"] select option { background: var(--v85-surface-strong); color: var(--v85-text); }
+
+/* Monatsauswahl, Status, Legenden. */
+html[data-color-scheme="dark"] .month-selector select { background: var(--v85-surface); color: var(--v85-text); }
+html[data-color-scheme="dark"] .status-wrap { color: var(--v85-muted); }
+html[data-color-scheme="dark"] .subline,
+html[data-color-scheme="dark"] .calendar-legend,
+html[data-color-scheme="dark"] .rule-legend,
+html[data-color-scheme="dark"] .section-note { color: var(--v85-muted); }
+
+/* Die Monatsplakette trug einen weißen Verlauf mit `--month-accent-strong` als
+   Schrift. Auf dunkler Fläche blieb der Verlauf hell, der kräftige Akzentton
+   ist aber dunkel: rund 1,8:1 am unteren Rand der Plakette.
+
+   Alle Flächenkorrekturen an gedruckten Bauteilen stehen in `@media screen`.
+   Sie sind spezifischer als der Druckblock am Ende von styles.css und würden
+   sonst dunkle Flächen auf das Papier bringen. */
+@media screen {
+  html[data-color-scheme="dark"] .month-palette-label {
+    color: color-mix(in oklab, var(--month-accent) 62%, white 38%);
+    background: color-mix(in oklab, var(--v85-surface-strong) 82%, var(--month-accent) 18%);
+    border-color: color-mix(in oklab, var(--v85-border) 60%, transparent);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06), 0 5px 14px rgba(0, 0, 0, .3);
+  }
+}
+
+/* Monatstabelle: Zellen, klebende Kopfzeile und Datumsfelder.
+ *
+ * Die Grundregeln in styles.css legen auf JEDE Zelle eine helle Fläche
+ * (`.plan-table th, .plan-table td { background: rgba(255,255,255,.78) }`, die
+ * Wochenendzeilen zusätzlich `var(--saturday-row-bg)` und die Kopfzeile einen
+ * weißen Verlauf). Zellflächen liegen über der Zeilenfläche, die dunklen
+ * Zeilenregeln aus app-v8-5.css kamen dadurch nie zum Vorschein: Im
+ * Dunkelmodus stand heller Text (`--v85-text`) auf nahezu weißem Grund, also
+ * rund 1,1:1. Die Zellen geben ihre Fläche deshalb frei.
+ *
+ * Die Kopfzeile bleibt ausdrücklich deckend: Sie klebt (`position: sticky`),
+ * eine durchsichtige Fläche ließe die Zeilen unter ihr hindurchlaufen. */
+@media screen {
+  html[data-color-scheme="dark"] .plan-table td,
+  html[data-color-scheme="dark"] .plan-table tr.saturday-row td,
+  html[data-color-scheme="dark"] .plan-table tr.sunday-row td,
+  html[data-color-scheme="dark"] .plan-table tr.holiday-row td {
+    background-color: transparent;
+  }
+  html[data-color-scheme="dark"] .plan-table th {
+    background: color-mix(in oklab, var(--v85-surface-muted) 74%, var(--month-accent) 26%);
+    color: var(--v85-text);
+    box-shadow:
+      inset 0 1px 0 color-mix(in oklab, white 12%, transparent),
+      inset 0 -2px 0 color-mix(in oklab, var(--month-accent) 60%, transparent);
+  }
+  html[data-color-scheme="dark"] .plan-table-wrap {
+    background: color-mix(in oklab, var(--v85-surface-strong) 94%, var(--month-accent) 6%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06), 0 4px 14px rgba(0, 0, 0, .32);
+  }
+  /* Datums- und Wochentagsspalte behalten ihre eigene Tönung. Die Zeilenklassen
+     der hellen Regeln zwingen hier zur gleichen Spezifität (`tr`). */
+  html[data-color-scheme="dark"] .plan-table tr td.date-cell {
+    background-color: color-mix(in oklab, var(--v85-surface-strong) 92%, var(--month-accent) 8%);
+    color: var(--v85-text);
+  }
+  html[data-color-scheme="dark"] .plan-table tr td.weekday-cell {
+    background-color: color-mix(in oklab, var(--v85-surface) 86%, var(--month-accent) 14%);
+    color: var(--v85-text);
+  }
+  /* Die Markierungsbalken der Feiertagszeile standen auf `--month-ink`. Der
+     Farbdirektor schreibt dort auch im Dunkelmodus eine dunkle Tinte als
+     Inline-Wert; auf dunkler Fläche war der Balken damit unsichtbar. Die
+     Abwahl der Wochenendhervorhebung behält ihren Vorrang (`:not`). */
+  html[data-color-scheme="dark"]:not([data-weekend-emphasis="false"]) .plan-table tr.holiday-row td.date-cell { box-shadow: inset 5px 0 0 var(--month-accent); }
+  html[data-color-scheme="dark"] .plan-table tr.holiday-row td.weekday-cell { box-shadow: inset 3px 0 0 var(--month-accent); }
+  html[data-color-scheme="dark"] .plan-table tbody tr:hover td {
+    /* Die Zellflächen sind im Dunkelmodus durchsichtig; ein `filter` auf der
+       Zelle hellte deshalb nur noch die Schrift auf. Die Rückmeldung kommt
+       jetzt als leichte Aufhellung der Zeilenfläche. */
+    background-color: rgba(255, 255, 255, .07);
+    filter: none;
+  }
+}
+/* Tastaturfokus in der Tabelle: styles.css hellt die Fläche auf
+   `rgba(255,255,255,.78)` auf – der fokussierte Eintrag war im Dunkelmodus
+   genau dann unlesbar, wenn er gerade bedient wird. */
+html[data-color-scheme="dark"] .assignment-btn:focus-visible,
+html[data-color-scheme="dark"] .cell-summary-button:focus-visible,
+html[data-color-scheme="dark"] .rbn-input:focus-visible {
+  background: color-mix(in oklab, var(--v85-surface-muted) 78%, var(--month-accent) 22%);
+  color: var(--v85-text);
+}
+html[data-color-scheme="dark"] .assignment-btn:hover,
+html[data-color-scheme="dark"] .cell-summary-button:hover {
+  background: rgba(255, 255, 255, .08);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .16);
+}
+html[data-color-scheme="dark"] .cell-summary-button { color: var(--v85-text); }
+html[data-color-scheme="dark"] .rbn-input { color: var(--v85-text); }
+html[data-color-scheme="dark"] .rbn-input:focus { background: var(--v85-surface-strong); }
+html[data-color-scheme="dark"] .rbn2-inactive-note { color: var(--v85-muted); }
+
+/* Badges und Chips: dunkle Tönungen mit hellen Texten. */
+html[data-color-scheme="dark"] .small-chip {
+  color: var(--v85-text);
+  border-color: color-mix(in oklab, var(--v85-border) 65%, transparent);
+  background: color-mix(in oklab, var(--v85-surface) 88%, white 12%);
+  box-shadow: none;
+}
+html[data-color-scheme="dark"] .small-chip.green { color: #8fe6b1; border-color: color-mix(in srgb, #6fd49a 55%, transparent); background: color-mix(in srgb, #1d3a2a 78%, transparent); }
+html[data-color-scheme="dark"] .small-chip.yellow { color: #ffd97a; border-color: color-mix(in srgb, #f0c75e 55%, transparent); background: color-mix(in srgb, #3d3312 78%, transparent); }
+html[data-color-scheme="dark"] .small-chip.orange { color: #ffb97e; border-color: color-mix(in srgb, #ffab6b 55%, transparent); background: color-mix(in srgb, #3d2410 78%, transparent); }
+html[data-color-scheme="dark"] .small-chip.red { color: #ffa4a4; border-color: color-mix(in srgb, #ff9292 55%, transparent); background: color-mix(in srgb, #3d1416 78%, transparent); }
+html[data-color-scheme="dark"] .small-chip.gray { color: #c6cfd8; border-color: color-mix(in srgb, #8fa0ae 55%, transparent); background: color-mix(in srgb, #232c35 78%, transparent); }
+
+/* Zusammenfassungs-Einträge und Abwesenheiten. */
+html[data-color-scheme="dark"] .summary-entry {
+  background: color-mix(in oklab, var(--v85-surface) 86%, white 14%);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--v85-border) 45%, transparent);
+}
+html[data-color-scheme="dark"] .absence-summary-detail { color: var(--v85-muted); }
+
+/* Verteilungs-/Statistiktabellen. */
+html[data-color-scheme="dark"] .distribution-table th,
+html[data-color-scheme="dark"] .distribution-table td {
+  background: color-mix(in oklab, var(--v85-surface) 92%, var(--month-accent) 8%);
+  border-color: color-mix(in oklab, var(--v85-border) 55%, transparent);
+}
+html[data-color-scheme="dark"] .distribution-table th {
+  background: linear-gradient(180deg, color-mix(in oklab, var(--v85-surface-muted) 90%, white 10%), color-mix(in oklab, var(--v85-surface) 85%, var(--month-accent) 15%));
+}
+html[data-color-scheme="dark"] .distribution-table .open-row,
+html[data-color-scheme="dark"] .distribution-table .open-row td { background: color-mix(in srgb, #7c2c33 55%, var(--v85-surface-strong)); }
+html[data-color-scheme="dark"] .excel-stats { color: var(--v85-text); }
+@media screen {
+  html[data-color-scheme="dark"] .excel-stats { background: color-mix(in oklab, var(--v85-surface-strong) 94%, var(--month-accent) 6%); }
+}
+
+/* Offene Punkte: Die Karten behielten `rgba(255,255,255,.72)`, während
+   `.issue-text strong` auf `--text` (im Dunkelmodus fast weiß) steht – die
+   Sammelprüfung des Monats war dadurch praktisch unlesbar (rund 1,1:1).
+   Die farbigen Kantenbalken bleiben unangetastet, deshalb wird hier nur die
+   Fläche und nicht `border-color` gesetzt. */
+html[data-color-scheme="dark"] .issue-item {
+  background: color-mix(in oklab, var(--v85-surface) 90%, var(--month-accent) 10%);
+  border-top-color: color-mix(in oklab, var(--v85-border) 45%, transparent);
+  border-right-color: color-mix(in oklab, var(--v85-border) 45%, transparent);
+  border-bottom-color: color-mix(in oklab, var(--v85-border) 45%, transparent);
+}
+html[data-color-scheme="dark"] .issue-item.red { background: color-mix(in oklab, var(--v85-surface-strong) 76%, #b3323c 24%); }
+html[data-color-scheme="dark"] .issue-item.orange { background: color-mix(in oklab, var(--v85-surface-strong) 78%, #b3702a 22%); }
+
+/* Picker und Tages-Detailmodals. */
+html[data-color-scheme="dark"] .picker-item { background: color-mix(in oklab, var(--v85-surface) 90%, var(--month-accent) 10%); color: var(--v85-text); }
+html[data-color-scheme="dark"] .picker-item:hover:not(:disabled) { background: color-mix(in oklab, var(--v85-surface-muted) 80%, var(--month-accent) 20%); }
+html[data-color-scheme="dark"] .picker-item.is-active:not(:disabled) { background: color-mix(in oklab, var(--month-accent) 24%, var(--v85-surface-strong)); }
+html[data-color-scheme="dark"] .picker-search input { background: var(--v85-surface-strong); color: var(--v85-text); }
+html[data-color-scheme="dark"] .picker-detail-reason { background: var(--v85-surface); border-color: color-mix(in oklab, var(--v85-border) 60%, transparent); }
+html[data-color-scheme="dark"] .picker-load.is-exceeded { background: color-mix(in srgb, #6b2326 55%, var(--v85-surface-strong)); color: #ffb3b3; }
+html[data-color-scheme="dark"] .picker-function,
+html[data-color-scheme="dark"] .picker-current,
+html[data-color-scheme="dark"] .picker-note,
+html[data-color-scheme="dark"] .picker-keys { color: var(--v85-muted); }
+html[data-color-scheme="dark"] .picker-current strong { color: var(--v85-text); }
+
+/* Der Picker behielt mehrere helle Restflächen aus styles.css. Sie trugen im
+   Dunkelmodus durchweg helle Schrift (`--muted`, `--text`, `--green`, `--red`)
+   und lagen damit zwischen 1,1:1 und 1,4:1.
+   Der Gruppenkopf klebt zusätzlich (`position: sticky`) und lief zum unteren
+   Rand hin in Durchsichtigkeit aus – die Einträge schoben sich sichtbar unter
+   die Beschriftung. Er bekommt deshalb eine deckende Fläche. */
+html[data-color-scheme="dark"] .picker-group-label {
+  color: var(--v85-muted);
+  background: color-mix(in oklab, var(--v85-surface-strong) 88%, var(--month-accent) 12%);
+}
+html[data-color-scheme="dark"] .picker-group--recommended .picker-group-label { color: var(--green); }
+html[data-color-scheme="dark"] .picker-group--confirm .picker-group-label { color: var(--red); }
+html[data-color-scheme="dark"] .picker-group-count,
+html[data-color-scheme="dark"] .picker-load,
+html[data-color-scheme="dark"] .picker-item .reason-more {
+  color: var(--v85-muted);
+  background: color-mix(in oklab, var(--v85-surface-muted) 86%, var(--month-accent) 14%);
+  border-color: color-mix(in oklab, var(--v85-border) 55%, transparent);
+}
+html[data-color-scheme="dark"] .picker-detail {
+  color: var(--v85-muted);
+  background: color-mix(in oklab, var(--v85-surface) 88%, var(--month-accent) 12%);
+  border-color: color-mix(in oklab, var(--v85-border) 50%, transparent);
+}
+html[data-color-scheme="dark"] .picker-detail-name { color: var(--v85-text); }
+html[data-color-scheme="dark"] .picker-footer {
+  background: color-mix(in oklab, var(--v85-surface-strong) 92%, var(--month-accent) 8%);
+  border-top-color: color-mix(in oklab, var(--v85-border) 50%, transparent);
+}
+html[data-color-scheme="dark"] .picker-keys kbd {
+  color: var(--v85-text);
+  background: color-mix(in oklab, var(--v85-surface-muted) 84%, white 16%);
+  border-color: color-mix(in oklab, var(--v85-border) 60%, transparent);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, .45);
+}
+/* Die Schaltflächen der Fußleiste bleiben hell (dafür gibt es bewusst keine
+   dunkle Grundregel für `button`). Der Dunkelmodus-Rotton `#ff9292` erreichte
+   darauf nur 2,2:1; die dunklere Marken-Textvariante bleibt bei 6,9:1. */
+html[data-color-scheme="dark"] .picker-footer .danger-ghost { color: var(--ksg-red-ink); }
+
+html[data-color-scheme="dark"] .day-meta-row {
+  background: color-mix(in oklab, var(--v85-surface) 88%, var(--month-accent) 12%);
+  border-color: color-mix(in oklab, var(--v85-border) 55%, transparent);
+  box-shadow: none;
+}
+html[data-color-scheme="dark"] .meta-chip { background: var(--v85-surface); border-color: color-mix(in oklab, var(--v85-border) 60%, transparent); color: var(--v85-muted); }
+html[data-color-scheme="dark"] .meta-chip.active { color: var(--v85-text); border-color: var(--month-accent); background: color-mix(in oklab, var(--month-accent) 22%, var(--v85-surface-strong)); }
+html[data-color-scheme="dark"] .batch-day {
+  background: color-mix(in oklab, var(--v85-surface) 88%, var(--month-accent) 12%);
+  border-color: color-mix(in oklab, var(--v85-border) 55%, transparent);
+}
+html[data-color-scheme="dark"] .batch-day.selected {
+  background: color-mix(in oklab, var(--month-accent) 22%, var(--v85-surface-strong));
+  border-color: var(--month-accent-strong);
+}
+/* Wochenend- und Feiertagsflächen der Mehrtagesauswahl stammen aus den hellen
+   Monatsvariablen (`--saturday-row-bg` …). Der Farbdirektor schreibt sie als
+   Inline-Wert mit `!important` an <html>; eine Umdefinition der Variablen im
+   Dunkelmodus bliebe deshalb wirkungslos, die Fläche muss direkt gesetzt
+   werden. Zuvor stand heller Text auf nahezu weißem Grund.
+   Die Reihenfolge folgt styles.css: Der Wochentagsgrund steht nach `.selected`
+   und behält damit wie im Hellmodus den Vorrang. */
+html[data-color-scheme="dark"] .batch-day.saturday { background: color-mix(in oklab, var(--v85-surface) 82%, var(--month-accent) 18%); }
+html[data-color-scheme="dark"] .batch-day.sunday { background: color-mix(in oklab, var(--v85-surface) 72%, var(--month-accent) 28%); }
+html[data-color-scheme="dark"] .batch-day.holiday { background: color-mix(in oklab, var(--v85-surface) 62%, var(--month-accent) 38%); }
+/* `--month-accent-strong` ist der dunkle Akzent; auf dunkler Fläche blieb der
+   Feiertagsname darunter. Das `!important` der Grundregel erzwingt hier eines. */
+html[data-color-scheme="dark"] .batch-holiday-name { color: color-mix(in oklab, var(--month-accent) 58%, white 42%) !important; }
+
+/* Command-Bar-Aktionen und Überlaufmenü. */
+html[data-color-scheme="dark"] .toolbar .tool-action,
+html[data-color-scheme="dark"] .toolbar-overflow-panel .tool-action,
+html[data-color-scheme="dark"] .toolbar .file-btn.tool-action,
+html[data-color-scheme="dark"] .toolbar-overflow-panel .file-btn.tool-action {
+  color: var(--v85-text);
+  background: linear-gradient(180deg, color-mix(in oklab, var(--v85-surface-strong) 88%, white 12%), color-mix(in oklab, var(--v85-surface) 90%, var(--month-accent) 10%));
+  border-color: color-mix(in oklab, var(--v85-border) 60%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05), 0 1px 2px rgba(0, 0, 0, .35);
+}
+html[data-color-scheme="dark"] .toolbar .tool-action:hover,
+html[data-color-scheme="dark"] .toolbar-overflow-panel .tool-action:hover { background: color-mix(in oklab, var(--v85-surface-muted) 82%, var(--month-accent) 18%); }
+html[data-color-scheme="dark"] .toolbar .tool-action--quiet { color: var(--v85-muted); }
+html[data-color-scheme="dark"] .toolbar-section-label { color: var(--v85-muted); }
+
+/* Einstellungsdialog: Flächen auf die dunkle Palette. */
+html[data-color-scheme="dark"] .settings-section {
+  background: color-mix(in oklab, var(--v85-surface) 88%, var(--month-accent) 12%);
+  border-color: color-mix(in oklab, var(--v85-border) 55%, transparent);
+  box-shadow: none;
+}
+html[data-color-scheme="dark"] .settings-section--accent {
+  background: linear-gradient(145deg, color-mix(in oklab, var(--month-accent) 14%, var(--v85-surface)), color-mix(in oklab, var(--v85-surface) 92%, var(--month-accent) 8%));
+}
+html[data-color-scheme="dark"] .settings-grid > label {
+  background: color-mix(in oklab, var(--v85-surface-strong) 88%, var(--month-accent) 12%);
+  border: 1px solid color-mix(in oklab, var(--v85-border) 45%, transparent);
+}
+html[data-color-scheme="dark"] .settings-section-heading p,
+html[data-color-scheme="dark"] .settings-grid label small,
+html[data-color-scheme="dark"] .settings-number b,
+html[data-color-scheme="dark"] .settings-header p { color: var(--v85-muted); }
+html[data-color-scheme="dark"] .settings-status { color: #ffd08a; }
+
+/* --------------- Ruhige, eindrucksvolle Animationen --------------- */
+
+.auto-plan-v85-wave::after {
+  animation-duration: 2.6s;
+}
+.auto-plan-phase[data-state="active"] {
+  animation-duration: 2.4s;
+}
+.auto-plan-log-entry {
+  animation-duration: .5s;
+}
+.auto-plan-v85-theatre li {
+  transition-duration: .32s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auto-plan-v85-wave::after,
+  .auto-plan-phase[data-state="active"],
+  .auto-plan-log-entry,
+  .auto-plan-v85-theatre li,
+  .auto-plan-v85-ribbon:after,
+  .auto-plan-v85-constellation i {
+    animation: none !important;
+    transition: none !important;
+  }
+}
