@@ -170,7 +170,7 @@ test('der exakte v9.5-Pfad lädt CP-SAT tatsächlich im Modul-Worker', async ({ 
   expect(result.cpSatUsed).toBe(true);
   expect(result.loadedFrom).toMatchObject({
     id: 'or-tools-wasm',
-    source: 'cdn',
+    source: 'local',
     version: '0.9.1'
   });
   expect(result.status).toBe('FEASIBLE');
