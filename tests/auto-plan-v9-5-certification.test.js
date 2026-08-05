@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-const { reconcileV95Certification } = await import('../js/auto-plan-certification-v9-5.js');
+const { reconcileV95Certification } = await import('../js/auto-plan-certification-v9-5.mjs');
 
 function result({ source = 'cp-sat-v9.5', proven = true, red = 0, complete = true, trace = null } = {}) {
   const certification = {
