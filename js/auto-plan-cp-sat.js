@@ -229,42 +229,58 @@ function normalizeSolverApi(module, id) {
         }
       };
     }
-    if (module?.CpModel && module?.CpSolver?.create) {
-      return {
-        id,
-        createModel() { return new module.CpModel(); },
-        newIntVar(model, lb, ub, name) { return model.newIntVar(lb, ub, name); },
-        addLinear(model, terms, lb, ub) {
-          const expression = terms.reduce((acc, [variable, coefficient]) => {
-            const term = variable.times(coefficient);
-            return acc === null ? term : acc.plus(term);
-          }, null);
-          if (!expression) return null;
-          return model.addLinearConstraint(expression, lb, ub);
-        },
-        minimize(model, terms) {
-          const expression = terms.reduce((acc, [variable, coefficient]) => {
-            const term = variable.times(coefficient);
-            return acc === null ? term : acc.plus(term);
-          }, null);
-          if (expression && typeof model.minimize === 'function') model.minimize(expression);
-        },
-        addHint(model, variable, value) {
-          if (typeof model.addHint === 'function') model.addHint(variable, value);
-        },
-        async solve(model, params) {
-          const solver = await module.CpSolver.create();
-          const result = await solver.solve(model, params);
-          return {
-            status: result.status,
-            statusName: String(result.status || 'UNKNOWN'),
-            objectiveValue: () => Number(result.objectiveValue ?? 0),
-            bestBound: () => (Number.isFinite(Number(result.bestObjectiveBound)) ? Number(result.bestObjectiveBound) : null),
-            value: variable => result.value(variable)
-          };
-        }
-      };
+  if (module?.CpModel && module?.CpSolver?.create) {
+    // cpsat-js liefert einen numerischen CpSolverStatus und erwartet
+    // camelCase-Parameter. Beides muss an die status- und parametergesteuerte
+    // Engine angepasst werden, sonst fällt v9 immer auf die Heuristik zurück.
+    const statusEnum = module.CpSolverStatus || {};
+    const byCode = {};
+    for (const [key, value] of Object.entries(statusEnum)) {
+      if (typeof value === 'number' && typeof key === 'string' && !/^\d+$/.test(key)) byCode[value] = key;
     }
+    const statusNameOf = code => byCode[code] ?? 'UNKNOWN';
+    return {
+      id,
+      createModel() { return new module.CpModel(); },
+      newIntVar(model, lb, ub, name) { return model.newIntVar(lb, ub, name); },
+      addLinear(model, terms, lb, ub) {
+        const expression = terms.reduce((acc, [variable, coefficient]) => {
+          const term = variable.times(coefficient);
+          return acc === null ? term : acc.plus(term);
+        }, null);
+        if (!expression) return null;
+        return model.addLinearConstraint(expression, lb, ub);
+      },
+      minimize(model, terms) {
+        const expression = terms.reduce((acc, [variable, coefficient]) => {
+          const term = variable.times(coefficient);
+          return acc === null ? term : acc.plus(term);
+        }, null);
+        if (expression && typeof model.minimize === 'function') model.minimize(expression);
+      },
+      addHint(model, variable, value) {
+        if (typeof model.addHint === 'function') model.addHint(variable, value);
+      },
+      async solve(model, params) {
+        const solver = await module.CpSolver.create();
+        const adapted = {
+          maxTimeInSeconds: Number(params?.max_time_in_seconds ?? params?.maxTimeInSeconds ?? 10),
+          numWorkers: Number.isInteger(params?.num_search_workers ?? params?.numWorkers)
+            ? (params.num_search_workers ?? params.numWorkers)
+            : undefined
+        };
+        const result = await solver.solve(model, adapted);
+        const statusName = statusNameOf(result.status);
+        return {
+          status: statusName,
+          statusName,
+          objectiveValue: () => Number(result.objectiveValue ?? 0),
+          bestBound: () => (Number.isFinite(Number(result.bestObjectiveBound)) ? Number(result.bestObjectiveBound) : null),
+          value: variable => result.value(variable)
+        };
+      }
+    };
+  }
     return null;
   } catch {
     return null;
