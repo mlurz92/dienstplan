@@ -92,11 +92,15 @@ test('Konstruktor-Bindungen bleiben als zweiter kompatibler API-Pfad verfügbar'
   assert.equal(constructorCalls, 1);
 });
 
-test('Ladereihenfolge ist versionsfixiert und priorisiert das lokale Worker-Asset', () => {
-  assert.equal(loader.V95_SOLVER_LOAD_ORDER[0].source, 'local');
-  assert.equal(loader.V95_SOLVER_LOAD_ORDER[0].url, '/vendor/or-tools-wasm/cp-sat.js');
+test('Ladereihenfolge ist versionsfixiert und nutzt nur kostenlose Solverbindungen', () => {
+  assert.equal(loader.V95_SOLVER_LOAD_ORDER[0].source, 'cdn');
+  assert.equal(loader.V95_SOLVER_LOAD_ORDER[0].url, 'https://cdn.jsdelivr.net/npm/or-tools-wasm@0.9.1/cp-sat/+esm');
   assert.deepEqual(
     loader.V95_SOLVER_LOAD_ORDER.map(candidate => candidate.version),
-    ['0.9.1', '0.9.1', '1.0.0']
+    ['0.9.1', '1.0.0']
+  );
+  assert.deepEqual(
+    loader.V95_SOLVER_LOAD_ORDER.map(candidate => candidate.id),
+    ['or-tools-wasm', 'cpsat-js']
   );
 });
