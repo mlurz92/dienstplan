@@ -1,0 +1,39 @@
+name: Temporary v9.5 bootstrap
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  bootstrap-v95:
+    name: Generate lock and verify v9.5 core
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Generate exact lockfile
+        run: npm install --package-lock-only --ignore-scripts
+      - name: Install exact dependencies
+        run: npm ci
+      - name: Static checks
+        run: npm run check
+      - name: Vendor and type build
+        run: npm run build
+      - name: Focused v9.5 tests
+        run: npm run test:v9.5
+      - name: Upload generated repository files
+        uses: actions/upload-artifact@v7
+        with:
+          name: v95-bootstrap-files
+          path: |
+            package-lock.json
+            vendor/floating-ui
+            vendor/or-tools-wasm
+          retention-days: 1
+          if-no-files-found: error
