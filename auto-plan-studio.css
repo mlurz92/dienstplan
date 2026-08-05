@@ -390,38 +390,44 @@
   background: linear-gradient(180deg, rgba(255, 255, 255, .97), rgba(248, 250, 253, .92));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), 0 1px 2px rgba(9, 14, 20, .06);
 }
-.auto-plan-visual { position: relative; overflow: hidden; }
-#autoPlanCanvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.auto-plan-visual { position: relative; overflow: hidden; display: flex; flex-direction: column; }
+#autoPlanCanvas { flex: 1 1 auto; min-height: 0; min-width: 0; width: 100%; }
 .auto-plan-core {
-  position: absolute;
-  inset: 50% auto auto 50%;
-  transform: translate(-50%, -56%);
-  display: grid;
-  grid-template-columns: auto auto;
-  justify-content: center;
+  order: 1;
+  position: static;
+  transform: none;
+  display: flex;
   align-items: baseline;
-  gap: 1px;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 12px 2px;
   text-align: center;
   pointer-events: none;
 }
 .auto-plan-core strong {
-  font-size: 2.7rem;
-  line-height: .92;
-  letter-spacing: -.03em;
+  font-size: 1.3rem;
+  line-height: 1;
+  letter-spacing: -.02em;
   font-variant-numeric: tabular-nums;
   color: var(--ap-ink);
 }
-.auto-plan-core > span { color: var(--muted); font-size: 1rem; font-weight: 700; }
+.auto-plan-core > span { color: var(--muted); font-size: .85rem; font-weight: 700; }
 .auto-plan-core small {
-  grid-column: 1 / -1;
-  margin-top: 6px;
   color: var(--ap-accent-strong);
   font-size: .62rem;
   font-weight: 750;
   letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
 }
-.auto-plan-orbit-legend { position: absolute; top: 11px; left: 12px; display: grid; gap: 3px; pointer-events: none; }
+.auto-plan-orbit-legend {
+  order: 3;
+  position: static;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 4px 12px 0;
+  pointer-events: none;
+}
 .auto-plan-orbit-label {
   display: flex;
   align-items: center;
@@ -440,10 +446,11 @@
 }
 .auto-plan-orbit-label--hg::before { background: var(--ap-accent); }
 .auto-plan-visual-foot {
-  position: absolute;
-  inset: auto 12px 10px 12px;
+  order: 5;
+  position: static;
   display: flex;
   justify-content: space-between;
+  padding: 2px 12px 6px;
   color: var(--muted);
   font-size: .66rem;
   font-variant-numeric: tabular-nums;
