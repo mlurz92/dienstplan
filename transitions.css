@@ -17,6 +17,22 @@
   view-transition-name: month-sheet;
 }
 
+/*
+ * Der View-Transition-Baum wird vom Browser über der Seite gerendert. Er ist
+ * ausschließlich visuell und darf daher niemals Toolbar, Monatsnavigation oder
+ * Auto-Plan-Aktionen als Pointer-Ziel verdecken. `pointer-events: none` lässt
+ * Maus-/Touch-Ereignisse durch die komplette Snapshot-Hierarchie zur weiterhin
+ * live gerenderten Anwendung passieren. Der Fallback ist bereits ebenso
+ * pointer-transparent.
+ */
+::view-transition,
+::view-transition-group(month-sheet),
+::view-transition-image-pair(month-sheet),
+::view-transition-old(month-sheet),
+::view-transition-new(month-sheet) {
+  pointer-events: none;
+}
+
 ::view-transition-group(month-sheet) {
   animation-duration: var(--month-motion-duration);
   animation-timing-function: var(--month-motion-ease);
@@ -85,6 +101,7 @@ html[data-month-motion-direction="backward"]::view-transition-new(month-sheet) {
 .month-motion-fallback-snapshot {
   contain: layout paint style;
   box-sizing: border-box;
+  pointer-events: none;
 }
 
 html[data-month-motion-state="preloading"] .month-selector {
