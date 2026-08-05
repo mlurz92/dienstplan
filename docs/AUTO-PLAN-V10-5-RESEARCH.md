@@ -190,7 +190,7 @@ Der Gewinn ist nicht Bequemlichkeit, sondern **Ausdrucksmächtigkeit**: Kardinal
 
 1. `L_p = Σ_d y[bd_d][p] + α · Σ_d y[hg_d][p]` — kombinierte Last je Person (α = Gewichtungsfaktor HG gegenüber BD, einstellbar).
 2. Stufe 1: `M ≥ L_p ∀p`, `min M` → obere Belastungsschranke.
-3. Stufe 2: `M` fixieren, Anzahl der Personen mit `L_p = M` minimieren (Indikator `t_p` mit `L_p ≥ M − (1−t_p)·BIG`).
+3. Stufe 2: `M` fixieren, Anzahl der Personen mit `L_p = M` minimieren (Indikator `t_p` mit `L_p ≤ M − 1 + t_p`, in CP-SAT als `add(L_p ≤ M − 1).onlyEnforceIf(¬t_p)` — ohne Big-M).
 4. Weiter absteigend, bis der Vektor eindeutig ist — oder Abbruch nach `k` Stufen (Zeitbudget).
 
 **Alternative Formulierung** über die Summe der `k` größten Lasten (`Σ_{i≤k} L_(i)`), linear darstellbar nach Ogryczak/Śliwiński; für monotone Gewichte ist die OWA-Zielfunktion sogar rein linear. Beide Wege sind exakt; die sortierte Variante ist besser erklärbar, die OWA-Variante schneller.
