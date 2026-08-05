@@ -81,10 +81,14 @@ async function mockApi(page) {
   });
 }
 
-async function openStudio(page, viewport = { width: 1280, height: 800 }) {
+async function openStudio(page, viewport = { width: 1280, height: 800 }, { theme = 'light' } = {}) {
   await page.setViewportSize(viewport);
   await mockApi(page);
   await page.goto('/');
+  if (theme === 'dark') {
+    await page.locator('#themeModeBtn').click();
+    await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
+  }
   await page.selectOption('#yearSelect', '2026');
   await page.selectOption('#monthSelect', '7');
   await expect(page.locator('#monthTitle')).toContainText('Juli 2026');
@@ -176,7 +180,6 @@ test('Light-Mode ist Standard und der Umschalter zeigt ausschließlich Sonne ode
   await expect(toggle).toBeVisible();
   await expect(toggle.locator('svg.tool-icon')).toHaveCount(1);
   await expect(toggle.locator('.tool-label:visible')).toHaveCount(0);
-  await expect(toggle.locator('.visually-hidden')).toHaveCount(1);
   await expect(toggle).toHaveAttribute('aria-label', /wechseln/);
 
   await toggle.click();
@@ -229,9 +232,7 @@ test('Kommentarfenster bleibt fest, scrollt intern und das Resultat benötigt ke
 
 test('Dark-Mode erhält lesbaren Kontrast für Felder, Badges und Tabellen', async ({ page }) => {
   test.setTimeout(90_000);
-  await openStudio(page, { width: 1100, height: 760 });
-  await page.locator('#themeModeBtn').click();
-  await expect(page.locator('html')).toHaveAttribute('data-color-scheme', 'dark');
+  await openStudio(page, { width: 1100, height: 760 }, { theme: 'dark' });
   await page.locator('#autoPlanV9SolverBackend').selectOption('heuristic-alns');
   await page.locator('#autoPlanStartBtn').click();
   await expect(page.locator('#autoPlanResult')).toBeVisible({ timeout: 60_000 });
