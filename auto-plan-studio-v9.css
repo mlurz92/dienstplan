@@ -336,63 +336,36 @@ html[data-color-scheme="dark"] .auto-plan-dialog[data-v9-layout="1"] .auto-plan-
   align-items: start;
   grid-template-columns: minmax(300px, .8fr) minmax(420px, 1.2fr);
 }
-.auto-plan-dialog[data-v9-layout="1"] .auto-plan-visual { min-height: 210px; max-height: 250px; }
+
+/* ---------------------------------------------------- V9 Reinzeichnung
+   Canvas pur – ohne Beschriftung, Label oder Overlay. Alle Informationen
+   stehen im Run-Strip (Console-Kopf) und im Theater. Die alte Phasenliste
+   wird versteckt; das Console-Raster ist auf vier explizite Zeilen begrenzt:
+   Strip · Theater · Log · Live-Metriken. */
+
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-core,
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-truth-strip,
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-orbit-legend,
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-visual-foot,
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-phase-list { display: none; }
+
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-visual { min-height: 210px; max-height: 320px; }
+.auto-plan-dialog[data-v9-layout="1"] #autoPlanCanvas { flex: 1 1 100%; min-height: 0; }
+
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-console {
   min-width: 0;
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
   align-content: start;
   min-height: 0;
 }
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-log {
   flex: 0 0 auto;
-  height: 210px;
+  height: 190px;
 }
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-log-stream {
   flex: 1 1 auto;
   min-height: 0;
   height: auto;
   overflow-y: auto;
-}
-}
-
-/* Wahrheitsleiste: Im Flex-Umbau als kompakte Badge-Reihe über dem Canvas,
-   nicht mehr als absolute Überlagerung. */
-.auto-plan-dialog[data-v9-layout="1"] .auto-plan-truth-strip {
-  order: 2;
-  position: static;
-  inset: auto;
-  z-index: auto;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 4px 12px 0;
-  pointer-events: none;
-}
-.auto-plan-dialog[data-v9-layout="1"] .auto-plan-truth-strip > div {
-  display: flex;
-  align-items: baseline;
-  gap: 4px;
-  padding: 4px 8px;
-  border: 1px solid var(--ap-hairline);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, .72);
-  font-size: .62rem;
-}
-.auto-plan-dialog[data-v9-layout="1"] .auto-plan-truth-strip span {
-  color: var(--muted);
-  font-size: .52rem;
-  font-weight: 700;
-  letter-spacing: var(--tracking-caps);
-  text-transform: uppercase;
-}
-.auto-plan-dialog[data-v9-layout="1"] .auto-plan-truth-strip strong {
-  color: var(--ap-ink);
-  font-size: .68rem;
-  font-weight: 750;
-}
-html[data-color-scheme="dark"] .auto-plan-dialog[data-v9-layout="1"] .auto-plan-truth-strip > div {
-  background: color-mix(in srgb, var(--month-accent) 12%, #1a222c);
-  border-color: color-mix(in srgb, #5f6b77 55%, var(--month-accent) 45%);
 }
 
 /* ------------------------------------------------------------- Ergebnis v9 */

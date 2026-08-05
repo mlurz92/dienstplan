@@ -256,7 +256,7 @@ test('v9-Layout erzwingt interne Scrollbereiche statt Modal-Scroll', async () =>
   assert.match(css, /\[data-v9-layout="1"\] #autoPlanConfig,/);
   assert.match(css, /\[data-v9-layout="1"\] #autoPlanResult\s*\{/);
   assert.match(css, /overflow-y:\s*auto/);
-  assert.match(css, /\.auto-plan-log\s*\{\s*flex:\s*0 0 auto;\s*height:\s*210px/);
+  assert.match(css, /\.auto-plan-log\s*\{\s*flex:\s*0 0 auto;\s*height:\s*190px/);
   assert.match(css, /html\[data-color-scheme="dark"\]/);
 });
 
