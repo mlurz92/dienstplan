@@ -17,6 +17,7 @@ Version 0.9.5 ersetzt die fehleranfällige numerische Personenindex-Modellierung
 - Freitag-BD · Samstag frei · Sonntag-BD wird explizit vermieden;
 - feste Studio-Geometrie mit internen Scrollbereichen und festem Kommentarfenster;
 - Light Mode als Standard, kontraststarker Dark Mode, rein pictografischer Theme-Schalter;
+- View-Transition-Snapshots sind pointer-transparent, sodass Navigation und Auto-Plan auch während des Monatswechsels bedienbar bleiben;
 - vollständige Tastatur-, Tooltip-, Layout- und Browserregressionen.
 
 ## Solver-Laufzeit
