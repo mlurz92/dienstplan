@@ -132,6 +132,16 @@
 
 /* --------------------------------------- Layout: alles im Modal ohne Scroll */
 
+.auto-plan-dialog[data-v9-layout="1"] {
+  height: min(920px, calc(100dvh - 1.25rem));
+  max-height: calc(100dvh - 1.25rem);
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-shell {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-header {
+  padding-block: 14px;
+}
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-body {
   overflow: hidden;
 }
@@ -158,14 +168,69 @@
   backdrop-filter: blur(6px);
 }
 
-/* Laufansicht: feste Höhen statt dynamischem Wachstum. */
+/* -------------------------------------------------- Konfiguration: 2 Spalten */
+
+/*
+ * Parameter und Grenzprüfung links, die personengebundenen Obergrenzen rechts
+ * in einer eigenen, intern scrollenden Spalte. Dadurch sind sämtliche
+ * Einstellungen gleichzeitig sichtbar – ohne das Modal zu scrollen.
+ */
+.auto-plan-dialog[data-v9-layout="1"] #autoPlanConfig {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(340px, .62fr);
+  grid-template-rows: auto auto;
+  grid-template-areas:
+    "hero limits"
+    "validation limits";
+  gap: var(--flow-group);
+  align-content: start;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-config-hero { grid-area: hero; align-self: start; }
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-panel {
+  grid-area: limits;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+.auto-plan-dialog[data-v9-layout="1"] #autoPlanValidation { grid-area: validation; align-self: start; }
+
+/* Dichtes Feldraster: mehr Einstellungen auf einen Blick. */
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-field-grid {
+  grid-template-columns: repeat(auto-fit, minmax(172px, 1fr));
+  gap: 8px 10px;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-field small { font-size: .62rem; line-height: 1.3; }
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-field select,
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-field input[type="number"],
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-field input[type="range"] { min-height: 30px; }
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-context-list { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
+
+/* Kompakte Obergrenzen-Tabelle. */
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-table th,
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-table td { padding: 3px 5px; height: 26px; }
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-table th:not(:first-child),
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-table td:not(:first-child) { width: 74px; }
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-table input { min-height: 26px; }
+
+/* --------------------------------------------------------- Laufansicht v9 */
+
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-stage {
   min-height: 0;
-  align-content: stretch;
+  grid-template-columns: minmax(300px, .8fr) minmax(420px, 1.2fr);
 }
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-visual { min-height: 210px; max-height: 250px; }
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-console {
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   align-content: start;
+  min-height: 0;
 }
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-log {
   flex: 0 0 auto;
@@ -177,7 +242,20 @@
   height: auto;
   overflow-y: auto;
 }
-.auto-plan-dialog[data-v9-layout="1"] .auto-plan-phase-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-theatre ol {
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 6px;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-theatre li { min-height: 58px; padding: 7px; }
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-theatre li b { font-size: .7rem; }
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-theatre li small { font-size: .58rem; }
+
+/* ------------------------------------------------------------- Ergebnis v9 */
+
+.auto-plan-dialog[data-v9-layout="1"] #autoPlanResult .auto-plan-card { padding-block: 10px; }
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-proposal-table th,
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-proposal-table td { padding: 4px 6px; height: 27px; }
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-proposal-wrap { max-height: none; }
 
 /* --------------------------------------------------- Dark-Mode-Kontraste */
 
@@ -300,6 +378,27 @@ html[data-color-scheme="dark"] .auto-plan-v9-run-strip { background: color-mix(i
 html[data-color-scheme="dark"] .auto-plan-dialog[data-v9-layout="1"] #autoPlanConfig .auto-plan-limit-head,
 html[data-color-scheme="dark"] .auto-plan-dialog[data-v9-layout="1"] #autoPlanResult .auto-plan-section-title {
   background: color-mix(in srgb, #151c24 96%, var(--month-accent) 4%);
+}
+
+/* Eingabefelder und gesperrte HG-Zeilen im Dunkeln. */
+html[data-color-scheme="dark"] .auto-plan-field select,
+html[data-color-scheme="dark"] .auto-plan-field input[type="number"],
+html[data-color-scheme="dark"] .auto-plan-limit-table input {
+  background: var(--v85-surface-strong);
+  color: var(--v85-text);
+  border-color: color-mix(in oklab, var(--v85-border) 60%, transparent);
+}
+html[data-color-scheme="dark"] .auto-plan-limit-table tbody tr.is-hg-blocked td:nth-child(5) input {
+  background: color-mix(in oklab, var(--v85-surface) 78%, black 22%);
+  color: var(--v85-muted);
+}
+html[data-color-scheme="dark"] .auto-plan-validation {
+  background: color-mix(in srgb, var(--green) 14%, var(--v85-surface-strong));
+  color: color-mix(in srgb, #8fe6b1 82%, #fff);
+}
+html[data-color-scheme="dark"] .auto-plan-validation.invalid {
+  background: color-mix(in srgb, var(--red) 14%, var(--v85-surface-strong));
+  color: #ffa4a4;
 }
 
 /* --------------------------------------------------------- Animations-Politur */

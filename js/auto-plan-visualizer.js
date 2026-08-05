@@ -294,8 +294,11 @@ export class AutoPlanVisualizer {
     node.glow = 1;
     node.settled = true;
     if (this.reduced) return;
-    this.comets.push({ target: index, travel: 0, speed: strong ? 2.4 : 1.7, strong: Boolean(strong) });
-    if (this.comets.length > 40) this.comets.shift();
+    // v9: Kometen fliegen ruhiger; bei viel Aktivität wird gebündelt,
+    // damit die Szene niemals hektisch wirkt.
+    if (this.comets.length < 6) {
+      this.comets.push({ target: index, travel: 0, speed: strong ? 1.25 : .95, strong: Boolean(strong) });
+    }
   }
 
   /** Abschluss: ein letzter, ruhiger Impuls über alle Knoten. */
@@ -337,8 +340,8 @@ export class AutoPlanVisualizer {
       this.color[channel] += (this.targetColor[channel] - this.color[channel]) * Math.min(1, delta * 3);
     }
     this.displayProgress += (this.progress - this.displayProgress) * Math.min(1, delta * 2.6);
-    this.energy = Math.max(0, this.energy - delta * .55);
-    this.activity += (Math.min(1, this.energy + (this.finished ? .25 : .12)) - this.activity) * Math.min(1, delta * 4);
+    this.energy = Math.max(0, this.energy - delta * .38);
+    this.activity += (Math.min(1, this.energy + (this.finished ? .22 : .1)) - this.activity) * Math.min(1, delta * 3);
 
     const { width, height } = this;
     if (!width || !height) {
@@ -405,7 +408,7 @@ export class AutoPlanVisualizer {
     const ringCount = (this.policy?.detail ?? 1) < .6 ? 3 : 5;
     for (let ring = 0; ring < ringCount; ring += 1) {
       const radius = size * (.28 + ring * .16);
-      const spin = this.reduced ? 0 : seconds * (ring % 2 ? .05 : -.038) * (1 + this.activity);
+      const spin = this.reduced ? 0 : seconds * (ring % 2 ? .026 : -.018) * (1 + this.activity);
       context.save();
       context.translate(centerX, centerY);
       context.rotate(spin);
@@ -447,14 +450,14 @@ export class AutoPlanVisualizer {
   positionNodes(centerX, centerY, size, seconds, delta) {
     const breathe = this.reduced ? 0 : 1;
     this.nodes.forEach((node, index) => {
-      const drift = this.reduced ? 0 : seconds * (node.role === 'bd' ? -.035 : .028) * (1 + this.activity * .8);
+      const drift = this.reduced ? 0 : seconds * (node.role === 'bd' ? -.016 : .012) * (1 + this.activity * .6);
       const angle = node.angle + drift;
-      const wobble = breathe * Math.sin(seconds * 1.1 + index * .41) * .02;
+      const wobble = breathe * Math.sin(seconds * .8 + index * .37) * .01;
       const radius = size * (node.ring + wobble);
       node.x = centerX + Math.cos(angle) * radius;
       node.y = centerY + Math.sin(angle) * radius;
-      node.pulse = Math.max(0, node.pulse - delta * 1.6);
-      node.glow = Math.max(node.fixed ? .22 : 0, node.glow - delta * .5);
+      node.pulse = Math.max(0, node.pulse - delta * 1.1);
+      node.glow = Math.max(node.fixed ? .22 : 0, node.glow - delta * .38);
     });
   }
 
@@ -478,10 +481,10 @@ export class AutoPlanVisualizer {
       context.stroke();
 
       if (this.reduced || index % 3) continue;
-      const travel = (seconds * (.22 + this.activity * .5) + link.offset) % 1;
+      const travel = (seconds * (.12 + this.activity * .2) + link.offset) % 1;
       context.fillStyle = this.rgba(.55 + this.activity * .35);
       context.beginPath();
-      context.arc(from.x + (to.x - from.x) * travel, from.y + (to.y - from.y) * travel, 1.4, 0, TAU);
+      context.arc(from.x + (to.x - from.x) * travel, from.y + (to.y - from.y) * travel, 1.15, 0, TAU);
       context.fill();
     }
   }
@@ -492,7 +495,7 @@ export class AutoPlanVisualizer {
       comet.travel += delta * comet.speed;
       if (comet.travel >= 1) {
         const node = this.nodes[comet.target];
-        if (node) this.burst(node.x, node.y, comet.strong ? 12 : 6);
+        if (node) this.burst(node.x, node.y, comet.strong ? 6 : 4);
         this.comets.splice(index, 1);
         continue;
       }
@@ -529,7 +532,7 @@ export class AutoPlanVisualizer {
     const available = Math.max(0, limit - this.sparks.length);
     for (let index = 0; index < Math.min(count, available); index += 1) {
       const angle = (index / count) * TAU + Math.random() * .4;
-      const speed = 22 + Math.random() * 46;
+      const speed = 11 + Math.random() * 22;
       this.sparks.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: 1 });
     }
     if (this.sparks.length > limit) this.sparks.splice(0, this.sparks.length - limit);
@@ -538,7 +541,7 @@ export class AutoPlanVisualizer {
   paintSparks(context, delta) {
     for (let index = this.sparks.length - 1; index >= 0; index -= 1) {
       const spark = this.sparks[index];
-      spark.life -= delta * 1.5;
+      spark.life -= delta * 1.05;
       if (spark.life <= 0) {
         this.sparks.splice(index, 1);
         continue;
@@ -549,7 +552,7 @@ export class AutoPlanVisualizer {
       spark.vy *= .94;
       context.fillStyle = this.rgba(spark.life * .8, 40);
       context.beginPath();
-      context.arc(spark.x, spark.y, spark.life * 1.9, 0, TAU);
+      context.arc(spark.x, spark.y, spark.life * 1.55, 0, TAU);
       context.fill();
     }
   }
@@ -579,8 +582,8 @@ export class AutoPlanVisualizer {
   paintWaves(context, centerX, centerY, size, delta) {
     for (let index = this.waves.length - 1; index >= 0; index -= 1) {
       const wave = this.waves[index];
-      wave.radius += delta * size * 2.1;
-      wave.life -= delta * .85;
+      wave.radius += delta * size * 1.1;
+      wave.life -= delta * .5;
       if (wave.life <= 0) {
         this.waves.splice(index, 1);
         continue;
@@ -594,7 +597,7 @@ export class AutoPlanVisualizer {
   }
 
   paintCore(context, centerX, centerY, size, seconds) {
-    const beat = this.reduced ? 0 : Math.sin(seconds * (2.2 + this.activity * 4)) * (.02 + this.activity * .05);
+    const beat = this.reduced ? 0 : Math.sin(seconds * (1.4 + this.activity * 2.2)) * (.014 + this.activity * .03);
     const radius = size * (.24 + beat);
     const gradient = context.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius * 2.1);
     gradient.addColorStop(0, this.rgba(.42 + this.activity * .3));

@@ -45,7 +45,16 @@ export const DEFAULT_SETTINGS = Object.freeze({
     perfectionEnabled: true,
     parallelSearches: null,
     certificationRounds: 4,
-    portfolioDiversity: true
+    portfolioDiversity: true,
+    solverBackend: 'auto',
+    cpSatTimeBudgetSeconds: 10,
+    cpSatWorkers: null,
+    cpSatWarmStart: 'heuristic',
+    fairnessProfile: 'leximin',
+    deterministic: true,
+    infeasibilityMode: 'mus',
+    repairOnEdit: true,
+    explanationDepth: 'detailed'
   })
 });
 
@@ -74,7 +83,6 @@ export const AUTO_PLAN_BD_LIMITS = Object.freeze({
 });
 
 export const DEFAULT_STAFF = [
-  { id: 'schaefer', name: 'Prof. Schäfer', short: 'Schäfer', category: 'urlaub-only', roleLabel: 'Chefarzt', activeFrom: '2025-01-01', activeUntil: null, includeInPlanning: false, includeInAbsenceList: true },
   { id: 'lurz', name: 'Dr. Lurz', short: 'Lurz', category: 'fa', roleLabel: 'FA/OA', activeFrom: '2025-01-01', activeUntil: null, includeInPlanning: true, includeInAbsenceList: true, bdTarget: 4, maxBd: null, canHg: true, canSaturdayBd: true },
   { id: 'polednia', name: 'Dr. Polednia', short: 'Polednia', category: 'fa', roleLabel: 'FA/OA', activeFrom: '2025-01-01', activeUntil: null, includeInPlanning: true, includeInAbsenceList: true, bdTarget: 3, maxBd: null, canHg: true, canSaturdayBd: true },
   { id: 'dalitz', name: 'Fr. Dalitz', short: 'Dalitz', category: 'fa', roleLabel: 'FÄ/OÄ', activeFrom: '2025-01-01', activeUntil: null, includeInPlanning: true, includeInAbsenceList: true, bdTarget: 4, maxBd: null, canHg: true, canSaturdayBd: true },
@@ -210,7 +218,16 @@ export function normalizeSettings(value, { strict = false } = {}) {
       perfectionEnabled: normalizedBoolean(autoPlan.perfectionEnabled, DEFAULT_SETTINGS.autoPlan.perfectionEnabled, 'settings.autoPlan.perfectionEnabled', strict),
       parallelSearches: normalizedBoundedInteger(autoPlan.parallelSearches, DEFAULT_SETTINGS.autoPlan.parallelSearches, 1, 8, 'settings.autoPlan.parallelSearches', strict, true),
       certificationRounds: normalizedBoundedInteger(autoPlan.certificationRounds, DEFAULT_SETTINGS.autoPlan.certificationRounds, 1, 8, 'settings.autoPlan.certificationRounds', strict),
-      portfolioDiversity: normalizedBoolean(autoPlan.portfolioDiversity, DEFAULT_SETTINGS.autoPlan.portfolioDiversity, 'settings.autoPlan.portfolioDiversity', strict)
+      portfolioDiversity: normalizedBoolean(autoPlan.portfolioDiversity, DEFAULT_SETTINGS.autoPlan.portfolioDiversity, 'settings.autoPlan.portfolioDiversity', strict),
+      solverBackend: normalizedEnum(autoPlan.solverBackend, new Set(['auto', 'cp-sat-exact', 'cp-sat-lns', 'heuristic-alns']), DEFAULT_SETTINGS.autoPlan.solverBackend, 'settings.autoPlan.solverBackend', strict),
+      cpSatTimeBudgetSeconds: normalizedBoundedInteger(autoPlan.cpSatTimeBudgetSeconds, DEFAULT_SETTINGS.autoPlan.cpSatTimeBudgetSeconds, 1, 60, 'settings.autoPlan.cpSatTimeBudgetSeconds', strict),
+      cpSatWorkers: normalizedBoundedInteger(autoPlan.cpSatWorkers, DEFAULT_SETTINGS.autoPlan.cpSatWorkers, 1, 8, 'settings.autoPlan.cpSatWorkers', strict, true),
+      cpSatWarmStart: normalizedEnum(autoPlan.cpSatWarmStart, new Set(['heuristic', 'none']), DEFAULT_SETTINGS.autoPlan.cpSatWarmStart, 'settings.autoPlan.cpSatWarmStart', strict),
+      fairnessProfile: normalizedEnum(autoPlan.fairnessProfile, new Set(['leximin', 'spread', 'variance', 'owa']), DEFAULT_SETTINGS.autoPlan.fairnessProfile, 'settings.autoPlan.fairnessProfile', strict),
+      deterministic: normalizedBoolean(autoPlan.deterministic, DEFAULT_SETTINGS.autoPlan.deterministic, 'settings.autoPlan.deterministic', strict),
+      infeasibilityMode: normalizedEnum(autoPlan.infeasibilityMode, new Set(['mus', 'relax', 'report']), DEFAULT_SETTINGS.autoPlan.infeasibilityMode, 'settings.autoPlan.infeasibilityMode', strict),
+      repairOnEdit: normalizedBoolean(autoPlan.repairOnEdit, DEFAULT_SETTINGS.autoPlan.repairOnEdit, 'settings.autoPlan.repairOnEdit', strict),
+      explanationDepth: normalizedEnum(autoPlan.explanationDepth, new Set(['short', 'detailed', 'llm']), DEFAULT_SETTINGS.autoPlan.explanationDepth, 'settings.autoPlan.explanationDepth', strict)
     }
   };
 }
@@ -276,6 +293,18 @@ function normalizeStaffEntry(entry, index, strict) {
   };
 }
 
+/**
+ * Aus dem Personalstamm entfernte Personen.
+ *
+ * Prof. Schäfer war ausschließlich in der Abwesenheitsliste geführt und kann
+ * in keiner Rolle gesetzt werden. Seit v9 wird er vollständig aus dem Stamm
+ * entfernt; gespeicherte Stände, Server-Bootstraps und Sicherungen werden
+ * beim Einlesen bereinigt. Historische Einträge in Monatsplänen bleiben als
+ * externe Fixpunkte lesbar, werden aber nicht mehr als Personal-ID
+ * interpretiert.
+ */
+export const RETIRED_STAFF_IDS = Object.freeze(['schaefer']);
+
 export function normalizeStaffList(value, { strict = false } = {}) {
   if (!Array.isArray(value)) {
     if (strict) throw new Error('„staff“ muss ein Array sein.');
@@ -286,6 +315,7 @@ export function normalizeStaffList(value, { strict = false } = {}) {
   for (let index = 0; index < value.length; index += 1) {
     const normalized = normalizeStaffEntry(value[index], index, strict);
     if (!normalized) continue;
+    if (RETIRED_STAFF_IDS.includes(normalized.id)) continue;
     if (seen.has(normalized.id)) {
       if (strict) throw new Error(`Personal-ID „${normalized.id}“ ist doppelt vorhanden.`);
       continue;

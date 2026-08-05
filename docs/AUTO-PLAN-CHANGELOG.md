@@ -1,5 +1,37 @@
 # Auto-Plan Changelog
 
+## 2026-08-04 (2) – Release 0.9.1 / Regelwerk v4.10
+
+- **Neue Regel Fr-BD · Sa frei · So-BD:** Freitags-BD, vollständig freier
+  Samstag und Sonntags-BD derselben Person sind rot und besonders
+  bestätigungspflichtig (spezieller Bestätigungstyp, symmetrische Prüfung,
+  graue Sperren bleiben absolut).
+- **Prof. Schäfer entfernt:** `RETIRED_STAFF_IDS` bereinigt Standardstamm,
+  gespeicherte Stände, Server-Bootstraps und Sicherungen; historische
+  Monatseinträge bleiben externe Fixpunkte.
+- **Einstellungsmenü:** Reiter „Auto-Plan v9“ mit Solver-Backend,
+  CP-SAT-Zeitbudget, CP-SAT-Worker, Warmstart, Fairness-Profil,
+  Infeasibility-Modus, Erklärungstiefe, Determinismus und
+  Reparatur-nach-Änderung; das Settings-Schema ist erweitert und strikt
+  normalisiert.
+- **v9-Bezeichnungen überall:** Ribbon, Engine-Badge, Guardrail, Stufenliste
+  und Phasentheater (acht Stufen) vollständig auf v9 gehoben.
+- **Studio-Layout:** zweispaltige Konfiguration, acht vollständig sichtbare
+  Phasenkarten, Modal passt ohne eigenen Scroll in den Viewport, Ergebnis-
+  und Obergrenzen-Bereiche scrollen intern.
+- **Dunkelmodus-Kohärenz:** globale Token-Abbildung auf die dunkle Palette;
+  Tabellen, Chips, Picker, Dialoge, Einstellungen, Formulare und Command Bar
+  kontraststark.
+- **Theme-Umschalter** nur noch als Sonnen-/Mond-Piktogramm; Start im
+  Hellmodus.
+- **Beruhigte Animationen:** Visualizer-Kometen, Wellen, Funken, Drift und
+  Phasenpuls langsamer und weicher; `prefers-reduced-motion` wird respektiert.
+- **Exakte Suche in Workern:** WASM-Guard erlaubt CP-SAT auch in den
+  Modul-Workern der Laufumgebung; Phasen-Pacing macht den exakten Durchlauf
+  sichtbar; `perfect`/`certify` werden explizit gemeldet.
+- **BugHunt:** 402 Modultests und 41 Browsertests grün; E2E-Verträge auf den
+  v9-Stand gehoben.
+
 ## 2026-08-04 – Release 0.9.0 / Auto-Plan v9 (Hybrid Exact Observatory)
 
 - **CP-SAT-Kern im Browser:** Googles OR-Tools CP-SAT läuft als WebAssembly

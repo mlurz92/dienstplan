@@ -60,8 +60,10 @@ function paintButton() {
   button.setAttribute('aria-label', targetLabel(mode));
   button.dataset.tooltip = targetLabel(mode);
   // v9: Der Umschalter trägt ausschließlich das Sonnen- bzw. Mondpiktogramm.
-  // Die Beschriftung bleibt für Vorlesewerkzeuge unsichtbar erhalten.
-  button.innerHTML = `${icon(mode)}<span class="visually-hidden">${label(mode)}</span>`;
+  // Der zugängliche Name kommt über aria-label; sichtbarer Text existiert
+  // bewusst nicht mehr (ein früherer .visually-hidden-Text war sichtbar, weil
+  // die Anwendung keine globale visually-hidden-Regel besitzt).
+  button.innerHTML = icon(mode);
 }
 
 function syncSettingsControl() {

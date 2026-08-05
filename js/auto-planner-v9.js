@@ -121,6 +121,29 @@ function elapsedSince(startedAt) {
   return Math.round((typeof performance !== 'undefined' ? performance.now() : Date.now()) - startedAt);
 }
 
+/**
+ * Kurze, abbruchfähige Verweildauer zwischen den sichtbaren Phasen.
+ *
+ * Die exakte Suche ist für 62 Felder in Millisekunden fertig. Ohne Verweilzeit
+ * würden die Phasenkarten unlesbar durchlaufen und der Lauf wirkte abgebrochen.
+ * Die Verweilzeit ist bewusst klein (unter zwei Sekunden gesamt), respektiert
+ * das Abbruchsignal und verändert niemals das Ergebnis – nur seine Präsentation.
+ */
+function pace(signal, milliseconds) {
+  return new Promise(resolve => {
+    if (signal?.aborted) return resolve();
+    const timer = setTimeout(() => {
+      signal?.removeEventListener?.('abort', onAbort);
+      resolve();
+    }, milliseconds);
+    const onAbort = () => {
+      clearTimeout(timer);
+      resolve();
+    };
+    signal?.addEventListener?.('abort', onAbort, { once: true });
+  });
+}
+
 function stableValue(value) {
   if (Array.isArray(value)) return value.map(stableValue);
   if (!value || typeof value !== 'object') return value;
@@ -408,6 +431,7 @@ export async function constructAutoPlan(parameters) {
 
   if (api && exactDesired && !signal?.aborted) {
     await onProgress?.({ phase: 'model', stage: 'cp-sat', progress: .1, message: 'CP-SAT-Modell wird gebaut · Variablen, Klauseln und Zielkomponenten' });
+    await pace(signal, 300);
     const hints = config.cpSatWarmStart === 'none'
       ? []
       : hintsFromMonth(heuristic?.plannedMonth, new Set((state?.staff || []).map(person => person.id)));
@@ -473,6 +497,7 @@ export async function constructAutoPlan(parameters) {
     // 3. CP-SAT-Ergebnis in einen Monat übersetzen und auditiert vergleichen.
     if (exactResult.result && Object.keys(exactResult.result).length && !signal?.aborted) {
       await onProgress?.({ phase: 'audit', stage: 'cp-sat', progress: .62, message: 'CP-SAT-Vorschlag wird durch die Regelengine auditiert' });
+      await pace(signal, 300);
       const planned = cloneMonth(baseline);
       for (const [key, staffId] of Object.entries(exactResult.result)) {
         const [dateIso, role] = key.split('|');
@@ -492,6 +517,22 @@ export async function constructAutoPlan(parameters) {
         better.metrics.mus = musInfo;
         finalizeConstructed(better, state, parameters);
         annotate(better, cpSatInfo, musInfo);
+        if (better.certified) {
+          await onProgress?.({
+            phase: 'perfect',
+            stage: 'cp-sat',
+            progress: .72,
+            message: 'Perfektionsphase: durch den CP-SAT-OPTIMAL-Beweis abgeschlossen'
+          });
+          await pace(signal, 340);
+          await onProgress?.({
+            phase: 'certify',
+            stage: 'cp-sat',
+            progress: .82,
+            message: `CP-SAT: ${cpSatInfo.status} · untere Schranke = Zielwert · Optimalität zertifiziert`
+          });
+          await pace(signal, 340);
+        }
       } else {
         better.metrics.cpSatUsed = false;
         better.metrics.cpSat = cpSatInfo;
@@ -500,7 +541,7 @@ export async function constructAutoPlan(parameters) {
       }
       await onProgress?.({
         phase: 'complete',
-        progress: .7,
+        progress: .92,
         message: `v9-Konstruktion: ${better === cpResult ? 'CP-SAT exakt' : 'Heuristik'} gewinnt · ${better.changes?.length || 0} Vorschläge · ${better.metrics?.red || 0} rot`,
         improvements: better.metrics?.red === 0 ? 1 : 0
       });

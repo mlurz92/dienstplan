@@ -1,4 +1,4 @@
-Regeln und Kriterien für manuelle Kandidatenempfehlungen und Auto-Plan in DienstplanRAD (v4.9)
+Regeln und Kriterien für manuelle Kandidatenempfehlungen und Auto-Plan in DienstplanRAD (v4.10)
 
 GRUNDPRINZIPIEN & DATENBASIS:
 - DienstplanRAD unterstützt manuelle Einzelplanung sowie eine bestätigungspflichtige automatische Komplettierung der noch leeren BD- und HG-Felder des aktuell sichtbaren Monats.
@@ -24,7 +24,7 @@ BESETZUNG, PERSONAL UND QUALIFIKATION:
 KONFLIKT- UND BESTÄTIGUNGSMODELL:
 - Nicht überschreibbar sind fehlende Qualifikation, nicht aktive oder nicht planbare Person, gleichzeitiger BD/HG derselben Person sowie unmittelbar aufeinanderfolgende eigene BD.
 - Nicht überschreibbare Bewertungen bleiben grau beziehungsweise technisch nicht wählbar und werden in keiner Such- oder Reparaturphase zugelassen.
-- Mit besonderer Bestätigung überschreibbar sind Abwesenheit, Polednia-Sperre und ein hinterlegtes hartes BD-Monatsmaximum.
+- Mit besonderer Bestätigung überschreibbar sind Abwesenheit, Polednia-Sperre, ein hinterlegtes hartes BD-Monatsmaximum und die Wochenendkette Fr-BD · Sa frei · So-BD.
 - Organisatorisch lösbare rote Planabweichungen bleiben nach gewöhnlicher Bestätigung wählbar.
 - Die Null-Rot-Suche schließt alle roten und grauen Kandidaten aus.
 - Erst wenn reguläre und vertiefte Null-Rot-Suche keine vollständige Belegung finden, darf ein gesonderter Minimal-Rot-Fallback starten.
@@ -144,6 +144,9 @@ WOCHENEND- & FEIERTAGSLOGIK:
 - Zwei benachbarte BD-Wochenenden sind rot; sonstige benachbarte Dienstwochenenden orange.
 - Null-Rot-Suche verwendet keine roten benachbarten BD-Wochenenden. Minimal-Rot darf sie nur als ausgewiesene bestätigbare Ausnahme nutzen.
 - Zweiter Samstags-BD derselben Person im Monat ist orange.
+- Wochenendkette Fr-BD · Sa frei · So-BD: Hat dieselbe Person am Freitag BD, ist sie am Samstag vollständig frei (kein BD, kein HG, kein RBN, keine zweite RBN) und trägt am Sonntag erneut BD, sind beide BD-Zellen rot und besonders bestätigungspflichtig (spezieller Bestätigungstyp mit begründendem Kommentar).
+- Die Fr-BD · Sa frei · So-BD-Regel wird symmetrisch geprüft, unabhängig davon, welche der beiden Zellen zuerst eingegeben wird.
+- Eine bereits graue oder nicht wählbare Person wird durch die Wochenendketten-Regel niemals wieder freigeschaltet.
 - Oster- und Pfingstblock alternieren; Dienst in beiden Blöcken ist orange.
 
 MONATSFAIRNESS & VERGLEICHSGRUPPE:

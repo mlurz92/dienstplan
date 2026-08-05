@@ -116,7 +116,7 @@ function controlsMarkup() {
       <option value="intensive">Intensiv · empfohlen</option>
       <option value="exhaustive">Exhaustiv</option>
     </select>
-    <small>Steuert Reparaturrunden, lokale Neuplanung und die v8.5-Eskalationsbreite gemeinsam.</small>
+    <small>Steuert Reparaturrunden, lokale Neuplanung und die v9-Eskalationsbreite gemeinsam.</small>
   </label>
   <label class="auto-plan-field auto-plan-field--v85">
     <span>Parallele Perfektionsstränge</span>
@@ -147,7 +147,7 @@ function installControls(dialog) {
     perfection.tabIndex = -1;
     perfection.closest('label')?.classList.add('auto-plan-switch--mandatory');
     const text = perfection.closest('label')?.querySelector('span');
-    if (text) text.textContent = 'Perfektionsphase und vollständiger Optimalitätsnachweis sind in v8.5 verbindlich.';
+    if (text) text.textContent = 'Perfektionsphase und Optimalitätsnachweis sind verbindlich: CP-SAT-OPTIMAL beweist, sonst zertifiziert die ALNS-Perfektion.';
   }
 
   const derived = document.createElement('div');
@@ -181,14 +181,20 @@ function installControls(dialog) {
 function stageIndex(update) {
   const stage = String(update?.stage || update?.subphase || '').toLowerCase();
   const phase = String(update?.phase || '').toLowerCase();
-  if (stage.includes('null-rot') || stage.includes('rescue') || update?.strictWave) return 2;
+  // v9-Phasenvertrag: acht Stufen (analysis, model, exact, rescue, repair,
+  // perfect, audit, certify). Die Heuristik-Wellen des Warmstarts zählen zur
+  // Null-Rot-Intensivierung.
+  if (stage.includes('null-rot') || stage.includes('rescue') || stage.includes('heuristik-warmstart') || update?.strictWave) return 3;
   if (phase === 'analysis') return 0;
-  if (phase === 'search' || phase === 'propagate') return 1;
-  if (phase === 'repair' || phase === 'polish' || phase === 'audit') return 3;
-  if (phase === 'perfect') return 4;
-  if (phase === 'certify') return 5;
+  if (phase === 'model') return 1;
+  if (phase === 'exact') return 2;
+  if (phase === 'search' || phase === 'propagate') return 3;
+  if (phase === 'repair') return 4;
+  if (phase === 'perfect' || phase === 'polish') return 5;
+  if (phase === 'audit') return 6;
+  if (phase === 'certify') return 7;
   if (phase === 'complete' || phase === 'blocked') return AUTO_PLAN_STAGES.length;
-  return Math.min(highestStage, AUTO_PLAN_STAGES.length - 1);
+  return 0;
 }
 
 function installPhaseTheatre(dialog) {
@@ -198,7 +204,7 @@ function installPhaseTheatre(dialog) {
   const theatre = document.createElement('section');
   theatre.id = 'autoPlanV85Theatre';
   theatre.className = 'auto-plan-v85-theatre';
-  theatre.setAttribute('aria-label', 'Aktueller Bearbeitungsstand der Auto-Plan Engine v8.5');
+  theatre.setAttribute('aria-label', 'Aktueller Bearbeitungsstand der Auto-Plan Engine v9');
   theatre.innerHTML = `<div class="auto-plan-v85-constellation" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
     <ol>${AUTO_PLAN_STAGES.map((stage, index) => `<li data-index="${index}" data-stage="${stage.id}"><i></i><div><b>${stage.title}</b><small>${stage.detail}</small></div><span>offen</span></li>`).join('')}</ol>
     <div class="auto-plan-v85-wave" id="autoPlanV85Wave" hidden><span>Null-Rot-Welle</span><b></b><i><em></em></i></div>`;
@@ -258,7 +264,7 @@ function renderEscalationResult(dialog) {
   const waves = Array.isArray(data.waves) ? data.waves : [];
   const nodes = waves.reduce((sum, wave) => sum + Number(wave.exploredNodes || 0), 0);
   panel.hidden = false;
-  panel.innerHTML = `<header><div><span>v8.5 Null-Rot-Protokoll</span><h4>${data.cleanFound ? 'Konfliktfreie Belegung erreicht' : 'Strikte Suche vollständig ausgeschöpft'}</h4></div><strong>${data.completed || 0}/${data.attempted || 0} Wellen</strong></header>
+  panel.innerHTML = `<header><div><span>v9 Null-Rot-Protokoll</span><h4>${data.cleanFound ? 'Konfliktfreie Belegung erreicht' : 'Strikte Suche vollständig ausgeschöpft'}</h4></div><strong>${data.completed || 0}/${data.attempted || 0} Wellen</strong></header>
     <div class="auto-plan-v85-result-grid"><div><span>Rescue-Breite</span><b>${data.strength || 0}%</b></div><div><span>Zusätzliche Knoten</span><b>${nodes.toLocaleString('de-DE')}</b></div><div><span>Reparaturprofil</span><b>${data.repairAggressiveness || '—'}</b></div></div>
     ${waves.length ? `<ol>${waves.map(wave => `<li><span>Welle ${wave.index}</span><b>${wave.complete ? `${wave.red} rot · ${wave.unfilled} offen` : `${wave.unfilled} offen`}</b><small>Beam ${wave.beamWidth} · Branch ${wave.branchLimit} · exakt ${Number(wave.exactBudget).toLocaleString('de-DE')}</small></li>`).join('')}</ol>` : '<p>Die reguläre Portfolio-Suche lieferte bereits eine vollständige Null-Rot-Lösung; keine Zusatzwelle erforderlich.</p>'}`;
 }
@@ -277,23 +283,23 @@ function installResultPanel(dialog) {
 function upgradeIdentity(dialog) {
   // `data-algorithm-revision="8"` und `#autoPlanV8Ribbon` bleiben als stabile
   // Integrations-Hooks bestehen. Die tatsächlich laufende Engine wird separat
-  // und sichtbar als 8.5 ausgewiesen.
+  // und sichtbar als v9 ausgewiesen.
   dialog.dataset.algorithmRevision = '8';
-  dialog.dataset.engineRevision = '8.5';
+  dialog.dataset.engineRevision = '9';
   const ribbon = dialog.querySelector('#autoPlanV8Ribbon, #autoPlanV75Ribbon, #autoPlanV7Ribbon');
   if (ribbon) {
     ribbon.classList.add('auto-plan-v85-ribbon');
     const title = ribbon.querySelector('b');
     const detail = ribbon.querySelector('small');
     const badge = ribbon.querySelector(':scope > strong');
-    if (title) title.textContent = 'Incremental Constraint Observatory · v8.5';
-    if (detail) detail.textContent = 'Exhaustive Clean-Solution: vollständiges Portfolio · mehrstufige Null-Rot-Intensivierung · adaptive Reparatur · verpflichtende Perfektion und Zertifizierung';
-    if (badge) badge.textContent = 'ENGINE v8.5';
+    if (title) title.textContent = 'Hybrid Exact Observatory · v9';
+    if (detail) detail.textContent = 'CP-SAT-Kern mit lexikografischer Maximin-Zielfunktion · Warmstart-Heuristik · Regelengine als Schlussaudit · MUS-artige Konfliktanalyse';
+    if (badge) badge.textContent = 'ENGINE v9';
   }
   const engine = dialog.querySelector('.auto-plan-engine-badge span');
-  if (engine) engine.textContent = 'Constraint Engine v8.5';
+  if (engine) engine.textContent = 'Constraint Engine v9';
   const guardrail = dialog.querySelector('.auto-plan-zero-red-guardrail header > span');
-  if (guardrail) guardrail.textContent = 'Null-Rot-Guardrail · Algorithmus v8.5';
+  if (guardrail) guardrail.textContent = 'Null-Rot-Guardrail · Algorithmus v9';
 }
 
 function enhance(dialog) {

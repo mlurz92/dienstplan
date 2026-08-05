@@ -106,7 +106,7 @@ test('JSON-Sicherung überlagert einen erfolgreichen Serverexport mit dem neuere
 
 test('nur echte planbare Assistenzärzte lösen AA-Kopplungen aus', () => {
   const state = { staff: structuredClone(DEFAULT_STAFF), months: new Map() };
-  assert.equal(isAaOn(state, 'schaefer', '2026-07-03'), false);
+  assert.equal(isAaOn(state, 'lurz', '2026-07-03'), false);
   assert.equal(isAaOn(state, 'licenji', '2026-07-03'), true);
   assert.equal(isAaOn(state, 'elhouba', '2026-09-22'), false);
 });

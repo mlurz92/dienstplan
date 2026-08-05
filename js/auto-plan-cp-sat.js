@@ -90,11 +90,18 @@ function countFixedRole(baseline, staffId, role) {
 
 /**
  * Lädt die Solver-Bindung (einmalig je Session).
+ *
+ * Die Engine läuft in Modul-Workern (`auto-plan-worker.js`); dort existiert
+ * kein `document`, aber sehr wohl `import()` und WebAssembly. Der Guard prüft
+ * deshalb Browser- UND Worker-Kontexte – nur reine Node-Umgebungen (Tests,
+ * CLI) bleiben ohne Bindung und nutzen den Heuristik-Fallback.
  */
 export async function loadCpSatSolver({ signal = null } = {}) {
   if (loader) return loader;
   loader = (async () => {
-    if (typeof globalThis === 'undefined' || typeof globalThis.document === 'undefined') return null;
+    const inRuntime = typeof globalThis !== 'undefined'
+      && (typeof globalThis.document !== 'undefined' || typeof globalThis.WorkerGlobalScope !== 'undefined');
+    if (!inRuntime) return null;
     for (const candidate of SOLVER_LOAD_ORDER) {
       if (signal?.aborted) return null;
       try {

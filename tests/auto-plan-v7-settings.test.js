@@ -32,7 +32,16 @@ test('v7 settings defaults are complete and safe', () => {
     perfectionEnabled: true,
     parallelSearches: null,
     certificationRounds: 4,
-    portfolioDiversity: true
+    portfolioDiversity: true,
+    solverBackend: 'auto',
+    cpSatTimeBudgetSeconds: 10,
+    cpSatWorkers: null,
+    cpSatWarmStart: 'heuristic',
+    fairnessProfile: 'leximin',
+    deterministic: true,
+    infeasibilityMode: 'mus',
+    repairOnEdit: true,
+    explanationDepth: 'detailed'
   });
 });
 
