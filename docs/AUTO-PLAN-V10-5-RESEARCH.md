@@ -31,8 +31,8 @@ Die Vorgabe „die Engine auf v9.5 heben“ ist nominell bereits erfüllt — **
 | Phase | Status | Zielwert | Untere Schranke | Zeit |
 |---|---|---|---|---|
 | Zulässigkeit | `OPTIMAL` | – | – | **218 ms** |
-| Maximin BD-Last | `OPTIMAL` | 4 | 4 | **188 ms** |
-| Lexikografisch (Maximin → BD-Soll → Wochenende) | `OPTIMAL` je Stufe | 4 / 0 / 3 | 4 / 0 / 3 | **445 ms gesamt** |
+| Minimax BD-Last (Stufe 1 der Leximax-Kaskade) | `OPTIMAL` | 4 | 4 | **188 ms** |
+| Lexikografisch (Minimax BD-Last → BD-Soll → Wochenende) | `OPTIMAL` je Stufe | 4 / 0 / 3 | 4 / 0 / 3 | **445 ms gesamt** |
 
 Das Problem ist für einen exakten Solver **klein**. Beweisbare Optimalität ist in unter einer halben Sekunde erreichbar. Die heutige Engine erreicht sie nie — nicht wegen der Problemgröße, sondern wegen fünf konkreter Modellierungs- und Bindungsfehler.
 
@@ -178,7 +178,7 @@ Der Gewinn ist nicht Bequemlichkeit, sondern **Ausdrucksmächtigkeit**: Kardinal
 
 **Modellgröße hier:** 60 Felder × Ø 6,2 Kandidaten ≈ **372 Binärvariablen** — gegenüber 56 Integer- plus **1.016 Hilfsvariablen** und 1.984 Constraints im heutigen Modell. Kleiner, korrekter, schneller.
 
-**Gemessen:** `OPTIMAL` in 218 ms (Zulässigkeit), 188 ms (Maximin), 445 ms (drei lexikografische Stufen).
+**Gemessen:** `OPTIMAL` in 218 ms (Zulässigkeit), 188 ms (Minimax BD-Last), 445 ms (drei lexikografische Stufen).
 
 **Eignung:** Bibliothek ist bereits vendorisiert, Apache-2.0, kostenfrei, läuft portabel ohne Cross-Origin-Isolation. **Keine Alternative kommt näher heran.**
 
@@ -449,7 +449,7 @@ Alle Aussagen dieses Berichts über den Ist-Zustand wurden ausgeführt, nicht ge
 | Gewichte | distinkte Gewichte je Zielkomponente gezählt | überall **genau 1** → Skalierung wirkungslos |
 | Zweigwahl | `normalizeSolverApi`-Bedingung gegen die realen `cpsat-js`-Exporte | erster Zweig greift, zweiter ist tot |
 | Modellgröße | `buildCpSatModel` auf 28-Tage-Monat | 56 Variablen, **1.016 Hilfsvariablen, 1.984 Constraints** |
-| Neues Modell | Prototyp gegen echtes `cpsat-js`-WASM, 30 Tage/60 Felder/8 Personen | `OPTIMAL` 218 ms · Maximin `OPTIMAL` 188 ms (Bound = Wert) · Kaskade 445 ms |
+| Neues Modell | Prototyp gegen echtes `cpsat-js`-WASM, 30 Tage/60 Felder/8 Personen | `OPTIMAL` 218 ms · Minimax BD-Last `OPTIMAL` 188 ms (Bound = Wert) · Kaskade 445 ms |
 | MCS-Diagnose | 8 Relaxationsliterale, künstlich unerfüllbar | `FEASIBLE` in 15 s, 5/8 aufgegeben — **nicht beweisbar minimal** |
 | Inkumbenten-Stream | `onSolution` mit `numWorkers: 1` | feuert **live** während des Solves (`live: true`) |
 
