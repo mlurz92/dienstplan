@@ -536,7 +536,7 @@ Reihenfolge ist bindend: jedes Paket ist für sich lauffähig und testbar.
 | **Zeitbudget gesamt** | 2–60 s (Default 10) | wird proportional auf die Stufen verteilt |
 | **Konfliktverhalten** | nur melden / MCS anzeigen / MCS anwenden | ersetzt `infeasibilityMode` |
 | **Solver-Pfad** | auto / exakt / nur Heuristik | Diagnose- und Rückfallschalter |
-| **Determinismus** | an/aus | fixiert Seed der Heuristik; CP-SAT ist bei festem Modell und `numWorkers=1` von sich aus reproduzierbar — **so ist es auch zu beschriften** |
+| **Determinismus** | an/aus | fixiert Seed der Heuristik; CP-SAT ist bei festem Modell und `numWorkers=1` nur reproduzierbar, **solange jede Stufe der Kaskade innerhalb ihres Zeitbudgets `OPTIMAL` meldet** — bricht eine Stufe stattdessen wanduhrgebunden ab, hängt das Ergebnis von Maschine und Systemlast ab, und ein Ausgleich über `random_seed` ist nicht möglich, weil `cpsat-js` diesen Parameter nicht entgegennimmt (§2.5); **so ist es auch zu beschriften** |
 
 **Jeder Regler bekommt eine Wirkungsanzeige**: unter dem Regler steht, was er im letzten Lauf bewirkt hat („Leximin-Tiefe 3 → Höchstlast 4, zweithöchste 4, dritthöchste 3“). Ein Regler ohne sichtbare Wirkung ist ein Regler, dem niemand traut.
 
