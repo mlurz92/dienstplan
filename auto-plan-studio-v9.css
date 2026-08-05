@@ -180,25 +180,58 @@ html[data-color-scheme="dark"] .auto-plan-dialog[data-v9-layout="1"] .auto-plan-
 .auto-plan-v9-relaxed ul { margin: 4px 0 0; padding-left: 15px; font-size: .7rem; }
 .auto-plan-v9-mus small { display: block; margin-top: 4px; color: var(--muted); font-size: .64rem; }
 
-/* --------------------------------------- Layout: alles im Modal ohne Scroll */
+/* ================================================================
+   NEUES LAYOUTPRINZIP: „CLEAR-SHEET GRID-SHELL MIT ZONEN-ISOLATION"
+   ----------------------------------------------------------------
+   1. Der Dialog ist eine strikte Grid-Shell (Header/Body/Footer) mit
+      overflow:hidden und isolation:isolate — kein Element kann aus
+      seiner Zone entweichen oder eine andere Zone überlagern.
+   2. Der Body ist genau EINE Grid-Zelle; nur der aktive Abschnitt
+      (Konfiguration/Lauf/Ergebnis) ist sichtbar, jeder scrollt intern.
+   3. Die Laufansicht ist ein garantiert getrenntes 2-Pane-Grid:
+      Canvas-Zone und Console-Zone sind eigene, beschnittene
+      Stacking-Kontexte (isolation:isolate, overflow:hidden).
+   4. Die 8 Phasen sind kompakte Stepper-Chips (flex-wrap) statt
+      sperriger Karten; die Deko-Konstellation ist deaktiviert.
+   5. Die Dienstobergrenzen sind eine sticky rechte Spalte der
+      Konfiguration — immer sichtbar, niemals versteckt.
+   ================================================================ */
 
 .auto-plan-dialog[data-v9-layout="1"] {
   height: min(920px, calc(100dvh - 1.25rem));
   max-height: calc(100dvh - 1.25rem);
+  overflow: hidden;
+  isolation: isolate;
 }
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-shell {
+  height: 100%;
+  min-height: 0;
+  display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
 }
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-header {
-  padding-block: 14px;
+  position: relative;
+  z-index: 0;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: 0;
+  padding-block: 12px;
 }
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-body {
   overflow: hidden;
+  position: relative;
+  z-index: 0;
+  isolation: isolate;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
 }
 .auto-plan-dialog[data-v9-layout="1"] #autoPlanConfig,
 .auto-plan-dialog[data-v9-layout="1"] #autoPlanStage,
 .auto-plan-dialog[data-v9-layout="1"] #autoPlanResult {
-  flex: 1 1 auto;
+  grid-area: 1 / 1;
+  min-width: 0;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
@@ -207,36 +240,53 @@ html[data-color-scheme="dark"] .auto-plan-dialog[data-v9-layout="1"] .auto-plan-
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--month-accent) 45%, #b9c4d0) transparent;
 }
+.auto-plan-dialog[data-v9-layout="1"] #autoPlanConfig[hidden],
+.auto-plan-dialog[data-v9-layout="1"] #autoPlanStage[hidden],
+.auto-plan-dialog[data-v9-layout="1"] #autoPlanResult[hidden] { display: none; }
 
 /* Sticky-Köpfe der intern scrollenden Abschnitte bleiben oben sichtbar. */
-.auto-plan-dialog[data-v9-layout="1"] #autoPlanConfig .auto-plan-limit-head,
 .auto-plan-dialog[data-v9-layout="1"] #autoPlanResult .auto-plan-section-title {
   position: sticky;
-  top: -1px;
-  z-index: 4;
+  top: 0;
+  z-index: 2;
   background: color-mix(in srgb, #fff 96%, var(--month-accent) 4%);
   backdrop-filter: blur(6px);
 }
 
-/* -------------------------------------------------- Konfiguration: 2 Spalten */
+/* -------------------------------------------------- Konfiguration: 2 Spalten
+   Links die Laufparameter, rechts die DIENSTOBERGRENZEN als sticky Spalte —
+   dadurch sind die harten Grenzen je Mitarbeitendem jederzeit sichtbar und
+   editierbar, ohne durch die Parameter scrollen zu müssen. */
 
-/*
- * Einspaltiges Vollbreiten-Layout: Keine Spalten mehr, die irgendwo zu
- * schmal werden. Alle Abschnitte (Laufparameter, Grenzprüfung, Limits)
- * liegen untereinander und nutzen die gesamte Dialogbreite.
- */
 .auto-plan-dialog[data-v9-layout="1"] #autoPlanConfig {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(320px, .9fr);
+  grid-template-areas:
+    "hero limits"
+    "validation limits";
+  gap: 10px;
+  padding: 10px;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-config-hero {
+  grid-area: hero;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 9px;
 }
-.auto-plan-dialog[data-v9-layout="1"] .auto-plan-config-hero { width: 100%; min-width: 0; }
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-panel {
-  width: 100%;
+  grid-area: limits;
+  min-width: 0;
+  position: sticky;
+  top: 0;
+  align-self: start;
+  max-height: calc(100dvh - 210px);
   display: flex;
   flex-direction: column;
   min-height: 0;
-  max-height: 340px;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-head {
+  flex: 0 0 auto;
 }
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-scroll {
   flex: 1 1 auto;
@@ -245,7 +295,17 @@ html[data-color-scheme="dark"] .auto-plan-dialog[data-v9-layout="1"] .auto-plan-
   scrollbar-gutter: stable;
   scrollbar-width: thin;
 }
-.auto-plan-dialog[data-v9-layout="1"] #autoPlanValidation { width: 100%; }
+.auto-plan-dialog[data-v9-layout="1"] #autoPlanValidation { grid-area: validation; width: 100%; }
+@media (max-width: 940px) {
+  .auto-plan-dialog[data-v9-layout="1"] #autoPlanConfig {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "hero" "limits" "validation";
+  }
+  .auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-panel {
+    position: static;
+    max-height: 340px;
+  }
+}
 
 /* Limits-Tabelle: volle Containerbreite, festes Spaltenraster, schmalere
    Zahlenfelder. Die Personenspalte nimmt den Rest und darf umbrechen. */
@@ -341,74 +401,97 @@ html[data-color-scheme="dark"] .auto-plan-dialog[data-v9-layout="1"] .auto-plan-
   line-height: 1.15;
 }
 
-/* ------------------------------------------------------- Theater-Karten */
+/* ------------------------------------------------------- Theater: Stepper-Chips
+   Die acht Etappen werden zu kompakten Stepper-Chips (flex-wrap) statt
+   sperriger Karten. Sie bleiben in einer flachen Zeile/Umbrüchen, sind
+   enthalten (contain: layout paint) und können dadurch nie über andere
+   Elemente hinausragen. Die Deko-Konstellation wird vollständig deaktiviert. */
 
-/* Die exakte Suche hat acht Etappen; 96 px pro Karte schnitt lange deutsche
-   Titel ab. 130 px lassen genug Platz, und `text-overflow:ellipsis` sichert
-   für die Bremsgrenzen ab. */
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-theatre {
+  overflow: hidden;
+  contain: layout paint;
+  padding: 6px 8px;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-theatre .auto-plan-v85-constellation { display: none; }
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-theatre ol {
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-  gap: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
 }
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-theatre li {
-  min-height: 58px;
-  padding: 7px;
+  min-height: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px 2px 6px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--month-accent) 32%, transparent);
+  background: color-mix(in srgb, var(--month-accent) 7%, #fff);
 }
-.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-theatre li b {
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-theatre li > i {
+  width: 7px;
+  height: 7px;
+  margin: 0;
+  flex: 0 0 auto;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-theatre li div b {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: .7rem;
+  font-size: .64rem;
 }
-.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-theatre li small {
-  font-size: .58rem;
-}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-theatre li div small,
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-theatre li > span { display: none; }
 
 /* --------------------------------------------------------- Laufansicht v9
-   Responsives Raster: Breite Viewports zeigen Animation (Visual) und
-   Algorithmuszustand (Console) NEBENEINANDER, schmale Viewports STAPELN sie
-   (Visual oben, Console darunter). So überlagert der Algorithmuszustand die
-   Animation under keinem Fall – er steht garantiert unter oder neben ihr. */
+   ZWEI GETRENNTE ZONEN: Canvas-Zone (links) und Console-Zone (rechts) sind
+   eigene Grid-Zellen, jede mit isolation:isolate + overflow:hidden. Der
+   Algorithmuszustand kann die Animation dadurch strukturell NIE überlagern —
+   er steht nebeneinander (breit) bzw. darunter (schmal). */
 
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-stage {
+  height: 100%;
   min-height: 0;
   display: grid;
-  grid-template-columns: 1fr;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   gap: 10px;
+  padding: 10px;
+  overflow: hidden;
 }
-@media (min-width: 880px) {
+@media (max-width: 880px) {
   .auto-plan-dialog[data-v9-layout="1"] .auto-plan-stage {
-    grid-template-columns: minmax(260px, 1fr) minmax(300px, 1.05fr);
-    grid-template-rows: minmax(0, 1fr);
-    align-items: stretch;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(190px, 42%) minmax(0, 58%);
   }
 }
 
-/* ---------------------------------------------------- V9 Reinzeichnung
-   Robuste Methode: ALLE Elemente im Fluss (kein position:absolute für
-   Layout), jedes Kind trägt min-height:0 / min-width:0, jeder Container
-   hat expliziten overflow. So überlagert garantiert nichts. */
-
-/* Alle ehemals absolut positionierten Beschriftungen ausblenden. */
+/* Alle ehemals absolut positionierten Beschriftungen der Canvas-Zone und
+   das alte Phasenband werden ausgeblendet: Die Zone zeigt NUR den Canvas. */
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-core,
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-truth-strip,
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-orbit-legend,
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-visual-foot,
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-phase-list { display: none; }
 
-/* Canvas-Container: Flex-Column mit einem Kind (dem Canvas). Kein
-   position:absolute mehr – der Canvas ist ein normales Flex-Kind. */
+/* Canvas-Zone: eigener, beschnittener Stacking-Kontext; der Canvas ist ein
+   normales Flex-Kind und füllt die Zone vollständig. */
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-visual {
   position: relative;
   isolation: isolate;
   z-index: 0;
   overflow: hidden;
+  min-width: 0;
+  min-height: 0;
   width: 100%;
-  min-height: 230px;
-  max-height: 420px;
+  height: 100%;
   display: flex;
   flex-direction: column;
+  border-radius: var(--app-radius);
 }
 .auto-plan-dialog[data-v9-layout="1"] #autoPlanCanvas {
   position: static;
@@ -419,25 +502,27 @@ html[data-color-scheme="dark"] .auto-plan-dialog[data-v9-layout="1"] .auto-plan-
   height: 100%;
 }
 
-/* Console: Flex-Column mit Strip/Theater/Log/Metriken. Jedes Kind
-   min-height:0, damit nichts ausbricht. */
+/* Console-Zone: eigener, beschnittener Stacking-Kontext; scrollt intern.
+   Jedes Kind trägt min-width:0 / min-height:0, damit nichts ausbricht. */
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-console {
   position: relative;
+  isolation: isolate;
   z-index: 1;
-  flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 6px;
   overflow: auto;
+  border-radius: var(--app-radius);
 }
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-console > * {
   min-width: 0;
   min-height: 0;
 }
-.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-theatre { min-height: 0; }
-.auto-plan-dialog[data-v9-layout="1"] .auto-plan-live-metrics { min-height: 0; }
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-theatre { min-height: 0; flex: 0 0 auto; }
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v9-run-strip { flex: 0 0 auto; }
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-live-metrics { min-height: 0; flex: 0 0 auto; }
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-log {
   flex: 0 0 auto;
   height: 190px;
