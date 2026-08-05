@@ -1,4 +1,5 @@
 // Temporärer CI-Transport; diese Datei wird aus dem Release-ZIP ausgeschlossen.
+// Finaler PR-Ereignis-Trigger für das reproduzierbare Releaseartefakt.
 import { cp, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
