@@ -9,10 +9,10 @@
  */
 
 import * as V95 from './auto-planner-v9-5.js?v=20260805.1';
-import { reconcileV95Certification } from './auto-plan-certification-v9-5.js?v=20260805.2';
+import { reconcileV95Certification } from './auto-plan-certification-v9-5.mjs?v=20260805.2';
 
 export * from './auto-planner-v9-5.js?v=20260805.1';
-export { reconcileV95Certification } from './auto-plan-certification-v9-5.js?v=20260805.2';
+export { reconcileV95Certification } from './auto-plan-certification-v9-5.mjs?v=20260805.2';
 
 function isTerminal(update) {
   return update?.phase === 'complete' || update?.phase === 'blocked';
