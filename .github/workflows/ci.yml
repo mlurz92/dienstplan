@@ -6,10 +6,6 @@ on:
   pull_request:
     branches: [main]
 
-# Bei neuen Commits desselben Branches ist ausschließlich der aktuelle Stand
-# relevant. Alte, mehrminütige Auto-Plan-/Playwright-Läufe werden sofort
-# abgebrochen, statt parallel Rechenzeit zu verbrauchen und veraltete Ergebnisse
-# nachzuliefern.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -20,18 +16,32 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: npm
+      - name: Bootstrap exact lockfile for v9.5 toolchain
+        run: npm install --package-lock-only --ignore-scripts
       - run: npm ci
       - run: npm run check
+      - run: npm run build
       - run: npm test
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
+      - name: Generated v9.5 assets
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: v95-generated-assets
+          path: |
+            package-lock.json
+            vendor/floating-ui
+            vendor/or-tools-wasm
+          if-no-files-found: error
+          retention-days: 7
       - name: Playwright-Diagnostik sichern
         if: always()
         uses: actions/upload-artifact@v7
