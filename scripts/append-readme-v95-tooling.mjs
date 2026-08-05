@@ -7,12 +7,13 @@ const section = `
 ${marker}
 ## 17. Build-, Typ- und Testwerkzeuge v9.5
 
-Die Produktionsanwendung bleibt frameworkfrei. Ein schmaler, reproduzierbarer Build-Layer erzeugt ausschließlich die lokal ausgelieferten Browser-Abhängigkeiten und prüft die typisierten Solvergrenzen.
+Die Produktionsanwendung bleibt frameworkfrei. Ein schmaler, reproduzierbarer Build-Layer erzeugt ausschließlich deploybare Browser-Abhängigkeiten und prüft die typisierten Solvergrenzen.
 
 | Baustein | Version | Aufgabe | Lizenz |
 | --- | ---: | --- | --- |
-| \`or-tools-wasm\` | \`0.9.1\` | lokaler CP-SAT-WebAssembly-Kern im Modul-Worker | Apache-2.0 |
-| Vite | \`8.1.5\` | deterministischer ESM-/Worker-/WASM-Build für Browser-Vendorcode | MIT |
+| \`or-tools-wasm\` | \`0.9.1\` | primärer CP-SAT-WebAssembly-Kern im Modul-Worker | Apache-2.0 |
+| \`cpsat-js\` | \`1.0.0\` | kostenfreier, einsträngiger CP-SAT-Laufzeitfallback | MIT |
+| Vite | \`8.1.5\` | deterministischer ESM-Build für lokal ausgelieferten Vendorcode | MIT |
 | TypeScript | \`7.0.2\` | strikte Typprüfung der Solver-, Zertifikat- und Vendorgrenzen | Apache-2.0 |
 | \`fast-check\` | \`4.9.0\` | Property-Based Tests mathematischer Invarianten | MIT |
 | Floating UI DOM | \`1.8.0\` | kollisionsfreie, viewportgebundene Rich-Tooltip-Positionierung | MIT |
@@ -27,11 +28,12 @@ npm run build
 
 \`npm run build\` führt nacheinander aus:
 
-1. Vite-Build des exakt gepinnten CP-SAT-Einstiegspunkts nach \`vendor/or-tools-wasm/cp-sat.js\`; zugehörige Modul-Worker und WebAssembly-Dateien werden als relative, gehashte Assets emittiert;
-2. Tree-Shaking von Floating UI zu \`vendor/floating-ui/floating-ui-dom.js\`;
-3. strikte TypeScript-Prüfung ohne Emit.
+1. Tree-Shaking von Floating UI zu \`vendor/floating-ui/floating-ui-dom.js\`;
+2. strikte TypeScript-Prüfung der Solver-API und Ergebnisverträge ohne Emit.
 
-Für Cloudflare Pages lautet der Build-Befehl \`npm run build\`; das Ausgabeverzeichnis bleibt das Repository-Root. Die Anwendung lädt im Betrieb ausschließlich die versionierten lokalen Vendorpfade. Externe CDN-Quellen sind nur ein kontrollierter Solver-Fallback, niemals Voraussetzung für den Regelbetrieb.
+Der vollständige Browser-Build von \`or-tools-wasm\` enthält mehrere WASM-Laufzeitvarianten und überschreitet die 25-MiB-Grenze eines einzelnen Cloudflare-Pages-Assets. Der Worker lädt deshalb die exakt gepinnte freie Version \`or-tools-wasm@0.9.1\` über jsDelivr; bei Lade- oder Kompatibilitätsfehlern folgen \`cpsat-js@1.0.0\` und anschließend die vollständig lokale v8.5-Heuristik. Es gibt keine kostenpflichtige Solver- oder Serverabhängigkeit.
+
+Für Cloudflare Pages lautet der Build-Befehl \`npm run build\`; das Ausgabeverzeichnis bleibt das Repository-Root.
 
 ### Qualitätsprüfungen
 
