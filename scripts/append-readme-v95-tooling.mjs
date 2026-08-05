@@ -12,7 +12,7 @@ Die Produktionsanwendung bleibt frameworkfrei. Ein schmaler, reproduzierbarer Bu
 | Baustein | Version | Aufgabe | Lizenz |
 | --- | ---: | --- | --- |
 | \`or-tools-wasm\` | \`0.9.1\` | lokaler CP-SAT-WebAssembly-Kern im Modul-Worker | Apache-2.0 |
-| Vite | \`8.1.5\` | deterministischer ESM-Library-Build für Browser-Vendorcode | MIT |
+| Vite | \`8.1.5\` | deterministischer ESM-/Worker-/WASM-Build für Browser-Vendorcode | MIT |
 | TypeScript | \`7.0.2\` | strikte Typprüfung der Solver-, Zertifikat- und Vendorgrenzen | Apache-2.0 |
 | \`fast-check\` | \`4.9.0\` | Property-Based Tests mathematischer Invarianten | MIT |
 | Floating UI DOM | \`1.8.0\` | kollisionsfreie, viewportgebundene Rich-Tooltip-Positionierung | MIT |
@@ -27,7 +27,7 @@ npm run build
 
 \`npm run build\` führt nacheinander aus:
 
-1. Kopieren des exakt gepinnten CP-SAT-Pakets nach \`vendor/or-tools-wasm/cp-sat\`;
+1. Vite-Build des exakt gepinnten CP-SAT-Einstiegspunkts nach \`vendor/or-tools-wasm/cp-sat.js\`; zugehörige Modul-Worker und WebAssembly-Dateien werden als relative, gehashte Assets emittiert;
 2. Tree-Shaking von Floating UI zu \`vendor/floating-ui/floating-ui-dom.js\`;
 3. strikte TypeScript-Prüfung ohne Emit.
 
