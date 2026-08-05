@@ -1,5 +1,113 @@
 # Auto-Plan Changelog
 
+## 2026-08-06 – Release 0.10.5 / Auto-Plan v10 (Exact Boolean Rostering Core)
+
+### Der Kern: ein Modell, das die Aufgabe ausdrücken kann
+
+- **Boolesches Zuordnungsmodell.** Je Feld und zulässiger Person eine
+  Binärvariable, genau eine Person je Feld. Die Vorgängerfassung führte je Feld
+  eine ganzzahlige Variable mit einem Personencode als Wert — in dieser
+  Darstellung ist „Person p hat höchstens vier Bereitschaftsdienste" linear
+  nicht ausdrückbar, weil die Summe von Personennummern keine Einsatzzahl ist.
+  Auf derselben Instanz sinken die harten Bedingungen von 2.036 auf 684, die
+  Hilfsvariablen von 1.058 auf 47.
+- **Kein Big-M, keine selbstgebaute Reifikation.** `onlyEnforceIf` leistet die
+  Halbreifikation. Die bisherigen Hilfskonstruktionen erzwangen durch eine nicht
+  an das Literal gebundene Klausel *unbedingt* Ungleichheit — die Wochenendkette
+  machte damit jeden Monat mit einem Fr–Sa–So-Tripel offener BD-Felder
+  unlösbar, und die Minimal-Perturbation erzwang maximale Abweichung.
+- **Lexikografische Kaskade** mit Sperrschnitten und Lösungshinweisen nach der
+  von OR-Tools empfohlenen Prozedur. Die Rangfolge der Ziele ist im Studio frei
+  sortierbar und ersetzt die bisherigen Gewichte.
+- **Leximin** über die Summe der Überschüsse oberhalb absteigender Schwellen.
+- **Fairness über Monatsgrenzen:** Ein Gedächtnis über bis zu sechs Monate hebt
+  den Startwert derjenigen an, die zuletzt über dem Mittel lagen.
+- **Minimal-Perturbation** als letzte Stufe: Stabilität entscheidet
+  Gleichstände, kostet aber nie Qualität.
+- **Korrekturmengen-Diagnose** in einem einzigen Lauf statt einer Löschschleife
+  über mehrere tausend Constraints. Das Ergebnis wird als „im Zeitbudget
+  nachgewiesen" ausgewiesen, nicht als Minimum behauptet.
+- **Reparaturlauf** über ein Änderungsfenster statt Neuplanung des Monats.
+- **Jain-Index, Gini-Koeffizient** an jedem Ergebnis, gleich welcher Pfad
+  gewonnen hat.
+
+### Ladefähigkeit — der Grund, warum v9.5 nie exakt rechnete
+
+- **Selbsttragendes WebAssembly-Bündel** (`npm run vendor:cpsat`). Der bisherige
+  Vendor-Pfad enthielt den bloßen Bezeichner `@bufbuild/protobuf` und war im
+  Browser nicht auflösbar; in einem Modul-Worker hilft auch eine Import-Map
+  nicht. Verifiziert im Hauptthread und im echten Modul-Worker.
+- **Erkennung an der Fabrik** `CpSolver.create` statt am bloßen Vorhandensein
+  von `CpModel`/`CpSolver` — beide Bindungen exportieren beides, weshalb v9.5
+  immer den falschen Zweig wählte und jeder Lösungsversuch in einem
+  verschluckten Fehler endete.
+- **`Cross-Origin-Embedder-Policy` entfällt.** Sie war nur für den mehrfädigen
+  Build nötig und stellte jede Fremdressource ohne CORP-Kopfzeile unter
+  Vorbehalt, darunter die Tabellenbibliothek des Excel-Imports.
+- **`notEquals` wird nirgends verwendet:** In `cpsat-js` erzeugt die Methode
+  eine Bedingung über die volle Wertedomäne, also gar keine Bedingung.
+
+### Studio v10.5
+
+- **Sachgruppen statt Spaltenraster**, aufklappbar, voreingestellt offen; die
+  Spaltenzahl folgt über Container-Abfragen dem tatsächlich verfügbaren Platz.
+- **Kein Regler ohne Wirkung:** Die neun `cpSat*Weight`-Gewichte, das nie
+  umgesetzte Fairness-Profil, der beim portablen Build bedeutungslose
+  Worker-Regler sowie `infeasibilityMode` und `musAutoRelax` entfallen aus
+  Schema, Engine-Normalisierung, Einstellungsdialog und Tests.
+- **Neue, wirksame Regler:** Rangfolge der Ziele, Leximin-Tiefe, HG-Gewicht,
+  Fairness-Gedächtnis und dessen Gewicht, Stabilitätsstufe, Konfliktverhalten,
+  Laufansicht.
+- **Erklärender Tooltip an jedem Bedienelement**, notfalls aus Beschriftung und
+  Beschreibung gebildet.
+- **Ergebnis-Panel** mit Stufenspur, erreichten Schranken, Modellgröße,
+  Verteilungskennzahlen und Korrekturmenge.
+
+### Laufansicht „Kristallisation"
+
+Domänenfeld, Schranken-Schere, Prioritätsleiter und Lastwaage — alle vier
+Ebenen aus echten Ereignissen des Laufs gespeist. Treffen Zielwert und untere
+Schranke aufeinander, läuft einmal ein Puls über das Feld. **Der Glanz folgt der
+Farbe:** Wärme, Sättigung und Helligkeit bestimmen Radius und Intensität des
+Glows. Die Orbit-Ansicht bleibt wählbar.
+
+### Layout und Lesbarkeit als Testeigenschaft
+
+`tests/e2e/layout-contrast-v10-5.spec.js` prüft in beiden Erscheinungsbildern
+bei fünf Breiten, ob ein sichtbares Element über seinen Rahmen hinausragt, und
+misst für jeden Textknoten den Kontrast gegen den tatsächlich wirksamen
+Hintergrund — inklusive halbtransparenter Schichten — gegen WCAG 2.1 AA.
+Aufgedeckt und behoben: 36 unlesbare Stellen im Dunkelmodus, darunter fest
+verdrahtete weiße Flächen und die kräftige Monatsfarbe als Schriftfarbe auf
+dunklem Grund (gemessene 1,3:1).
+
+### Während der Umsetzung gefunden und behoben
+
+- `Number(null)` ist null und `Number.isInteger(0)` ist wahr: Eine nicht gesetzte
+  Obergrenze wurde dadurch zur härtesten aller Grenzen und das Modell unlösbar.
+- Das Fairness-Gedächtnis verglich nur Personen mit Vorlast; ihr Mittel war ihr
+  eigenes und der Versatz damit stets null.
+- Vorzeichen des Gedächtnisses: Die Kaskade minimiert die Höchstlast, also muss
+  die Vorlast den Startwert anheben, nicht senken.
+- Die Leximin-Bindung rechnete Schranken über den festen Variablenraum und
+  stürzte an ihren eigenen Zusatzvariablen ab. Der Modultest hatte das verdeckt,
+  weil er den Solver unter einem anderen Modulbezeichner lud und damit eine
+  zweite Instanz erzeugte — die Tests laden jetzt exakt dieselben Bezeichner wie
+  die Engine und prüfen ausdrücklich, dass der exakte Pfad erreichbar war.
+- Lastskalierung in Zehnteln statt Hundertsteln; bei Hundertsteln erreicht die
+  Höchstlaststufe in vertretbarer Zeit keinen Beweis mehr.
+
+### Mathematisches Audit der Heuristik
+
+- **UCB-Normierung:** Der Ausbeutungsterm der kostenbewussten Operatorwahl war
+  unnormiert und stand neben einem Explorationsbonus der Größenordnung eins.
+  Normiert auf die beste beobachtete Effizienz liegt er nun in [0,1].
+- `saturdayVariance` wurde als Parameter `weekendSpread` übergeben und war beim
+  Lesen verlässlich irreführend — umbenannt.
+- Populationsvarianz und die 2017er-Fassung der Late-Acceptance-Fortschreibung
+  sind als solche dokumentiert.
+
+
 ## 2026-08-04 (2) – Release 0.9.1 / Regelwerk v4.10
 
 - **Neue Regel Fr-BD · Sa frei · So-BD:** Freitags-BD, vollständig freier

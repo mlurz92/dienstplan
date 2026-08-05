@@ -11,8 +11,12 @@ import { readFile } from 'node:fs/promises';
 
 process.env.TZ = 'Europe/Berlin';
 
-const model = await import('../js/auto-plan-model.js');
-const solverBridge = await import('../js/auto-plan-solver.js');
+// Dieselben Modulbezeichner wie in der Engine – inklusive Abfragezeichen.
+// Ein abweichender Bezeichner erzeugt eine zweite Modulinstanz mit eigenem
+// Solver-Zustand; der exakte Pfad liefe dann im Test niemals, und genau das
+// hat einen Absturz in der Leximin-Bindung bis in den Browser durchgelassen.
+const model = await import('../js/auto-plan-model.js?v=20260806.1');
+const solverBridge = await import('../js/auto-plan-solver.js?v=20260806.1');
 const planner = await import('../js/auto-planner.js');
 const { DEFAULT_STAFF } = await import('../js/defaults.js');
 const source = async path => readFile(new URL(path, import.meta.url), 'utf8');
@@ -316,7 +320,7 @@ test('die Korrekturmengen-Diagnose benennt die aufzugebende Gruppe in einem Lauf
 });
 
 test('der vollständige Lauf liefert einen auditierten, vollständigen Monat', async () => {
-  solverBridge.resetSolverForTests();
+  await solverOrNull();
   const monthData = monthOf(2026, 9);
   const state = stateWith(monthData);
   const result = await planner.buildAutoPlan({
@@ -327,6 +331,9 @@ test('der vollständige Lauf liefert einen auditierten, vollständigen Monat', a
     runConfig: { cpSatTimeBudgetSeconds: 6, leximinDepth: 2, searchIntensity: 'standard', repairIterations: 0, perfectionEnabled: false }
   });
   assert.equal(result.algorithmRevision, 10);
+  // Der exakte Pfad muss im Lauf tatsächlich erreichbar gewesen sein.
+  assert.notEqual(result.metrics.exact?.status, 'UNAVAILABLE',
+    `exakter Pfad nicht erreichbar: ${JSON.stringify(solverBridge.solverDiagnostics())}`);
   assert.equal(result.metrics.engine, 'v10-exact-boolean-rostering-core');
   assert.equal(result.openSlots, result.changes.length, 'jedes offene Feld ist vorgeschlagen');
   assert.equal(result.metrics.gray, 0);

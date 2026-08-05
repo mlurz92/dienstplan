@@ -42,6 +42,7 @@ import {
 import { holidayName } from './holidays.js?v=20260806.1';
 import { AlgorithmCommentary, commentaryParts } from './auto-plan-commentary.js?v=20260806.1';
 import { AutoPlanVisualizer } from './auto-plan-visualizer.js?v=20260806.1';
+import { AutoPlanCrystallizer } from './auto-plan-crystallize.js?v=20260806.1';
 import { AutoPlanProgressModel } from './auto-plan-progress.js?v=20260806.1';
 import { AutoPlanRunEpoch, abortableDelay } from './auto-plan-lifecycle.js?v=20260806.1';
 
@@ -1085,7 +1086,13 @@ function openStudio() {
 async function startPlanner() {
   if (!syncConfigValidation()) return;
   const runToken = runEpoch.begin();
-  const runConfig = readConfig();
+  /**
+   * Die Laufkonfiguration entsteht in zwei Schichten: Der Kern liest seine
+   * eigenen Felder, die v10.5-Schicht ergänzt Rangfolge, Leximin-Tiefe,
+   * Fairness-Gedächtnis und Konfliktverhalten. Fehlt die Schicht — etwa in
+   * einem Test, der nur den Kern lädt —, gilt schlicht ihre Voreinstellung.
+   */
+  const runConfig = { ...readConfig(), ...(globalThis.__autoPlanV10RunConfig?.() || {}) };
   const open = Object.values(activeMonth.days || {}).reduce((sum, day) => sum + Number(!day.bd) + Number(!day.hg), 0);
   const execution = createAutoPlanExecutionPlan({
     hardwareConcurrency: navigator.hardwareConcurrency,
@@ -1110,11 +1117,24 @@ async function startPlanner() {
   const localController = new AbortController();
   controller = localController;
   visualizer?.stop();
+  /**
+   * Zwei Darstellungen derselben Suche.
+   *
+   * „Kristallisation" zeigt den Zusammenfall des Suchraums, die Annäherung von
+   * Zielwert und unterer Schranke und die Lastverteilung — sie ist die
+   * Voreinstellung, weil sie ablesbar ist. Die Orbit-Ansicht bleibt als
+   * Alternative erhalten; die Wahl steht im Studio und wird lokal gemerkt.
+   */
+  const visualMode = document.documentElement.dataset.autoPlanVisual === 'orbit' ? 'orbit' : 'crystal';
+  const canvas = byId('autoPlanCanvas');
   const localVisualizer = state.settings?.workflow?.studioVisualizer === false
     ? null
-    : new AutoPlanVisualizer(byId('autoPlanCanvas'), activeMonth);
+    : visualMode === 'orbit'
+      ? new AutoPlanVisualizer(canvas, activeMonth)
+      : new AutoPlanCrystallizer(canvas, activeMonth);
   visualizer = localVisualizer;
   dialog.dataset.visualizer = localVisualizer ? 'on' : 'off';
+  dialog.dataset.visualMode = localVisualizer ? visualMode : 'off';
   startClock();
 
   resetLog();

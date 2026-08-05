@@ -1,0 +1,550 @@
+/*
+ * Auto-Plan Studio v10.5 — Layoutschicht.
+ *
+ * GRUNDSATZ
+ *
+ * Überlagerungsfreiheit ist hier kein Ergebnis von Einzelfallreparaturen,
+ * sondern von vier Regeln, aus denen sie folgt:
+ *
+ *   1. Eine Gitterebene je Zone. Keine Zone kennt die Position einer anderen.
+ *   2. `min-width: 0` und `min-height: 0` auf jedem Gitter- und Flex-Kind.
+ *      Ohne das erzwingt die automatische Mindestgröße den Überlauf – die mit
+ *      Abstand häufigste Ursache abgeschnittener Inhalte.
+ *   3. `position: absolute` ausschließlich für Dekor, immer hinter einem
+ *      `isolation: isolate` und immer mit `z-index: 0`.
+ *   4. Scrollen ist Eigenschaft einer Zone, nie des Dialogs.
+ *
+ * Container-Abfragen statt Viewport-Schwellen: Die Zonen reagieren auf den
+ * Platz, den sie wirklich haben, nicht auf die Breite des Fensters.
+ */
+
+/* ------------------------------------------------------------------ *
+ * 1. Grundsicherung gegen Überlauf
+ * ------------------------------------------------------------------ */
+
+.auto-plan-dialog[data-v10-layout="1"] * {
+  min-width: 0;
+}
+
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-card,
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-panel,
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-group,
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-group-body,
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-field {
+  min-width: 0;
+  min-height: 0;
+  max-width: 100%;
+}
+
+/* Kein Textträger darf seinen Inhalt abschneiden. */
+.auto-plan-dialog[data-v10-layout="1"] h1,
+.auto-plan-dialog[data-v10-layout="1"] h2,
+.auto-plan-dialog[data-v10-layout="1"] h3,
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-group-title,
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-field > span,
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-field > small,
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-section-title {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+}
+
+/* Breite Inhalte scrollen in ihrem eigenen Kasten – nie die Seite. */
+.auto-plan-dialog[data-v10-layout="1"] table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* ------------------------------------------------------------------ *
+ * 2. Sachgruppen statt Spaltenraster
+ * ------------------------------------------------------------------ */
+
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-field-grid {
+  display: block;
+}
+
+.auto-plan-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  container-type: inline-size;
+  container-name: autoplan-config;
+}
+
+.auto-plan-group {
+  border: 1px solid color-mix(in oklab, var(--border, #d6dee6) 70%, transparent);
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--panel, #fff) 88%, transparent);
+  overflow: clip;
+}
+
+.auto-plan-group-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  font-weight: 600;
+  list-style: none;
+  color: var(--text, #16202b);
+  /* Der Sommer-Marker der Browser ist inkonsistent; das Dreieck steht unten. */
+}
+
+.auto-plan-group-summary::-webkit-details-marker { display: none; }
+
+.auto-plan-group-summary::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 160ms ease;
+  opacity: .55;
+}
+
+.auto-plan-group[open] > .auto-plan-group-summary::before {
+  transform: rotate(45deg);
+}
+
+.auto-plan-group-summary:focus-visible {
+  outline: 2px solid var(--month-accent, #4f8fbd);
+  outline-offset: -2px;
+}
+
+.auto-plan-group-title { flex: 1 1 auto; }
+
+.auto-plan-group-count {
+  flex: 0 0 auto;
+  min-width: 1.6em;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: .72rem;
+  font-weight: 700;
+  text-align: center;
+  background: color-mix(in oklab, var(--month-accent, #4f8fbd) 16%, transparent);
+  color: color-mix(in oklab, var(--month-accent, #4f8fbd) 78%, var(--text, #16202b));
+}
+
+.auto-plan-group-body {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  padding: 4px 12px 12px;
+}
+
+@container autoplan-config (min-width: 520px) {
+  .auto-plan-group-body { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .auto-plan-group-body > .auto-plan-field--wide { grid-column: 1 / -1; }
+}
+
+@container autoplan-config (min-width: 860px) {
+  .auto-plan-group-body { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+/* ------------------------------------------------------------------ *
+ * 3. Rangfolge der Zielstufen
+ * ------------------------------------------------------------------ */
+
+.auto-plan-stage-order {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.auto-plan-stage-row {
+  display: grid;
+  grid-template-columns: 1.7rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--month-accent, #4f8fbd) 8%, transparent);
+  font-size: .82rem;
+}
+
+.auto-plan-stage-rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  font-size: .72rem;
+  font-weight: 700;
+  background: color-mix(in oklab, var(--month-accent, #4f8fbd) 24%, transparent);
+}
+
+.auto-plan-stage-label {
+  overflow-wrap: anywhere;
+}
+
+.auto-plan-stage-buttons {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.auto-plan-stage-buttons button {
+  width: 1.6rem;
+  height: 1.6rem;
+  padding: 0;
+  border: 1px solid color-mix(in oklab, var(--border, #d6dee6) 64%, transparent);
+  border-radius: 6px;
+  background: color-mix(in oklab, var(--panel, #fff) 92%, transparent);
+  color: inherit;
+  font-size: .62rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.auto-plan-stage-buttons button:disabled { opacity: .32; cursor: default; }
+.auto-plan-stage-buttons button:not(:disabled):hover {
+  background: color-mix(in oklab, var(--month-accent, #4f8fbd) 18%, var(--panel, #fff));
+}
+
+/* ------------------------------------------------------------------ *
+ * 4. Laufansicht – Animation und Konsole nebeneinander, nie übereinander
+ * ------------------------------------------------------------------ */
+
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-stage {
+  container-type: inline-size;
+  container-name: autoplan-stage;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(180px, 44%) minmax(0, 1fr);
+  gap: 10px;
+  min-height: 0;
+}
+
+@container autoplan-stage (min-width: 900px) {
+  .auto-plan-dialog[data-v10-layout="1"] .auto-plan-stage {
+    grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.85fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
+}
+
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-visual {
+  position: relative;
+  isolation: isolate;
+  z-index: 0;
+  min-width: 0;
+  min-height: 0;
+  overflow: clip;
+}
+
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-visual canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-console {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+/* Phasenkarten: Der bisher fehlschlagende Layouttest prüft genau das – eine
+   Karte darf niemals über die rechte Dialogkante hinausragen. Mit
+   `auto-fit`/`minmax(0, …)` und erlaubtem Umbruch ist das strukturell
+   ausgeschlossen statt nur zufällig richtig. */
+.auto-plan-dialog[data-v10-layout="1"] #autoPlanPhaseList,
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-phase-list,
+.auto-plan-dialog[data-v10-layout="1"] #autoPlanV85Theatre ol {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: 6px;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow: hidden;
+}
+
+@container autoplan-stage (max-width: 720px) {
+  .auto-plan-dialog[data-v10-layout="1"] #autoPlanPhaseList,
+  .auto-plan-dialog[data-v10-layout="1"] .auto-plan-phase-list,
+  .auto-plan-dialog[data-v10-layout="1"] #autoPlanV85Theatre ol {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.auto-plan-dialog[data-v10-layout="1"] #autoPlanPhaseList > li,
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-phase-list > li,
+.auto-plan-dialog[data-v10-layout="1"] #autoPlanV85Theatre ol > li {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+/* ------------------------------------------------------------------ *
+ * 5. Ergebnis-Panel v10
+ * ------------------------------------------------------------------ */
+
+.auto-plan-v10-result { display: grid; gap: 8px; min-width: 0; }
+
+.auto-plan-v10-status {
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: .74rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.auto-plan-v10-status[data-tone="proof"] {
+  background: color-mix(in oklab, var(--green, #2f8f5b) 20%, transparent);
+  color: color-mix(in oklab, var(--green, #2f8f5b) 82%, var(--text, #16202b));
+}
+
+.auto-plan-v10-status[data-tone="conflict"] {
+  background: color-mix(in oklab, var(--red, #c8493f) 18%, transparent);
+  color: color-mix(in oklab, var(--red, #c8493f) 82%, var(--text, #16202b));
+}
+
+.auto-plan-v10-status[data-tone="plain"] {
+  background: color-mix(in oklab, var(--month-accent, #4f8fbd) 16%, transparent);
+  color: color-mix(in oklab, var(--month-accent, #4f8fbd) 80%, var(--text, #16202b));
+}
+
+.auto-plan-v10-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(210px, 100%), 1fr));
+  gap: 6px 14px;
+  margin: 0;
+}
+
+.auto-plan-v10-facts > div {
+  display: grid;
+  gap: 1px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--month-accent, #4f8fbd) 7%, transparent);
+  min-width: 0;
+}
+
+.auto-plan-v10-facts dt { font-size: .7rem; opacity: .78; overflow-wrap: anywhere; }
+.auto-plan-v10-facts dd { margin: 0; font-weight: 650; font-size: .84rem; overflow-wrap: anywhere; }
+
+.auto-plan-v10-trace {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 190px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.auto-plan-v10-trace > li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: 7px;
+  font-size: .78rem;
+  background: color-mix(in oklab, var(--panel, #fff) 90%, transparent);
+  border: 1px solid color-mix(in oklab, var(--border, #d6dee6) 55%, transparent);
+}
+
+.auto-plan-v10-trace > li[data-status="OPTIMAL"] {
+  border-color: color-mix(in oklab, var(--green, #2f8f5b) 42%, transparent);
+}
+
+.auto-plan-v10-trace > li > span { overflow-wrap: anywhere; }
+.auto-plan-v10-trace > li > small { opacity: .7; font-size: .66rem; white-space: nowrap; }
+
+.auto-plan-v10-conflict {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: .8rem;
+  line-height: 1.45;
+  background: color-mix(in oklab, var(--orange, #d98324) 12%, transparent);
+  overflow-wrap: anywhere;
+}
+
+/* ------------------------------------------------------------------ *
+ * 6. Dunkelmodus
+ * ------------------------------------------------------------------ */
+
+html[data-color-scheme="dark"] .auto-plan-group {
+  background: color-mix(in oklab, var(--v85-surface, #141a21) 88%, transparent);
+  border-color: color-mix(in oklab, var(--v85-border, #2b343d) 78%, transparent);
+}
+
+html[data-color-scheme="dark"] .auto-plan-group-summary { color: var(--v85-text, #e6edf3); }
+
+html[data-color-scheme="dark"] .auto-plan-group-count,
+html[data-color-scheme="dark"] .auto-plan-stage-rank {
+  background: color-mix(in oklab, var(--month-accent, #4f8fbd) 30%, transparent);
+  color: var(--v85-text, #e6edf3);
+}
+
+html[data-color-scheme="dark"] .auto-plan-stage-row {
+  background: color-mix(in oklab, var(--v85-surface-strong, #1b232c) 88%, transparent);
+}
+
+html[data-color-scheme="dark"] .auto-plan-stage-buttons button {
+  background: color-mix(in oklab, var(--v85-surface-strong, #1b232c) 92%, transparent);
+  border-color: color-mix(in oklab, var(--v85-border, #2b343d) 82%, transparent);
+  color: var(--v85-text, #e6edf3);
+}
+
+html[data-color-scheme="dark"] .auto-plan-v10-facts > div,
+html[data-color-scheme="dark"] .auto-plan-v10-trace > li {
+  background: color-mix(in oklab, var(--v85-surface-strong, #1b232c) 86%, transparent);
+  border-color: color-mix(in oklab, var(--v85-border, #2b343d) 70%, transparent);
+  color: var(--v85-text, #e6edf3);
+}
+
+html[data-color-scheme="dark"] .auto-plan-v10-facts dt { opacity: .84; }
+
+html[data-color-scheme="dark"] .auto-plan-v10-conflict {
+  background: color-mix(in oklab, var(--orange, #ffab6b) 16%, var(--v85-surface, #141a21));
+  color: var(--v85-text, #e6edf3);
+}
+
+/* ------------------------------------------------------------------ *
+ * 7. Reduzierte Bewegung
+ * ------------------------------------------------------------------ */
+
+@media (prefers-reduced-motion: reduce) {
+  .auto-plan-group-summary::before { transition: none; }
+}
+
+/* ------------------------------------------------------------------ *
+ * 8. Dunkelmodus des Studios — gemessen, nicht geschätzt
+ *
+ * Die gewachsenen Studio-Schichten setzen an vielen Stellen die kräftige
+ * Monatsfarbe als Schriftfarbe. Auf hellem Grund ist das richtig; auf dunklem
+ * Grund steht dort dunkle Tinte auf dunkler Fläche — gemessene 1,3:1, also
+ * unlesbar. Statt einzelne Fundstellen nachzubessern, werden hier die
+ * Textrollen im Dialog geschlossen auf die Dunkelpalette gelegt.
+ *
+ * Die Werte stammen aus `tests/e2e/layout-contrast-v10-5.spec.js`, das jeden
+ * sichtbaren Textknoten gegen seinen tatsächlich wirksamen Hintergrund misst.
+ * ------------------------------------------------------------------ */
+
+html[data-color-scheme="dark"] .auto-plan-dialog {
+  --month-ink: var(--v85-text);
+  --month-accent-strong: color-mix(in oklab, var(--month-accent) 62%, white 38%);
+}
+
+/* Hervorgehobene Werte, Überschriften und Tabellenköpfe. */
+html[data-color-scheme="dark"] .auto-plan-dialog b,
+html[data-color-scheme="dark"] .auto-plan-dialog strong,
+html[data-color-scheme="dark"] .auto-plan-dialog output,
+html[data-color-scheme="dark"] .auto-plan-dialog th,
+html[data-color-scheme="dark"] .auto-plan-dialog dt,
+html[data-color-scheme="dark"] .auto-plan-dialog legend,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-section-title,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-section-title > span,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-kicker,
+html[data-color-scheme="dark"] .auto-plan-dialog .eyebrow {
+  color: var(--v85-text);
+}
+
+/* Fließtext, Hilfetexte und Beschriftungen. */
+html[data-color-scheme="dark"] .auto-plan-dialog,
+html[data-color-scheme="dark"] .auto-plan-dialog p,
+html[data-color-scheme="dark"] .auto-plan-dialog li,
+html[data-color-scheme="dark"] .auto-plan-dialog td,
+html[data-color-scheme="dark"] .auto-plan-dialog label,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-field > span {
+  color: var(--v85-text);
+}
+
+html[data-color-scheme="dark"] .auto-plan-dialog small,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-field > small,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-note {
+  color: var(--v85-muted);
+}
+
+/* Flächen: Jede Karte, jede Zeile und jeder Schalter bekommt eine dunkle
+   Unterlage. Ohne sie stünde heller Text auf hellem Kasten. */
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-card,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-panel,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-toggle,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-field,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-scorecard,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-limit-table,
+html[data-color-scheme="dark"] .auto-plan-dialog table {
+  background-color: color-mix(in oklab, var(--v85-surface) 92%, transparent);
+  color: var(--v85-text);
+  border-color: color-mix(in oklab, var(--v85-border) 68%, transparent);
+}
+
+html[data-color-scheme="dark"] .auto-plan-dialog thead th {
+  background-color: color-mix(in oklab, var(--v85-surface-muted) 88%, transparent);
+}
+
+html[data-color-scheme="dark"] .auto-plan-dialog tbody tr:nth-child(even) td {
+  background-color: color-mix(in oklab, var(--v85-surface-strong) 60%, transparent);
+}
+
+/* Schaltflächen: Die dunkle Tinte der Hellfassung wird auf beiden Ebenen
+   ersetzt — Fläche und Schrift gemeinsam, sonst verschiebt sich nur das
+   Problem. Der Abstand zur Umgebung bleibt bewusst moderat: Ein Knopf soll
+   sich abheben, nicht herausbrennen. */
+html[data-color-scheme="dark"] .auto-plan-dialog button {
+  color: var(--v85-text);
+  border-color: color-mix(in oklab, var(--v85-border) 72%, transparent);
+}
+
+html[data-color-scheme="dark"] .auto-plan-dialog button:not(.primary):not([data-variant="primary"]) {
+  background-color: color-mix(in oklab, var(--v85-surface-muted) 84%, transparent);
+}
+
+html[data-color-scheme="dark"] .auto-plan-dialog button.primary,
+html[data-color-scheme="dark"] .auto-plan-dialog #autoPlanStartBtn,
+html[data-color-scheme="dark"] .auto-plan-dialog #autoPlanApplyBtn {
+  background-color: color-mix(in oklab, var(--month-accent) 46%, #101820 54%);
+  color: #f6fafd;
+}
+
+/* Ribbon und Phasentheater trugen dunkle Tinte auf dunklem Verlauf. */
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-v85-ribbon,
+html[data-color-scheme="dark"] .auto-plan-dialog #autoPlanV8Ribbon,
+html[data-color-scheme="dark"] .auto-plan-dialog #autoPlanPhaseList > li,
+html[data-color-scheme="dark"] .auto-plan-dialog #autoPlanV85Theatre ol > li {
+  background-color: color-mix(in oklab, var(--v85-surface-muted) 82%, transparent);
+  color: var(--v85-text);
+}
+
+html[data-color-scheme="dark"] .auto-plan-dialog #autoPlanPhaseList > li small,
+html[data-color-scheme="dark"] .auto-plan-dialog #autoPlanV85Theatre ol > li small {
+  color: var(--v85-muted);
+}
+
+/* Fest verdrahtete weiße Flächen aus früheren Fassungen.
+   Sie stammen aus einer Zeit ohne Dunkelmodus und tragen seither hellen Text
+   auf weißem Grund – gemessene 1,3:1. Sie werden hier auf die Dunkelpalette
+   gelegt, statt die Schriftfarbe zurückzudunkeln: Eine weiße Insel in einer
+   dunklen Oberfläche wäre auch bei gutem Kontrast ein Fremdkörper. */
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-guardrail-flow > li,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-switch,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-switch--v85,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-chip,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-pill,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-run-strip,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-metric,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-scorecard > * {
+  background-color: color-mix(in oklab, var(--v85-surface-muted) 86%, transparent);
+  color: var(--v85-text);
+  border-color: color-mix(in oklab, var(--v85-border) 66%, transparent);
+}
+
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-guardrail-flow > li small,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-switch small {
+  color: var(--v85-muted);
+}

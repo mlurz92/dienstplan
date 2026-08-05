@@ -58,7 +58,8 @@ import {
   planProfileIds,
   syncPeerCache,
   adoptPeerCacheToken,
-  validateAutoPlanConfig
+  validateAutoPlanConfig,
+  autoPlanConfigFingerprint
 } from './auto-planner-engine.js?v=20260806.1';
 import { getStaffById } from './rules.js?v=20260806.1';
 import { basicallyEligiblePeers } from './rules-core.js?v=20260806.1';
@@ -251,6 +252,21 @@ export function fallbackRobustness(state, monthData) {
   return total ? covered / total : 1;
 }
 
+/**
+ * Last je Person als benannte Liste – die Form, die die Lastwaage der
+ * Darstellung erwartet.
+ */
+export function personLoads(state, monthData, hgFactor = 0.6) {
+  const loads = new Map();
+  for (const person of state?.staff || []) loads.set(person.id, 0);
+  for (const dateIso of Object.keys(monthData?.days || {})) {
+    const day = monthData.days[dateIso] || {};
+    if (day.bd) loads.set(day.bd, (loads.get(day.bd) || 0) + 1);
+    if (day.hg) loads.set(day.hg, (loads.get(day.hg) || 0) + hgFactor);
+  }
+  return [...loads.entries()].map(([staffId, value]) => ({ staffId, value: Number(value.toFixed(2)) }));
+}
+
 function loadVector(state, monthData, hgFactor) {
   const loads = new Map();
   for (const person of state?.staff || []) loads.set(person.id, 0);
@@ -303,13 +319,17 @@ function buildLeximinScaffold(model, depth) {
 
 /**
  * Constraints, die die Höchstlast an `Lmax` binden: L_p ≤ Lmax.
+ *
+ * `allVars` muss die Zusatzvariablen der Stufe enthalten: Die Terme verweisen
+ * auf `Lmax`, das jenseits des festen Variablenraums liegt. Wird nur
+ * `model.vars` übergeben, greift die Schrankenrechnung ins Leere.
  */
-function leximinMaxConstraints(model, lmaxIndex) {
+function leximinMaxConstraints(model, lmaxIndex, allVars) {
   const constraints = [];
   for (const [staffId, entry] of model.loadTerms) {
     if (!entry.terms.length) continue;
     const terms = [...entry.terms, [lmaxIndex, -1]];
-    const [low] = termBounds(terms, model.vars);
+    const [low] = termBounds(terms, allVars);
     constraints.push({
       id: `leximin_bind_${staffId}`,
       group: 'leximin',
@@ -325,13 +345,13 @@ function leximinMaxConstraints(model, lmaxIndex) {
 /**
  * Constraints der Stufe `level`: excess_p ≥ L_p − threshold.
  */
-function leximinExcessConstraints(model, excessRow, threshold) {
+function leximinExcessConstraints(model, excessRow, threshold, allVars) {
   const constraints = [];
   for (const [staffId, entry] of model.loadTerms) {
     const excessIndex = excessRow.get(staffId);
     if (excessIndex === undefined || !entry.terms.length) continue;
     const terms = [...entry.terms, [excessIndex, -1]];
-    const [low] = termBounds(terms, model.vars);
+    const [low] = termBounds(terms, allVars);
     constraints.push({
       id: `leximin_excess_${threshold}_${staffId}`,
       group: 'leximin',
@@ -373,12 +393,21 @@ function stagePlan(config, model) {
 async function runCascade({ model, api, config, signal, onProgress, onIncumbent }) {
   const stages = stagePlan(config, model);
   const scaffold = buildLeximinScaffold(model, config.leximinDepth);
+  const allVars = [...model.vars, ...scaffold.extraVars];
   const fixedValues = Object.values(model.relaxLiterals).map(index => [index, 1]);
   const carried = [];
   const trace = [];
   let hintValues = null;
   let bestValues = null;
   let leximinTop = null;
+
+  await onProgress?.({
+    phase: 'exact',
+    stage: 'cp-sat',
+    progress: 0.27,
+    message: `Kaskade: ${stages.length} Zielstufen`,
+    stages: stages.map(stage => ({ id: stage.id, label: stage.label, status: 'pending', value: null, bound: null }))
+  });
 
   const totalUnits = stages.reduce((sum, stage) => sum + (stage.kind === 'leximin' ? config.leximinDepth : 1), 0) + 1;
   const budgetPerUnit = Math.max(400, Math.floor((config.exactTimeBudgetSeconds * 1000) / Math.max(1, totalUnits)));
@@ -401,7 +430,7 @@ async function runCascade({ model, api, config, signal, onProgress, onIncumbent 
   // Stufe 0: Zulässigkeit. Sie kostet fast nichts und trennt sauber zwischen
   // „unlösbar" und „lösbar, aber nicht in Budget optimierbar".
   await onProgress?.({ phase: 'exact', stage: 'cp-sat', progress: 0.28, message: 'Exakte Suche: Zulässigkeit wird geprüft' });
-  const feasibility = solveStep('Zulässigkeit', { extraConstraints: [...leximinMaxConstraints(model, scaffold.lmaxIndex)] });
+  const feasibility = solveStep('Zulässigkeit', { extraConstraints: [...leximinMaxConstraints(model, scaffold.lmaxIndex, allVars)] });
   trace.push({ id: 'feasibility', label: 'Zulässigkeit', status: feasibility.statusName, value: null, bound: null, wallTimeMs: feasibility.wallTimeMs });
   if (feasibility.statusName !== 'OPTIMAL' && feasibility.statusName !== 'FEASIBLE') {
     return { values: null, trace, infeasible: feasibility.statusName === 'INFEASIBLE', reason: feasibility.reason || feasibility.statusName, stages };
@@ -414,7 +443,7 @@ async function runCascade({ model, api, config, signal, onProgress, onIncumbent 
     if (stage.kind === 'leximin') {
       // Ebene 1: Höchstlast senken.
       await onProgress?.({ phase: 'exact', stage: 'cp-sat', progress: progress(), message: 'Leximin 1: Höchstlast wird gesenkt', cpSatPhase: 'fairness' });
-      const bind = leximinMaxConstraints(model, scaffold.lmaxIndex);
+      const bind = leximinMaxConstraints(model, scaffold.lmaxIndex, allVars);
       const first = solveStep('Leximin · Höchstlast', {
         extraConstraints: [...carried, ...bind],
         objectiveTerms: [[scaffold.lmaxIndex, 1]]
@@ -432,7 +461,7 @@ async function runCascade({ model, api, config, signal, onProgress, onIncumbent 
         const threshold = leximinTop - level * model.loadScale;
         if (threshold <= scaffold.extraVars[0].lb) break;
         const row = scaffold.excess[level - 1];
-        const excessConstraints = leximinExcessConstraints(model, row, threshold);
+        const excessConstraints = leximinExcessConstraints(model, row, threshold, allVars);
         if (!excessConstraints.length) break;
         const objective = [...row.values()].map(index => [index, 1]);
         await onProgress?.({
@@ -470,7 +499,7 @@ async function runCascade({ model, api, config, signal, onProgress, onIncumbent 
       objectiveTerms: stage.terms
     });
     if (!accept(step)) break;
-    const [low] = termBounds(stage.terms, [...model.vars, ...scaffold.extraVars]);
+    const [low] = termBounds(stage.terms, allVars);
     carried.push({
       id: `fix_${stage.id}`, group: 'stage', terms: stage.terms,
       lb: low, ub: Math.round(step.objectiveValue), enforce: null
@@ -600,7 +629,17 @@ function makeResult({ state, baseline, plannedMonth, config, searchProfile, star
     month: baseline.month,
     baselineFingerprint: planningFingerprintOf(state, baseline),
     runConfig: cloneMonth(config),
-    runConfigFingerprint: JSON.stringify(stableValue(config)),
+    /**
+     * Der Fingerabdruck muss über die **engine-normalisierte** Konfiguration
+     * gebildet werden, nicht über die um die v10-Felder erweiterte.
+     *
+     * Die Übernahme prüft vor dem Schreiben erneut
+     * `autoPlanConfigFingerprint(validateAutoPlanConfig(...).config)` gegen
+     * diesen Wert. Die Normalisierung kennt die v10-Felder nicht und lässt sie
+     * fallen — ein Fingerabdruck über die erweiterte Fassung stimmte deshalb
+     * nie überein, und die Übernahme verweigerte lautlos den Dienst.
+     */
+    runConfigFingerprint: autoPlanConfigFingerprint(validateAutoPlanConfig(state, baseline, config).config),
     baseline,
     plannedMonth: cloneMonth(plannedMonth),
     changes,
@@ -797,8 +836,24 @@ export async function constructAutoPlan(parameters) {
     modelCounts: model.counts
   });
 
-  // 3. Kaskade.
-  const cascade = await runCascade({ model, api, config, signal, onProgress, onIncumbent });
+  // 3. Kaskade. Zwischenlösungen wandern als Fortschrittsmeldung nach außen –
+  //    über denselben Kanal wie alles andere, damit die Darstellung auch über
+  //    die Worker-Grenze hinweg ohne Sonderweg versorgt ist.
+  const streamIncumbent = update => {
+    const assignments = solutionToAssignments(model, update.values);
+    onIncumbent?.({ ...update, assignments });
+    onProgress?.({
+      phase: 'exact',
+      stage: 'cp-sat',
+      incumbent: {
+        objectiveValue: update.objectiveValue,
+        bestBound: update.bestBound,
+        stage: update.stageLabel || null,
+        assignments
+      }
+    });
+  };
+  const cascade = await runCascade({ model, api, config, signal, onProgress, onIncumbent: streamIncumbent });
   exactInfo.trace = cascade.trace;
   exactInfo.stages = cascade.stages?.map(stage => stage.id) || [];
   const certifiedStages = cascade.trace.filter(entry => entry.status === 'OPTIMAL').length;
@@ -846,7 +901,8 @@ export async function constructAutoPlan(parameters) {
     await onProgress?.({
       phase: 'complete', progress: 0.94,
       message: `v10: ${exactWins ? 'exakte Suche' : 'Heuristik'} gewinnt · ${winner.changes?.length || 0} Vorschläge · ${winner.metrics?.red || 0} rot`,
-      improvements: winner.metrics?.red === 0 ? 1 : 0
+      improvements: winner.metrics?.red === 0 ? 1 : 0,
+      loads: personLoads(state, winner.plannedMonth, config.hgLoadFactor)
     });
     return winner;
   }

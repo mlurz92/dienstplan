@@ -17,7 +17,7 @@
  *    sondern scrollt intern. Dark-Mode-Kontraste werden angehoben.
  */
 
-import { AUTO_PLAN_STAGES, isCpSatReady } from './auto-planner.js?v=20260806.1';
+import { AUTO_PLAN_STAGES, isSolverReady } from './auto-planner.js?v=20260806.1';
 import { state } from './state.js?v=20260806.1';
 import { setRichTooltip } from './rich-tooltip-v8-5.js?v=20260806.1';
 
@@ -147,7 +147,7 @@ function installV9Controls(dialog) {
 
   const markup = `
     <details class="auto-plan-v9-advanced" open>
-      <summary><span>v9 · Exakte Engine</span><small>Einklappen schafft Platz im Studio</small></summary>
+      <summary><span>v10 · Exakte Engine</span><small>Einklappen schafft Platz im Studio</small></summary>
       <div class="auto-plan-v9-advanced-grid">
     <label class="auto-plan-field auto-plan-field--v9">
       <span>Solver-Backend</span>
@@ -489,7 +489,7 @@ function renderV9Result(dialog, result) {
   const relaxedHtml = Array.isArray(cpSat.relaxedGroups) && cpSat.relaxedGroups.length
     ? `<div class="auto-plan-v9-relaxed"><span>Relaxierte Gruppen</span><ul>${cpSat.relaxedGroups.map(group => `<li>${group}</li>`).join('')}</ul></div>`
     : '';
-  panel.innerHTML = `<div class="auto-plan-section-title"><span>Exaktheitsnachweis · Engine v9</span><b class="auto-plan-v9-status ${tone}">${status}</b></div>
+  panel.innerHTML = `<div class="auto-plan-section-title"><span>Exaktheitsnachweis · Engine v10</span><b class="auto-plan-v9-status ${tone}">${status}</b></div>
     <div class="auto-plan-v9-result-grid">
       <div><span>Untere Schranke</span><b>${bound}</b></div>
       <div><span>CP-SAT-Laufzeit</span><b>${wallTime}</b></div>
@@ -567,22 +567,22 @@ function upgradeTheatre(dialog) {
 }
 
 function upgradeIdentity(dialog) {
-  dialog.dataset.algorithmRevision = '9';
-  dialog.dataset.engineRevision = '9';
+  dialog.dataset.algorithmRevision = '10';
+  dialog.dataset.engineRevision = '10';
   const ribbon = dialog.querySelector('#autoPlanV8Ribbon, #autoPlanV75Ribbon, #autoPlanV7Ribbon, .auto-plan-v85-ribbon');
   if (ribbon) {
     ribbon.classList.add('auto-plan-v9-ribbon');
     const title = ribbon.querySelector('b');
     const detail = ribbon.querySelector('small');
     const badge = ribbon.querySelector(':scope > strong');
-    if (title) title.textContent = 'Hybrid Exact Observatory · v9';
+    if (title) title.textContent = 'Exact Boolean Rostering Core · v10';
     if (detail) detail.textContent = 'CP-SAT-Kern mit lexikografischer Leximin-Zielfunktion · Warmstart-Heuristik · Regelengine als Schlussaudit · MUS-artige Konfliktanalyse';
-    if (badge) badge.textContent = 'ENGINE v9';
+    if (badge) badge.textContent = 'ENGINE v10';
   }
   const engine = dialog.querySelector('.auto-plan-engine-badge span');
-  if (engine) engine.textContent = 'Constraint Engine v9';
+  if (engine) engine.textContent = 'Constraint Engine v10';
   const guardrail = dialog.querySelector('.auto-plan-zero-red-guardrail header > span');
-  if (guardrail) guardrail.textContent = 'Null-Rot-Guardrail · Algorithmus v9';
+  if (guardrail) guardrail.textContent = 'Null-Rot-Guardrail · Algorithmus v10';
 }
 
 function enhance(dialog) {
@@ -611,6 +611,7 @@ function enhance(dialog) {
   window.addEventListener('autoplanresult', event => {
     const result = event.detail || null;
     renderV9Result(dialog, result);
+    globalThis.__autoPlanV10RenderResult?.(dialog, result);
     if (result?.metrics?.engine?.startsWith('v9') && result?.metrics?.cpSatUsed === true && result.complete) {
       const title = byId('autoPlanResultTitle');
       if (title) title.textContent = result.certified
@@ -638,5 +639,5 @@ if (typeof document !== 'undefined') {
   else initialize();
 }
 
-export { isCpSatReady };
+export { isSolverReady };
 export const AUTO_PLAN_STUDIO_V9_RELEASE = RELEASE;

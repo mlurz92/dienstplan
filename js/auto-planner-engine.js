@@ -584,6 +584,14 @@ function auditProposal(state, monthData, baseline) {
   };
 }
 
+/**
+ * Populationsvarianz (Division durch n, nicht durch n−1).
+ *
+ * Verglichen werden vollständige, feste Personenmengen — keine Stichproben aus
+ * einer größeren Grundgesamtheit. Die erwartungstreue Korrektur wäre hier nicht
+ * nur unnötig, sie würde Monate mit unterschiedlich vielen planbaren Personen
+ * gegeneinander verzerren.
+ */
 function variance(values) {
   if (!values.length) return 0;
   const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
@@ -642,18 +650,24 @@ function wishSnapshot(state, monthData, baseline) {
   return { possible, fulfilled, missed: Math.max(0, possible - fulfilled) };
 }
 
-function softObjectiveKey(config, audit, wishes, fairness, weekendSpread) {
+/**
+ * Der letzte Parameter ist die Varianz der Samstagsdienste, nicht die
+ * Wochenend-Spannweite. Die frühere Benennung `weekendSpread` bezeichnete an
+ * dieser Stelle etwas anderes als das gleichnamige Feld in `fairness` und war
+ * beim Lesen verlässlich irreführend.
+ */
+function softObjectiveKey(config, audit, wishes, fairness, saturdayLoadVariance) {
   const common = [-audit.recommendation[0], -audit.recommendation[1], -audit.recommendation[2]];
   if (config.optimizationFocus === 'wishes') {
-    return [-wishes.fulfilled, ...common, fairness.bdPenalty, fairness.combinedVariance, fairness.aaHgVariance, fairness.weekendVariance, weekendSpread];
+    return [-wishes.fulfilled, ...common, fairness.bdPenalty, fairness.combinedVariance, fairness.aaHgVariance, fairness.weekendVariance, saturdayLoadVariance];
   }
   if (config.optimizationFocus === 'workload') {
-    return [fairness.bdPenalty, fairness.combinedVariance, fairness.aaHgVariance, -wishes.fulfilled, ...common, fairness.weekendVariance, weekendSpread];
+    return [fairness.bdPenalty, fairness.combinedVariance, fairness.aaHgVariance, -wishes.fulfilled, ...common, fairness.weekendVariance, saturdayLoadVariance];
   }
   if (config.optimizationFocus === 'weekends') {
-    return [fairness.weekendVariance, weekendSpread, -wishes.fulfilled, ...common, fairness.bdPenalty, fairness.combinedVariance, fairness.aaHgVariance];
+    return [fairness.weekendVariance, saturdayLoadVariance, -wishes.fulfilled, ...common, fairness.bdPenalty, fairness.combinedVariance, fairness.aaHgVariance];
   }
-  return [...common, -wishes.fulfilled, fairness.bdPenalty, fairness.combinedVariance, fairness.aaHgVariance, fairness.weekendVariance, weekendSpread];
+  return [...common, -wishes.fulfilled, fairness.bdPenalty, fairness.combinedVariance, fairness.aaHgVariance, fairness.weekendVariance, saturdayLoadVariance];
 }
 
 function finalObjective(state, monthData, baseline, config) {

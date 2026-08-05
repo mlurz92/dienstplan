@@ -9,3 +9,4 @@
 import './ui-v8-5.js?v=20260806.1';
 import './auto-plan-studio-v8-5.js?v=20260806.1';
 import './auto-plan-studio-v9.js?v=20260806.1';
+import './auto-plan-studio-v10.js?v=20260806.1';

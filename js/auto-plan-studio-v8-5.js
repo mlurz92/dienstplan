@@ -285,16 +285,16 @@ function upgradeIdentity(dialog) {
   // Integrations-Hooks bestehen. Die tatsächlich laufende Engine wird separat
   // und sichtbar als v9 ausgewiesen.
   dialog.dataset.algorithmRevision = '8';
-  dialog.dataset.engineRevision = '9';
+  dialog.dataset.engineRevision = '10';
   const ribbon = dialog.querySelector('#autoPlanV8Ribbon, #autoPlanV75Ribbon, #autoPlanV7Ribbon');
   if (ribbon) {
     ribbon.classList.add('auto-plan-v85-ribbon');
     const title = ribbon.querySelector('b');
     const detail = ribbon.querySelector('small');
     const badge = ribbon.querySelector(':scope > strong');
-    if (title) title.textContent = 'Hybrid Exact Observatory · v9';
+    if (title) title.textContent = 'Exact Boolean Rostering Core · v10';
     if (detail) detail.textContent = 'CP-SAT-Kern mit lexikografischer Maximin-Zielfunktion · Warmstart-Heuristik · Regelengine als Schlussaudit · MUS-artige Konfliktanalyse';
-    if (badge) badge.textContent = 'ENGINE v9';
+    if (badge) badge.textContent = 'ENGINE v10';
   }
   const engine = dialog.querySelector('.auto-plan-engine-badge span');
   if (engine) engine.textContent = 'Constraint Engine v9';

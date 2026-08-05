@@ -24,15 +24,15 @@ Die Vorgabe „die Engine auf v9.5 heben“ ist nominell bereits erfüllt — **
 
 ## 1. Kurzfassung
 
-**Empfehlung in einem Satz:** v10.5 ersetzt das Integer-Codierungs-Modell der Engine v9.5 durch ein **reines Boolean-Zuordnungsmodell (One-Hot)** mit echter Reifikation über `onlyEnforceIf`, löst es **lexikografisch mit Blocking-Constraints und Warmstart-Hints**, setzt **Leximin über sortierte Lastvektoren** als Fairnesskern, diagnostiziert Unerfüllbarkeit über **Relaxationsliterale (MCS) statt Löschschleife**, behält die v8.5-ALNS als **Fallback und Anytime-Sicherung**, und macht den Lauf über **`onSolution`-Inkumbenten und `bestObjectiveBound`** erstmals ehrlich sichtbar.
+**Empfehlung in einem Satz:** v10.5 ersetzt das Integer-Codierungs-Modell der Engine v9.5 durch ein **reines Boolean-Zuordnungsmodell (One-Hot)** mit echter Reifikation über `onlyEnforceIf`, löst es **lexikografisch mit Blocking-Constraints und Warmstart-Hints**, setzt **Leximin über sortierte Lastvektoren** (auf der Belastungsseite also eine Leximax-Ordnung: erst die Höchstlast senken, dann die nächstniedrigere) als Fairnesskern, diagnostiziert Unerfüllbarkeit über **Relaxationsliterale (MCS) statt Löschschleife**, behält die v8.5-ALNS als **Fallback und Anytime-Sicherung**, und macht den Lauf über **`onSolution`-Inkumbenten und `bestObjectiveBound`** erstmals ehrlich sichtbar.
 
 **Warum das trägt — gemessen, nicht behauptet.** Ein Prototyp des vorgeschlagenen Modells wurde gegen das echte `cpsat-js`-WASM auf einer realen Monatsinstanz (30 Tage, 60 offene Felder, 8 planbare Personen) gefahren:
 
 | Phase | Status | Zielwert | Untere Schranke | Zeit |
 |---|---|---|---|---|
 | Zulässigkeit | `OPTIMAL` | – | – | **218 ms** |
-| Maximin BD-Last | `OPTIMAL` | 4 | 4 | **188 ms** |
-| Lexikografisch (Maximin → BD-Soll → Wochenende) | `OPTIMAL` je Stufe | 4 / 0 / 3 | 4 / 0 / 3 | **445 ms gesamt** |
+| Minimax BD-Last (Rang 1 der Leximin-Kaskade) | `OPTIMAL` | 4 | 4 | **188 ms** |
+| Lexikografisch (Minimax → BD-Soll → Wochenende) | `OPTIMAL` je Stufe | 4 / 0 / 3 | 4 / 0 / 3 | **445 ms gesamt** |
 
 Das Problem ist für einen exakten Solver **klein**. Beweisbare Optimalität ist in unter einer halben Sekunde erreichbar. Die heutige Engine erreicht sie nie — nicht wegen der Problemgröße, sondern wegen fünf konkreter Modellierungs- und Bindungsfehler.
 
@@ -95,7 +95,7 @@ Der zweite, in `AUTO-PLAN-V9.5-FINAL.md` als „kritischer Brücken-Fix“ besch
 
 Verschärfend: `_headers` setzt global `Cross-Origin-Embedder-Policy: require-corp`. Das ist die richtige Wahl für den *threaded* Build — es stellt aber jede Fremdressource unter CORP/CORS-Vorbehalt. Der klassische `<script src="https://cdn.sheetjs.com/…">` in `index.html` trägt **kein** `crossorigin`-Attribut und wird deshalb im No-CORS-Modus geladen; unter `require-corp` ist das nur zulässig, wenn die Gegenstelle `Cross-Origin-Resource-Policy: cross-origin` sendet. Das ist eine Abhängigkeit von fremder Header-Politik an einer Stelle, an der der Excel-Import hängt. **Zu prüfen und zu entkoppeln.**
 
-### 2.5 Defekt 5 — Sieben von zehn Studio-Reglern sind mathematisch wirkungslos
+### 2.5 Defekt 5 — Alle neun `cpSat*Weight`-Gewichte sind mathematisch wirkungslos
 
 Die Phasenordnung `FOCUS_PHASE_ORDER` minimiert **je Phase genau eine Komponente allein**. Innerhalb jeder Komponente tragen alle Terme dasselbe Gewicht — gemessen:
 
@@ -108,7 +108,11 @@ hgBurden       terme=  12  distinkte Gewichte=1
 weekendChain   terme=  32  distinkte Gewichte=1
 ```
 
-Die Minimalstelle einer Zielfunktion ändert sich nicht, wenn man sie mit einer positiven Konstanten skaliert. **Jeder der Gewichtsregler `cpSatFairnessWeight`, `cpSatWishWeight`, `cpSatBdTargetWeight`, `cpSatWeekendWeight`, `cpSatSaturdayWeight`, `cpSatHgWeight`, `cpSatCtLeadershipWeight`, `cpSatWeekendChainWeight`, `cpSatPerturbationWeight` ist ohne Wirkung.** Ergänzend:
+Die Minimalstelle einer Zielfunktion ändert sich nicht, wenn man sie mit einer positiven Konstanten skaliert. **Jedes der neun Gewichte `cpSatFairnessWeight`, `cpSatWishWeight`, `cpSatBdTargetWeight`, `cpSatWeekendWeight`, `cpSatSaturdayWeight`, `cpSatHgWeight`, `cpSatCtLeadershipWeight`, `cpSatWeekendChainWeight`, `cpSatPerturbationWeight` ist ohne Wirkung.**
+
+Zur Genauigkeit über die Oberflächenwirkung: Als sichtbares Bedienelement existieren davon nur zwei (`autoPlanV9FairnessWeight`, `autoPlanV9PerturbationWeight`). Vier weitere stehen im Einstellungsschema (`DEFAULT_SETTINGS` und `normalizeSettings`), die übrigen fünf nur als Inline-Vorgabe im Modellbau. Wirkungslos sind alle neun; zu entfernen sind sie an drei verschiedenen Orten.
+
+Ergänzend:
 
 - `hgBurden` steht in **keiner** Fokus-Reihenfolge → wird nie minimiert.
 - `fairness` steht nur bei `fairnessProfile === 'leximin'` in der Reihenfolge; die Profile `spread`, `variance`, `owa` sind nirgends implementiert und bedeuten faktisch **„gar keine Fairness-Phase“**.
@@ -176,7 +180,17 @@ Bewertet wird durchgehend nach: **Eignung** (0–5) für das Auto-Plan Studio un
 
 Der Gewinn ist nicht Bequemlichkeit, sondern **Ausdrucksmächtigkeit**: Kardinalität, Fairness und Wünsche sind erst in dieser Darstellung überhaupt formulierbar. Big-M entfällt vollständig; `onlyEnforceIf` liefert echte Halbreifikation ohne Hilfskonstruktion. Genau das ist die in der Literatur beschriebene Praxis („Boolean composition … auxiliary violation variables can be flexibly reused and combined with other logical conditions“).
 
-**Modellgröße hier:** 60 Felder × Ø 6,2 Kandidaten ≈ **372 Binärvariablen** — gegenüber 56 Integer- plus **1.016 Hilfsvariablen** und 1.984 Constraints im heutigen Modell. Kleiner, korrekter, schneller.
+**Modellgröße, beide Zahlen auf derselben Instanz** (September 2026, 30 Tage, 60 offene Felder, 8 planbare Personen):
+
+| | alt (Integer-Codierung) | neu (Boolean One-Hot) |
+|---|---|---|
+| Entscheidungsvariablen | 60 | 370 |
+| Hilfsvariablen | **1.058** | **47** |
+| harte Constraints | **2.036** | **684** |
+
+Beide Spalten sind auf derselben Instanz gemessen: Der alte Modellbauer wurde dafür aus der Versionsgeschichte geholt und gegen denselben Monat laufen gelassen.
+
+Der frühere Wert „56 Felder / 1.016 Hilfsvariablen / 1.984 Constraints" in §13 bezog sich auf einen 28-Tage-Monat und ist für den Vergleich nicht heranzuziehen. Kleiner in der Zahl der Bedingungen, korrekt in der Aussage, schneller im Lauf.
 
 **Gemessen:** `OPTIMAL` in 218 ms (Zulässigkeit), 188 ms (Maximin), 445 ms (drei lexikografische Stufen).
 
@@ -186,14 +200,15 @@ Der Gewinn ist nicht Bequemlichkeit, sondern **Ausdrucksmächtigkeit**: Kardinal
 
 **Erklärung.** Leximin maximiert das Minimum, danach — bei festgehaltenem Minimum — das Zweitkleinste, und so weiter. Es ist die ordinale Gerechtigkeitsordnung: eine Verbesserung des Schlechtestgestellten wiegt schwerer als jeder Ausgleich weiter oben. Bouveret und Lemaître zeigen fünf CP-Algorithmen; der praktikabelste („successively maximizes the elements of a sorted objective vector“) ist für unsere Größenordnung ideal.
 
-**Kodierung für BD/HG (Minimierung der Last, also Leximax auf Belastung):**
+**Kodierung für BD/HG (Minimierung der Last, also Leximax auf der Belastungsseite):**
 
-1. `L_p = Σ_d y[bd_d][p] + α · Σ_d y[hg_d][p]` — kombinierte Last je Person (α = Gewichtungsfaktor HG gegenüber BD, einstellbar).
-2. Stufe 1: `M ≥ L_p ∀p`, `min M` → obere Belastungsschranke.
-3. Stufe 2: `M` fixieren, Anzahl der Personen mit `L_p = M` minimieren (Indikator `t_p` mit `L_p ≥ M − (1−t_p)·BIG`).
-4. Weiter absteigend, bis der Vektor eindeutig ist — oder Abbruch nach `k` Stufen (Zeitbudget).
+1. `L_p = Σ_d y[bd_d][p] + α · Σ_d y[hg_d][p] + Versatz_p` — kombinierte Last je Person (α = Gewichtung HG gegenüber BD, `Versatz_p` = Fairness-Gedächtnis nach §7.3).
+2. **Rang 1:** Hilfsvariable `M` mit `L_p ≤ M ∀p`; `min M`. Ergebnis `v₁` wird durch `M ≤ v₁` festgeschrieben.
+3. **Rang j (2…d):** Schwelle `t_j = v₁ − (j−1)`. Überschussvariablen `e_p ≥ L_p − t_j`, `e_p ≥ 0`; `min Σ_p e_p`. Ergebnis wird ebenso festgeschrieben.
 
-**Alternative Formulierung** über die Summe der `k` größten Lasten (`Σ_{i≤k} L_(i)`), linear darstellbar nach Ogryczak/Śliwiński; für monotone Gewichte ist die OWA-Zielfunktion sogar rein linear. Beide Wege sind exakt; die sortierte Variante ist besser erklärbar, die OWA-Variante schneller.
+Das ist die Summe der Überschüsse über absteigende Schwellen — die lineare Form der geordneten Mittelwertbildung nach Ogryczak/Śliwiński und für ganzzahlige Lasten äquivalent zur Leximin-Ordnung. Sie kommt ohne Indikatorvariablen und **ohne jedes Big-M** aus, ist in einer Stufe abbrechbar (Anytime) und braucht je Rang nur `n` zusätzliche Variablen.
+
+*Eine naheliegende, aber falsche Alternative sei ausdrücklich genannt, weil sie beim Entwurf zweimal auftauchte:* „Zahl der Personen auf Höchstlast minimieren" über einen Indikator `t_p` mit `L_p ≥ M − (1−t_p)·BIG` zählt nichts — die Ungleichung ist für `t_p = 0` immer erfüllt, `min Σ t_p` setzt alle auf null und die Stufe ist wirkungslos. Die zählende Richtung wäre `t_p = 0 ⇒ L_p ≤ M − 1`, in CP-SAT als `add(L_p ≤ M − 1).onlyEnforceIf(¬t_p)`. Die hier gewählte Überschussform vermeidet die Fallgrube ganz.
 
 **Eignung:** Löst genau die Schwäche aus 3.1(3). Die Stufenzahl ist ein natürlicher Zeitbudget-Regler.
 
@@ -269,7 +284,7 @@ Müller/Rudová/Barták entwickelten IFS mit konfliktbasierter Statistik für Un
 
 **Erklärung.** Fairness in einem einzelnen Monat ist nicht Fairness. Wer im März drei Wochenenden hatte, muss im April entlastet werden. Die Literatur zur periodischen Zuweisung („Schedules Need to be Fair Over Time“, „Fair Periodic Assignment Problem“) formalisiert genau das; die Praxis nennt es Equitable Distribution Index über kumulierte Daten.
 
-**Bewertung.** Der Zustand enthält bereits alle Vormonate (`state.months`). Ein **Carry-over-Konto** je Person (BD, HG, Wochenendäquivalent, jeweils gleitend über *k* Monate) fließt als Startversatz in den Leximin-Lastvektor ein: `L_p = aktuelle Last + λ · Rückstand_p`. Das ist ein kleiner Eingriff mit großer wahrgenommener Wirkung. **Aufnehmen, mit Regler λ und Fensterlänge k.**
+**Bewertung.** Der Zustand enthält bereits alle Vormonate (`state.months`). Ein **Carry-over-Konto** je Person (BD, HG, jeweils gleitend über *m* Monate) fließt als Startversatz in den Leximin-Lastvektor ein: `L_p = aktuelle Last + λ · Rückstand_p`. Das ist ein kleiner Eingriff mit großer wahrgenommener Wirkung. **Aufnehmen, mit Gewicht λ und Fensterlänge m.**
 
 ## 8. B4 — Erklärbarkeit und Konfliktdiagnose
 
@@ -277,7 +292,7 @@ Müller/Rudová/Barták entwickelten IFS mit konfliktbasierter Statistik für Un
 
 **Erklärung.** Ein Minimal Unsatisfiable Subset ist eine kleinste Constraint-Menge, die für sich unerfüllbar ist. QuickXplain findet ihn **dichotom** (rekursive Halbierung) statt durch lineare Löschung; MARCO kartiert die Grenze zwischen erfüllbaren und unerfüllbaren Teilmengen.
 
-**Bewertung.** Das Konzept ist richtig. Die heutige Umsetzung (lineare Löschung über **jeden einzelnen Constraint**) ist es nicht. **Korrektur:** QuickXplain **auf Gruppenebene** (7 Gruppen → ≈ log₂ 7 · c Solves statt 1.984) — das ist die Auflösung, die eine Oberfläche ohnehin nur zeigen kann.
+**Bewertung.** Das Konzept ist richtig. Die heutige Umsetzung (lineare Löschung über **jeden einzelnen Constraint**) ist es nicht. **Korrektur:** QuickXplain **auf Gruppenebene** statt auf Constraint-Ebene. Maßgeblich ist die in `RELAX_GROUPS` (`js/auto-plan-model.js`) definierte Gruppenzahl — in v10.5 sind das **sieben**; diese eine Stelle legt sie fest, alle übrigen Angaben verweisen darauf. QuickXplain benötigt für einen Konflikt der Größe `k` aus `n` Elementen `O(2k·log(n/k) + 2k)` Konsistenzprüfungen; bei `n = 7` und kleinem `k` bleibt das im einstelligen bis niedrigen zweistelligen Bereich — gegenüber 1.984 Solves der Löschschleife eine andere Größenordnung, nicht eine bessere Konstante.
 
 ### 8.2 Assumptions / UNSAT-Core — **Eignung 3/5 (blockiert)**
 
@@ -289,7 +304,7 @@ CP-SAT beherrscht seit Version 8.2 `add_assumptions` und `sufficient_assumptions
 
 **Erklärung.** Jede relaxierbare Regelgruppe `g` erhält ein Literal `r_g`; alle Constraints der Gruppe werden mit `.onlyEnforceIf(r_g)` versehen. Dann `maximize Σ w_g · r_g`. Die Lösung sagt in **einem einzigen Solve**: „Dieser Monat ist lösbar, wenn genau *diese* Regeln aufgegeben werden“ — und liefert direkt den zugehörigen Plan mit. Das ist die MaxSAT-Denkfigur aus 5.6, ausgeführt von CP-SAT.
 
-**Gemessen (künstlich unerfüllbar gemachte Instanz, 8 Relaxationsgruppen):** `FEASIBLE` nach 15 s Budget, 5 von 8 Regeln aufgegeben. Wichtige, ehrliche Beobachtung: **die Minimierung der Aufgabemenge ist selbst ein hartes Optimierungsproblem** und war in 15 s nicht beweisbar optimal. Konsequenz für die Umsetzung: MCS **anytime** führen (jede Verbesserung sofort anzeigen), mit kurzem Budget, und das Ergebnis als „so wenig wie in *t* Sekunden nachweisbar“ auszeichnen — nicht als Minimum behaupten.
+**Gemessen (künstlich unerfüllbar gemachte Instanz, acht Personenobergrenzen als Relaxationsliterale):** `FEASIBLE` nach 15 s Budget, 5 von 8 Regeln aufgegeben. Wichtige, ehrliche Beobachtung: **die Minimierung der Aufgabemenge ist selbst ein hartes Optimierungsproblem** und war in 15 s nicht beweisbar optimal. Konsequenz für die Umsetzung: MCS **anytime** führen (jede Verbesserung sofort anzeigen), mit kurzem Budget, und das Ergebnis als „so wenig wie in *t* Sekunden nachweisbar“ auszeichnen — nicht als Minimum behaupten.
 
 **MUS und MCS sind komplementär:** MUS beantwortet „warum geht es nicht?“, MCS beantwortet „was müsste ich aufgeben?“. Die Oberfläche sollte beides zeigen; MCS zuerst, weil es handlungsleitend ist.
 
@@ -350,7 +365,7 @@ Workers KV im kostenfreien Tarif: **100.000 Lesevorgänge/Tag, 1.000 Schreibvorg
 | `comlink` | Apache-2.0 | frei | Worker-RPC | **optional** — der vorhandene `postMessage`-Vertrag genügt |
 | `d3-scale`, `d3-shape` | ISC | frei | Achsen/Pfade der Animation | **optional**, nur diese zwei Module |
 | `MiniZinc.js` | MPL-2.0 | frei | Modellierungssprache | **abgelehnt** (Größe, zweite Modellsprache) |
-| `or-tools-wasm` | Apache-2.0 | frei | CDN-Reserve | **beibehalten** als letzte Stufe |
+| `or-tools-wasm` | Apache-2.0 | frei | CDN-Reserve | **gestrichen** — der mehrfädige Build benötigt Cross-Origin-Isolation, die mit dem Wegfall von COEP nicht mehr besteht |
 
 Kein Framework-Wechsel. Der Bestand ist reines ESM ohne Build-Schritt; das ist für Cloudflare Pages die robusteste Auslieferung und soll so bleiben.
 
@@ -432,7 +447,7 @@ Kein Framework-Wechsel. Der Bestand ist reines ESM ohne Build-Schritt; das ist f
 | `fairnessProfile: spread/variance/owa` | nie implementiert |
 | `diagnoseInfeasibility` Ebene 2 (Constraint-Löschschleife) | vierstellige Solve-Zahl ohne Aussagewert |
 | `random_seed`/`log_search_progress` in `cpSatParameters` | von `cpsat-js` nicht entgegengenommen |
-| `Cross-Origin-Embedder-Policy: require-corp` | für den portablen Build nicht nötig; gefährdet Fremdressourcen |
+| `Cross-Origin-Embedder-Policy: require-corp` | für den portablen Build nicht nötig; gefährdet Fremdressourcen. **Bedingung:** Da `or-tools-wasm` als mehrfädiger Build `SharedArrayBuffer` und damit Cross-Origin-Isolation benötigt, entfällt er zugleich als Reserve. Die Ladeordnung besteht in v10.5 nur noch aus dem lokalen Bündel und demselben Paket vom CDN — beide portabel. Eine Reserve, die ohne Isolation nicht lädt, wäre keine. |
 
 ---
 
@@ -449,7 +464,9 @@ Alle Aussagen dieses Berichts über den Ist-Zustand wurden ausgeführt, nicht ge
 | Gewichte | distinkte Gewichte je Zielkomponente gezählt | überall **genau 1** → Skalierung wirkungslos |
 | Zweigwahl | `normalizeSolverApi`-Bedingung gegen die realen `cpsat-js`-Exporte | erster Zweig greift, zweiter ist tot |
 | Modellgröße | `buildCpSatModel` auf 28-Tage-Monat | 56 Variablen, **1.016 Hilfsvariablen, 1.984 Constraints** |
-| Neues Modell | Prototyp gegen echtes `cpsat-js`-WASM, 30 Tage/60 Felder/8 Personen | `OPTIMAL` 218 ms · Maximin `OPTIMAL` 188 ms (Bound = Wert) · Kaskade 445 ms |
+| Neues Modell | Prototyp gegen echtes `cpsat-js`-WASM, 30 Tage/60 Felder/8 Personen | `OPTIMAL` 218 ms · Minimax `OPTIMAL` 188 ms (Bound = Wert) · Kaskade 445 ms |
+
+**Messumgebung** (gilt für alle Zeitangaben dieses Berichts): `cpsat-js` **portable** Build, `numWorkers = 1` (vom portablen Build erzwungen), Node 22 auf dem Entwicklungscontainer, Einzelläufe ohne Aufwärmphase. Bewusst der langsamere der beiden Wege: Der mehrfädige Build ist auf großen Modellen rund neunmal schneller, wird hier aber nicht ausgeliefert. Die Browser-Messung derselben Modelle liegt in derselben Größenordnung; maßgeblich für die Abnahme ist die Testsuite, nicht diese Einzelwerte.
 | MCS-Diagnose | 8 Relaxationsliterale, künstlich unerfüllbar | `FEASIBLE` in 15 s, 5/8 aufgegeben — **nicht beweisbar minimal** |
 | Inkumbenten-Stream | `onSolution` mit `numWorkers: 1` | feuert **live** während des Solves (`live: true`) |
 
@@ -463,8 +480,12 @@ Alle Aussagen dieses Berichts über den Ist-Zustand wurden ausgeführt, nicht ge
 Reihenfolge ist bindend: jedes Paket ist für sich lauffähig und testbar.
 
 ### P0 — Ladefähigkeit herstellen *(Voraussetzung für alles)*
-- `@bufbuild/protobuf` nach `vendor/bufbuild/` vendorisieren.
-- `<script type="importmap">` in `index.html` **und** im Worker-Kontext (`import`-Map gilt nicht in Workern → im Worker den vollständigen Pfad importieren oder das Vendor-Bundle vorab zu einer Datei ohne bloße Bezeichner zusammenführen).
+
+**Der Kern des Problems, klar benannt:** Der bloße Bezeichner steckt *innerhalb* der Vendor-Dateien, nicht im Import der Einstiegsdatei. Ein Vollpfad-Import hilft deshalb nicht, und eine Import-Map in `index.html` hilft ebenfalls nicht, weil die Engine im Modul-Worker lädt und Import-Maps dort nicht gelten. Es bleiben genau zwei Wege: die Bezeichner in den vendorisierten Dateien einmalig auf relative Pfade umschreiben, oder ein selbsttragendes Bündel erzeugen.
+
+**Gewählt: das Bündel** (`vendor/cpsat-js/dist/cpsat-portable.bundle.js`, erzeugt über `npm run vendor:cpsat`). Begründung: Das Umschreiben müsste `@bufbuild/protobuf` samt aller Unterpfade mitvendorisieren und bei jedem Versionswechsel wiederholt werden — fehleranfällig und schlechter prüfbar.
+
+**Zum Widerspruch mit „kein Build-Schritt":** Er besteht und wird hier aufgelöst statt verschwiegen. Die Zusage gilt der **Anwendung** — `index.html` lädt weiterhin unverändertes ESM, Cloudflare Pages liefert das Verzeichnis ohne Bauvorgang aus. Das Bündel ist ein *vendorisiertes Fremdartefakt*, im Repository eingecheckt und mit einem einzigen reproduzierbaren Befehl neu erzeugbar — dieselbe Kategorie wie die bereits vorhandene `cpsat.wasm`. Ein Bauvorgang bei der Auslieferung entsteht dadurch nicht.
 - `Cross-Origin-Embedder-Policy` aus `_headers` entfernen; `Cross-Origin-Opener-Policy: same-origin` darf bleiben.
 - SheetJS entkoppeln: entweder lokal vendorisieren oder mit `crossorigin="anonymous"` laden.
 - **Test:** Browser-E2E lädt `/vendor/cpsat-js/dist/index.portable.js` und löst ein Zwei-Variablen-Modell. Grün = P0 fertig.
@@ -494,12 +515,12 @@ Reihenfolge ist bindend: jedes Paket ist für sich lauffähig und testbar.
 
 ### P4 — Leximin + Carry-over
 - `L_p = Σ BD + α·Σ HG + λ·Rückstand_p(k Monate)`.
-- Stufenweises Absenken der Maximallast, `k` Stufen aus dem Zeitbudget.
+- Stufenweises Absenken der Höchstlast über `d` Ränge; `d` und das Zeitbudget begrenzen gemeinsam.
 - **Test:** konstruierte Instanz mit erzwungener Ungleichverteilung; Leximin muss den Schlechtestgestellten nachweislich anheben, ohne die Summe zu verschlechtern.
 
 ### P5 — Diagnose neu
 - MCS: `maximize Σ w_g·r_g`, anytime über `onSolution`, Ergebnis als „nachgewiesen in *t* s“ ausweisen — **nicht** als Minimum behaupten.
-- QuickXplain auf Gruppenebene als Zweitdiagnose (≈ 20 statt 1.984 Solves).
+- QuickXplain auf Gruppenebene als Zweitdiagnose: bei sieben Gruppen einige wenige Solves statt 1.984.
 - Alte `diagnoseInfeasibility`-Ebene 2 entfernen.
 - **Test:** unerfüllbare Fixture; MCS nennt die tatsächlich verletzte Gruppe; Laufzeit unter Budget.
 
@@ -507,36 +528,48 @@ Reihenfolge ist bindend: jedes Paket ist für sich lauffähig und testbar.
 - Auslöser: manuelle Änderung nach einem Lauf.
 - Freigabefenster: geänderter Tag ± 3 Tage, gleiches Wochenende, betroffene Person im ganzen Monat.
 - Rest per `add(y.equals(1))` fixiert, Kaskade nur auf dem Fenster.
-- **Test:** Änderung eines Feldes darf höchstens *n* weitere Felder bewegen.
+- **Abnahmekriterium, aus dem Freigabefenster abgeleitet:** Eine Änderung an einem Feld öffnet Tag ± 3 (also höchstens 7 Tage × 2 Rollen = 14 Felder) zuzüglich der Felder der betroffenen Person. Der Test fordert: höchstens 14 zusätzlich veränderte Felder, und kein verändertes Feld außerhalb des Fensters.
 
 ### P7 — Studio-Einstellungen v10.5 *(Abschnitt 15)*
 
 ### P8 — Layout und Animation *(Abschnitte 16, 17)*
 
 ### P9 — Abschluss
-- Versions-Token gemeinsam anheben (`index.html`, Manifest, Asset-Queries, Icon-Query, `package.json`).
+- **Dateiliste von `npm run check` nachziehen.** Das Skript zählt die zu prüfenden Dateien einzeln auf; neue Module ohne Eintrag laufen ohne Syntaxprüfung durch die CI. Aufzunehmen: `js/auto-plan-model.js`, `js/auto-plan-solver.js`, `js/auto-planner-v10.js`, `js/auto-plan-crystallize.js`, `js/auto-plan-studio-v10.js`. Zu entfernen: `js/auto-plan-cp-sat.js`, `js/auto-planner-v9.js`.
+- Versions-Token gemeinsam anheben (`index.html`, Manifest, Asset-Queries, Icon-Query, `package.json`). **Alle Modul-Abfragezeichen müssen denselben Stand tragen:** Ein Modul, das unter zwei verschiedenen `?v=`-Werten importiert wird, ist im Browser zweimal geladen — mit zwei getrennten Zuständen.
 - `docs/AUTO-PLAN-CHANGELOG.md` fortschreiben.
 - README-Abschnitt „Auto-Plan v10“ ersetzt „Auto-Plan v9“.
 - Vollständiger Lauf `npm run verify`.
 
 ## 15. Studio-Einstellungen v10.5
 
-**Entfernt** (wirkungslos): neun `cpSat*Weight`-Regler, `fairnessProfile` mit den Attrappen-Profilen, `cpSatWorkers` (portabel immer 1).
+**Entfernt** (wirkungslos): die neun `cpSat*Weight`-Gewichte, `fairnessProfile` mit den Attrappen-Profilen, `cpSatWorkers` (portabel immer 1), `infeasibilityMode` und `musAutoRelax` (durch `conflictMode` ersetzt).
+
+**Berührungspunkte, die dabei alle nachzuziehen sind** — bleibt einer stehen, scheitert entweder die strikte Prüfung in `PUT /api/settings` oder ein Regler steht ohne Wirkung in der Oberfläche:
+
+| Ort | Was |
+|---|---|
+| `js/defaults.js` | `DEFAULT_SETTINGS.autoPlan` **und** `normalizeSettings` |
+| `js/auto-planner-engine.js` | `createDefaultAutoPlanConfig` und `normalizeAutoPlanConfig` |
+| `js/app-settings.js` | Markup, Vorbelegung und Auslesen des Einstellungsdialogs |
+| `js/auto-plan-studio-v9.js` | die beiden sichtbaren Gewichtsregler |
+| Testfixtures | `tests/auto-plan-v7-settings.test.js` prüft die Gestalt des Schemas |
+| gespeicherte Stände | unbekannte Schlüssel werden von `normalizeSettings` still verworfen — kein Migrationsschritt nötig |
 
 **Neu bzw. neu belegt** — jeder Regler verändert nachweislich das Ergebnis:
 
 | Regler | Wertebereich | Wirkung |
 |---|---|---|
 | **Zielreihenfolge** | Drag-&-Drop-Liste der Stufen S1–S6 | *die* eigentliche Steuerung: lexikografische Priorität ist die ehrliche Form von „Gewichtung“ |
-| **Leximin-Tiefe** `k` | 1–8 (Default 3) | wie viele Ränge des sortierten Lastvektors exakt festgezurrt werden |
+| **Leximin-Tiefe** `d` | 1–8 (Default 3) | wie viele Ränge des sortierten Lastvektors exakt festgezurrt werden |
 | **HG-Faktor** `α` | 0,0–1,0 (Default 0,6) | wie stark ein HG gegenüber einem BD als Last zählt |
-| **Carry-over-Fenster** `k` | 0–6 Monate (Default 3) | Länge des Fairness-Gedächtnisses |
+| **Carry-over-Fenster** `m` | 0–6 Monate (Default 3) | Länge des Fairness-Gedächtnisses |
 | **Carry-over-Gewicht** `λ` | 0–100 % (Default 50) | wie stark Rückstände aus Vormonaten den Startversatz bestimmen |
 | **Stabilitätsstufe** | aus / Gleichstand / streng | Rang der Minimal-Perturbation in der Kaskade |
 | **Zeitbudget gesamt** | 2–60 s (Default 10) | wird proportional auf die Stufen verteilt |
 | **Konfliktverhalten** | nur melden / MCS anzeigen / MCS anwenden | ersetzt `infeasibilityMode` |
 | **Solver-Pfad** | auto / exakt / nur Heuristik | Diagnose- und Rückfallschalter |
-| **Determinismus** | an/aus | fixiert Seed der Heuristik; CP-SAT ist bei festem Modell und `numWorkers=1` von sich aus reproduzierbar — **so ist es auch zu beschriften** |
+| **Determinismus** | an/aus | fixiert den Seed der Heuristik. Für die exakte Kaskade gilt eine Einschränkung, die auch so zu beschriften ist: CP-SAT ist bei festem Modell und `numWorkers = 1` reproduzierbar, **solange jede Stufe innerhalb ihres Budgets `OPTIMAL` meldet**. Bricht eine Stufe am Zeitlimit ab, hängt ihr Ergebnis an der Wanduhr und damit an Maschine und Last; ein Ausgleich über `random_seed` ist nicht möglich, weil `cpsat-js` den Parameter nicht annimmt |
 
 **Jeder Regler bekommt eine Wirkungsanzeige**: unter dem Regler steht, was er im letzten Lauf bewirkt hat („Leximin-Tiefe 3 → Höchstlast 4, zweithöchste 4, dritthöchste 3“). Ein Regler ohne sichtbare Wirkung ist ein Regler, dem niemand traut.
 
@@ -600,7 +633,9 @@ Ein horizontales Balkendiagramm der kombinierten Last je Person, **aufsteigend s
 **Obergrenzen.** `B_p ≤ maxBd_p` , `H_p ≤ maxHg_p` , `B_p + H_p ≤ maxTotal_p`
 
 **Kombinierte Last mit Gedächtnis.**
-`L_p = B_p + α·H_p + λ·( \bar{L} − \tilde{L}_p )` mit `\tilde{L}_p` = mittlere Last der Person über die letzten `k` Monate und `\bar{L}` deren Gruppenmittel. Positiver Rückstand hebt `L_p` an und macht die Person für den Leximin-Schritt attraktiver.
+`L_p = B_p + α·H_p + λ·( \tilde{L}_p − \bar{L} )` mit `\tilde{L}_p` = mittlere Last der Person über die letzten `m` Monate und `\bar{L}` das Gruppenmittel derselben Größe.
+
+Das Vorzeichen ist die Stelle, an der man sich zwangsläufig einmal irrt: Die Kaskade **minimiert die Höchstlast**, ein höherer Startwert `L_p` führt also zu *weniger* neuen Diensten. Wer in den Vormonaten über dem Mittel lag, startet daher erhöht und wird entlastet. Das umgekehrte Vorzeichen entlastet die ohnehin Wenigbelasteten und kehrt die Mehrmonatsfairness um.
 
 **Leximin (Minimierungsform, Stufe *j*).**
 ```

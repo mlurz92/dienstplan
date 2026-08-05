@@ -945,12 +945,24 @@ class LateAcceptance {
     this.index = 0;
   }
 
+  /**
+   * Annahmeregel nach Burke und Bykov: Angenommen wird, was entweder den
+   * Historienwert von vor `length` Runden oder den aktuellen Zustand nicht
+   * verschlechtert. Die zweite Bedingung hält die Suche in Bewegung, wenn die
+   * Historie noch mit dem Startwert gefüllt ist.
+   */
   accepts(candidateKey, currentKey) {
     const reference = this.history[this.index % this.history.length];
     return compareObjectiveKeys(candidateKey, reference) <= 0
       || compareObjectiveKeys(candidateKey, currentKey) <= 0;
   }
 
+  /**
+   * Fortschreibung in der Fassung von 2017: Der Historienplatz wird nur
+   * verbessert, nie verschlechtert. Die Urfassung von 2008 schreibt den
+   * aktuellen Zustand unbedingt zurück; die hier gewählte Variante hält die
+   * Vergleichsschwelle monoton und ist gegen lange Talfahrten unempfindlicher.
+   */
   record(currentKey) {
     const position = this.index % this.history.length;
     if (compareObjectiveKeys(currentKey, this.history[position]) < 0) this.history[position] = currentKey;
@@ -1499,11 +1511,23 @@ export function selectAdaptiveOperator(random, operators, learning) {
   const untried = operators.filter(operator => !(learning.get(operator)?.uses > 0));
   if (untried.length) return untried[Math.min(untried.length - 1, Math.floor(random() * untried.length))];
   const totalUses = operators.reduce((sum, operator) => sum + Number(learning.get(operator)?.uses || 0), 0);
+  const bestEfficiency = Math.max(1e-9, ...operators.map(operator => {
+    const stats = learning.get(operator);
+    return Number(stats?.reward || 0) / Math.max(.05, Number(stats?.costMs || 0));
+  }));
   let best = operators[0];
   let bestScore = -Infinity;
   for (const operator of operators) {
     const stats = learning.get(operator) || { uses: 0, reward: 0, costMs: 0 };
-    const efficiency = Number(stats.reward || 0) / Math.max(.05, Number(stats.costMs || 0)) * 100;
+    // UCB1 setzt Belohnungen in [0,1] voraus. Die rohe Effizienz (Nutzen je
+    // Millisekunde) hat keine natürliche Obergrenze; ungeteilt stünde ein Term
+    // beliebiger Größe neben einem Explorationsbonus der Größenordnung eins,
+    // und die Exploration wäre je nach Instanz entweder wirkungslos oder
+    // beherrschend. Normiert wird deshalb auf die beste im Lauf beobachtete
+    // Effizienz – damit liegt der Ausbeutungsterm stets in [0,1] und das
+    // Verhältnis der beiden Terme ist instanzunabhängig.
+    const rawEfficiency = Number(stats.reward || 0) / Math.max(.05, Number(stats.costMs || 0));
+    const efficiency = rawEfficiency / bestEfficiency;
     const exploration = Math.sqrt(2 * Math.log(Math.max(2, totalUses)) / Math.max(1, Number(stats.uses || 0)));
     // Das Segmentgewicht ist die kurzfristige Meinung der Suche, die Effizienz
     // ihre langfristige. Ohne hinterlegtes Gewicht – etwa bei direkten Aufrufen

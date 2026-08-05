@@ -91,10 +91,10 @@ async function openJuly(page) {
 async function openStudio(page) {
   await page.locator('#autoPlanBtn').click();
   await expect(page.locator('#autoPlanDialog')).toBeVisible();
-  await expect(page.locator('#autoPlanDialog')).toHaveAttribute('data-algorithm-revision', '9');
-  await expect(page.locator('#autoPlanDialog')).toHaveAttribute('data-engine-revision', '9');
-  await expect(page.locator('#autoPlanV8Ribbon')).toContainText('Hybrid Exact Observatory · v9');
-  await expect(page.locator('#autoPlanV8Ribbon')).toContainText('v9');
+  await expect(page.locator('#autoPlanDialog')).toHaveAttribute('data-algorithm-revision', '10');
+  await expect(page.locator('#autoPlanDialog')).toHaveAttribute('data-engine-revision', '10');
+  await expect(page.locator('#autoPlanV8Ribbon')).toContainText('Exact Boolean Rostering Core · v10');
+  await expect(page.locator('#autoPlanV8Ribbon')).toContainText('v10');
   // Die Stufenliste stammt aus der Engine selbst, nicht aus einem zweiten Text.
   await expect(page.locator('#autoPlanV8Ribbon .auto-plan-v8-stages li')).toHaveCount(8);
   await expect(page.locator('#autoPlanPerformanceProfile')).toHaveValue('adaptive');

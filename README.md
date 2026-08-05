@@ -6,9 +6,9 @@
 
 <p align="center"><strong>Regelgestützte Monatsplanung für Bereitschaftsdienst, Hintergrunddienst und neuroradiologische Rufbereitschaft</strong></p>
 
-> **Paketversion:** `0.9.1`  
+> **Paketversion:** `0.10.5`  
 > **Regelwerk:** Eignungsregeln `v4.10`  
-> **Auto-Plan:** Algorithmus `v9` — *Hybrid Exact Observatory* (CP-SAT-Kern, Heuristik-Fallback)  
+> **Auto-Plan:** Algorithmus `v10` — *Exact Boolean Rostering Core* (boolesches CP-SAT-Modell, lexikografische Leximin-Kaskade, Heuristik als Warmstart und Rückfallebene)  
 > **Feiertagsregion:** Sachsen (`SN`)  
 > **Betrieb:** Cloudflare Pages · Pages Functions · Workers KV · lokale Browser-Sicherung
 
@@ -95,64 +95,78 @@ Damit ist die beim ursprünglichen v8.5-Release entstandene Rückkopplung beseit
 
 ---
 
-## 4. Auto-Plan v9
+## 4. Auto-Plan v10 — Exact Boolean Rostering Core
 
-### 4.1 Hybride exakte Architektur
+### 4.1 Architektur
 
 ```text
-Fixpunkte/Domänen
+Fixpunkte/Domänen · Fairness-Gedächtnis der Vormonate
   → Warmstart-Heuristik (v8.5-Pipeline, unverändert)
-  → CP-SAT-Modellbau (Variablen, Klauseln, phasenweise Zielkomponenten)
-  → lexikografische exakte Suche (Maximin-Fairness zuerst, dann weiche Ziele)
+  → Modellbau: je Feld und zulässiger Person eine Binärvariable
+  → lexikografische Kaskade: Stufe minimieren, Wert per Sperrschnitt
+    festschreiben, Lösung als Hinweis in die nächste Stufe
   → Regelengine-Schlussaudit (einzige fachliche Wahrheitsquelle)
-  → bei OPTIMAL: beweisbare untere Schranke und Zertifizierung
-  → bei INFEASIBLE: MUS-artige Ursachenanalyse, optional Relaxierung
-  → sonst: bewährte Null-Rot-Intensivierung, Reparatur und ALNS-Perfektion
+  → bei erreichter unterer Schranke: Optimalitätsnachweis je Stufe
+  → bei Unlösbarkeit: Korrekturmengen-Diagnose in einem einzigen Lauf
+  → ohne WebAssembly: die Heuristik trägt den Lauf vollständig allein
 ```
 
-v9.5 übersetzt den Monatszustand in ein lineares Constraint-Modell und löst es
-mit **Googles OR-Tools CP-SAT**, das als WebAssembly direkt im Browser läuft.
-Der Single-Thread-Solver `cpsat-js` (MIT) wird seit v9.5 **lokal unter
-`vendor/cpsat-js` ausgeliefert** (offline-fähig, ohne CDN-Laufzeitrisiko,
-keine Cross-Origin-Isolation nötig); `or-tools-wasm` (Apache-2.0) und der
-CDN-Weg bleiben als Fallback erhalten. Kann keine Bindung geladen werden
-(älterer Browser, fehlende COOP/COEP-Isolation), bleibt die v8.5-Heuristik
-vollständig erhalten und übernimmt.
+**Warum ein boolesches Modell.** Die Vorgängerfassung führte je offenem Feld
+eine ganzzahlige Variable mit einem Personencode als Wert. In dieser Darstellung
+ist „Person p hat höchstens vier Bereitschaftsdienste" linear **nicht**
+ausdrückbar — die Summe von Personennummern ist keine Einsatzzahl. v10 stellt
+deshalb je Paar aus Feld und zulässiger Person eine Binärvariable `y[f][p]` und
+fordert `Σ_p y[f][p] = 1`. Erst damit werden Kardinalität, Fairness, Wünsche und
+Stabilität überhaupt formulierbar. Auf derselben Instanz (30 Tage, 60 offene
+Felder, 8 Personen) sinkt die Zahl der harten Bedingungen von 2.036 auf 684 und
+die der Hilfsvariablen von 1.058 auf 47.
 
-**Regelengine bleibt die einzige Wahrheitsquelle:** Jeder CP-SAT-Vorschlag
-durchläuft den vollständigen Schlussaudit der produktiven Engine; gewonnen wird
-ausschließlich nach deren lexikografischer Zielordnung. Das CP-Modell ist eine
+**Solver.** `cpsat-js` (Apache-2.0) läuft als WebAssembly im Browser, als
+selbsttragendes Bündel unter `vendor/cpsat-js/dist/cpsat-portable.bundle.js`
+(erzeugt über `npm run vendor:cpsat`). Der portable Build braucht **keine**
+Cross-Origin-Isolation; `Cross-Origin-Embedder-Policy` entfällt dadurch und mit
+ihr das Risiko, Fremdressourcen ohne CORP-Kopfzeile zu blockieren.
+
+**Regelengine bleibt die einzige Wahrheitsquelle:** Jeder Vorschlag durchläuft
+den vollständigen Schlussaudit der produktiven Engine; gewonnen wird
+ausschließlich nach deren lexikografischer Zielordnung. Das Modell ist eine
 Suchhilfe, kein zweites Regelwerk.
 
-### 4.2 Exakte Suche und Erklärbarkeit
+### 4.2 Ziele, Fairness und Erklärbarkeit
 
-- **Lexikografische Phasen:** Maximin-Fairness zuerst, danach Wünsche,
-  BD-Soll, Wochenend- und Samstagslast in der Reihenfolge des
-  Optimierungsschwerpunkts; erreichte Werte werden phasenweise fixiert.
-  Seit v9.5 folgen am Ende der Kette drei zusätzliche Vermeidungsziele:
-  **Wochenendkette** (Fr-BD · Sa frei · So-BD, v4.10 – möglichst vermeiden),
-  **CT-Leitung** (M1 – keine selbst erzeugte Becker-FZA, wenn Martin fehlt)
-  und **Minimal-Perturbation** (Abweichung vom Heuristik-Vorschlag).
-- **Modellvollständigkeit:** Das CP-Modell kennt seit v9.5 die fachlichen
-  Kernregeln als Constraints, die früher nur das Schlussaudit sah: Becker-FZA
-  wird **nach jedem BD** (Werktag wie Wochenende) am nächsten regulären
-  Werktag abgeleitet und sperrt dort BD und HG; die CT-Leitungsdeckung (M1)
-  und die Wochenendkette (v4.10) fließen als weiche Ziele ein.
-- **Optimalitätsnachweis:** `OPTIMAL` liefert eine echte untere Schranke und
-  zertifiziert den Plan – der erste beweisbare Optimalitätsbeweis des Projekts.
-- **Echte MUS-Konfliktanalyse:** Bei Unzulässigkeit wird seit v9.5 eine
-  zweistufige Löschdiagnose gefahren (Gruppen- und Constraint-Ebene) und die
-  **kleinste nachgewiesene Konfliktmenge (MUS)** benannt – statt der früheren
-  gierigen Aktivierung. Auf Wunsch (`infeasibilityMode: 'relax'` oder
-  `musAutoRelax`) werden genau diese Gruppen aufgeweicht und im Ergebnis
-  ausgewiesen.
-- **Determinismus:** Alle Zufallsströme (CP-SAT-Seed, Heuristik-Seed) leiten
-  sich aus Konfiguration und Monatszustand ab; identische Eingaben ergeben
-  identische Pläne.
-- **Warmstart:** Das Heuristik-Ergebnis dient als Lösungshinweis (Hint) und
-  prunt die exakte Suche.
-- **Stabilität:** `protectBaseline` (Standard an) hält bestehende Belegungen;
-  manuelle Edits bleiben beim Re-Planen erhalten.
+- **Lexikografisch statt gewichtet.** Gewichte über unvergleichbare Ziele sind
+  Scheingenauigkeit — niemand kann angeben, wie viele Wunscherfüllungen eine
+  Einheit Ungleichverteilung wert sind. Stattdessen wird stufenweise optimiert
+  und jeder erreichte Wert festgeschrieben. Die **Rangfolge der Stufen ist im
+  Studio frei sortierbar** und damit die ehrliche Form der Gewichtung.
+- **Leximin über sortierte Lastvektoren.** Zuerst wird die Höchstlast gesenkt,
+  dann die nächstniedrigere Stufe — umgesetzt über die Summe der Überschüsse
+  oberhalb absteigender Schwellen, die lineare Form der geordneten
+  Mittelwertbildung. Varianz und Summenstrafen tauschen eine sehr ungleiche
+  Verteilung gegen viele kleine Abweichungen ein; Leximin tut das nicht.
+- **Fairness über Monatsgrenzen.** Ein Fairness-Gedächtnis über bis zu sechs
+  abgeschlossene Monate hebt den Startwert derjenigen an, die zuletzt über dem
+  Mittel lagen — und entlastet sie damit in der Lastminimierung.
+- **Minimal-Perturbation.** Als letzte Stufe wird die Abweichung vom
+  Ausgangsvorschlag minimiert: Stabilität entscheidet Gleichstände, kostet aber
+  nie Qualität.
+- **Optimalitätsnachweis.** Trifft der Zielwert einer Stufe ihre bewiesene
+  untere Schranke, ist sie beweisbar optimal. Das Ergebnis-Panel weist aus,
+  wie viele Stufen den Nachweis erreicht haben.
+- **Korrekturmengen-Diagnose.** Bei Unlösbarkeit wird jede relaxierbare
+  Regelgruppe an ein Literal gebunden und die gewichtete Summe der eingehaltenen
+  Gruppen maximiert. Ein einziger Lauf sagt, welche Regeln aufgegeben werden
+  müssten, und liefert den zugehörigen Plan mit. Ausgewiesen wird ehrlich als
+  „im Zeitbudget nachgewiesen", nicht als Minimum.
+- **Reparaturlauf.** Nach einer manuellen Änderung wird ein Fenster um die
+  Änderung geöffnet und alles außerhalb fixiert — exakt für das Fenster, und der
+  Rest des Plans bleibt in Ruhe.
+- **Verteilungskennzahlen.** Jain-Index und Gini-Koeffizient der Lastverteilung
+  stehen an jedem Ergebnis, gleich ob es aus der exakten Suche oder aus der
+  Heuristik stammt.
+- **Determinismus.** Der Heuristik-Seed leitet sich aus Konfiguration und
+  Monatszustand ab. Für die exakte Kaskade gilt: reproduzierbar, solange jede
+  Stufe innerhalb ihres Budgets den Optimalitätsnachweis erreicht.
 
 ### 4.3 Verbindliche v8.5-Pipeline (Fallback und Warmstart)
 
@@ -170,7 +184,7 @@ Die v8.5-Profile (Ausgewogen/Intensiv/Exhaustiv), die strikte Eskalation vor
 Rot und die verbindliche Perfektion bleiben unverändert bestehen und werden
 weiterhin über `deriveV85Tuning()` in echte Solverfelder übersetzt.
 
-### 4.2 Gekoppelte Suchprofile
+### 4.4 Gekoppelte Suchprofile
 
 | Profil | Reparaturrunden | lokales Neuplanungsbudget | Late Acceptance | strikte Wellen | Rescue-Breite |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -180,7 +194,7 @@ weiterhin über `deriveV85Tuning()` in echte Solverfelder übersetzt.
 
 Die Ableitung erfolgt in `deriveV85Tuning()`. Dadurch steuern die sichtbaren Felder tatsächlich den Solver und nicht nur die Darstellung.
 
-### 4.3 Strikte Eskalation vor Rot
+### 4.5 Strikte Eskalation vor Rot
 
 Jede Welle erhöht begrenzt:
 
@@ -190,7 +204,7 @@ Jede Welle erhöht begrenzt:
 
 `allowRedFallback`, `maxRedViolations` und `profileFilter` werden für sämtliche strikten Wellen hart auf Null-Rot gesetzt. Erst wenn reguläre Konstruktion und alle Wellen keine saubere Vollbelegung liefern, darf das Profil `confirmable-balanced` ausgeführt werden.
 
-### 4.4 Adaptive Perfektion
+### 4.6 Adaptive Perfektion
 
 Die v8-Basis bleibt erhalten und wird verpflichtend genutzt:
 
@@ -202,7 +216,7 @@ Die v8-Basis bleibt erhalten und wird verpflichtend genutzt:
 - absteigende Nachbarschaften mit Einzelumsetzung, Paartausch, Rollentausch, Dreierkette, Tages- und Wochenendpaket;
 - vollständiger Nachweis über Einzelumsetzungen, Paartausche und Tagespakete.
 
-### 4.5 Parallelität
+### 4.7 Parallelität
 
 Die Zahl der Perfektionsstränge ist automatisch oder explizit einstellbar. Das effektive Worker-Budget bleibt das Minimum aus:
 
@@ -214,7 +228,7 @@ Die Zahl der Perfektionsstränge ist automatisch oder explizit einstellbar. Das 
 
 Die fachliche Regelberechnung bleibt in Web Workers identisch zur manuellen Bewertung. Es existiert keine vereinfachte zweite Regelengine.
 
-### 4.6 Wahrheitsgetreue Laufanzeige
+### 4.8 Wahrheitsgetreue Laufanzeige
 
 Das Studio zeigt getrennt:
 
@@ -229,6 +243,85 @@ Das Studio zeigt getrennt:
 Die Ergebnisansicht protokolliert zusätzliche Wellen, Knoten, Rescue-Breite, Reparaturprofil und gegebenenfalls den nachgelagerten Fallback.
 
 ---
+
+### 4.9 Auto-Plan Studio v10.5
+
+**Sachgruppen statt Spaltenraster.** Alle Regler sind unabhängig von ihrer
+Herkunft in aufklappbare Sachgruppen sortiert: *Ziele und ihre Reihenfolge*,
+*Exakte Suche*, *Heuristik, Reparatur und Perfektion*, *Grenzen und Freigaben*,
+*Darstellung des Laufs*. Die Gruppen sind voreingestellt offen — Einklappen ist
+ein Angebot, keine Voreinstellung; der zuletzt gewählte Zustand wird lokal
+gemerkt. Die Spaltenzahl folgt über Container-Abfragen dem tatsächlich
+verfügbaren Platz, nicht der Fensterbreite.
+
+**Kein Regler ohne Wirkung.** Entfallen sind die neun `cpSat*Weight`-Gewichte,
+das nie umgesetzte Fairness-Profil, der beim portablen Build bedeutungslose
+Worker-Regler sowie `infeasibilityMode` und `musAutoRelax`. Neu und nachweislich
+wirksam:
+
+| Regler | Wirkung |
+| --- | --- |
+| Rangfolge der Ziele | die lexikografische Priorität — ersetzt jede Gewichtung |
+| Leximin-Tiefe | Ränge des sortierten Lastvektors, die exakt festgezurrt werden |
+| HG-Gewicht in der Last | wie stark ein HG gegenüber einem BD als Belastung zählt |
+| Fairness-Gedächtnis | Anzahl berücksichtigter Vormonate |
+| Gewicht des Gedächtnisses | Wirkung der Vorlast auf den Startwert |
+| Stabilität | Rang der Minimal-Perturbation in der Kaskade |
+| Bei Unlösbarkeit | melden, Korrekturmenge anzeigen oder anwenden |
+| Laufansicht | Kristallisation oder Orbit |
+
+**Kein Feld ohne Erklärung.** Jedes Bedienelement trägt einen erklärenden
+Tooltip. Wo eine frühere Fassung keinen hinterlegt hat, wird er aus Beschriftung
+und Beschreibung gebildet — ein Feld ohne Erklärung gibt es nicht mehr.
+
+### 4.10 Die Laufansicht „Kristallisation"
+
+Die Ansicht zeigt nicht, *dass* gerechnet wird, sondern *was* gerechnet wird.
+Vier Ebenen, alle aus echten Ereignissen des Laufs gespeist — nichts wird
+interpoliert:
+
+1. **Domänenfeld** — ein Raster aus Tagen und Rollen. Jede Zelle trägt anfangs
+   ihre Kandidatenmenge als Fächer. Trifft eine Entscheidung ein, fallen die
+   nicht gewählten Marken heraus und die gewählte rastet ein: Der Suchraum
+   fällt sichtbar zusammen.
+2. **Schranken-Schere** — der Zielwert der besten bekannten Lösung von oben, die
+   bewiesene untere Schranke von unten. Die Fläche dazwischen ist genau das, was
+   noch nicht bewiesen ist. Berühren sich beide, läuft **einmal** ein heller
+   Puls über das gesamte Feld: die Kristallisation.
+3. **Prioritätsleiter** — die lexikografischen Stufen als Sprossen. Eine gelöste
+   Stufe schließt ihr Schloss und graviert ihren Wert ein; ein Konflikt bricht
+   die Sprosse heraus.
+4. **Lastwaage** — Balken je Person, aufsteigend sortiert. Leximin wird dadurch
+   sichtbar, wie es arbeitet: Der kürzeste Balken hebt sich zuerst.
+
+**Der Glanz folgt der Farbe.** Der Glow ist keine feste Größe: Wärme, Sättigung
+und Helligkeit bestimmen Radius und Intensität. Ein warmer, satter Ton trägt
+weiter als ein kühler, blasser; eine dunkle Farbe braucht mehr Radius, um
+überhaupt zu leuchten, eine sehr helle würde sonst ausbrennen. Rote Warnungen
+wirken dadurch heiß und drängend, grüne Bestätigungen ruhig, und die Monatsfarbe
+bleibt in jedem Monat gleich präsent, ohne je zu schreien.
+
+Bei `prefers-reduced-motion: reduce` entfallen Fächern und Puls; Raster, Kurven
+und Balken bleiben als ruhige Zustandsanzeige. Die Orbit-Ansicht der früheren
+Fassungen bleibt als Alternative wählbar.
+
+### 4.11 Layout und Lesbarkeit als Testeigenschaft
+
+Überlagerungsfreiheit und Lesekontrast sind keine Zusagen mehr, sondern geprüfte
+Eigenschaften. `tests/e2e/layout-contrast-v10-5.spec.js` öffnet die Anwendung in
+beiden Erscheinungsbildern bei 360, 768, 1024, 1440 und 1920 Pixeln — Arbeits-
+fläche wie Studio — und prüft:
+
+- **Überlauf:** Für jedes sichtbare Element, ob es innerhalb seines Elternrahmens
+  liegt. Ein Element, das über seinen Rahmen hinausragt, lässt den Test fallen.
+- **Kontrast:** Für jeden sichtbaren Textknoten das Verhältnis gegen den
+  tatsächlich wirksamen Hintergrund — inklusive halbtransparenter Schichten —
+  gegen die Schwellen der WCAG 2.1 Stufe AA (4,5:1, bei großer Schrift 3:1).
+
+Der Test hat im Dunkelmodus 36 unlesbare Stellen aufgedeckt: fest verdrahtete
+weiße Flächen aus einer Zeit ohne Dunkelmodus und die kräftige Monatsfarbe als
+Schriftfarbe auf dunklem Grund — gemessene 1,3:1. Beides ist behoben; beide
+Erscheinungsbilder sind bei allen fünf Breiten grün.
 
 ## 5. Performance für Windows 11 und Chrome
 
@@ -329,7 +422,7 @@ Cloudflare Pages wird aus dem Repository-Root gebaut. Das KV-Binding lautet `DIE
 
 ---
 
-## 10. Projektstruktur v9
+## 10. Projektstruktur v10.5
 
 ```text
 js/auto-planner-v9.js         hybride exakte Orchestrierung (CP-SAT + Fallback)
