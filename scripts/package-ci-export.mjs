@@ -26,29 +26,41 @@ const excludedFiles = new Set([
   'scripts/package-ci-export.mjs',
 ]);
 
+function shouldInclude(relativePath) {
+  const relative = normalize(relativePath);
+  if (!relative) return true;
+  if (excludedFiles.has(relative)) return false;
+  return !excludedPrefixes.some((prefix) => relative === prefix || relative.startsWith(`${prefix}/`));
+}
+
 await rm(stageRoot, { recursive: true, force: true });
 await rm(artifactDir, { recursive: true, force: true });
 await mkdir(releaseDir, { recursive: true });
 await mkdir(artifactDir, { recursive: true });
 
-await cp(root, releaseDir, {
-  recursive: true,
-  preserveTimestamps: true,
-  filter(source) {
-    const relative = normalize(path.relative(root, source));
-    if (!relative) return true;
-    if (excludedFiles.has(relative)) return false;
-    return !excludedPrefixes.some((prefix) => relative === prefix || relative.startsWith(`${prefix}/`));
-  },
-});
+for (const entry of await readdir(root, { withFileTypes: true })) {
+  if (!shouldInclude(entry.name)) continue;
+  const source = path.join(root, entry.name);
+  const destination = path.join(releaseDir, entry.name);
+  await cp(source, destination, {
+    recursive: entry.isDirectory(),
+    preserveTimestamps: true,
+    filter(candidate) {
+      return shouldInclude(path.relative(root, candidate));
+    },
+  });
+}
 
 const readmePath = path.join(releaseDir, 'README.md');
 const readme = await readFile(readmePath, 'utf8');
-await writeFile(
-  readmePath,
-  readme.replace('> **Regelwerk:** Eignungsregeln `v4.9`', '> **Regelwerk:** Eignungsregeln `v4.10`'),
-  'utf8',
+const correctedReadme = readme.replace(
+  '> **Regelwerk:** Eignungsregeln `v4.9`',
+  '> **Regelwerk:** Eignungsregeln `v4.10`',
 );
+if (correctedReadme === readme) {
+  throw new Error('README-Regelwerkszeile konnte nicht deterministisch auf v4.10 korrigiert werden.');
+}
+await writeFile(readmePath, correctedReadme, 'utf8');
 
 const packagePath = path.join(releaseDir, 'package.json');
 const packageData = JSON.parse(await readFile(packagePath, 'utf8'));
