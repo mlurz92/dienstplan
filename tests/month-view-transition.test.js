@@ -70,6 +70,6 @@ test('native animation state begins only when transition layers are ready', () =
 });
 
 test('transition stylesheet and syntax check are shipped', () => {
-  assert.match(motion, /\/transitions\.css\?v=20260803\.4/);
+  assert.match(motion, /\/transitions\.css\?v=20260805\.1/);
   assert.match(packageJson.scripts.check, /js\/month-view-transition\.js/);
 });

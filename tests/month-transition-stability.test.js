@@ -35,7 +35,7 @@ test('a running transition towards the same month is never restarted', () => {
 });
 
 test('every synchronization ends the base animation and hands the colour to the director', () => {
-  assert.match(stability, /import \{ applyMonthTheme \} from '.\/theme\.js\?v=20260803\.4';/);
+  assert.match(stability, /import \{ applyMonthTheme \} from '.\/theme\.js\?v=20260805\.1';/);
   assert.match(stability, /applyMonthTheme\(month, \{ animate: false, year \}\);/);
   assert.match(stability, /applySpectrumProfile\(year, month, \{ animate: true \}\)/);
 
@@ -100,5 +100,5 @@ test('the base theme never overwrites the colours owned by the director', () => 
 test('printing settles the director transition instead of the base theme', () => {
   const prepare = app.slice(app.indexOf('function prepareForPrint()'), app.indexOf('function restoreAfterPrint()'));
   assert.match(prepare, /applySpectrumProfile\(resolveThemeYear\(state\.currentYear\), state\.currentMonth, \{ animate: false \}\)/);
-  assert.match(app, /import \{ applySpectrumProfile \} from '\.\/color-director\.js\?v=20260803\.4';/);
+  assert.match(app, /import \{ applySpectrumProfile \} from '\.\/color-director\.js\?v=20260805\.1';/);
 });

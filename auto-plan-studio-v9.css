@@ -51,6 +51,56 @@
   box-shadow: 0 0 6px color-mix(in srgb, var(--month-accent) 50%, transparent);
 }
 
+/* Kollabierbare „v9 · Exakte Engine“-Sektion: Alle v9-Regler liegen in einem
+   aufklappbaren Feld, damit das Parameterraster bei Bedarf Platz freigibt und
+   keine Einstellung abgeschnitten wird. */
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v9-advanced {
+  grid-column: 1 / -1;
+  border: 1px solid color-mix(in srgb, var(--month-accent) 30%, transparent);
+  border-radius: var(--app-radius-sm);
+  background: color-mix(in srgb, var(--month-accent) 4%, #fff);
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v9-advanced > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+  list-style: none;
+  color: var(--ap-accent-strong);
+  font-size: .66rem;
+  font-weight: 750;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v9-advanced > summary::-webkit-details-marker { display: none; }
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v9-advanced > summary::before {
+  content: '▸';
+  display: inline-block;
+  transition: transform .18s cubic-bezier(.22, 1, .36, 1);
+  color: var(--muted);
+  font-size: .6rem;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v9-advanced[open] > summary::before { transform: rotate(90deg); }
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v9-advanced > summary small {
+  color: var(--muted);
+  font-size: .58rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v9-advanced-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(172px, 1fr));
+  gap: 8px 10px;
+  padding: 2px 10px 10px;
+}
+html[data-color-scheme="dark"] .auto-plan-dialog[data-v9-layout="1"] .auto-plan-v9-advanced {
+  background: color-mix(in srgb, #1a222c 92%, var(--month-accent) 8%);
+  border-color: color-mix(in srgb, #5f6b77 55%, var(--month-accent) 45%);
+}
+
 /* ------------------------------------------------------- Exaktheitsnachweis */
 
 .auto-plan-v9-result { padding: 0; }
@@ -171,36 +221,54 @@
 /* -------------------------------------------------- Konfiguration: 2 Spalten */
 
 /*
- * Parameter und Grenzprüfung links, die personengebundenen Obergrenzen rechts
- * in einer eigenen, intern scrollenden Spalte. Dadurch sind sämtliche
- * Einstellungen gleichzeitig sichtbar – ohne das Modal zu scrollen.
+ * Einspaltiges Vollbreiten-Layout: Keine Spalten mehr, die irgendwo zu
+ * schmal werden. Alle Abschnitte (Laufparameter, Grenzprüfung, Limits)
+ * liegen untereinander und nutzen die gesamte Dialogbreite.
  */
 .auto-plan-dialog[data-v9-layout="1"] #autoPlanConfig {
-  display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(340px, .62fr);
-  grid-template-rows: auto auto;
-  grid-template-areas:
-    "hero limits"
-    "validation limits";
-  gap: var(--flow-group);
-  align-content: start;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
 }
-.auto-plan-dialog[data-v9-layout="1"] .auto-plan-config-hero { grid-area: hero; align-self: start; }
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-config-hero { width: 100%; min-width: 0; }
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-panel {
-  grid-area: limits;
-  align-self: stretch;
+  width: 100%;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  max-height: 340px;
 }
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-scroll {
   flex: 1 1 auto;
   min-height: 0;
-  overflow-y: auto;
+  overflow: auto;
   scrollbar-gutter: stable;
   scrollbar-width: thin;
 }
-.auto-plan-dialog[data-v9-layout="1"] #autoPlanValidation { grid-area: validation; align-self: start; }
+.auto-plan-dialog[data-v9-layout="1"] #autoPlanValidation { width: 100%; }
+
+/* Limits-Tabelle: volle Containerbreite, festes Spaltenraster, schmalere
+   Zahlenfelder. Die Personenspalte nimmt den Rest und darf umbrechen. */
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-table {
+  min-width: 0;
+  width: 100%;
+  table-layout: fixed;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-table th,
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-table td {
+  padding: 3px 4px;
+  height: 26px;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-table th:first-child,
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-table td:first-child {
+  width: auto;
+  white-space: normal;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-table th:not(:first-child),
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-table td:not(:first-child) {
+  width: 58px;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-table input { min-height: 26px; }
 
 /* Dichtes Feldraster: mehr Einstellungen auf einen Blick. */
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-field-grid {
@@ -213,28 +281,167 @@
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-field input[type="range"] { min-height: 30px; }
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-context-list { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
 
-/* Kompakte Obergrenzen-Tabelle. */
-.auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-table th,
-.auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-table td { padding: 3px 5px; height: 26px; }
-.auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-table th:not(:first-child),
-.auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-table td:not(:first-child) { width: 74px; }
-.auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-table input { min-height: 26px; }
+/* ------------------------------------------------------- v9-Phasen-Ribbon */
 
-/* --------------------------------------------------------- Laufansicht v9 */
+/* Acht Stufen beanspruchen im v9-Kopfband mehr Platz als die sechs der
+   früheren Generation. Die Kacheln werden schmaler und dichter, damit sie
+   ohne übermäßig hohen Header in zwei Reihen Platz finden. */
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v8-stages {
+  grid-template-columns: repeat(auto-fill, minmax(8.5rem, 1fr));
+  gap: .35rem;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v8-stages li {
+  padding: .38rem .55rem .38rem 1.45rem;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v8-stages li::before {
+  inline-size: .82rem;
+  block-size: .82rem;
+  font-size: .55rem;
+  inset-block-start: .38rem;
+  inset-inline-start: .38rem;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v8-stages b {
+  font-size: .68rem;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v8-stages small {
+  font-size: .6rem;
+}
+
+/* Der dekorative Orbit-Kreis des Ribbons ragte um 150 px nach oben; die
+   Animation rotiert trotz Entfernung aus dem sichtbaren Bereich sinnlos
+   weiter. Er wird jetzt an den unteren rechten Rand gesetzt – sichtbar und
+   ohne seitliches Überlappen der Laufansicht. Er liegt z-index-mäßig HINTER
+   der Beschriftung, damit „Hybrid Exact Observatory · v9“ weder überlagert
+   noch vom Ribbon-Overflow abgeschnitten wird. */
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-ribbon::after {
+  inset: auto -10px -6px auto;
+  width: 150px;
+  height: 150px;
+  z-index: 0;
+  opacity: .5;
+  pointer-events: none;
+}
+/* Beschriftung des Ribbons: im Fluss belassen, aber über dem Dekor­kreis
+   angeordnet und mehrazeilig – so wird der Titel nie überlagert oder
+   abgeschnitten. */
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-ribbon {
+  padding: 10px 16px;
+  min-height: 54px;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-ribbon > b,
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-ribbon > small,
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-ribbon > strong {
+  position: relative;
+  z-index: 1;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-ribbon b {
+  display: block;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.15;
+}
+
+/* ------------------------------------------------------- Theater-Karten */
+
+/* Die exakte Suche hat acht Etappen; 96 px pro Karte schnitt lange deutsche
+   Titel ab. 130 px lassen genug Platz, und `text-overflow:ellipsis` sichert
+   für die Bremsgrenzen ab. */
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-theatre ol {
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 6px;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-theatre li {
+  min-height: 58px;
+  padding: 7px;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-theatre li b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: .7rem;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-theatre li small {
+  font-size: .58rem;
+}
+
+/* --------------------------------------------------------- Laufansicht v9
+   Responsives Raster: Breite Viewports zeigen Animation (Visual) und
+   Algorithmuszustand (Console) NEBENEINANDER, schmale Viewports STAPELN sie
+   (Visual oben, Console darunter). So überlagert der Algorithmuszustand die
+   Animation under keinem Fall – er steht garantiert unter oder neben ihr. */
 
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-stage {
   min-height: 0;
-  grid-template-columns: minmax(300px, .8fr) minmax(420px, 1.2fr);
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 10px;
 }
-.auto-plan-dialog[data-v9-layout="1"] .auto-plan-visual { min-height: 210px; max-height: 250px; }
+@media (min-width: 880px) {
+  .auto-plan-dialog[data-v9-layout="1"] .auto-plan-stage {
+    grid-template-columns: minmax(260px, 1fr) minmax(300px, 1.05fr);
+    grid-template-rows: minmax(0, 1fr);
+    align-items: stretch;
+  }
+}
+
+/* ---------------------------------------------------- V9 Reinzeichnung
+   Robuste Methode: ALLE Elemente im Fluss (kein position:absolute für
+   Layout), jedes Kind trägt min-height:0 / min-width:0, jeder Container
+   hat expliziten overflow. So überlagert garantiert nichts. */
+
+/* Alle ehemals absolut positionierten Beschriftungen ausblenden. */
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-core,
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-truth-strip,
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-orbit-legend,
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-visual-foot,
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-phase-list { display: none; }
+
+/* Canvas-Container: Flex-Column mit einem Kind (dem Canvas). Kein
+   position:absolute mehr – der Canvas ist ein normales Flex-Kind. */
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-visual {
+  position: relative;
+  isolation: isolate;
+  z-index: 0;
+  overflow: hidden;
+  width: 100%;
+  min-height: 230px;
+  max-height: 420px;
+  display: flex;
+  flex-direction: column;
+}
+.auto-plan-dialog[data-v9-layout="1"] #autoPlanCanvas {
+  position: static;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Console: Flex-Column mit Strip/Theater/Log/Metriken. Jedes Kind
+   min-height:0, damit nichts ausbricht. */
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-console {
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
-  align-content: start;
+  position: relative;
+  z-index: 1;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow: auto;
+}
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-console > * {
+  min-width: 0;
   min-height: 0;
 }
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-theatre { min-height: 0; }
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-live-metrics { min-height: 0; }
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-log {
   flex: 0 0 auto;
-  height: 210px;
+  height: 190px;
+  min-height: 0;
 }
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-log-stream {
   flex: 1 1 auto;
@@ -242,13 +449,6 @@
   height: auto;
   overflow-y: auto;
 }
-.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-theatre ol {
-  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
-  gap: 6px;
-}
-.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-theatre li { min-height: 58px; padding: 7px; }
-.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-theatre li b { font-size: .7rem; }
-.auto-plan-dialog[data-v9-layout="1"] .auto-plan-v85-theatre li small { font-size: .58rem; }
 
 /* ------------------------------------------------------------- Ergebnis v9 */
 
