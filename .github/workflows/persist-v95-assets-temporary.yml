@@ -1,0 +1,82 @@
+name: Persist v9.5 production assets
+
+on:
+  push:
+    branches:
+      - agent/auto-plan-v9-5-correct-engine
+
+permissions:
+  contents: write
+
+concurrency:
+  group: persist-v95-production-assets
+  cancel-in-progress: true
+
+jobs:
+  persist:
+    name: Generate, verify and persist
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout v9.5 branch head
+        uses: actions/checkout@v6
+        with:
+          ref: agent/auto-plan-v9-5-correct-engine
+          fetch-depth: 1
+
+      - name: Configure Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Generate exact lockfile
+        run: npm install --package-lock-only --ignore-scripts
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Verify syntax and shipped modules
+        run: npm run check
+
+      - name: Build local vendor assets and type-check
+        run: npm run build
+
+      - name: Run complete Node regression suite
+        timeout-minutes: 20
+        run: npm test
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run complete browser regression suite
+        timeout-minutes: 12
+        run: npm run test:e2e
+
+      - name: Update release documentation
+        run: node scripts/append-readme-v95-tooling.mjs
+
+      - name: Persist generated production assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json README.md vendor/floating-ui/floating-ui-dom.js vendor/or-tools-wasm/cp-sat.js
+          if git diff --cached --quiet; then
+            echo "Generated production assets are already current."
+            exit 0
+          fi
+          git commit -m "Persist v9.5 generated production assets"
+          git push origin HEAD:agent/auto-plan-v9-5-correct-engine
+
+      - name: Preserve browser diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: persist-v95-playwright-diagnostics
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 7
