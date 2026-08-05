@@ -1,0 +1,28 @@
+name: Temporary source export
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  export-source:
+    name: Export tracked repository source
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Create exact source archive
+        shell: bash
+        run: git archive --format=zip --output=dienstplan-v9.5-source.zip HEAD
+      - name: Upload source archive
+        uses: actions/upload-artifact@v7
+        with:
+          name: dienstplan-v9.5-source
+          path: dienstplan-v9.5-source.zip
+          retention-days: 1
+          if-no-files-found: error
