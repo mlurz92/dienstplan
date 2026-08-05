@@ -221,27 +221,22 @@ html[data-color-scheme="dark"] .auto-plan-dialog[data-v9-layout="1"] .auto-plan-
 /* -------------------------------------------------- Konfiguration: 2 Spalten */
 
 /*
- * Parameter und Grenzprüfung links, die personengebundenen Obergrenzen rechts
- * in einer eigenen, intern scrollenden Spalte. Dadurch sind sämtliche
- * Einstellungen gleichzeitig sichtbar – ohne das Modal zu scrollen.
+ * Einspaltiges Vollbreiten-Layout: Keine Spalten mehr, die irgendwo zu
+ * schmal werden. Alle Abschnitte (Laufparameter, Grenzprüfung, Limits)
+ * liegen untereinander und nutzen die gesamte Dialogbreite.
  */
 .auto-plan-dialog[data-v9-layout="1"] #autoPlanConfig {
-  display: grid;
-  grid-template-columns: minmax(0, .85fr) minmax(380px, 1.15fr);
-  grid-template-rows: auto auto;
-  grid-template-areas:
-    "hero limits"
-    "validation limits";
+  display: flex;
+  flex-direction: column;
   gap: 9px;
-  align-content: start;
 }
-.auto-plan-dialog[data-v9-layout="1"] .auto-plan-config-hero { grid-area: hero; align-self: start; min-width: 0; }
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-config-hero { width: 100%; min-width: 0; }
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-panel {
-  grid-area: limits;
-  align-self: stretch;
+  width: 100%;
   display: flex;
   flex-direction: column;
   min-height: 0;
+  max-height: 340px;
 }
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-limit-scroll {
   flex: 1 1 auto;
@@ -250,7 +245,7 @@ html[data-color-scheme="dark"] .auto-plan-dialog[data-v9-layout="1"] .auto-plan-
   scrollbar-gutter: stable;
   scrollbar-width: thin;
 }
-.auto-plan-dialog[data-v9-layout="1"] #autoPlanValidation { grid-area: validation; align-self: start; }
+.auto-plan-dialog[data-v9-layout="1"] #autoPlanValidation { width: 100%; }
 
 /* Limits-Tabelle: volle Containerbreite, festes Spaltenraster, schmalere
    Zahlenfelder. Die Personenspalte nimmt den Rest und darf umbrechen. */
@@ -345,19 +340,22 @@ html[data-color-scheme="dark"] .auto-plan-dialog[data-v9-layout="1"] .auto-plan-
   font-size: .58rem;
 }
 
-/* --------------------------------------------------------- Laufansicht v9 */
+/* --------------------------------------------------------- Laufansicht v9
+   Vertikale Stapelung: Canvas oben (volle Breite), darunter die Console mit
+   Theater, Log und Live-Metriken. Keine Spalten mehr – alles nutzt die
+   gesamte Dialogbreite. */
 
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-stage {
   min-height: 0;
-  align-items: start;
-  grid-template-columns: minmax(300px, .8fr) minmax(420px, 1.2fr);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 /* ---------------------------------------------------- V9 Reinzeichnung
-   Canvas pur – ohne Beschriftung, Label oder Overlay. Alle Informationen
-   stehen im Run-Strip (Console-Kopf) und im Theater. Die alte Phasenliste
-   wird versteckt; das Console-Raster ist auf vier explizite Zeilen begrenzt:
-   Strip · Theater · Log · Live-Metriken. */
+   Canvas pur – ohne Beschriftung, Label oder Overlay. Der Canvas bekommt
+   mehr Höhe, weil er die volle Breite nutzt. Alle Informationen stehen
+   im darunter liegenden Console-Bereich. */
 
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-core,
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-truth-strip,
@@ -365,13 +363,23 @@ html[data-color-scheme="dark"] .auto-plan-dialog[data-v9-layout="1"] .auto-plan-
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-visual-foot,
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-phase-list { display: none; }
 
-.auto-plan-dialog[data-v9-layout="1"] .auto-plan-visual { min-height: 210px; max-height: 320px; }
-.auto-plan-dialog[data-v9-layout="1"] #autoPlanCanvas { flex: 1 1 100%; min-height: 0; }
+.auto-plan-dialog[data-v9-layout="1"] .auto-plan-visual {
+  width: 100%;
+  min-height: 230px;
+  max-height: 420px;
+}
+.auto-plan-dialog[data-v9-layout="1"] #autoPlanCanvas {
+  flex: 1 1 100%;
+  min-height: 0;
+  width: 100%;
+}
 
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-console {
-  min-width: 0;
-  align-content: start;
+  flex: 1 1 auto;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 .auto-plan-dialog[data-v9-layout="1"] .auto-plan-log {
   flex: 0 0 auto;
