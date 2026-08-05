@@ -173,7 +173,7 @@ Bewertet wird durchgehend nach: **Eignung** (0–5) für das Auto-Plan Studio un
 | kein BD an Folgetagen | `y[bd_d][p] + y[bd_{d+1}][p] ≤ 1` |
 | HG Mo–Do ⇒ kein BD am Folgetag | `y[hg_d][p] + y[bd_{d+1}][p] ≤ 1` |
 | Obergrenze BD | `Σ_d y[bd_d][p] ≤ maxBd_p − fix_p` |
-| Wochenendkette Fr-BD·Sa frei·So-BD | `k` mit `k ≥ y_fri + (1−y_satBD) + (1−y_satHG) + y_sun − 3`, `k` in der Zielfunktion |
+| Wochenendkette Fr-BD·Sa frei·So-BD | `chain` mit `chain ≥ y_fri + (1−y_satBD) + (1−y_satHG) + y_sun − 3`, `chain` in der Zielfunktion |
 | Qualifikation | Variable wird gar nicht erst erzeugt |
 
 Der Gewinn ist nicht Bequemlichkeit, sondern **Ausdrucksmächtigkeit**: Kardinalität, Fairness und Wünsche sind erst in dieser Darstellung überhaupt formulierbar. Big-M entfällt vollständig; `onlyEnforceIf` liefert echte Halbreifikation ohne Hilfskonstruktion. Genau das ist die in der Literatur beschriebene Praxis („Boolean composition … auxiliary violation variables can be flexibly reused and combined with other logical conditions“).
@@ -193,9 +193,9 @@ Der Gewinn ist nicht Bequemlichkeit, sondern **Ausdrucksmächtigkeit**: Kardinal
 1. `L_p = Σ_d y[bd_d][p] + α · Σ_d y[hg_d][p]` — kombinierte Last je Person (α = Gewichtungsfaktor HG gegenüber BD, einstellbar).
 2. Stufe 1: `M ≥ L_p ∀p`, `min M` → obere Belastungsschranke.
 3. Stufe 2: `M` fixieren, Anzahl der Personen mit `L_p = M` minimieren (Indikator `t_p` mit `L_p ≤ M − 1 + t_p`, in CP-SAT als `add(L_p ≤ M − 1).onlyEnforceIf(¬t_p)` — ohne Big-M).
-4. Weiter absteigend, bis der Vektor eindeutig ist — oder Abbruch nach `k` Stufen (Zeitbudget).
+4. Weiter absteigend, bis der Vektor eindeutig ist — oder Abbruch nach `d` Stufen (Zeitbudget).
 
-**Alternative Formulierung** über die Summe der `k` größten Lasten (`Σ_{i≤k} L_(i)`), linear darstellbar nach Ogryczak/Śliwiński; für monotone Gewichte ist die OWA-Zielfunktion sogar rein linear. Beide Wege sind exakt; die sortierte Variante ist besser erklärbar, die OWA-Variante schneller.
+**Alternative Formulierung** über die Summe der `d` größten Lasten (`Σ_{i≤d} L_(i)`), linear darstellbar nach Ogryczak/Śliwiński; für monotone Gewichte ist die OWA-Zielfunktion sogar rein linear. Beide Wege sind exakt; die sortierte Variante ist besser erklärbar, die OWA-Variante schneller.
 
 **Eignung:** Löst genau die Schwäche aus 3.1(3). Die Stufenzahl ist ein natürlicher Zeitbudget-Regler.
 
@@ -271,7 +271,7 @@ Müller/Rudová/Barták entwickelten IFS mit konfliktbasierter Statistik für Un
 
 **Erklärung.** Fairness in einem einzelnen Monat ist nicht Fairness. Wer im März drei Wochenenden hatte, muss im April entlastet werden. Die Literatur zur periodischen Zuweisung („Schedules Need to be Fair Over Time“, „Fair Periodic Assignment Problem“) formalisiert genau das; die Praxis nennt es Equitable Distribution Index über kumulierte Daten.
 
-**Bewertung.** Der Zustand enthält bereits alle Vormonate (`state.months`). Ein **Carry-over-Konto** je Person (BD, HG, Wochenendäquivalent, jeweils gleitend über *k* Monate) fließt als Startversatz in den Leximin-Lastvektor ein: `L_p = aktuelle Last + λ · Rückstand_p`. Das ist ein kleiner Eingriff mit großer wahrgenommener Wirkung. **Aufnehmen, mit Regler λ und Fensterlänge k.**
+**Bewertung.** Der Zustand enthält bereits alle Vormonate (`state.months`). Ein **Carry-over-Konto** je Person (BD, HG, Wochenendäquivalent, jeweils gleitend über *m* Monate) fließt als Startversatz in den Leximin-Lastvektor ein: `L_p = aktuelle Last + λ · Rückstand_p`. Das ist ein kleiner Eingriff mit großer wahrgenommener Wirkung. **Aufnehmen, mit Regler λ und Fensterlänge m.**
 
 ## 8. B4 — Erklärbarkeit und Konfliktdiagnose
 
@@ -402,7 +402,7 @@ Kein Framework-Wechsel. Der Bestand ist reines ESM ohne Build-Schritt; das ist f
 4  EXAKTE KASKADE lexikografisch, je Stufe: lösen → Wert per Blocking-Constraint
                   fixieren → Lösung als Hint in die nächste Stufe
      S0  Zulässigkeit + alle r_g = 1
-     S1  Leximin auf kombinierter Last L_p (inkl. Carry-over)      [k Stufen]
+     S1  Leximin auf kombinierter Last L_p (inkl. Carry-over)      [d Stufen]
      S2  Wunscherfüllung
      S3  BD-Soll-Abweichung
      S4  Wochenend- und Samstagsausgleich
@@ -521,8 +521,8 @@ Reihenfolge ist bindend: jedes Paket ist für sich lauffähig und testbar.
 - **Offener Punkt (aus Abschnitt 13):** Die Prototyp-Messung (218 ms / 188 ms / 445 ms) erneut ausführen — `cpsat-js` **portable**, `numWorkers: 1`, echter Browser-Web-Worker (nicht Node.js), CPU/Gerät benannt, **≥ 10 Läufe** mit Median und Spannweite. Erst danach gilt die Laufzeitaussage als für den empfohlenen Pfad validiert; die Testfixtures aus P3 können dafür als Grundlage dienen.
 
 ### P4 — Leximin + Carry-over
-- `L_p = Σ BD + α·Σ HG + λ·Rückstand_p(k Monate)`.
-- Stufenweises Absenken der Maximallast, `k` Stufen aus dem Zeitbudget.
+- `L_p = Σ BD + α·Σ HG + λ·Rückstand_p(m Monate)`.
+- Stufenweises Absenken der Maximallast, `d` Stufen aus dem Zeitbudget.
 - **Test:** konstruierte Instanz mit erzwungener Ungleichverteilung; Leximin muss den Schlechtestgestellten nachweislich anheben, ohne die Summe zu verschlechtern.
 
 ### P5 — Diagnose neu
@@ -580,9 +580,9 @@ Tatsächlich sind also nur **zwei** der neun Schlüssel als Studio-Regler sichtb
 | Regler | Wertebereich | Wirkung |
 |---|---|---|
 | **Zielreihenfolge** | Drag-&-Drop-Liste der Stufen S1–S6 | *die* eigentliche Steuerung: lexikografische Priorität ist die ehrliche Form von „Gewichtung“ |
-| **Leximin-Tiefe** `k` | 1–8 (Default 3) | wie viele Ränge des sortierten Lastvektors exakt festgezurrt werden |
+| **Leximin-Tiefe** `d` | 1–8 (Default 3) | wie viele Ränge des sortierten Lastvektors exakt festgezurrt werden |
 | **HG-Faktor** `α` | 0,0–1,0 (Default 0,6) | wie stark ein HG gegenüber einem BD als Last zählt |
-| **Carry-over-Fenster** `k` | 0–6 Monate (Default 3) | Länge des Fairness-Gedächtnisses |
+| **Carry-over-Fenster** `m` | 0–6 Monate (Default 3) | Länge des Fairness-Gedächtnisses |
 | **Carry-over-Gewicht** `λ` | 0–100 % (Default 50) | wie stark Rückstände aus Vormonaten den Startversatz bestimmen |
 | **Stabilitätsstufe** | aus / Gleichstand / streng | Rang der Minimal-Perturbation in der Kaskade |
 | **Zeitbudget gesamt** | 2–60 s (Default 10) | wird proportional auf die Stufen verteilt |
@@ -652,7 +652,7 @@ Ein horizontales Balkendiagramm der kombinierten Last je Person, **aufsteigend s
 **Obergrenzen.** `B_p ≤ maxBd_p` , `H_p ≤ maxHg_p` , `B_p + H_p ≤ maxTotal_p`
 
 **Kombinierte Last mit Gedächtnis.**
-`L_p = B_p + α·H_p + λ·( \bar{L} − \tilde{L}_p )` mit `\tilde{L}_p` = mittlere Last der Person über die letzten `k` Monate und `\bar{L}` deren Gruppenmittel. Positiver Rückstand hebt `L_p` an und macht die Person für den Leximin-Schritt attraktiver.
+`L_p = B_p + α·H_p + λ·( \bar{L} − \tilde{L}_p )` mit `\tilde{L}_p` = mittlere Last der Person über die letzten `m` Monate und `\bar{L}` deren Gruppenmittel. Positiver Rückstand hebt `L_p` an und macht die Person für den Leximin-Schritt attraktiver.
 
 **Leximin (Minimierungsform, Stufe *j*).**
 ```
