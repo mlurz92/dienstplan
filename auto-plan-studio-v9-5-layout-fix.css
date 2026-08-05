@@ -1,0 +1,76 @@
+/*
+ * Narrow-viewport hardening for Auto-Plan Studio v9.5.
+ *
+ * The legacy configuration hero uses two columns down to 760 px. On phone
+ * widths the first column can collapse to a zero-width grid track while the
+ * limits card occupies the available width. v9.5 keeps both sections in the
+ * normal document flow and lets only their own scroll containers overflow.
+ */
+
+@media (max-width: 760px) {
+  .auto-plan-dialog[data-v95-layout="1"] .auto-plan-config-hero {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    align-items: start;
+    gap: 10px;
+    width: 100%;
+    min-width: 0;
+    overflow: visible;
+  }
+
+  .auto-plan-dialog[data-v95-layout="1"] .auto-plan-config-hero > * {
+    grid-column: 1 !important;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .auto-plan-dialog[data-v95-layout="1"] .auto-plan-field-grid {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .auto-plan-dialog[data-v95-layout="1"] .auto-plan-field,
+  .auto-plan-dialog[data-v95-layout="1"] .auto-plan-field :is(input, select, textarea, output) {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .auto-plan-dialog[data-v95-layout="1"] .auto-plan-field :is(input, select, textarea) {
+    min-height: 34px;
+  }
+
+  .auto-plan-dialog[data-v95-layout="1"] .auto-plan-limit-panel {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  .auto-plan-dialog[data-v95-layout="1"] .auto-plan-limit-scroll {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto !important;
+    overflow-y: visible;
+    overscroll-behavior-inline: contain;
+    scrollbar-gutter: stable;
+  }
+
+  .auto-plan-dialog[data-v95-layout="1"] .auto-plan-limit-scroll table {
+    min-width: 680px;
+  }
+}
+
+@media (max-width: 420px) {
+  .auto-plan-dialog[data-v95-layout="1"] #autoPlanConfig {
+    padding-inline: 6px;
+  }
+
+  .auto-plan-dialog[data-v95-layout="1"] .auto-plan-config-hero,
+  .auto-plan-dialog[data-v95-layout="1"] .auto-plan-field-grid {
+    gap: 7px;
+  }
+
+  .auto-plan-dialog[data-v95-layout="1"] .auto-plan-field {
+    padding-inline: 8px;
+  }
+}
