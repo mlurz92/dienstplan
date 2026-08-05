@@ -515,6 +515,7 @@ Reihenfolge ist bindend: jedes Paket ist für sich lauffähig und testbar.
 
 ### P9 — Abschluss
 - Versions-Token gemeinsam anheben (`index.html`, Manifest, Asset-Queries, Icon-Query, `package.json`).
+- Dateiliste des `check`-Skripts in `package.json` nachziehen: `js/auto-plan-solver.js`, `js/auto-plan-model.js`, `js/auto-planner-v10.js` und `js/auto-plan-crystallize.js` ergänzen; `js/auto-planner-v9.js` und `js/auto-plan-cp-sat.js` (abgelöste Engine v9.5, siehe Abschnitt 0) entfernen. `npm run verify` ruft nur `check`, `test` und `test:e2e` auf (siehe `.github/workflows/ci.yml`) — ohne diesen Schritt liefe die neue Engine v10 ohne Syntaxprüfung durch die CI.
 - `docs/AUTO-PLAN-CHANGELOG.md` fortschreiben.
 - README-Abschnitt „Auto-Plan v10“ ersetzt „Auto-Plan v9“.
 - Vollständiger Lauf `npm run verify`.
