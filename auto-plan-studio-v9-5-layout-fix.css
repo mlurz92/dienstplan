@@ -101,3 +101,37 @@
     padding-inline: 8px;
   }
 }
+
+/*
+ * The native modal top layer makes the surrounding command bar inert. The
+ * original pictographic theme toggle is therefore moved into this header while
+ * the studio is open. Explicit grid tracks keep it separate from the close
+ * action at every viewport width and preserve a reliable pointer target.
+ */
+.auto-plan-dialog[data-v95-layout="1"] .auto-plan-header {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+}
+
+.auto-plan-dialog[data-v95-layout="1"] .auto-plan-headline {
+  grid-column: 1;
+  min-width: 0;
+}
+
+.auto-plan-dialog[data-v95-layout="1"] .auto-plan-modal-theme-toggle {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: center;
+  justify-self: end;
+  position: relative;
+  z-index: 22;
+  margin: 0;
+}
+
+.auto-plan-dialog[data-v95-layout="1"] .auto-plan-close {
+  grid-column: 3;
+  grid-row: 1;
+  align-self: center;
+  position: relative;
+  z-index: 22;
+}
