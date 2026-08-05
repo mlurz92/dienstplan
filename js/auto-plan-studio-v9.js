@@ -17,11 +17,11 @@
  *    sondern scrollt intern. Dark-Mode-Kontraste werden angehoben.
  */
 
-import { AUTO_PLAN_STAGES, isCpSatReady } from './auto-planner.js?v=20260803.4';
-import { state } from './state.js?v=20260803.4';
-import { setRichTooltip } from './rich-tooltip-v8-5.js?v=20260803.4';
+import { AUTO_PLAN_STAGES, isCpSatReady } from './auto-planner.js?v=20260805.1';
+import { state } from './state.js?v=20260805.1';
+import { setRichTooltip } from './rich-tooltip-v8-5.js?v=20260805.1';
 
-const RELEASE = '20260803.4';
+const RELEASE = '20260805.1';
 const STORAGE_KEY = 'dienstplanrad:autoplan-v9-studio';
 
 const BACKEND_LABELS = Object.freeze({
@@ -75,7 +75,12 @@ const TOOLTIP_CATALOG = Object.freeze({
   '#autoPlanApplyBtn': 'Prüft den Vorschlag erneut vollständig gegen alle Regeln und schreibt ihn dann in einem Zug in den Monatsplan.',
   '#autoPlanCancelBtn': 'Bricht den Lauf ab und schließt das Studio. Am Monatsplan wird nichts verändert.',
   '#autoPlanLimitReset': 'Setzt alle Zeilen auf die festgelegten Vorgaben zurück: die monatliche BD-Zahl je Person und die HG-Sperre für alle, die im Monat an keinem Tag HG-berechtigt sind.',
-  '#autoPlanLimitClear': 'Entfernt sämtliche Laufgrenzen. Hinterlegte Personalmaxima und alle fachlichen Regeln gelten unabhängig davon weiter.'
+  '#autoPlanLimitClear': 'Entfernt sämtliche Laufgrenzen. Hinterlegte Personalmaxima und alle fachlichen Regeln gelten unabhängig davon weiter.',
+  '#autoPlanV9FairnessWeight': 'Gewichtung der exakten Fairness (Maximin): höhere Werte lassen die Suche stärker zugunsten der am schwächsten gestellten Person ausgleichen, auch wenn andere weiche Ziele darunter leiden.',
+  '#autoPlanV9ProtectBaseline': 'Stabilität: Der exakte Kern behält bestehende Belegungen bei und rührt manuelle Edits nur an, wenn es die fachlichen Ziele nennenswert verbessert. So bleiben manuelle Änderungen beim Re-Planen erhalten.',
+  '#autoPlanV9PerturbationWeight': 'Gewichtung der Minimal-Perturbation: wie stark Abweichungen vom heuristischen Vorschlag (der manuelle Edits ehrt) vermieden werden sollen.',
+  '#autoPlanV9RelaxationDepth': 'Tiefe der Konfliktaufweichung bei unzulässigem Modell: „tief“ entspannt konsequent bis zur ersten zulässigen Lösung, „flach“ nur die nötigsten Gruppen.',
+  '#autoPlanV9MusAutoRelax': 'Bei unzulässigem Modell nicht nur die kleinste Konfliktursache (MUS) benennen, sondern die markierten Gruppen sofort relaxieren und einen planbaren Vorschlag liefern.'
 });
 
 const CONSOLE_TOOLTIPS = Object.freeze({
@@ -112,7 +117,12 @@ function applyToState() {
     deterministic: saved.deterministic !== false,
     infeasibilityMode: saved.infeasibilityMode || target.infeasibilityMode || 'mus',
     repairOnEdit: saved.repairOnEdit !== false,
-    explanationDepth: saved.explanationDepth || target.explanationDepth || 'detailed'
+    explanationDepth: saved.explanationDepth || target.explanationDepth || 'detailed',
+    cpSatFairnessWeight: Number.isFinite(Number(saved.cpSatFairnessWeight)) ? Number(saved.cpSatFairnessWeight) : (target.cpSatFairnessWeight ?? 90),
+    protectBaseline: saved.protectBaseline !== false,
+    cpSatPerturbationWeight: Number.isFinite(Number(saved.cpSatPerturbationWeight)) ? Number(saved.cpSatPerturbationWeight) : (target.cpSatPerturbationWeight ?? 45),
+    relaxationDepth: saved.relaxationDepth || target.relaxationDepth || 'deep',
+    musAutoRelax: saved.musAutoRelax === true
   });
 }
 
@@ -221,6 +231,46 @@ function installV9Controls(dialog) {
         <option value="llm">LLM-gestützt</option>
       </select>
       <small>Regel-Kennungen bzw. optionale KI-Begründung</small>
+    </label>
+    <label class="auto-plan-field auto-plan-field--v9">
+      <span>Fairness-Gewicht</span>
+      <div class="auto-plan-range">
+        <input id="autoPlanV9FairnessWeight" type="range" min="1" max="100" step="1" value="90">
+        <output id="autoPlanV9FairnessWeightOut">90</output>
+      </div>
+      <small>Maximin-Ausgleich der am schwächsten gestellten Person</small>
+    </label>
+    <label class="auto-plan-field auto-plan-field--v9">
+      <span>Stabilität (Änderungen minimieren)</span>
+      <select id="autoPlanV9ProtectBaseline">
+        <option value="on">Aktiv (manual edits erhalten)</option>
+        <option value="off">Aus (freie Neuplanung)</option>
+      </select>
+      <small>Re-Planen rührt bestehende Belegungen kaum an</small>
+    </label>
+    <label class="auto-plan-field auto-plan-field--v9">
+      <span>Minimal-Perturbation-Gewicht</span>
+      <div class="auto-plan-range">
+        <input id="autoPlanV9PerturbationWeight" type="range" min="0" max="100" step="1" value="45">
+        <output id="autoPlanV9PerturbationWeightOut">45</output>
+      </div>
+      <small>Abweichung vom heuristischen Vorschlag vermeiden</small>
+    </label>
+    <label class="auto-plan-field auto-plan-field--v9">
+      <span>Relaxations­tiefe</span>
+      <select id="autoPlanV9RelaxationDepth">
+        <option value="deep">Tief (konsequent)</option>
+        <option value="shallow">Flach (nur nötigstes)</option>
+      </select>
+      <small>Konfliktaufweichung bei Unzulässigkeit</small>
+    </label>
+    <label class="auto-plan-field auto-plan-field--v9">
+      <span>MUS automatisch relaxieren</span>
+      <select id="autoPlanV9MusAutoRelax">
+        <option value="off">Nur benennen</option>
+        <option value="on">Relaxieren + Vorschlag</option>
+      </select>
+      <small>Kleinste Konfliktursache sofort aufweichen</small>
     </label>`;
 
   const holder = document.createElement('template');
@@ -242,6 +292,15 @@ function installV9Controls(dialog) {
   setSelect('autoPlanV9Infeasibility', saved.infeasibilityMode || target.infeasibilityMode || 'mus');
   setSelect('autoPlanV9RepairOnEdit', saved.repairOnEdit === false ? 'off' : 'on');
   setSelect('autoPlanV9Explanation', saved.explanationDepth || target.explanationDepth || 'detailed');
+  const fairnessWeight = Number(saved.cpSatFairnessWeight ?? target.cpSatFairnessWeight ?? 90);
+  byId('autoPlanV9FairnessWeight').value = String(fairnessWeight);
+  byId('autoPlanV9FairnessWeightOut').textContent = String(fairnessWeight);
+  const perturbationWeight = Number(saved.cpSatPerturbationWeight ?? target.cpSatPerturbationWeight ?? 45);
+  byId('autoPlanV9PerturbationWeight').value = String(perturbationWeight);
+  byId('autoPlanV9PerturbationWeightOut').textContent = String(perturbationWeight);
+  setSelect('autoPlanV9ProtectBaseline', saved.protectBaseline === false ? 'off' : 'on');
+  setSelect('autoPlanV9RelaxationDepth', saved.relaxationDepth ?? target.relaxationDepth ?? 'deep');
+  setSelect('autoPlanV9MusAutoRelax', saved.musAutoRelax === true ? 'on' : 'off');
   const budget = Number(saved.cpSatTimeBudgetSeconds ?? target.cpSatTimeBudgetSeconds ?? 10);
   byId('autoPlanV9TimeBudget').value = String(budget);
   byId('autoPlanV9TimeBudgetOut').textContent = `${budget} s`;
@@ -257,7 +316,12 @@ function installV9Controls(dialog) {
       deterministic: byId('autoPlanV9Determinism').value === 'deterministic',
       infeasibilityMode: byId('autoPlanV9Infeasibility').value,
       repairOnEdit: byId('autoPlanV9RepairOnEdit').value === 'on',
-      explanationDepth: byId('autoPlanV9Explanation').value
+      explanationDepth: byId('autoPlanV9Explanation').value,
+      cpSatFairnessWeight: Number(byId('autoPlanV9FairnessWeight').value) || 90,
+      protectBaseline: byId('autoPlanV9ProtectBaseline').value === 'on',
+      cpSatPerturbationWeight: Number(byId('autoPlanV9PerturbationWeight').value) || 0,
+      relaxationDepth: byId('autoPlanV9RelaxationDepth').value,
+      musAutoRelax: byId('autoPlanV9MusAutoRelax').value === 'on'
     };
     writeSettings(value);
     applyToState();
@@ -269,6 +333,12 @@ function installV9Controls(dialog) {
   byId('autoPlanV9TimeBudget').addEventListener('input', () => {
     byId('autoPlanV9TimeBudgetOut').textContent = `${byId('autoPlanV9TimeBudget').value} s`;
   });
+  byId('autoPlanV9FairnessWeight').addEventListener('input', () => {
+    byId('autoPlanV9FairnessWeightOut').textContent = byId('autoPlanV9FairnessWeight').value;
+  });
+  byId('autoPlanV9PerturbationWeight').addEventListener('input', () => {
+    byId('autoPlanV9PerturbationWeightOut').textContent = byId('autoPlanV9PerturbationWeight').value;
+  });
 
   applyToState();
 
@@ -276,8 +346,9 @@ function installV9Controls(dialog) {
   for (const id of [
     'autoPlanV9SolverBackend', 'autoPlanV9Exactness', 'autoPlanV9TimeBudget',
     'autoPlanV9Workers', 'autoPlanV9WarmStart', 'autoPlanV9Fairness',
-    'autoPlanV9Determinism', 'autoPlanV9Infeasibility', 'autoPlanV9RepairOnEdit',
-    'autoPlanV9Explanation'
+    'autoPlanV9Determinism',     'autoPlanV9Infeasibility', 'autoPlanV9RepairOnEdit',
+    'autoPlanV9Explanation', 'autoPlanV9FairnessWeight', 'autoPlanV9ProtectBaseline',
+    'autoPlanV9PerturbationWeight', 'autoPlanV9RelaxationDepth', 'autoPlanV9MusAutoRelax'
   ]) {
     setRichTooltip(byId(id), TOOLTIP_CATALOG[`#${id}`]);
   }

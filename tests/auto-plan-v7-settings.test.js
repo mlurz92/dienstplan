@@ -41,7 +41,14 @@ test('v7 settings defaults are complete and safe', () => {
     deterministic: true,
     infeasibilityMode: 'mus',
     repairOnEdit: true,
-    explanationDepth: 'detailed'
+    explanationDepth: 'detailed',
+    cpSatFairnessWeight: 90,
+    protectBaseline: true,
+    cpSatPerturbationWeight: 45,
+    cpSatCtLeadershipWeight: 70,
+    cpSatWeekendChainWeight: 100,
+    relaxationDepth: 'deep',
+    musAutoRelax: false
   });
 });
 

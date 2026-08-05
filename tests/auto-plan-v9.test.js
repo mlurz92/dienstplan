@@ -275,3 +275,38 @@ test('_headers setzen Cross-Origin-Isolation für multithreaded WASM', async () 
   assert.match(headers, /Cross-Origin-Embedder-Policy:\s*require-corp/);
   assert.match(headers, /\/vendor\/\*/);
 });
+
+test('v9.5 CP-SAT-Modell kodiert Becker-FZA, CT-Leitung und Wochenendkette', () => {
+  const dates = Array.from({ length: 31 }, (_, i) => `2026-01-${String(i + 1).padStart(2, '0')}`);
+  const monthData = miniMonth(dates);
+  // Martin fehlt am Montag (05.01.), dem FZA-Tag nach Becker-BD am Freitag (02.01.).
+  monthData.absences.martin = { '2026-01-05': 'urlaub' };
+  const state = stateWith(monthData);
+  const model = bridge.buildCpSatModel({
+    state,
+    monthData,
+    baseline: monthData,
+    config: {},
+    hints: [{ dateIso: '2026-01-01', role: 'bd', staffId: 'becker' }]
+  });
+
+  assert.ok(model.counts.variables > 0, 'Slot-Variablen erzeugt');
+  // Becker-FZA: reifizierte Gleichheit für jeden Becker-BD-Tag.
+  assert.ok(model.hardConstraints.some(c => c.id.startsWith('becker_fza_2026-01-02')), 'Becker-FZA-Constraint für 02.01. vorhanden');
+  // Wochenendkette Fr(02.01.)·Sa frei·So(04.01.) als weiches Vermeidungsziel.
+  assert.ok(model.hardConstraints.some(c => c.id.includes('chain_fri_2026-01-02')), 'Wochenendketten-Constraint für 02.01. vorhanden');
+  assert.ok(model.components.weekendChain.terms.length > 0, 'Wochenendketten-Ziel besetzt');
+  // CT-Leitung: Martin am FZA-Tag (05.01.) abwesend -> Becker-BD am 02.01. bestraft.
+  assert.ok(model.components.ctLeadership.terms.length > 0, 'CT-Leitungs-Ziel besetzt (Martin am FZA-Tag fehlend)');
+  // Minimal-Perturbation: Hinweis für 01.01. BD = becker erzeugt Penalty-Literal.
+  assert.ok(model.components.perturbation.terms.length > 0, 'Perturbations-Ziel besetzt (Heuristik-Hinweis)');
+});
+
+test('v9.5 diagnoseInfeasibility liefert MUS-fähiges Ergebnis ohne Solver', async () => {
+  const state = stateWith(miniMonth(['2026-01-01', '2026-01-02']));
+  const model = bridge.buildCpSatModel({ state, monthData: miniMonth(['2026-01-01', '2026-01-02']), baseline: miniMonth(['2026-01-01', '2026-01-02']), config: {} });
+  const diagnosis = await bridge.diagnoseInfeasibility(model, null, {});
+  assert.equal(diagnosis.infeasible, true);
+  assert.ok(Array.isArray(diagnosis.groups), 'Gruppenliste vorhanden');
+  assert.ok('mus' in diagnosis, 'MUS-Konfliktmenge vorhanden');
+});

@@ -1,9 +1,9 @@
 /** DienstplanRAD v8.5 – Command Bar, Theme, Tooltips und Chrome-Shell. */
-import { createThemeToggle, installThemeController } from './app-theme-v8-5.js?v=20260803.4';
-import { installRichTooltips, setRichTooltip } from './rich-tooltip-v8-5.js?v=20260803.4';
-import { state } from './state.js?v=20260803.4';
+import { createThemeToggle, installThemeController } from './app-theme-v8-5.js?v=20260805.1';
+import { installRichTooltips, setRichTooltip } from './rich-tooltip-v8-5.js?v=20260805.1';
+import { state } from './state.js?v=20260805.1';
 
-const RELEASE = '20260803.4';
+const RELEASE = '20260805.1';
 const STYLESHEETS = Object.freeze(['/app-v8-5.css', '/toolbar-v8-5.css', '/app-v9.css']);
 const NAV_ICONS = Object.freeze({
   prevMonthBtn: '<svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg>',

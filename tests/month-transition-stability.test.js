@@ -12,8 +12,8 @@ const app = await readFile(new URL('../js/app.js', import.meta.url), 'utf8');
 const packageJson = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
 
 test('month transition stability is loaded after the spectrum director', () => {
-  const spectrumImport = uiControls.indexOf("import './color-director.js?v=20260803.4';");
-  const stabilityImport = uiControls.indexOf("import './month-transition-stability.js?v=20260803.4';");
+  const spectrumImport = uiControls.indexOf("import './color-director.js?v=20260805.1';");
+  const stabilityImport = uiControls.indexOf("import './month-transition-stability.js?v=20260805.1';");
   assert.ok(spectrumImport >= 0, 'der Spectrum Director muss eingebunden bleiben');
   assert.ok(stabilityImport > spectrumImport, 'die Stabilisierung muss den Director nachgelagert abschließen');
 });
