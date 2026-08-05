@@ -118,7 +118,7 @@ Die Minimalstelle einer Zielfunktion ändert sich nicht, wenn man sie mit einer 
 
 ### 2.6 Der Folgeschaden: die Diagnose läuft ins Leere
 
-Weil jeder Solve `UNKNOWN` meldet, gilt in `solveExactPhases` sofort `infeasible: true`. `diagnoseInfeasibility` startet daraufhin die zweistufige Löschdiagnose: Ebene 2 iteriert über **jeden einzelnen Constraint jeder essenziellen Gruppe** und startet je Constraint einen vollständigen Solve. Das reale Modell hat **1.984 harte Constraints und 1.016 Hilfsvariablen** für 56 offene Felder. Das ist eine Schleife mit vierstelliger Solve-Zahl, deren Ergebnis konstruktionsbedingt „alle Gruppen sind schuld“ lautet.
+Weil jeder Solve `UNKNOWN` meldet, gilt in `solveExactPhases` sofort `infeasible: true`. `diagnoseInfeasibility` startet daraufhin die zweistufige Löschdiagnose: Ebene 2 iteriert über **jeden einzelnen Constraint jeder essenziellen Gruppe** und startet je Constraint einen vollständigen Solve. Das reale Modell hat **2.060 harte Constraints und 1.074 Hilfsvariablen** für einen 30-Tage-Monat mit 60 offenen Feldern (8 planbare Personen). Das ist eine Schleife mit vierstelliger Solve-Zahl, deren Ergebnis konstruktionsbedingt „alle Gruppen sind schuld“ lautet.
 
 **Nettobefund:** Die ausgelieferte Anwendung baut ein ~3.000-Zeilen-Modell, verwirft es, durchläuft eine mehrtausendfache Diagnoseschleife ohne Aussagewert, und liefert am Ende **immer** das Ergebnis der v8.5-Heuristik. Das Exaktheitsnachweis-Panel zeigt entsprechend nie einen Beweis.
 
@@ -178,7 +178,7 @@ Bewertet wird durchgehend nach: **Eignung** (0–5) für das Auto-Plan Studio un
 
 Der Gewinn ist nicht Bequemlichkeit, sondern **Ausdrucksmächtigkeit**: Kardinalität, Fairness und Wünsche sind erst in dieser Darstellung überhaupt formulierbar. Big-M entfällt vollständig; `onlyEnforceIf` liefert echte Halbreifikation ohne Hilfskonstruktion. Genau das ist die in der Literatur beschriebene Praxis („Boolean composition … auxiliary violation variables can be flexibly reused and combined with other logical conditions“).
 
-**Modellgröße hier:** 60 Felder × Ø 6,2 Kandidaten ≈ **372 Binärvariablen** — gegenüber 56 Integer- plus **1.016 Hilfsvariablen** und 1.984 Constraints im heutigen Modell. Kleiner, korrekter, schneller.
+**Modellgröße hier — beide Werte auf derselben Instanz (30-Tage-Monat, 60 offene Felder, 8 planbare Personen):** 60 Felder × Ø 6,0 Kandidaten ≈ **362 Binärvariablen** — gegenüber 60 Integer- plus **1.074 Hilfsvariablen** und **2.060 Constraints** im heutigen Modell (siehe Verifikationsprotokoll, §13). Kleiner, korrekter, schneller.
 
 **Gemessen:** `OPTIMAL` in 218 ms (Zulässigkeit), 188 ms (Minimax BD-Last), 445 ms (drei lexikografische Stufen). *Einzellauf ohne vollständig protokollierte Umgebung — Einordnung, Vorbehalt gegenüber dem empfohlenen portablen Browser-Pfad und offener Nachmess-Punkt in Abschnitt 13.*
 
@@ -279,7 +279,7 @@ Müller/Rudová/Barták entwickelten IFS mit konfliktbasierter Statistik für Un
 
 **Erklärung.** Ein Minimal Unsatisfiable Subset ist eine kleinste Constraint-Menge, die für sich unerfüllbar ist. QuickXplain findet ihn **dichotom** (rekursive Halbierung) statt durch lineare Löschung; MARCO kartiert die Grenze zwischen erfüllbaren und unerfüllbaren Teilmengen.
 
-**Bewertung.** Das Konzept ist richtig. Die heutige Umsetzung (lineare Löschung über **jeden einzelnen Constraint**) ist es nicht. **Korrektur:** QuickXplain **auf Gruppenebene** (7 Gruppen → ≈ log₂ 7 · c Solves statt 1.984) — das ist die Auflösung, die eine Oberfläche ohnehin nur zeigen kann.
+**Bewertung.** Das Konzept ist richtig. Die heutige Umsetzung (lineare Löschung über **jeden einzelnen Constraint**) ist es nicht. **Korrektur:** QuickXplain **auf Gruppenebene** (7 Gruppen → ≈ log₂ 7 · c Solves statt 2.060) — das ist die Auflösung, die eine Oberfläche ohnehin nur zeigen kann.
 
 ### 8.2 Assumptions / UNSAT-Core — **Eignung 3/5 (blockiert)**
 
@@ -450,7 +450,7 @@ Alle Aussagen dieses Berichts über den Ist-Zustand wurden ausgeführt, nicht ge
 | Obergrenzen | Termmengen aller `limit_bd_*` am real gebauten Modell verglichen | für alle Personen **identisch**, = alle BD-Slots; `Σ ≥ 28 > ub = 4` |
 | Gewichte | distinkte Gewichte je Zielkomponente gezählt | überall **genau 1** → Skalierung wirkungslos |
 | Zweigwahl | `normalizeSolverApi`-Bedingung gegen die realen `cpsat-js`-Exporte | erster Zweig greift, zweiter ist tot |
-| Modellgröße | `buildCpSatModel` auf 28-Tage-Monat | 56 Variablen, **1.016 Hilfsvariablen, 1.984 Constraints** |
+| Modellgröße | `buildCpSatModel` auf 30-Tage-Monat (60 offene Felder, 8 planbare Personen) | 60 Variablen, **1.074 Hilfsvariablen, 2.060 Constraints** |
 | Neues Modell | Prototyp gegen echtes `cpsat-js`-WASM, 30 Tage/60 Felder/8 Personen | `OPTIMAL` 218 ms · Minimax BD-Last `OPTIMAL` 188 ms (Bound = Wert) · Kaskade 445 ms *(Messumgebung unvollständig protokolliert — siehe Hinweis unten)* |
 | MCS-Diagnose | 8 Relaxationsliterale, künstlich unerfüllbar | `FEASIBLE` in 15 s, 5/8 aufgegeben — **nicht beweisbar minimal** |
 | Inkumbenten-Stream | `onSolution` mit `numWorkers: 1` | feuert **live** während des Solves (`live: true`) |
@@ -527,7 +527,7 @@ Reihenfolge ist bindend: jedes Paket ist für sich lauffähig und testbar.
 
 ### P5 — Diagnose neu
 - MCS: `maximize Σ w_g·r_g`, anytime über `onSolution`, Ergebnis als „nachgewiesen in *t* s“ ausweisen — **nicht** als Minimum behaupten.
-- QuickXplain auf Gruppenebene als Zweitdiagnose (≈ 20 statt 1.984 Solves).
+- QuickXplain auf Gruppenebene als Zweitdiagnose (≈ 20 statt 2.060 Solves).
 - Alte `diagnoseInfeasibility`-Ebene 2 entfernen.
 - **Test:** unerfüllbare Fixture; MCS nennt die tatsächlich verletzte Gruppe; Laufzeit unter Budget.
 
