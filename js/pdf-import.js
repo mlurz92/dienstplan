@@ -27,8 +27,21 @@
  * Spalten, aber dieselbe Bauweise.
  */
 
-const PDFJS_VERSION = '4.10.38';
-const PDFJS_BASE = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}`;
+export const PDFJS_VERSION = '4.10.38';
+const VERSION_MARKER = '20260806.1';
+
+/**
+ * Ladeordnung der Bibliothek — dieselbe Regel wie beim CP-SAT-WebAssembly:
+ * Was ausgeliefert wird, liegt im Repository. Das Netz ist nur die Rückfallebene.
+ *
+ * Ein Import darf nicht daran scheitern, dass ein fremder Dienst gerade nicht
+ * erreichbar ist. Die 1,7 MB liegen deshalb unter `vendor/pdfjs/` und werden mit
+ * `immutable`-Cache genau einmal geholt.
+ */
+export const PDF_ENGINE_SOURCES = Object.freeze([
+  Object.freeze({ origin: 'local', base: '/vendor/pdfjs', marker: `?v=${VERSION_MARKER}` }),
+  Object.freeze({ origin: 'cdn', base: `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}`, marker: '' })
+]);
 
 /**
  * Gesperrte Versalschrift kommt als „B E R E I T S C H A F T“ an. Für die
@@ -177,18 +190,38 @@ export function documentToSheets(pages, { name = 'PDF' } = {}) {
  * ------------------------------------------------------------------ */
 
 let enginePromise = null;
+let loadDiagnostics = [];
+
+/** Woher die Bibliothek kam — für Fehlermeldungen und Tests. */
+export function pdfEngineDiagnostics() {
+  return [...loadDiagnostics];
+}
 
 /**
- * Lädt pdf.js einmalig nach. Wie die Tabellenbibliothek wird es erst geholt,
- * wenn es gebraucht wird — ein Import ist die Ausnahme, nicht der Regelfall,
- * und 1,7 MB gehören nicht in den Startpfad.
+ * Lädt pdf.js einmalig nach, zuerst aus dem Repository, dann aus dem Netz.
+ *
+ * Nachgeladen wird erst, wenn es gebraucht wird: Ein Import ist die Ausnahme,
+ * nicht der Regelfall, und 1,7 MB gehören nicht in den Startpfad.
  */
-export async function loadPdfEngine({ base = PDFJS_BASE } = {}) {
+export async function loadPdfEngine({ sources = PDF_ENGINE_SOURCES } = {}) {
   if (enginePromise) return enginePromise;
   const attempt = (async () => {
-    const module = await import(/* webpackIgnore: true */ `${base}/pdf.min.mjs`);
-    module.GlobalWorkerOptions.workerSrc = `${base}/pdf.worker.min.mjs`;
-    return module;
+    loadDiagnostics = [];
+    let lastError = null;
+    for (const source of sources) {
+      try {
+        const module = await import(/* webpackIgnore: true */ `${source.base}/pdf.min.mjs${source.marker || ''}`);
+        // Der Worker muss aus derselben Quelle stammen wie das Modul: Ein
+        // lokales Modul mit fremdem Worker scheitert an der Same-Origin-Regel.
+        module.GlobalWorkerOptions.workerSrc = `${source.base}/pdf.worker.min.mjs${source.marker || ''}`;
+        loadDiagnostics.push({ ...source, ok: true });
+        return module;
+      } catch (error) {
+        lastError = error;
+        loadDiagnostics.push({ ...source, ok: false, reason: error?.message || String(error) });
+      }
+    }
+    throw new Error(`pdf.js konnte nicht geladen werden: ${lastError?.message || 'keine Quelle erreichbar'}`);
   })();
   enginePromise = attempt;
   // Ein misslungener Ladeversuch darf sich nicht einbrennen: Das Netz kann

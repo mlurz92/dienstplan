@@ -50,8 +50,10 @@ Zwei Regeln dazu:
 - ES-Module mit Versionsmarke im Bezeichner: `./modul.js?v=20260806.1`.
   Die Marke muss in allen Importen desselben Moduls gleich sein — sonst
   entstehen zwei Modulinstanzen mit getrenntem Zustand.
-- Kein Build, kein Bundler, keine Laufzeitabhängigkeit außer dem vendorierten
-  CP-SAT-WebAssembly unter `vendor/cpsat-js/`.
+- Kein Build, kein Bundler. Fremde Bibliotheken, die ausgeliefert werden,
+  liegen im Repository: CP-SAT-WebAssembly unter `vendor/cpsat-js/`, pdf.js
+  unter `vendor/pdfjs/` (`npm run vendor:pdfjs`). Ein CDN ist Rückfallebene,
+  nie der einzige Weg.
 - Neue Abhängigkeiten nur, wenn sie sowohl in `package.json` als auch in
   `package-lock.json` stehen — sonst scheitert `npm ci` in der CI.
 

@@ -10,6 +10,7 @@
     "test:e2e": "playwright test",
     "verify": "npm run check && npm test && npm run test:e2e",
     "deploy-note": "Deploy via Cloudflare Pages from GitHub repository root",
+    "vendor:pdfjs": "node scripts/vendor-pdfjs.mjs",
     "vendor:cpsat": "npx --yes esbuild@0.25.10 vendor/cpsat-js/dist/index.portable.js --bundle --format=esm --platform=browser --target=es2022 --external:node:* --legal-comments=none --outfile=vendor/cpsat-js/dist/cpsat-portable.bundle.js"
   },
   "devDependencies": {
