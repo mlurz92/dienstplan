@@ -24,8 +24,9 @@ DienstplanRAD verbindet kontrollierbare manuelle Monatsplanung mit einer bestät
 - Monatsstatistik, Sollvergleich, Wochenendäquivalente und offene Punkte;
 - **ein Import für alle Dateien** — Excel-Mappen, PDF-Ausdrucke und
   JSON-Sicherungen über dieselbe Schaltfläche (siehe §5.2);
-- Excel-/PDF-/JSON-Export — der Ausdruck passt garantiert auf **eine**
-  DIN-A4-Seite hochkant (siehe §5.1);
+- Excel-/PDF-/JSON-Export — das PDF entsteht direkt als Datei
+  `Dienstplan JJJJ-MM.pdf` und passt garantiert auf **eine** DIN-A4-Seite
+  hochkant (siehe §5.1);
 - server-first Synchronisierung mit lokaler Offline-Sicherung;
 - Auto-Plan Studio für Konfiguration, laufende Beobachtung, vollständige Vorschlagsprüfung und atomare Übernahme.
 
@@ -348,41 +349,57 @@ selbst scrollen. Die automatische Mindesthöhe ist der einzige Mechanismus, der
 eine Karte davor bewahrt, unter ihren Inhalt zusammenzufallen; wer sie pauschal
 abschaltet, macht Inhalte unerreichbar statt sie unterzubringen.
 
-## 5. Druckausgabe
+## 5. PDF-Ausgabe
 
-### 5.1 Ein Monat, eine Seite
+### 5.1 Ein Monat, eine Seite — als Datei, nicht als Druckauftrag
 
-Der Ausdruck ist ein Aushang. Er trägt in dieser Reihenfolge:
+„PDF exportieren" schreibt die Datei selbst und bietet sie zum Herunterladen
+an. Der frühere Weg über `window.print()` lieferte kein verlässliches
+Ergebnis: Papierformat, Ränder, Kopf- und Fußzeilen und selbst die Frage, ob
+Hintergrundflächen überhaupt gedruckt werden, hingen an den Einstellungen des
+Druckdialogs, und den Dateinamen aus dem Dokumenttitel übernahm nicht jeder
+Browser. Erzeugt wird jetzt immer dasselbe Blatt: **A4 hochkant, eine Seite**,
+Datei­name immer `Dienstplan JJJJ-MM.pdf`.
+
+Das Blatt trägt in dieser Reihenfolge:
 
 1. **Kopf:** links zweizeilig „Bereitschaftsdienstplan" über „Monat JJJJ",
    rechts auf derselben Höhe die Bezeichnung des Monatskontrasts
    (etwa „Monatskontrast · Festival Fuchsia").
-2. **Planungstabelle** mit allen Spalten: Tag, Wochentag, BD, HG, RBN, 2. RBN.
-3. **Statistik** darunter, bewusst reduziert auf Mitarbeitende, BD und HG.
+2. **Planungstabelle** mit allen Spalten: Tag, Wochentag, BD, HG, RBN, 2. RBN —
+   samt Monatsfarbe, Wochenend- und Feiertagsflächen und der Feiertagszeile
+   unter dem Wochentag.
+3. **Statistik** darunter, bewusst reduziert auf Mitarbeitende, BD und HG,
+   abgeschlossen von der Zeile „Offen".
 
-Die Datei heißt `Dienstplan JJJJ-MM.pdf`: Der Dateiname stammt in allen
-gängigen Browsern aus dem Dokumenttitel, der für die Dauer des Drucks
-entsprechend gesetzt und danach zurückgenommen wird.
+**Wie das Dokument entsteht.** `js/pdf-document.js` ist ein minimaler
+PDF-Schreiber: Rechtecke, Linien, Plaketten und Text in Helvetica und
+Helvetica-Bold, Koordinaten in Millimetern mit Ursprung oben links. Mehr
+braucht dieses Blatt nicht, und die Standardschriften bringt jeder Betrachter
+mit — es wird deshalb weder eine Schrift eingebettet noch eine Fremdbibliothek
+ausgeliefert. `js/pdf-export.js` setzt darauf das Satzbild und leitet die
+Farben aus demselben Monatsprofil ab wie die Oberfläche
+(`colorProfileForDate` → `spectrumVariables`). Damit ist der Export unabhängig
+davon, wo der Farbverlauf auf dem Bildschirm gerade steht: Er trägt immer die
+Zielfarbe des Monats, nie einen Zwischenton.
+
+Beide Module kennen kein DOM. Der Inhalt des Blattes und das erzeugte PDF sind
+deshalb in Node prüfbar — `tests/pdf-export.test.js`.
 
 **Höhenbudget statt fester Zeilenhöhen.** Feste Zeilenhöhen in Millimetern sind
 für genau einen Fall gerechnet und laufen in jedem anderen über: Mit zwölf statt
 acht Mitarbeitenden brauchte ein 31-Tage-Monat 289 mm und riss auf eine zweite
-Seite. Stattdessen steht je Block ein festes Budget, und die Zeilenhöhe ergibt
-sich als Budget geteilt durch die tatsächliche Zeilenzahl — `--print-plan-rows`
-und `--print-stat-rows` setzt die Anwendung beim Rendern. Die Gesamthöhe ist
-damit von der Zahl der Tage und der Mitarbeitenden unabhängig und liegt bei rund
-250 mm.
+Seite. Stattdessen steht je Block ein festes Budget (172 mm für den Plan, 44 mm
+für die Statistik), und die Zeilenhöhe ergibt sich als Budget geteilt durch die
+tatsächliche Zeilenzahl, gedeckelt auf das gewohnte Satzbild. Die Gesamthöhe ist
+damit von der Zahl der Tage und der Mitarbeitenden unabhängig.
 
-Die verbleibenden knapp 30 mm bis zum Satzspiegel sind bewusste Reserve: Chrome
-vergrößert die Ränder, sobald in seinem Druckdialog Kopf- und Fußzeilen
-eingeschaltet sind — und das ist die Voreinstellung. Ein Ausdruck, der nur ohne
-sie passt, passt praktisch nicht.
-
-`tests/e2e/print-single-page.spec.js` prüft nicht die gerechnete Höhe, sondern
-das erzeugte PDF: Für alle zwölf Monate, im Ungünstigstfall aus zwölf
-Mitarbeitenden, langen externen Namen und voller Belegung, muss der Seitenbaum
-genau eine Seite enthalten — mit dem eigenen Satzspiegel und mit dem, den Chrome
-bei eingeschalteten Kopf- und Fußzeilen übrig lässt.
+**Der Druckdialog bleibt bestehen.** Wer die Seite mit Strg+P ausgibt, bekommt
+weiterhin das druckoptimierte Blatt aus `@media print` in `styles.css` — dieselbe
+Regel, ein Monat auf eine Seite, mit Reserve für die von Chrome voreingestellten
+Kopf- und Fußzeilen. `tests/e2e/print-single-page.spec.js` prüft beides: den
+Seitenbaum des über den Druckweg erzeugten PDF für die teuersten Monate und den
+Download der Schaltfläche samt Dateinamen und Inhalt.
 
 ### 5.2 Ein Import für alle Dateien
 
@@ -523,7 +540,7 @@ Cloudflare Pages wird aus dem Repository-Root gebaut. Das KV-Binding lautet `DIE
 ### Browsertests
 
 - vollständiger Abschluss des Browser-`load`-Ereignisses und responsiver Event Loop nach späten DOM-Einbauten;
-- Monatsplanung, Picker, Batch-Verwaltung und Druck;
+- Monatsplanung, Picker, Batch-Verwaltung und PDF-Ausgabe;
 - Toolbar über zahlreiche Fensterbreiten ohne Überlagerung oder Horizontal-Scroll;
 - Auto-Plan Studio, Vorschlagstabelle und Abbruchpfade;
 - Theme-Persistenz;
@@ -562,6 +579,8 @@ tests/e2e/v8-5-shell.spec.js       Browser-, Bootstrap- und Observer-Regressione
 tests/e2e/layout-contrast-v10-5.spec.js  Überlappungsfreiheit und WCAG-AA-Kontrast
 tests/e2e/studio-layout-v10-5.spec.js    Layoutvertrag der drei Studiozustände
 tests/e2e/print-single-page.spec.js      Ein Monat, eine A4-Seite (gemessen am PDF)
+js/pdf-document.js                       minimaler PDF-Schreiber (Flächen, Linien, Text)
+js/pdf-export.js                         Satzbild des Monatsblatts und Download
 js/file-import.js                        ein Eingang für Excel, PDF und JSON
 js/pdf-import.js                         Textpositionen zu Tabellenzeilen (pdf.js)
 tests/e2e/helpers/contrast.js            gemeinsame WCAG-Kontrastmessung

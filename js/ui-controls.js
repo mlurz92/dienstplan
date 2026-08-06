@@ -40,7 +40,7 @@ export const TOOLBAR_GROUPS = Object.freeze([
     label: 'Ausgabe',
     items: Object.freeze([
       Object.freeze({ id: 'exportExcelBtn', label: 'Monatsplan als Excel exportieren', shortLabel: 'Excel', icon: 'spreadsheet' }),
-      Object.freeze({ id: 'exportPdfBtn', label: 'Monatsplan als PDF drucken', shortLabel: 'PDF', icon: 'print' }),
+      Object.freeze({ id: 'exportPdfBtn', label: 'Monatsplan als PDF herunterladen', shortLabel: 'PDF', icon: 'print' }),
       Object.freeze({ id: 'exportJsonBtn', label: 'Vollständige JSON-Sicherung erstellen', shortLabel: 'JSON sichern', icon: 'backup' })
     ])
   }),

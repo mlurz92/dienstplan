@@ -10,6 +10,7 @@ import { additionalReasons, buildPickerModel, filterPickerModel, flattenPickerMo
 import { readPlanFile } from './file-import.js?v=20260806.1';
 import { loadXlsxEngine, readWorkbookSheets } from './xlsx-engine.js?v=20260806.1';
 import { applyApplicationSettings } from './app-settings.js?v=20260806.1';
+import { downloadPlanPdf } from './pdf-export.js?v=20260806.1';
 
 const $ = selector => document.querySelector(selector);
 
@@ -139,13 +140,7 @@ function bindEvents() {
   $('#pickerSearch').addEventListener('keydown', onPickerSearchKeydown);
   $('#dataImportInput').addEventListener('change', onFileImport);
   $('#exportExcelBtn').addEventListener('click', exportCurrentMonthToExcel);
-  // Safari kennt kein `beforeprint`; deshalb wird beim Export zusätzlich
-  // ausdrücklich vorbereitet und nach der Rückkehr aus dem Dialog aufgeräumt.
-  $('#exportPdfBtn').addEventListener('click', () => {
-    prepareForPrint();
-    window.print();
-    restoreAfterPrint();
-  });
+  $('#exportPdfBtn').addEventListener('click', exportCurrentMonthToPdf);
   window.addEventListener('beforeprint', prepareForPrint);
   window.addEventListener('afterprint', restoreAfterPrint);
   $('#exportJsonBtn').addEventListener('click', exportJsonBackup);
@@ -1365,6 +1360,23 @@ async function exportCurrentMonthToExcel() {
   ws['!cols'] = [{wch:10},{wch:12},{wch:28},{wch:28},{wch:18},{wch:18}];
   XLSX.utils.book_append_sheet(wb, ws, `${state.currentYear}-${String(state.currentMonth).padStart(2,'0')}`);
   XLSX.writeFile(wb, `dienstplan_${state.currentYear}_${String(state.currentMonth).padStart(2,'0')}.xlsx`);
+}
+
+/**
+ * Der Monatsplan als PDF — direkt als Datei, nicht über den Druckdialog.
+ *
+ * Der Druckweg lieferte je nach Browsereinstellung ein anderes Blatt und einen
+ * anderen Dateinamen; das erzeugte Dokument hier ist immer dasselbe und heißt
+ * immer „Dienstplan JJJJ-MM.pdf".
+ */
+function exportCurrentMonthToPdf() {
+  const monthData = getMonthData(state.currentYear, state.currentMonth);
+  try {
+    downloadPlanPdf(state, monthData);
+  } catch (error) {
+    console.error(error);
+    alert('Der PDF-Export ist fehlgeschlagen.');
+  }
 }
 
 async function exportJsonBackup() {
