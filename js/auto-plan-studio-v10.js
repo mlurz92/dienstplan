@@ -76,8 +76,8 @@ const GROUPS = Object.freeze([
     id: 'view',
     title: 'Darstellung des Laufs',
     hint: 'Wie die laufende Suche gezeigt wird. Die Darstellung kostet keine Rechenzeit der Suche; sie liest nur mit.',
-    // Offen wie alle übrigen Gruppen. Zugeklappt war die Wahl zwischen
-    // Kristallisation und Orbit faktisch verschwunden: Eine Einstellung, die
+    // Offen wie alle übrigen Gruppen. Zugeklappt war die Wahl der Laufansicht
+    // faktisch verschwunden: Eine Einstellung, die
     // man erst aufklappen muss, um zu erfahren, dass es sie gibt, existiert für
     // die Bedienung nicht.
     open: true,
@@ -95,7 +95,7 @@ const TOOLTIPS = Object.freeze({
   '#autoPlanV10CarryWeight': 'Wie stark ein Vorsprung aus den Vormonaten den Startwert anhebt. Wer zuletzt über dem Mittel lag, startet erhöht und wird von der Lastminimierung entlastet.',
   '#autoPlanV10Stability': 'Wie stark der Vorschlag am Ausgangsplan festhält. „Bei Gleichstand“ ändert nur, was die Qualität verbessert; „streng“ stellt Stabilität über alle weichen Ziele.',
   '#autoPlanV10Conflict': 'Verhalten bei unlösbarem Monat. Die Korrekturmengen-Diagnose sagt in einem einzigen Lauf, welche Regelgruppen aufgegeben werden müssten, und liefert den zugehörigen Plan mit.',
-  '#autoPlanV10VisualMode': 'Kristallisation zeigt den Zusammenfall des Suchraums, die Annäherung von Zielwert und unterer Schranke sowie die Lastverteilung. Die Orbit-Ansicht ist die frühere Ringdarstellung.',
+  '#autoPlanV10VisualMode': 'Vier Blicke auf denselben Lauf. Kristallisation zeigt den Zusammenfall des Suchraums, die Annäherung von Zielwert und unterer Schranke sowie die Lastverteilung. Die Weberei zeigt den entstehenden Plan als Gewebe aus Personen und Tagen. Die Kaskade zeigt die lexikografische Rangfolge als Becken, deren Ungewissheitsband sich bis zum Beweis schließt. Orbit ist die frühere Ringdarstellung.',
   '#autoPlanV9SolverBackend': 'Automatisch versucht die exakte Suche und fällt bei fehlendem WebAssembly vollständig auf die Heuristik zurück. „Nur Heuristik“ erzwingt den Rückfallweg, etwa zum Vergleich.',
   '#autoPlanV9TimeBudget': 'Gesamtbudget der exakten Kaskade, anteilig auf die Stufen verteilt. Bei rund sechzig offenen Feldern ist jede Stufe meist in Millisekunden beweisbar optimal.',
   '#autoPlanV9WarmStart': 'Übergibt die Heuristik-Lösung als Startpunkt. Der Solver darf davon abweichen — ein Hinweis beschränkt nichts, er spart nur Suchzeit.',
@@ -225,6 +225,8 @@ function fieldMarkup() {
       <span>Laufansicht</span>
       <select id="autoPlanV10VisualMode">
         <option value="crystal" selected>Kristallisation</option>
+        <option value="weave">Weberei</option>
+        <option value="cascade">Kaskade</option>
         <option value="orbit">Orbit</option>
       </select>
       <small>Darstellung der laufenden Suche</small>
@@ -394,10 +396,19 @@ function bindValues(dialog) {
     if (byId('autoPlanV10CarryWeight')) byId('autoPlanV10CarryWeight').value = String(stored.carryOverPercent ?? 50);
     if (byId('autoPlanV10Stability')) byId('autoPlanV10Stability').value = stored.stabilityLevel || 'tiebreak';
     if (byId('autoPlanV10Conflict')) byId('autoPlanV10Conflict').value = stored.conflictMode || 'show';
-    if (byId('autoPlanV10VisualMode')) byId('autoPlanV10VisualMode').value = stored.visualMode || 'crystal';
+    // Ein gespeicherter Wert aus einer Fassung mit anderem Ansichtsangebot darf
+    // die Auswahlliste nicht leer lassen: Ein `select` ohne passende Option
+    // zeigt gar nichts an, und die Laufansicht wäre nicht mehr wählbar.
+    const visual = byId('autoPlanV10VisualMode');
+    if (visual) {
+      visual.value = stored.visualMode || 'crystal';
+      if (!visual.value) visual.value = 'crystal';
+    }
     sync();
   }
-  document.documentElement.dataset.autoPlanVisual = readStore().values?.visualMode || 'crystal';
+  document.documentElement.dataset.autoPlanVisual = byId('autoPlanV10VisualMode')?.value
+    || readStore().values?.visualMode
+    || 'crystal';
 }
 
 /**

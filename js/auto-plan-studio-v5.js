@@ -43,6 +43,8 @@ import { holidayName } from './holidays.js?v=20260806.1';
 import { AlgorithmCommentary, commentaryParts } from './auto-plan-commentary.js?v=20260806.1';
 import { AutoPlanVisualizer } from './auto-plan-visualizer.js?v=20260806.1';
 import { AutoPlanCrystallizer } from './auto-plan-crystallize.js?v=20260806.1';
+import { AutoPlanWeaver } from './auto-plan-weave.js?v=20260806.1';
+import { AutoPlanCascade } from './auto-plan-cascade.js?v=20260806.1';
 import { AutoPlanProgressModel } from './auto-plan-progress.js?v=20260806.1';
 import { AutoPlanRunEpoch, abortableDelay } from './auto-plan-lifecycle.js?v=20260806.1';
 
@@ -1118,20 +1120,30 @@ async function startPlanner() {
   controller = localController;
   visualizer?.stop();
   /**
-   * Zwei Darstellungen derselben Suche.
+   * Vier Darstellungen derselben Suche — dieselben Meldungen, vier Fragen.
    *
-   * „Kristallisation" zeigt den Zusammenfall des Suchraums, die Annäherung von
-   * Zielwert und unterer Schranke und die Lastverteilung — sie ist die
-   * Voreinstellung, weil sie ablesbar ist. Die Orbit-Ansicht bleibt als
-   * Alternative erhalten; die Wahl steht im Studio und wird lokal gemerkt.
+   *   Kristallisation  Wie fällt der Suchraum zusammen? (Voreinstellung, weil
+   *                    sie ohne Vorwissen ablesbar ist.)
+   *   Weberei          Was steht am Ende im Plan — Person für Person, Tag für Tag?
+   *   Kaskade          Wie arbeitet sich das Verfahren durch seine Rangfolge?
+   *   Orbit            Die frühere Ringdarstellung, unverändert erhalten.
+   *
+   * Die Wahl steht im Studio und wird lokal gemerkt. Eine unbekannte Marke —
+   * etwa aus einem älteren gespeicherten Wert — fällt auf die Voreinstellung
+   * zurück, statt die Laufanzeige ausfallen zu lassen.
    */
-  const visualMode = document.documentElement.dataset.autoPlanVisual === 'orbit' ? 'orbit' : 'crystal';
   const canvas = byId('autoPlanCanvas');
+  const builders = {
+    crystal: () => new AutoPlanCrystallizer(canvas, activeMonth),
+    weave: () => new AutoPlanWeaver(canvas, activeMonth, { staff: state.staff || [] }),
+    cascade: () => new AutoPlanCascade(canvas, activeMonth),
+    orbit: () => new AutoPlanVisualizer(canvas, activeMonth)
+  };
+  const requested = document.documentElement.dataset.autoPlanVisual;
+  const visualMode = builders[requested] ? requested : 'crystal';
   const localVisualizer = state.settings?.workflow?.studioVisualizer === false
     ? null
-    : visualMode === 'orbit'
-      ? new AutoPlanVisualizer(canvas, activeMonth)
-      : new AutoPlanCrystallizer(canvas, activeMonth);
+    : builders[visualMode]();
   visualizer = localVisualizer;
   dialog.dataset.visualizer = localVisualizer ? 'on' : 'off';
   dialog.dataset.visualMode = localVisualizer ? visualMode : 'off';
