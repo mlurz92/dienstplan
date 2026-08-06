@@ -76,7 +76,11 @@ const GROUPS = Object.freeze([
     id: 'view',
     title: 'Darstellung des Laufs',
     hint: 'Wie die laufende Suche gezeigt wird. Die Darstellung kostet keine Rechenzeit der Suche; sie liest nur mit.',
-    open: false,
+    // Offen wie alle übrigen Gruppen. Zugeklappt war die Wahl zwischen
+    // Kristallisation und Orbit faktisch verschwunden: Eine Einstellung, die
+    // man erst aufklappen muss, um zu erfahren, dass es sie gibt, existiert für
+    // die Bedienung nicht.
+    open: true,
     fields: ['autoPlanV10VisualMode']
   }
 ]);

@@ -58,7 +58,9 @@ export const RELAX_GROUPS = Object.freeze({
   // im Verzeichnis, weil Diagnosetexte und Oberfläche sie benennen.
   qualification: { label: 'Qualifikation und Verfügbarkeit', priority: 1, weight: 900, structural: true },
   exclusivity: { label: 'Keine Doppelbelegung am selben Tag', priority: 2, weight: 800 },
-  rest: { label: 'Ruhezeit zwischen Bereitschaftsdiensten', priority: 3, weight: 700 },
+  // Umfasst beides: keinen zweiten Bereitschaftsdienst am Folgetag und keinen
+  // Hintergrunddienst am Folgetag (außer samstags und sonntags).
+  rest: { label: 'Ruhezeit nach Bereitschaftsdienst', priority: 3, weight: 700 },
   sequence: { label: 'Hintergrunddienst vor Bereitschaftsdienst', priority: 4, weight: 600 },
   freizeitausgleich: { label: 'Freizeitausgleich nach Bereitschaftsdienst', priority: 5, weight: 500 },
   limits: { label: 'Personengebundene Obergrenzen', priority: 6, weight: 400 }
@@ -332,6 +334,27 @@ export function buildPlanModel({
       if (offset >= 2) continue; // beide fixiert und verletzt: Sache des Audits
       addConstraint(`rest_${days[index]}_${staffId}`, 'rest', terms, 0, 1 - offset,
         `${staffId}: kein BD am ${days[index]} und ${days[index + 1]} zugleich.`, relaxLiterals.rest);
+    }
+  }
+
+  // 6b. Der Tag nach einem Bereitschaftsdienst ist dienstfrei — auch für den
+  //     Hintergrunddienst. Ausgenommen sind Samstag und Sonntag: Dort ist der
+  //     Hintergrunddienst unmittelbar nach einem Bereitschaftsdienst zulässig
+  //     und bildet die bekannte Wochenendkopplung (Fr-BD · Sa-HG, Sa-BD · So-HG).
+  //     Der Freitag zählt hier nicht als Wochenende: Ein Donnerstags-BD lässt
+  //     den Freitag genauso dienstfrei wie jeden anderen Werktag.
+  for (let index = 0; index < days.length - 1; index += 1) {
+    const nextWeekday = weekdayOf(days[index + 1]);
+    if (nextWeekday === 6 || nextWeekday === 0) continue;
+    for (const staffId of staffIds) {
+      const bd = literalOrConst(days[index], 'bd', staffId);
+      const hg = literalOrConst(days[index + 1], 'hg', staffId);
+      const terms = pairTerms(bd, hg);
+      if (!terms.length) continue;
+      const offset = (bd.constant || 0) + (hg.constant || 0);
+      if (offset >= 2) continue;
+      addConstraint(`bdhg_${days[index]}_${staffId}`, 'rest', terms, 0, 1 - offset,
+        `${staffId}: BD am ${days[index]} schließt HG am Folgetag aus.`, relaxLiterals.rest);
     }
   }
 

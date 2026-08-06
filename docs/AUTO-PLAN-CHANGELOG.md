@@ -133,6 +133,34 @@ dunklem Grund (gemessene 1,3:1).
   belegt, dass es keine bloßen Bezeichner mehr enthält und die WASM-Datei
   danebenliegt.
 
+### Regelwerk v4.11 – der Tag nach einem Bereitschaftsdienst
+
+- **Neue harte Regel:** Wer Bereitschaftsdienst getragen hat, ist am Folgetag
+  für keinen weiteren Dienst verfügbar. Für den Bereitschaftsdienst war das
+  bereits gesperrt („BD bereits am Vortag"); für den Hintergrunddienst fehlte
+  die Entsprechung — er war nur orange, wenn er *vor* einem eigenen BD lag, und
+  ungeprüft *danach*. Er ist jetzt rot und nicht wählbar.
+- **Ausnahme Wochenende:** Samstag und Sonntag bleibt der Hintergrunddienst
+  unmittelbar nach einem Bereitschaftsdienst zulässig — die Grundlage der
+  Wochenendbündelung (Fr-BD · Sa-HG, Sa-BD · So-HG). Der Freitag zählt dabei
+  nicht als Wochenende.
+- **Beidseitig umgesetzt:** in der Regelengine (`js/rules-evaluation.js`) und
+  als harte Bedingung im Booleschen Modell (`bdhg_*` in der Gruppe „Ruhezeit
+  nach Bereitschaftsdienst"). Eine Regel, die nur die Engine kennt, lässt die
+  exakte Suche Vorschläge bauen, die das Schlussaudit anschließend verwirft —
+  ohne dass die Suche den Grund kennt.
+- `tests/rest-day-after-bd.test.js` prüft beide Seiten: Werktag gesperrt,
+  Freitag nach Donnerstags-BD gesperrt, Samstag und Sonntag frei, fremder BD am
+  Vortag ohne Wirkung, und die Bedingungsmenge des Modells.
+
+### Bedienung
+
+- **Die Wahl der Laufansicht war verschwunden.** Die Gruppe „Darstellung des
+  Laufs" stand als einzige zugeklappt in der Parameteransicht; die Umschaltung
+  zwischen Kristallisation und Orbit war dadurch faktisch nicht vorhanden. Sie
+  ist jetzt wie alle übrigen Gruppen offen, und ein Browsertest hält fest, dass
+  beide Ansichten ohne Aufklappen zur Wahl stehen.
+
 ### Dritte Prüfrunde – Layout aller drei Studiozustände
 
 Ausgangspunkt waren drei Meldungen aus dem laufenden Betrieb: eine Leiste, die
