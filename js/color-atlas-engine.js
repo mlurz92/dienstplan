@@ -64,13 +64,13 @@ function parseHexColor(value) {
   const hex = String(value).replace('#', '');
   return [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16), 1];
 }
-const labToLch = ([L, a, b, alpha = 1]) => [L, Math.hypot(a, b), Math.atan2(b, a), alpha];
+export const labToLch = ([L, a, b, alpha = 1]) => [L, Math.hypot(a, b), Math.atan2(b, a), alpha];
 const lchToLab = ([L, C, h, alpha = 1]) => [L, C * Math.cos(h), C * Math.sin(h), alpha];
 
 function inSrgbGamut(color) {
   return color.slice(0, 3).every(channel => Number.isFinite(channel) && channel >= 0 && channel <= 255);
 }
-function oklchToRgb(lightness, chroma, hue, alpha = 1) {
+export function oklchToRgb(lightness, chroma, hue, alpha = 1) {
   let fittedChroma = chroma;
   let rgb = oklabToRgbRaw(lchToLab([lightness, fittedChroma, hue, alpha]));
   for (let i = 0; i < 28 && !inSrgbGamut(rgb); i += 1) {

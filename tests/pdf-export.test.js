@@ -96,3 +96,20 @@ test('das Blatt bleibt auch im ungünstigsten Fall im Satzspiegel', () => {
   const bottom = 24.1 + 5.2 + rowHeight * model.rows.length + 7 + 5.4 + 5.2 + statRow * model.stats.length;
   assert.ok(bottom <= 297 - 9, `Unterkante bei ${bottom.toFixed(1)} mm`);
 });
+
+test('Samstag, Sonntag und Feiertag sind in jedem Monat sicher zu unterscheiden', async () => {
+  const { colorProfileForDate, perceptualDistance } = await import('../js/color-atlas-engine.js');
+  const { planRowTones } = await import('../js/pdf-export.js');
+  // Die Oberfläche mischt feste Anteile mit Weiß; bei einem hellen Akzent —
+  // Juni 2026 lieferte 240/232/223 — liegen die drei Flächen auf dem Papier
+  // zu dicht beieinander. Der Ausdruck setzt deshalb feste Helligkeitsstufen.
+  for (let month = 1; month <= 12; month += 1) {
+    const tones = planRowTones(colorProfileForDate(2026, month).accent.slice(0, 3));
+    const pairs = [['saturday', 'sunday'], ['sunday', 'holiday'], ['saturday', 'holiday']];
+    for (const [first, second] of pairs) {
+      const distance = perceptualDistance([...tones[first], 1], [...tones[second], 1]);
+      assert.ok(distance >= 0.035,
+        `Monat ${month}: ${first} und ${second} liegen nur ${distance.toFixed(3)} auseinander`);
+    }
+  }
+});
