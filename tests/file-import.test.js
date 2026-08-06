@@ -66,6 +66,29 @@ test('ohne Tabellenbibliothek scheitert der Excel-Weg mit klarer Ansage', async 
   );
 });
 
+test('die Tabellenbibliothek liegt im Repository und wird von dort zuerst geladen', async () => {
+  const { XLSX_ENGINE_SOURCES, SHEETJS_VERSION } = await import('../js/xlsx-engine.js?v=20260806.1');
+  const { readFile } = await import('node:fs/promises');
+
+  const [first, second] = XLSX_ENGINE_SOURCES;
+  assert.equal(first.origin, 'local');
+  assert.match(first.url, /^\/vendor\/sheetjs\/xlsx\.full\.min\.js\?v=/);
+  assert.equal(second.origin, 'cdn');
+  assert.ok(second.url.includes(SHEETJS_VERSION), 'die Rückfallebene muss dieselbe Fassung holen');
+
+  for (const name of ['xlsx.full.min.js', 'LICENSE']) {
+    await assert.doesNotReject(
+      readFile(new URL(`../vendor/sheetjs/${name}`, import.meta.url)),
+      `vendor/sheetjs/${name} fehlt`
+    );
+  }
+
+  // Die Seite darf die Bibliothek nicht mehr blockierend im Kopf laden: 950
+  // Kilobyte für einen Vorgang, der die Ausnahme ist.
+  const page = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+  assert.ok(!/cdn\.sheetjs\.com/.test(page), 'index.html lädt die Bibliothek nicht mehr vorab');
+});
+
 test('Excel und PDF münden in dieselbe Ergebnisform', async () => {
   const rows = [
     ['Bereitschaftsdienstplan', '', '', '', 'August 2026'],

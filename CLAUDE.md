@@ -52,8 +52,9 @@ Zwei Regeln dazu:
   entstehen zwei Modulinstanzen mit getrenntem Zustand.
 - Kein Build, kein Bundler. Fremde Bibliotheken, die ausgeliefert werden,
   liegen im Repository: CP-SAT-WebAssembly unter `vendor/cpsat-js/`, pdf.js
-  unter `vendor/pdfjs/` (`npm run vendor:pdfjs`). Ein CDN ist Rückfallebene,
-  nie der einzige Weg.
+  unter `vendor/pdfjs/`, SheetJS unter `vendor/sheetjs/`
+  (`npm run vendor:libs`). Ein CDN ist Rückfallebene, nie der einzige Weg.
+  Fremde Bibliotheken werden bei Bedarf geladen, nicht im Startpfad.
 - Neue Abhängigkeiten nur, wenn sie sowohl in `package.json` als auch in
   `package-lock.json` stehen — sonst scheitert `npm ci` in der CI.
 

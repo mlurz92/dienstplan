@@ -151,6 +151,12 @@ dunklem Grund (gemessene 1,3:1).
   2. Dienst | Sonstiges`) wird erkannt und liefert **ausschließlich** die beiden
   Rufbereitschaften; BD und HG bleiben unangetastet. Der Monat kommt aus der
   Datumsspalte, nicht aus dem Kopf — dort steht er nur zweistellig („Juli 26“).
+- **Auch die Tabellenbibliothek liegt jetzt im Repository** (`vendor/sheetjs/`,
+  Apache-2.0, 930 KiB) und wird erst beim ersten Excel-Vorgang geholt. Zuvor
+  hing sie als blockierendes `<script>` im Seitenkopf — bei jedem Aufruf, für
+  einen Vorgang, der die Ausnahme ist. Damit entfällt zugleich der Fehlerfall
+  „Excel-Bibliothek noch nicht geladen", den Nutzende nicht beheben konnten.
+  `npm run vendor:libs` pflegt beide Bibliotheken.
 - Die Trennung zwischen Auslesen (Browser, pdf.js) und Rekonstruktion (reine
   Rechnerei) macht den Importpfad in Node prüfbar. `tests/pdf-import.test.js`
   arbeitet mit den echten Textelementen zweier realer Ausdrucke, nicht mit

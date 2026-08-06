@@ -150,7 +150,11 @@ test('Der Merge ersetzt abweichende Werte, lässt aber nichts verschwinden', asy
   // Funktion wird deshalb aus dem Quelltext gelöst und einzeln geprüft.
   const source = await readFile(new URL('../js/app.js', import.meta.url), 'utf8');
   const start = source.indexOf('function mergeMonthData(target, source) {');
-  const end = source.indexOf('function exportCurrentMonthToExcel()');
+  // Bis zur schließenden Klammer schneiden, nicht bis zum Beginn der nächsten
+  // Funktion: Deren Schlüsselwörter (`async`) landeten sonst im Ausschnitt und
+  // machten ihn unausführbar.
+  const next = source.indexOf('exportCurrentMonthToExcel', start);
+  const end = source.lastIndexOf('}', next) + 1;
   const factory = new Function('getAbsence', 'setAbsence', `${source.slice(start, end)}; return mergeMonthData;`);
   const mergeMonthData = factory(readAbsence, setAbsence);
 
