@@ -24,6 +24,7 @@
  *    Beschriftung und Beschreibung erzeugt, statt das Feld unerklärt zu lassen.
  */
 
+import { RUN_VIEWS, DEFAULT_RUN_VIEW, resolveRunView } from './auto-plan-run-views.js?v=20260806.1';
 import { setRichTooltip } from './rich-tooltip-v8-5.js?v=20260806.1';
 import { state } from './state.js?v=20260806.1';
 import { OBJECTIVE_COMPONENTS } from './auto-planner.js?v=20260806.1';
@@ -85,6 +86,19 @@ const GROUPS = Object.freeze([
   }
 ]);
 
+/**
+ * Die Erklärung der Laufansicht wird aus der Registratur gebildet. Eine von
+ * Hand gepflegte Aufzählung wäre die dritte Stelle, an der eine neue Ansicht
+ * nachgetragen werden müsste — und die erste, die es niemand merkt, wenn sie
+ * fehlt: Ein Tooltip, der eine Ansicht verschweigt, ist keine Erklärung.
+ */
+function visualModeTooltip() {
+  const zahlwort = ['keine', 'ein', 'Zwei', 'Drei', 'Vier', 'Fünf', 'Sechs', 'Sieben', 'Acht'];
+  const zahl = zahlwort[RUN_VIEWS.length] || String(RUN_VIEWS.length);
+  const views = RUN_VIEWS.map(view => `${view.label} ${view.hint}`).join('. ');
+  return `${zahl} Blicke auf denselben Lauf. ${views}.`;
+}
+
 /** Erklärungen für jedes Bedienelement — auch für die geerbten. */
 const TOOLTIPS = Object.freeze({
   '#autoPlanOptimizationFocus': 'Setzt die Voreinstellung der Stufenreihenfolge. Harte Regeln, vollständige Besetzung und rote Bewertungen haben immer Vorrang; der Schwerpunkt ordnet nur, was danach kommt.',
@@ -95,7 +109,7 @@ const TOOLTIPS = Object.freeze({
   '#autoPlanV10CarryWeight': 'Wie stark ein Vorsprung aus den Vormonaten den Startwert anhebt. Wer zuletzt über dem Mittel lag, startet erhöht und wird von der Lastminimierung entlastet.',
   '#autoPlanV10Stability': 'Wie stark der Vorschlag am Ausgangsplan festhält. „Bei Gleichstand“ ändert nur, was die Qualität verbessert; „streng“ stellt Stabilität über alle weichen Ziele.',
   '#autoPlanV10Conflict': 'Verhalten bei unlösbarem Monat. Die Korrekturmengen-Diagnose sagt in einem einzigen Lauf, welche Regelgruppen aufgegeben werden müssten, und liefert den zugehörigen Plan mit.',
-  '#autoPlanV10VisualMode': 'Vier Blicke auf denselben Lauf. Kristallisation zeigt den Zusammenfall des Suchraums, die Annäherung von Zielwert und unterer Schranke sowie die Lastverteilung. Die Weberei zeigt den entstehenden Plan als Gewebe aus Personen und Tagen. Die Kaskade zeigt die lexikografische Rangfolge als Becken, deren Ungewissheitsband sich bis zum Beweis schließt. Orbit ist die frühere Ringdarstellung.',
+  '#autoPlanV10VisualMode': visualModeTooltip(),
   '#autoPlanV9SolverBackend': 'Automatisch versucht die exakte Suche und fällt bei fehlendem WebAssembly vollständig auf die Heuristik zurück. „Nur Heuristik“ erzwingt den Rückfallweg, etwa zum Vergleich.',
   '#autoPlanV9TimeBudget': 'Gesamtbudget der exakten Kaskade, anteilig auf die Stufen verteilt. Bei rund sechzig offenen Feldern ist jede Stufe meist in Millisekunden beweisbar optimal.',
   '#autoPlanV9WarmStart': 'Übergibt die Heuristik-Lösung als Startpunkt. Der Solver darf davon abweichen — ein Hinweis beschränkt nichts, er spart nur Suchzeit.',
@@ -223,12 +237,9 @@ function fieldMarkup() {
     </label>
     <label class="auto-plan-field" data-v10-field="autoPlanV10VisualMode">
       <span>Laufansicht</span>
-      <select id="autoPlanV10VisualMode">
-        <option value="crystal" selected>Kristallisation</option>
-        <option value="weave">Weberei</option>
-        <option value="cascade">Kaskade</option>
-        <option value="orbit">Orbit</option>
-      </select>
+      <select id="autoPlanV10VisualMode">${RUN_VIEWS
+        .map(view => `<option value="${view.id}"${view.id === DEFAULT_RUN_VIEW ? ' selected' : ''}>${view.label}</option>`)
+        .join('')}</select>
       <small>Darstellung der laufenden Suche</small>
     </label>`;
 }
@@ -380,7 +391,7 @@ function bindValues(dialog) {
       carryOverPercent: Number(byId('autoPlanV10CarryWeight')?.value ?? 50),
       stabilityLevel: byId('autoPlanV10Stability')?.value || 'tiebreak',
       conflictMode: byId('autoPlanV10Conflict')?.value || 'show',
-      visualMode: byId('autoPlanV10VisualMode')?.value || 'crystal'
+      visualMode: resolveRunView(byId('autoPlanV10VisualMode')?.value).id
     };
     writeStore(store);
     document.documentElement.dataset.autoPlanVisual = store.values.visualMode;
@@ -400,15 +411,12 @@ function bindValues(dialog) {
     // die Auswahlliste nicht leer lassen: Ein `select` ohne passende Option
     // zeigt gar nichts an, und die Laufansicht wäre nicht mehr wählbar.
     const visual = byId('autoPlanV10VisualMode');
-    if (visual) {
-      visual.value = stored.visualMode || 'crystal';
-      if (!visual.value) visual.value = 'crystal';
-    }
+    if (visual) visual.value = resolveRunView(stored.visualMode).id;
     sync();
   }
-  document.documentElement.dataset.autoPlanVisual = byId('autoPlanV10VisualMode')?.value
-    || readStore().values?.visualMode
-    || 'crystal';
+  document.documentElement.dataset.autoPlanVisual = resolveRunView(
+    byId('autoPlanV10VisualMode')?.value || readStore().values?.visualMode
+  ).id;
 }
 
 /**

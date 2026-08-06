@@ -1,9 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { AutoPlanCrystallizer } from '../js/auto-plan-crystallize.js';
-import { AutoPlanWeaver } from '../js/auto-plan-weave.js';
-import { AutoPlanCascade } from '../js/auto-plan-cascade.js';
+import { RUN_VIEWS, DEFAULT_RUN_VIEW, createRunView, resolveRunView } from '../js/auto-plan-run-views.js';
 
 /**
  * Die Laufansichten zeichnen auf eine Leinwand, die es in Node nicht gibt. Sie
@@ -12,13 +10,11 @@ import { AutoPlanCascade } from '../js/auto-plan-cascade.js';
  * auch die Randfälle, die im Browser nur selten auftreten und dort dann eine
  * schwarze Fläche hinterlassen: eine winzige Leinwand, ein leerer Monat, eine
  * Zwischenlösung vor dem Stufenplan, ein Beweis ohne Zielfunktion.
+ *
+ * Geprüft wird gegen die Registratur, nicht gegen eine Liste im Test: Eine neue
+ * Ansicht ist damit ab ihrem Eintrag geprüft und nicht erst, wenn jemand daran
+ * denkt, sie hier nachzutragen.
  */
-
-const VIEWS = [
-  ['Kristallisation', AutoPlanCrystallizer],
-  ['Weberei', AutoPlanWeaver],
-  ['Kaskade', AutoPlanCascade]
-];
 
 function monthFixture() {
   const days = {};
@@ -36,7 +32,13 @@ function stubContext() {
     measureText: text => ({ width: String(text).length * 6 }),
     setTransform() {},
     save() {},
-    restore() {}
+    restore() {},
+    // Verläufe sind Objekte, keine Rückgabewerte: Wer einen anfordert, ruft
+    // anschließend addColorStop darauf.
+    createLinearGradient: () => ({ addColorStop() {} }),
+    createRadialGradient: () => ({ addColorStop() {} }),
+    createConicGradient: () => ({ addColorStop() {} }),
+    createPattern: () => null
   };
   return new Proxy(state, {
     get(target, property) {
@@ -90,6 +92,19 @@ function environment({ width = 900, height = 420 } = {}) {
   };
 }
 
+/** Ansichten, die keinen Optimalitätsbeweis darstellen. */
+const PROOFLESS = new Set(['orbit']);
+
+/**
+ * Ansichten, deren `renderMode` den Lebenszyklus trägt.
+ *
+ * Orbit legt dort die Darstellungsgüte ihrer Animationsrichtlinie ab
+ * (`full`, `balanced`, `reduced` …). Das ist gebunden — `auto-plan-studio-v7-5.css`
+ * färbt danach ihre Güteplakette —, also wird es hier nicht eingefordert,
+ * sondern ausgenommen. Was für alle gilt, prüft die Marke `runView`.
+ */
+const LIFECYCLE_MODE = new Set(RUN_VIEWS.map(view => view.id).filter(id => id !== 'orbit'));
+
 const RUN = [
   { phase: 'analysis', progress: 0.05, message: 'Monatszustand wird gelesen' },
   {
@@ -139,14 +154,30 @@ const RUN = [
   }
 ];
 
-for (const [name, View] of VIEWS) {
+test('Registratur: Voreinstellung vorhanden, unbekannte Marke fällt zurück', () => {
+  assert.ok(RUN_VIEWS.length >= 2, 'es gibt eine Wahl');
+  assert.equal(new Set(RUN_VIEWS.map(view => view.id)).size, RUN_VIEWS.length, 'Marken sind eindeutig');
+  assert.equal(resolveRunView(DEFAULT_RUN_VIEW).id, DEFAULT_RUN_VIEW);
+  // Eine Marke aus einer Fassung mit anderem Angebot darf die Laufanzeige nicht
+  // ausfallen lassen — sie fällt auf die Voreinstellung zurück.
+  assert.equal(resolveRunView('marke-aus-alter-fassung').id, DEFAULT_RUN_VIEW);
+  assert.equal(resolveRunView(undefined).id, DEFAULT_RUN_VIEW);
+  for (const view of RUN_VIEWS) {
+    assert.equal(typeof view.label, 'string');
+    assert.ok(view.hint, `${view.id} erklärt sich`);
+    assert.equal(typeof view.create, 'function');
+  }
+});
+
+for (const { id: name } of RUN_VIEWS) {
   test(`${name}: vollständiger Lauf zeichnet ohne Fehler`, () => {
     const world = environment();
     try {
-      const view = new View(world.canvas, monthFixture(), {
+      const view = createRunView(name, world.canvas, monthFixture(), {
         staff: [{ id: 'a', short: 'Ah' }, { id: 'b', short: 'Be' }, { id: 'c', short: 'Ce' }]
-      });
-      assert.equal(world.canvas.dataset.renderMode, 'running');
+      }).instance;
+      assert.equal(world.canvas.dataset.runView, name, 'die Leinwand nennt ihre Ansicht');
+      if (LIFECYCLE_MODE.has(name)) assert.equal(world.canvas.dataset.renderMode, 'running');
 
       let now = 0;
       for (const update of RUN) {
@@ -155,7 +186,7 @@ for (const [name, View] of VIEWS) {
         world.tick(now);
       }
       view.finish();
-      assert.equal(world.canvas.dataset.renderMode, 'complete');
+      if (LIFECYCLE_MODE.has(name)) assert.equal(world.canvas.dataset.renderMode, 'complete');
       world.tick(now + 120);
       assert.ok(world.context.calls > 0, 'es wurde tatsächlich gezeichnet');
 
@@ -172,7 +203,7 @@ for (const [name, View] of VIEWS) {
     // beides sah in früheren Fassungen wie ein abgeschnittener Rand aus.
     const world = environment({ width: 120, height: 90 });
     try {
-      const view = new View(world.canvas, { days: {} });
+      const view = createRunView(name, world.canvas, { days: {} }, {}).instance;
       view.update({ phase: 'search', progress: 0.4, message: 'Suche' });
       view.update(RUN[1]);
       view.update(RUN[3]);
@@ -185,13 +216,17 @@ for (const [name, View] of VIEWS) {
     }
   });
 
-  test(`${name}: Zwischenlösung ohne Zielfunktion beweist nichts`, () => {
+  // Nicht jede Ansicht kennt einen Beweismoment; Orbit zeigt Bewegung, keinen
+  // Nachweis. Ein Test, der bei ihr trivial „null gleich null" prüft, sagt
+  // nichts — deshalb läuft dieser nur, wo es etwas zu widerlegen gibt.
+  const proofMarker = view => view.crystallizedAt ?? view.seamAt ?? view.provenAt ?? null;
+  test(`${name}: Zwischenlösung ohne Zielfunktion beweist nichts`, { skip: PROOFLESS.has(name) }, () => {
     // Die Zulässigkeitssuche läuft ohne Ziel und meldet Zielwert wie Schranke
     // als null. Wer daraus einen Beweis ableitet, steht den Rest des Laufs
     // still — der Defekt, der bis v10.4 die Kristallisation lähmte.
     const world = environment();
     try {
-      const view = new View(world.canvas, monthFixture());
+      const view = createRunView(name, world.canvas, monthFixture(), {}).instance;
       view.update(RUN[1]);
       view.update({
         phase: 'exact',
@@ -199,8 +234,7 @@ for (const [name, View] of VIEWS) {
         incumbent: { objectiveValue: 0, bestBound: 0, hasObjective: false, stage: 'Zulässigkeit', assignments: [] }
       });
       world.tick(16);
-      const proven = view.crystallizedAt ?? view.seamAt ?? view.provenAt ?? null;
-      assert.equal(proven, null, 'kein Beweis ohne Zielfunktion');
+      assert.equal(proofMarker(view), null, 'kein Beweis ohne Zielfunktion');
       view.stop();
     } finally {
       world.restore();
@@ -212,7 +246,7 @@ for (const [name, View] of VIEWS) {
     try {
       const canvas = { dataset: {}, getContext: () => null, getBoundingClientRect: () => ({ width: 400, height: 300 }) };
       assert.doesNotThrow(() => {
-        const view = new View(canvas, monthFixture());
+        const view = createRunView(name, canvas, monthFixture(), {}).instance;
         view.update({ phase: 'search', progress: 0.4 });
         view.finish();
         view.stop();

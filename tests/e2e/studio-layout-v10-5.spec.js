@@ -197,17 +197,23 @@ const setScheme = (page, mode) => page.evaluate(value => {
     // Die Wahl der Laufansicht muss ohne Aufklappen sichtbar sein: Eine
     // Einstellung hinter einer geschlossenen Gruppe ist für die Bedienung nicht
     // vorhanden — genau so war die Orbit-Ansicht abhandengekommen.
-    const visual = await page.evaluate(() => {
+    const visual = await page.evaluate(async () => {
       const select = document.getElementById('autoPlanV10VisualMode');
       const group = select?.closest('details');
       const rect = select?.getBoundingClientRect();
+      // Verglichen wird gegen die Registratur, nicht gegen eine Liste im Test:
+      // Eine neue Ansicht soll diesen Test bestehen, sobald sie eingetragen ist,
+      // aber weiterhin auffallen, wenn die Auswahl sie nicht anbietet.
+      const { RUN_VIEWS } = await import('/js/auto-plan-run-views.js?v=20260806.1');
       return {
         options: select ? [...select.options].map(option => option.value) : [],
+        registered: RUN_VIEWS.map(view => view.id),
         groupOpen: group ? group.open : null,
         height: Math.round(rect?.height || 0)
       };
     });
-    expect(visual.options, 'Kristallisation und Orbit stehen zur Wahl').toEqual(['crystal', 'orbit']);
+    expect(visual.options, 'jede eingetragene Laufansicht steht zur Wahl').toEqual(visual.registered);
+    expect(visual.options.length, 'es gibt überhaupt eine Wahl').toBeGreaterThan(1);
     expect(visual.groupOpen, 'die Gruppe ist aufgeklappt').toBe(true);
     expect(visual.height, 'die Auswahl ist sichtbar').toBeGreaterThan(10);
 

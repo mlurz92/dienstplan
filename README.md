@@ -724,6 +724,22 @@ Zonenschnitt und Textkürzung.
 Passen nicht alle Einträge, zeigt die Ansicht einen Ausschnitt und weist die
 Zahl der übrigen aus, statt die Zeilen ineinanderlaufen zu lassen.
 
+**Eine Stelle je Ansicht.** Welche Ansichten es gibt, wie sie heißen, was sie
+zeigen und wie sie gebaut werden, steht in `js/auto-plan-run-views.js`. Auswahl
+im Studio, Erklärungstext und Erzeugung im Laufpfad lesen daraus; wer eine
+Ansicht hinzufügt, ergänzt genau einen Eintrag. Dort steht auch der Vertrag, den
+eine Ansicht zu halten hat — `update()`, `finish()`, `stop()`, kein Werfen ohne
+Leinwandkontext — und welche Felder eine Fortschrittsmeldung trägt.
+
+Eine Doppeldeutung bleibt bewusst bestehen: `canvas.dataset.renderMode` trägt
+bei den drei jüngeren Ansichten den Lebenszyklus, bei Orbit die
+Darstellungsgüte ihrer Animationsrichtlinie. Vereinheitlichen ließe sich das
+nicht folgenlos — `auto-plan-studio-v7-5.css` färbt danach ihre Güteplakette,
+und ein Browsertest prüft den Wert. Beobachtbares Verhalten ist gebunden, ob
+zugesagt oder nicht; die Doppeldeutung steht deshalb geschrieben statt still
+umbenannt. Einheitlich über alle vier ist `canvas.dataset.runView` mit der
+Marke der laufenden Ansicht.
+
 #### „Kristallisation"
 
 Die Ansicht zeigt nicht, *dass* gerechnet wird, sondern *was* gerechnet wird.
@@ -1118,8 +1134,8 @@ und den Ausdruck als gemessenes PDF — ein Monat, eine A4-Seite.
   teuersten Fall aus zwölf Mitarbeitenden, langen externen Namen und voller
   Belegung, mit eigenem Satzspiegel und mit dem, den Chrome bei eingeschalteten
   Kopf- und Fußzeilen übrig lässt.
-- **Laufansichten.** `tests/auto-plan-run-views.test.js` fährt jede der drei
-  jüngeren Ansichten durch einen vollständigen Lauf gegen eine aufzeichnende
+- **Laufansichten.** `tests/auto-plan-run-views.test.js` fährt jede Ansicht der
+  Registratur durch einen vollständigen Lauf gegen eine aufzeichnende
   Ersatzleinwand — samt der Randfälle, die im Browser sonst nur eine schwarze
   Fläche hinterlassen: winzige Leinwand, leerer Monat, Zwischenlösung vor dem
   Stufenplan, geschlossene Lücke ohne Zielfunktion, fehlender Leinwandkontext.
@@ -1166,6 +1182,7 @@ js/auto-planner-v10.js             lexikografische Kaskade, Leximin, Konfliktdia
 js/auto-planner-v8-5.js            Heuristik: Warmstart, Rückfallebene, Phasenvertrag
 js/auto-planner-optimizer.js       Ruin-and-Recreate-Perfektion
 js/auto-plan-studio-*.js           Oberfläche des Studios, additiv geschichtet
+js/auto-plan-run-views.js          Registratur der Laufansichten: der geschriebene Vertrag
 js/auto-plan-visual-kit.js         Unterbau der Laufansichten: Farbwelt, Glow-Regel, Leinwand
 js/auto-plan-crystallize.js        Laufansicht „Kristallisation": Zusammenfall des Suchraums
 js/auto-plan-weave.js              Laufansicht „Weberei": entstehender Plan als Gewebe
