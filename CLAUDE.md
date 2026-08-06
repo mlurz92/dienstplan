@@ -35,8 +35,21 @@ nicht nach jede Änderung.** Maßgeblich ist, was die Änderung berühren kann:
 | **Vor Commit und Merge** | `npm run check && npm test`, Browsertests nur für die berührten Flächen |
 | **Vor einem Release** | `npm run verify` |
 
-Zwei Regeln dazu:
+Drei Regeln dazu:
 
+- **Testausgaben gehören nicht in den Kontext.** Der teuerste Posten ist nicht
+  die Laufzeit, sondern die Ausgabe: Eine volle Suite schreibt tausende Zeilen,
+  ein Profillauf noch mehr. Testläufe deshalb grundsätzlich gefiltert abrufen —
+  nur die Zusammenfassung, bei einem Fehlschlag nur den fehlgeschlagenen Fall:
+
+  ```
+  npm test 2>&1 | grep -E "^# (pass|fail)"
+  node --test tests/<datei>.test.js 2>&1 | grep -A 12 "^not ok"
+  npx playwright test <datei> 2>&1 | tail -5
+  ```
+
+  Dasselbe gilt für jede andere lange Ausgabe: `grep`, `head`, `tail` davor,
+  nie der ungefilterte Strom.
 - **Einmal messen genügt.** Wer eine Korrektur mit einem gezielten Test belegt
   hat, muss nicht anschließend die ganze Suite zur Bestätigung fahren.
 - **Neue Tests sparsam.** Ein Test, der eine bereits geprüfte Zusage
