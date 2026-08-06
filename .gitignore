@@ -5,3 +5,9 @@ playwright-report/
 
 # Playwright-MCP-Seitenmitschnitte sind Werkzeugausgabe, kein Quelltext.
 .playwright-mcp/
+
+# Auslieferungsstand für IONOS — jederzeit aus dem Repository erzeugbar.
+dist-ionos/
+
+# Zugangsdaten des Webspace. Sie existieren ausschließlich dort.
+server/ionos/api/config.php

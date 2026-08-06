@@ -33,6 +33,7 @@ nicht nach jede Änderung.** Maßgeblich ist, was die Änderung berühren kann:
 | Druckausgabe (`styles.css` `@media print`) | `tests/e2e/print-single-page.spec.js` |
 | Studio-Layout | `tests/e2e/studio-layout-v10-5.spec.js` |
 | Farbtoken, Dunkelmodus (`js/color-atlas-engine.js`, `dark-contrast.css`) | `tests/e2e/dark-contrast.spec.js` |
+| Backend für IONOS (`server/ionos/`) | `node --test tests/ionos-api.test.js` (braucht `php` mit `pdo_sqlite`) |
 | **Vor Commit und Merge** | `npm run check && npm test`, Browsertests nur für die berührten Flächen |
 | **Vor einem Release** | `npm run verify` |
 
@@ -103,4 +104,5 @@ dark-contrast.css         Lesekontrast im Dunkelmodus (zuletzt geladen)
 js/file-import.js         ein Eingang für Excel, PDF und JSON
 js/pdf-import.js          Textpositionen zu Tabellenzeilen (pdf.js)
 functions/                Cloudflare Pages Functions (KV-Zugriff)
+server/ionos/             dieselbe API als PHP auf MySQL (IONOS Webhosting)
 ```

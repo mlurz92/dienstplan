@@ -1129,10 +1129,16 @@ npm test            # Modultests                        (~70 s)
 npm run test:e2e    # Browsertests                      (~4 min)
 npm run verify      # alles                             (~5,5 min)
 npm run vendor:libs # pdf.js und SheetJS ins Repository holen
+npm run bundle:ionos # Auslieferungsstand für IONOS Webhosting nach dist-ionos/
 ```
 
 Cloudflare Pages wird aus dem Repository-Root gebaut; ein Build-Schritt
 existiert nicht. Das KV-Binding lautet `DIENSTPLAN_KV`.
+
+**Betrieb auf eigenem Webhosting.** Unter `server/ionos/` liegt dieselbe API als
+PHP-Frontcontroller mit einer MySQL-Tabelle anstelle von Workers KV — gleiche
+Pfade, gleiche Antworten, unverändertes Frontend. Der vollständige Weg dorthin
+samt Datenumzug steht in [`docs/IONOS-MIGRATION.md`](docs/IONOS-MIGRATION.md).
 
 ---
 

@@ -1,0 +1,115 @@
+# DienstplanRAD auf IONOS Webhosting — Apache-Konfiguration des Dokumentwurzels.
+#
+# Diese Datei wird auf dem Webspace als „.htaccess“ abgelegt (mit Punkt am
+# Anfang). Sie ersetzt, was auf Cloudflare Pages die Datei `_headers` und das
+# Function-Routing erledigt haben.
+#
+# Im Repository trägt sie einen anderen Namen, damit sie nicht versehentlich
+# die Entwicklungsumgebung beeinflusst und in Verzeichnislisten sichtbar bleibt.
+
+# ---------------------------------------------------------------------------
+# 1. Zwangsweise HTTPS
+# ---------------------------------------------------------------------------
+# Der Plan enthält Personaldaten. Eine unverschlüsselte Verbindung darf es
+# nicht geben — auch nicht kurz, auch nicht als Weiterleitungsziel.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{HTTPS} !=on
+  RewriteCond %{HTTP:X-Forwarded-Proto} !https
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+</IfModule>
+
+# ---------------------------------------------------------------------------
+# 2. Routing der API auf den Frontcontroller
+# ---------------------------------------------------------------------------
+# Alle Pfade unter /api/ gehen an api/index.php. Der Controller liest den
+# restlichen Pfad selbst aus der URI; angelegte Dateien bleiben unangetastet.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^api/(.*)$ api/index.php [QSA,L]
+
+  # Der Grabstein für einen alten Service Worker. Als PHP, damit die Kopfzeilen
+  # in jedem Fall stimmen — ein falscher MIME-Typ bricht die Updateprüfung des
+  # Browsers ab, OHNE die Registrierung zu lösen.
+  RewriteRule ^sw\.js$ sw.js.php [L]
+</IfModule>
+
+# ---------------------------------------------------------------------------
+# 3. Zugangsdaten und Innereien sind nicht abrufbar
+# ---------------------------------------------------------------------------
+<FilesMatch "^(config\.php|config\.example\.php|store\.php|package(-lock)?\.json|playwright\.config\.js|\.git.*|.*\.md)$">
+  Require all denied
+</FilesMatch>
+
+RedirectMatch 404 (?i)^/(tests|scripts|docs|\.git)(/|$)
+
+Options -Indexes
+
+# ---------------------------------------------------------------------------
+# 4. Schutzkopfzeilen — die Übersetzung von `_headers`
+# ---------------------------------------------------------------------------
+<IfModule mod_headers.c>
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "geolocation=(), microphone=(), camera=()"
+  Header always set Cross-Origin-Opener-Policy "same-origin"
+  # HSTS erst setzen, wenn HTTPS nachweislich läuft: Ein Fehler hier sperrt
+  # die Domain für die Dauer von max-age aus.
+  Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+  # Kein Cross-Origin-Embedder-Policy: require-corp. Begründung wie in `_headers`
+  # — der ausgelieferte portable Solver-Build braucht keine Vollisolierung, und
+  # sie würde den Excel-Import gefährden.
+
+  # Der Einstieg wird nie zwischengespeichert, sonst hängen Clients an einer
+  # alten Modulversion.
+  <FilesMatch "^index\.html$">
+    Header always set Cache-Control "no-cache, no-store, must-revalidate"
+  </FilesMatch>
+  <FilesMatch "\.(css|js)$">
+    Header always set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
+  <FilesMatch "^sw\.js(\.php)?$">
+    Header always set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
+  </FilesMatch>
+</IfModule>
+
+# Die Fremdbibliotheken tragen ihre Version im Pfad und sind unveränderlich.
+# Die Regel steht bewusst NACH der allgemeinen .js-Regel und gewinnt dadurch.
+<IfModule mod_headers.c>
+  <If "%{REQUEST_URI} =~ m#^/vendor/#">
+    Header always set Cache-Control "public, max-age=31536000, immutable"
+  </If>
+</IfModule>
+
+# ---------------------------------------------------------------------------
+# 5. MIME-Typen und Kompression
+# ---------------------------------------------------------------------------
+AddType application/javascript .js
+AddType application/manifest+json .webmanifest
+AddType application/wasm .wasm
+AddType image/svg+xml .svg
+AddDefaultCharset UTF-8
+
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json application/manifest+json image/svg+xml
+</IfModule>
+
+# ---------------------------------------------------------------------------
+# 6. Zugangsschutz — bitte lesen, nicht überspringen
+# ---------------------------------------------------------------------------
+# Auf Cloudflare Pages war die Anwendung ohne Anmeldung erreichbar. Unter einer
+# eigenen Domain ist das keine gute Idee: Wer die Adresse kennt, kann den Plan
+# lesen UND überschreiben. Die vier Zeilen unten kommentieren und den Pfad zur
+# mit `htpasswd` erzeugten Datei einsetzen (Details in
+# docs/IONOS-MIGRATION.md, Schritt 9).
+#
+# Basisauthentifizierung genügt hier, weil die Verbindung durch HTTPS geschützt
+# ist. Das Frontend braucht dafür keine Änderung: Der Browser hängt die
+# Anmeldung an jede `fetch`-Anfrage derselben Herkunft von selbst an.
+#
+# AuthType Basic
+# AuthName "DienstplanRAD"
+# AuthUserFile /homepages/00/d000000000/htdocs/.htpasswd-dienstplan
+# Require valid-user

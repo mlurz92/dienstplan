@@ -1,0 +1,78 @@
+name: Auslieferung nach IONOS
+
+# Bewusst nur von Hand. Eine Auslieferung bei jedem Push auf main wäre für einen
+# Dienstplan im Betrieb die falsche Voreinstellung: Der Zeitpunkt gehört dem
+# Betreiber, nicht dem Commit.
+on:
+  workflow_dispatch:
+    inputs:
+      probelauf:
+        description: 'Nur anzeigen, was hochgeladen würde (nichts schreiben)'
+        type: boolean
+        default: true
+
+concurrency:
+  group: deploy-ionos
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+
+      # Kein Upload ohne grüne Prüfung. Die Browsertests bleiben außen vor, sie
+      # sichern die Oberfläche, nicht die Auslieferung.
+      - run: npm run check
+      - run: npm test
+
+      - run: npm run bundle:ionos
+
+      - name: Hochladen per SFTP
+        env:
+          HOST: ${{ secrets.IONOS_SFTP_HOST }}
+          USER: ${{ secrets.IONOS_SFTP_USER }}
+          PASSWORD: ${{ secrets.IONOS_SFTP_PASSWORD }}
+          REMOTE: ${{ secrets.IONOS_REMOTE_DIR }}
+          PROBELAUF: ${{ inputs.probelauf }}
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq lftp
+          MODUS=""
+          if [ "$PROBELAUF" = "true" ]; then MODUS="--dry-run"; fi
+          # `--delete` räumt auf dem Webspace auf, was im Repository nicht mehr
+          # existiert — sonst bleiben alte Modulversionen liegen und werden von
+          # Clients mit veraltetem Cache weiter geladen.
+          #
+          # Die Ausnahmen sind die beiden Dateien, die NUR auf dem Webspace
+          # existieren: die Zugangsdaten der Datenbank und die Kennwortdatei der
+          # Basisauthentifizierung. Sie dürfen weder überschrieben noch gelöscht
+          # werden.
+          lftp -c "
+            set sftp:auto-confirm yes;
+            set net:max-retries 3;
+            open -u \"$USER\",\"$PASSWORD\" sftp://$HOST;
+            mirror --reverse --delete --verbose=1 $MODUS \
+              --exclude-glob api/config.php \
+              --exclude-glob .htpasswd* \
+              dist-ionos/ \"$REMOTE\";
+          "
+
+      - name: Erreichbarkeit prüfen
+        if: ${{ inputs.probelauf == false }}
+        env:
+          URL: ${{ secrets.IONOS_PUBLIC_URL }}
+          AUTH: ${{ secrets.IONOS_BASIC_AUTH }}
+        run: |
+          # Zwei Anfragen genügen als Abnahme: Die Seite lädt, und die API
+          # antwortet aus der Datenbank.
+          curl -fsS ${AUTH:+-u "$AUTH"} -o /dev/null -w 'index: %{http_code}\n' "$URL/"
+          curl -fsS ${AUTH:+-u "$AUTH"} "$URL/api/bootstrap" | head -c 200
