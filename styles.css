@@ -1081,6 +1081,32 @@ h3 { font-size: 1.05rem; }
 @media print {
   @page { size: A4 portrait; margin: 9mm 10mm; }
 
+  /* HÖHENBUDGET STATT FESTER ZEILENHÖHEN
+   *
+   * Der Satzspiegel misst 297 mm − 2 × 9 mm = 279 mm. Feste Zeilenhöhen sind
+   * für genau einen Fall gerechnet und laufen in jedem anderen über: Mit zwölf
+   * statt acht Mitarbeitenden brauchte ein 31-Tage-Monat 289 mm und landete
+   * auf einer zweiten Seite. Deshalb steht hier ein Budget je Block, und die
+   * Zeilenhöhe ergibt sich als Budget geteilt durch die tatsächliche
+   * Zeilenzahl — `--print-plan-rows` und `--print-stat-rows` setzt die
+   * Anwendung beim Rendern (siehe `syncPrintMetrics` in `js/app.js`).
+   *
+   * Die Summe ist damit von der Zeilenzahl unabhängig:
+   *   Kopf 15 + Tabellenkopf 6 + Plan 158 + Abstand 6 + Statistikkopf 10
+   *   + Statistik 46 = rund 241 mm.
+   * Die verbleibenden knapp 40 mm sind bewusste Reserve: Chrome vergrößert die
+   * Ränder, sobald in seinem Druckdialog Kopf- und Fußzeilen eingeschaltet
+   * sind — und das ist die Voreinstellung. Ohne diese Reserve genügt genau
+   * das, um den Ausdruck zu zerreißen. */
+  :root {
+    --print-plan-rows: 31;
+    --print-stat-rows: 9;
+    --print-plan-budget: 158mm;
+    --print-stats-budget: 46mm;
+    --print-plan-row: calc(var(--print-plan-budget) / var(--print-plan-rows));
+    --print-stat-row: calc(var(--print-stats-budget) / var(--print-stat-rows));
+  }
+
   html, body { width: auto; height: auto; background: #fff !important; color: #000; background-attachment: scroll !important; isolation: auto; }
   /* Verläufe, Filter und Containment zwingen Chromium sonst in eine
      Rasterausgabe der gesamten Seite: unscharf und um ein Vielfaches größer. */
@@ -1112,13 +1138,15 @@ h3 { font-size: 1.05rem; }
   .app-shell, .sheet-layout, .sheet-panel { width: 168mm; margin-left: auto; margin-right: auto; }
 
   /* Kopf ---------------------------------------------------------------- */
+  /* Kopf: links zweizeilig „Bereitschaftsdienstplan" über „Monat JJJJ",
+     rechts auf derselben Grundlinie die Bezeichnung des Monatskontrasts. */
   .sheet-heading {
     display: flex; justify-content: space-between; align-items: flex-end; gap: 6mm;
     margin: 0 0 3.4mm; padding: 0 0 1.6mm; border-bottom: .5mm solid var(--month-accent);
   }
   .sheet-heading .eyebrow {
-    display: block; margin: 0 0 .6mm; font-size: 7pt; font-weight: 600;
-    text-transform: uppercase; letter-spacing: .16em; color: var(--month-accent-strong);
+    display: block; margin: 0 0 .8mm; font-size: 10pt; font-weight: 700;
+    text-transform: none; letter-spacing: .01em; color: var(--month-accent-strong);
   }
   #monthTitle { font-size: 13pt; letter-spacing: .01em; margin: 0; line-height: 1.15; color: var(--month-ink); }
   .legend-stack { display: block; }
@@ -1142,7 +1170,7 @@ h3 { font-size: 1.05rem; }
     background: color-mix(in srgb, var(--month-accent) 26%, #fff);
     color: var(--month-ink); border-bottom: .35mm solid var(--month-ink);
   }
-  .plan-table td { height: 5.6mm; }
+  .plan-table td { height: var(--print-plan-row); }
   .plan-table th:nth-child(1), .plan-table td:nth-child(1) { width: 7%; }
   .plan-table th:nth-child(2), .plan-table td:nth-child(2) { width: 21%; }
   .plan-table th:nth-child(3), .plan-table td:nth-child(3),
@@ -1154,7 +1182,7 @@ h3 { font-size: 1.05rem; }
   .plan-table th:nth-child(8), .plan-table td:nth-child(8) { display: none; }
 
   .assignment-btn, .rbn-field, .rbn-input, .cell-summary-button {
-    min-height: 0; height: 5.6mm; font-size: 8pt; padding: 0 1.4mm; line-height: 1.1;
+    min-height: 0; height: var(--print-plan-row); font-size: 8pt; padding: 0 1.4mm; line-height: 1.1;
   }
   .rbn-input { appearance: none; -webkit-appearance: none; color: #000; }
   /* Der Platzhalter „— auswählen —“ ist eine Bedienhilfe; auf dem Ausdruck
@@ -1174,7 +1202,7 @@ h3 { font-size: 1.05rem; }
   .excel-stats { display: inline-block; width: auto; box-shadow: none; border: .35mm solid var(--month-ink); border-radius: 0; background: #fff; }
   .distribution-table { width: 88mm; font-size: 8pt; }
   .distribution-table th, .distribution-table td {
-    height: auto; padding: 0.75mm 1.6mm; border-color: rgba(0,0,0,.55); background: #fff; color: #000;
+    height: var(--print-stat-row); padding: 0 1.6mm; border-color: rgba(0,0,0,.55); background: #fff; color: #000;
   }
   .distribution-table th {
     font-weight: 700; color: var(--month-ink);
