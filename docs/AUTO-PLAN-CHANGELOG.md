@@ -139,8 +139,11 @@ dunklem Grund (gemessene 1,3:1).
   waren getrennt, PDF gab es gar nicht. Jetzt entscheidet die Endung — und wo
   sie lügt, die Dateisignatur: Ein PDF, das jemand `.xls` genannt hat, bleibt
   ein PDF.
-- **PDF-Import** über pdf.js, nachgeladen bei Bedarf wie die
-  Tabellenbibliothek. `js/pdf-import.js` baut aus Textpositionen wieder Zeilen
+- **PDF-Import** über pdf.js **aus dem Repository** (`vendor/pdfjs/`,
+  Apache-2.0, 1,7 MB), geladen erst beim ersten PDF. Dieselbe Regel wie beim
+  CP-SAT-WebAssembly: Was ausgeliefert wird, liegt im Repository; das Netz ist
+  nur die Rückfallebene. Nachgewiesen mit abgeschnittenem Netz — beide
+  Beispiel-PDFs werden ohne einen einzigen fremden Aufruf gelesen. `js/pdf-import.js` baut aus Textpositionen wieder Zeilen
   und Spalten — Zeilen aus gleicher Grundlinie, Spalten aus wiederkehrenden
   Mittelpunkten. Die linke Kante taugt dafür nicht: Bei zentriertem Zelltext
   wandert sie mit der Wortlänge, und der Wochentag landete in der Nachbarspalte.

@@ -17,8 +17,8 @@ import { readFile } from 'node:fs/promises';
 
 process.env.TZ = 'Europe/Berlin';
 
-const { documentToSheets, groupTextRows, detectColumns, buildTable, collapseLetterSpacing } =
-  await import('../js/pdf-import.js?v=20260806.1');
+const { documentToSheets, groupTextRows, detectColumns, buildTable, collapseLetterSpacing,
+  PDF_ENGINE_SOURCES, PDFJS_VERSION } = await import('../js/pdf-import.js?v=20260806.1');
 const { analyzeWorkbook, parseNeuroSheet } = await import('../js/excel-import.js?v=20260806.1');
 const { DEFAULT_STAFF } = await import('../js/defaults.js');
 
@@ -116,4 +116,29 @@ test('Zeilen ohne Inhalt erzeugen keine Geisterspalten', () => {
   assert.deepEqual(groupTextRows([]), []);
   assert.deepEqual(detectColumns([]), []);
   assert.deepEqual(buildTable([], []), []);
+});
+
+test('die Bibliothek liegt im Repository und wird von dort zuerst geladen', async () => {
+  // Dieselbe Regel wie beim CP-SAT-WebAssembly: Was ausgeliefert wird, liegt im
+  // Repository. Ein Import darf nicht daran scheitern, dass ein fremder Dienst
+  // gerade nicht erreichbar ist.
+  const [first, second] = PDF_ENGINE_SOURCES;
+  assert.equal(first.origin, 'local');
+  assert.equal(first.base, '/vendor/pdfjs');
+  assert.ok(first.marker.startsWith('?v='), 'die Versionsmarke fehlt – ein Zwischenspeicher liefert sonst die alte Fassung aus');
+  assert.equal(second.origin, 'cdn');
+  assert.ok(second.base.includes(PDFJS_VERSION), 'die Rückfallebene muss dieselbe Fassung holen');
+
+  for (const name of ['pdf.min.mjs', 'pdf.worker.min.mjs', 'LICENSE']) {
+    const file = new URL(`../vendor/pdfjs/${name}`, import.meta.url);
+    await assert.doesNotReject(readFile(file), `vendor/pdfjs/${name} fehlt`);
+  }
+
+  // Das Modul muss ein ES-Modul ohne bloße Bezeichner sein: Ohne Bündler kann
+  // der Browser sonst nichts damit anfangen.
+  const module = await readFile(new URL('../vendor/pdfjs/pdf.min.mjs', import.meta.url), 'utf8');
+  const bare = [...module.matchAll(/\bfrom\s*["']([^"'.\/][^"']*)["']/g)]
+    .map(match => match[1])
+    .filter(specifier => !specifier.startsWith('node:'));
+  assert.deepEqual(bare, [], `nicht auflösbare Bezeichner: ${bare.join(', ')}`);
 });

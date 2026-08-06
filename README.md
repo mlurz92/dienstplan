@@ -407,10 +407,16 @@ wandert sie mit der Wortlänge, und ein kurzer Wochentag landet in der
 Nachbarspalte. Beide Schwellen (Zeilentoleranz, Spaltenabstand) leiten sich aus
 den Daten ab, nicht aus geratenen Konstanten.
 
-Das Auslesen selbst übernimmt pdf.js, nachgeladen bei Bedarf wie die
-Tabellenbibliothek. Die Rekonstruktion dagegen ist reine Rechnerei und deshalb
-in Node prüfbar: `tests/pdf-import.test.js` arbeitet mit den echten
-Textelementen zweier realer Ausdrucke.
+Das Auslesen selbst übernimmt **pdf.js aus dem Repository** (`vendor/pdfjs/`,
+Apache-2.0, 1,7 MB) — dieselbe Regel wie beim CP-SAT-WebAssembly: Was
+ausgeliefert wird, liegt im Repository; das Netz ist nur die Rückfallebene. Ein
+Import darf nicht daran scheitern, dass ein fremder Dienst gerade nicht
+erreichbar ist. Geladen wird erst beim ersten PDF, nicht beim Start.
+`npm run vendor:pdfjs` holt die Fassung, die `js/pdf-import.js` festlegt.
+
+Die Rekonstruktion dagegen ist reine Rechnerei und deshalb in Node prüfbar:
+`tests/pdf-import.test.js` arbeitet mit den echten Textelementen zweier realer
+Ausdrucke.
 
 **Der Neuroradiologieplan** trägt nur die beiden Rufbereitschaften; BD und HG
 kommen darin nicht vor und bleiben beim Import unangetastet. Sein Kopf nennt
@@ -539,6 +545,7 @@ auto-plan-studio-v8-5.css          v8.5-Studiozustände
 auto-plan-studio-v9.css            Modal-Fit-Layout, kollabierbare Sektion, Animation
 auto-plan-studio-v10.css           Akkordeon, Laufansicht, Überlaufhärtung, Dark-Mode
 vendor/cpsat-js/                   lokal ausgelieferter CP-SAT-Solver (portable, Apache-2.0)
+vendor/pdfjs/                      lokal ausgeliefertes pdf.js für den PDF-Import (Apache-2.0)
 _headers                           Cache- und Sicherheitskopfzeilen (bewusst ohne COEP)
 tests/auto-plan-v8-5.test.js       Solver- und Integrationsverträge
 tests/auto-plan-v10.test.js        Modell-, Kaskaden-, Leximin- und Kennzahlenverträge
