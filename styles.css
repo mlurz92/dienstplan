@@ -1101,10 +1101,17 @@ h3 { font-size: 1.05rem; }
   :root {
     --print-plan-rows: 31;
     --print-stat-rows: 9;
-    --print-plan-budget: 158mm;
-    --print-stats-budget: 46mm;
-    --print-plan-row: calc(var(--print-plan-budget) / var(--print-plan-rows));
-    --print-stat-row: calc(var(--print-stats-budget) / var(--print-stat-rows));
+    --print-plan-budget: 172mm;
+    --print-stats-budget: 44mm;
+    /* `min()` hält zwei Zusagen zugleich:
+     *   – Die Obergrenze bewahrt das gewohnte Satzbild. Ohne sie bekäme ein
+     *     Februar mit 28 Zeilen unnatürlich hohe Zeilen, nur weil Platz übrig
+     *     ist.
+     *   – Der Quotient greift, sobald es eng wird: mehr Tage, mehr
+     *     Mitarbeitende. Dann schrumpfen die Zeilen so weit wie nötig — und
+     *     keinen Zehntelmillimeter weiter. */
+    --print-plan-row: min(5.9mm, calc(var(--print-plan-budget) / var(--print-plan-rows)));
+    --print-stat-row: min(5.4mm, calc(var(--print-stats-budget) / var(--print-stat-rows)));
   }
 
   html, body { width: auto; height: auto; background: #fff !important; color: #000; background-attachment: scroll !important; isolation: auto; }
@@ -1145,8 +1152,8 @@ h3 { font-size: 1.05rem; }
     margin: 0 0 3.4mm; padding: 0 0 1.6mm; border-bottom: .5mm solid var(--month-accent);
   }
   .sheet-heading .eyebrow {
-    display: block; margin: 0 0 .8mm; font-size: 10pt; font-weight: 700;
-    text-transform: none; letter-spacing: .01em; color: var(--month-accent-strong);
+    display: block; margin: 0 0 .6mm; font-size: 7pt; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .16em; color: var(--month-accent-strong);
   }
   #monthTitle { font-size: 13pt; letter-spacing: .01em; margin: 0; line-height: 1.15; color: var(--month-ink); }
   .legend-stack { display: block; }

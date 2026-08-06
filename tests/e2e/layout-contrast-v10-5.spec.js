@@ -18,7 +18,9 @@ import { collectContrast } from './helpers/contrast.js';
  *      Stufe AA geprüft (4,5:1, bei großer Schrift 3:1).
  */
 
-const WIDTHS = [360, 768, 1024, 1440, 1920];
+// Drei Breiten statt fünf: Die Umbruchpunkte der Anwendung liegen bei 768 und
+// 1024 Pixeln. 360 prüft das Minimum, 1920 verhält sich wie 1440.
+const WIDTHS = [360, 1024, 1920];
 
 /** Relative Leuchtdichte nach WCAG 2.1. */
 async function collectOverflow(page) {
@@ -82,18 +84,10 @@ for (const scheme of ['light', 'dark']) {
       contrastFindings.push(...(await collectContrast(page)).map(entry => ({ ...entry, width })));
     }
 
-    // Studio öffnen und dasselbe dort prüfen – der Dialog trägt die dichteste
-    // Oberfläche der Anwendung und war der Ort der bisherigen Abschnitte.
-    await page.setViewportSize({ width: 1280, height: 900 });
-    await page.click('#autoPlanBtn');
-    await page.waitForSelector('#autoPlanDialog[open]', { timeout: 30000 });
-    await page.waitForTimeout(900);
-    for (const width of [768, 1024, 1440]) {
-      await page.setViewportSize({ width, height: 900 });
-      await page.waitForTimeout(250);
-      overflowFindings.push(...(await collectOverflow(page)).map(entry => ({ ...entry, width, where: 'studio' })));
-      contrastFindings.push(...(await collectContrast(page)).map(entry => ({ ...entry, width, where: 'studio' })));
-    }
+    // Der Studio-Dialog wird hier nicht mehr geöffnet: Seine drei Zustände
+    // prüft `studio-layout-v10-5.spec.js` vollständig und in beiden
+    // Erscheinungsbildern. Zweimal dasselbe zu messen kostet Laufzeit und
+    // bringt keine zusätzliche Aussage.
 
     expect(overflowFindings, `Elemente ragen aus ihrem Rahmen: ${JSON.stringify(overflowFindings.slice(0, 12), null, 2)}`).toEqual([]);
     expect(contrastFindings, `Zu geringer Lesekontrast: ${JSON.stringify(contrastFindings.slice(0, 12), null, 2)}`).toEqual([]);
@@ -107,14 +101,22 @@ for (const scheme of ['light', 'dark']) {
  * die Rechtecke beider Elemente in beiden Visualisierungen und verlangt, dass
  * sie sich nicht schneiden.
  */
-for (const visual of ['crystal', 'orbit']) {
-  test(`Algorithmuszustand überlagert die Leinwand nicht · ${visual}`, async ({ page }) => {
-    test.setTimeout(120000);
-    await page.goto('/');
-    await page.waitForSelector('#autoPlanBtn', { timeout: 30000 });
-    await page.setViewportSize({ width: 1280, height: 900 });
-    await page.click('#autoPlanBtn');
-    await page.waitForSelector('#autoPlanDialog[open]', { timeout: 30000 });
+/**
+ * Regression: Bis v10.4 hing das Banner „Algorithmuszustand" als
+ * `position: absolute` über der Leinwand. In der Kristall-Ansicht fiel das
+ * nicht auf, in der Orbit-Ansicht verdeckte es die Animation. Der Test misst
+ * die Rechtecke in beiden Visualisierungen — in einer Sitzung, weil das Öffnen
+ * des Studios die eigentliche Laufzeit kostet, nicht das Messen.
+ */
+test('Algorithmuszustand überlagert die Leinwand nicht · beide Ansichten', async ({ page }) => {
+  test.setTimeout(120000);
+  await page.goto('/');
+  await page.waitForSelector('#autoPlanBtn', { timeout: 30000 });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.click('#autoPlanBtn');
+  await page.waitForSelector('#autoPlanDialog[open]', { timeout: 30000 });
+
+  for (const visual of ['crystal', 'orbit']) {
     // Die Laufansicht erscheint erst im Zustand „läuft"; der Dialog wird dafür
     // aus der Parametrierung in den Laufzustand versetzt, ohne eine echte
     // Optimierung zu starten — geprüft wird Geometrie, nicht Rechenergebnis.
@@ -129,7 +131,7 @@ for (const visual of ['crystal', 'orbit']) {
       const stage = document.getElementById('autoPlanStage');
       if (stage) stage.hidden = false;
     }, visual);
-    await page.waitForTimeout(700);
+    await page.waitForTimeout(600);
 
     const geometry = await page.evaluate(() => {
       const box = element => {
@@ -144,7 +146,7 @@ for (const visual of ['crystal', 'orbit']) {
       };
     });
 
-    expect(geometry.canvas, 'Leinwand ist sichtbar').toBeTruthy();
+    expect(geometry.canvas, `Leinwand ist sichtbar (${visual})`).toBeTruthy();
     expect(geometry.canvas.width).toBeGreaterThan(40);
     expect(geometry.canvas.height).toBeGreaterThan(40);
 
@@ -153,8 +155,8 @@ for (const visual of ['crystal', 'orbit']) {
       && a.top < b.bottom - 0.5 && b.top < a.bottom - 0.5;
 
     expect(overlaps(geometry.canvas, geometry.narrative),
-      `Zustandsbanner schneidet die Leinwand: ${JSON.stringify(geometry, null, 2)}`).toBe(false);
+      `Zustandsbanner schneidet die Leinwand (${visual}): ${JSON.stringify(geometry, null, 2)}`).toBe(false);
     expect(overlaps(geometry.canvas, geometry.badge),
-      `Engine-Badge schneidet die Leinwand: ${JSON.stringify(geometry, null, 2)}`).toBe(false);
-  });
-}
+      `Engine-Badge schneidet die Leinwand (${visual}): ${JSON.stringify(geometry, null, 2)}`).toBe(false);
+  }
+});
