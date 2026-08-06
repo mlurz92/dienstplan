@@ -36,6 +36,13 @@
 
 const TAU = Math.PI * 2;
 
+/* Lesbarkeitsuntergrenzen der Leinwand. Unter diesen Werten wird nicht mehr
+   gezeichnet, sondern ausgedünnt: Eine Zeile, die man nicht lesen kann, ist
+   keine Information, sondern Rauschen. */
+const LIST_FONT = 11;
+const LADDER_MIN_ROW = 18;
+const SCALE_MIN_ROW = 9;
+
 /** Semantische Farbwelt in HSL. Die Zahlen sind Ton, Sättigung, Helligkeit. */
 const SEVERITY = Object.freeze({
   red: { h: 6, s: 0.78, l: 0.55 },
@@ -351,26 +358,70 @@ export class AutoPlanCrystallizer {
    * überschneiden sich per Konstruktion nicht: Jede Ebene bekommt ihren
    * eigenen Streifen, niemand zeichnet in den Streifen eines anderen.
    */
+  /**
+   * Zonenaufteilung der Leinwand.
+   *
+   * LESBARKEIT GEHT VOR VOLLSTÄNDIGKEIT. Die Vorgängerfassung verteilte die
+   * verfügbare Höhe restlos auf alle Einträge: Bei zwölf Stufen in 190 Pixeln
+   * blieben 15 Pixel je Zeile, während die Schrift unverändert 10 Pixel maß —
+   * die Zeilen liefen ineinander. Die Lastwaage verwarf zusätzlich stillschweigend
+   * jeden Balken, der nicht mehr passte, und schrieb ihre Überschrift zehn Pixel
+   * *oberhalb* ihrer eigenen Zone. Beides sah aus wie ein abgeschnittener Rand.
+   *
+   * Deshalb gilt jetzt: Jede Liste hat eine Mindestzeilenhöhe. Passen nicht alle
+   * Einträge, wird ein Ausschnitt gezeigt und die Zahl der übrigen ausgewiesen.
+   */
   layout() {
     const padding = 12;
-    const compact = this.width < 620;
-    const ladderWidth = compact ? 0 : clamp(this.width * 0.26, 150, 250);
+    const gap = 10;
+    const compact = this.width < 640;
+    const ladderWidth = compact ? 0 : clamp(this.width * 0.26, 190, 300);
     const scissorsHeight = clamp(this.height * 0.2, 46, 96);
-    const scaleHeight = clamp(this.height * 0.17, 40, 80);
-    const fieldWidth = this.width - padding * 2 - (ladderWidth ? ladderWidth + padding : 0);
-    const fieldHeight = this.height - padding * 3 - scissorsHeight - (compact ? scaleHeight + padding : 0);
+    const scaleHeight = clamp(this.height * 0.17, 44, 84);
+    const fieldWidth = this.width - padding * 2 - (ladderWidth ? ladderWidth + gap : 0);
+    const fieldHeight = Math.max(60, this.height - padding * 2 - gap - scissorsHeight
+      - (compact ? scaleHeight + gap : 0));
+    const rightX = padding + fieldWidth + gap;
+    // In der breiten Aufteilung teilen sich Leiter und Waage die rechte Spalte:
+    // Die Leiter bekommt die Höhe des Feldes, die Waage die der Schere darunter.
     return {
       padding,
+      gap,
       compact,
-      field: { x: padding, y: padding, w: Math.max(80, fieldWidth), h: Math.max(60, fieldHeight) },
-      ladder: ladderWidth
-        ? { x: padding * 2 + fieldWidth, y: padding, w: ladderWidth, h: Math.max(60, fieldHeight) }
-        : null,
-      scissors: { x: padding, y: padding * 2 + Math.max(60, fieldHeight), w: this.width - padding * 2, h: scissorsHeight },
+      field: { x: padding, y: padding, w: Math.max(80, fieldWidth), h: fieldHeight },
+      ladder: ladderWidth ? { x: rightX, y: padding, w: ladderWidth, h: fieldHeight } : null,
+      scissors: { x: padding, y: padding + fieldHeight + gap, w: (compact ? this.width - padding * 2 : fieldWidth), h: scissorsHeight },
       scale: compact
-        ? { x: padding, y: padding * 3 + Math.max(60, fieldHeight) + scissorsHeight, w: this.width - padding * 2, h: scaleHeight }
-        : { x: padding * 2 + fieldWidth, y: padding * 2 + Math.max(60, fieldHeight), w: ladderWidth, h: scissorsHeight }
+        ? { x: padding, y: padding + fieldHeight + gap + scissorsHeight + gap, w: this.width - padding * 2, h: scaleHeight }
+        : { x: rightX, y: padding + fieldHeight + gap, w: ladderWidth, h: scissorsHeight }
     };
+  }
+
+  /** Führt eine Zeichnung streng innerhalb ihrer Zone aus. */
+  withinZone(rect, draw) {
+    const ctx = this.context;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(rect.x, rect.y, rect.w, rect.h);
+    ctx.clip();
+    draw();
+    ctx.restore();
+  }
+
+  /** Kürzt Text auf die verfügbare Breite und setzt ein Auslassungszeichen. */
+  fitText(text, maxWidth) {
+    const ctx = this.context;
+    const value = String(text ?? '');
+    if (maxWidth <= 0) return '';
+    if (ctx.measureText(value).width <= maxWidth) return value;
+    let low = 0;
+    let high = value.length;
+    while (low < high) {
+      const middle = Math.ceil((low + high) / 2);
+      if (ctx.measureText(`${value.slice(0, middle)}…`).width <= maxWidth) low = middle;
+      else high = middle - 1;
+    }
+    return low > 0 ? `${value.slice(0, low)}…` : '';
   }
 
   draw(now) {
@@ -380,9 +431,9 @@ export class AutoPlanCrystallizer {
     const color = this.activeColor(now);
     ctx.clearRect(0, 0, this.width, this.height);
 
-    this.drawField(zones.field, color, now);
+    this.withinZone(zones.field, () => this.drawField(zones.field, color, now));
     if (zones.ladder) this.drawLadder(zones.ladder, color);
-    this.drawScissors(zones.scissors, color);
+    this.withinZone(zones.scissors, () => this.drawScissors(zones.scissors, color));
     this.drawScale(zones.scale, color);
     if (this.pulse > 0 && !this.reducedMotion) this.drawPulse(zones.field, now);
   }
@@ -441,29 +492,63 @@ export class AutoPlanCrystallizer {
 
   drawLadder(rect, color) {
     const ctx = this.context;
-    const rows = Math.max(1, this.stages.length || 1);
-    const rowHeight = Math.min(24, rect.h / rows);
-    ctx.font = '600 10px system-ui, sans-serif';
-    ctx.textBaseline = 'middle';
-    this.stages.forEach((stage, index) => {
-      const y = rect.y + index * rowHeight;
-      if (y + rowHeight > rect.y + rect.h) return;
-      const done = stage.status === 'done';
-      const broken = stage.status === 'broken';
-      const tone = broken ? SEVERITY.red : done ? SEVERITY.proof : color;
-      this.applyGlow(tone, done ? 0.8 : 0.35, 8);
-      ctx.fillStyle = hsl(tone, broken ? 0.5 : done ? 0.42 : 0.2);
-      this.roundRect(rect.x, y + 2, rect.w, rowHeight - 4, 4);
-      ctx.fill();
-      this.clearGlow();
-      ctx.fillStyle = hsl({ ...tone, l: clamp(tone.l - 0.28, 0.1, 0.5) }, 0.95);
-      const label = String(stage.label || stage.id).slice(0, 22);
-      ctx.fillText(`${done ? '🔒 ' : broken ? '✕ ' : '▸ '}${label}`, rect.x + 6, y + rowHeight / 2);
-      if (stage.value !== null && stage.value !== undefined) {
-        const text = Number(stage.value).toFixed(Number.isInteger(stage.value) ? 0 : 2);
-        ctx.textAlign = 'right';
-        ctx.fillText(text, rect.x + rect.w - 6, y + rowHeight / 2);
-        ctx.textAlign = 'left';
+    if (!this.stages.length) return;
+    this.withinZone(rect, () => {
+      const titleHeight = 14;
+      const body = { x: rect.x, y: rect.y + titleHeight, w: rect.w, h: Math.max(0, rect.h - titleHeight) };
+
+      ctx.font = `600 ${LIST_FONT}px system-ui, sans-serif`;
+      ctx.textBaseline = 'top';
+      ctx.textAlign = 'left';
+      ctx.fillStyle = hsl({ ...color, l: clamp(color.l - 0.1, 0.15, 0.6) }, 0.85);
+      ctx.fillText(this.fitText('Prioritätsleiter', rect.w), rect.x, rect.y);
+
+      // Wie viele Sprossen passen, ohne die Mindestzeilenhöhe zu unterschreiten?
+      const capacity = Math.max(1, Math.floor(body.h / LADDER_MIN_ROW));
+      const total = this.stages.length;
+      const overflow = total > capacity;
+      const shownCount = overflow ? Math.max(1, capacity - 1) : total;
+      // Der Ausschnitt endet an der zuletzt aktiven Stufe: Was gerade passiert,
+      // ist immer sichtbar; Abgeschlossenes darf nach oben herauswandern.
+      const activeIndex = Math.max(0, this.stages.findLastIndex(stage => stage.status !== 'pending'));
+      const start = clamp(activeIndex - shownCount + 1, 0, Math.max(0, total - shownCount));
+      const visible = this.stages.slice(start, start + shownCount);
+      const rowHeight = Math.min(26, body.h / Math.max(1, shownCount + (overflow ? 1 : 0)));
+
+      ctx.textBaseline = 'middle';
+      visible.forEach((stage, index) => {
+        const y = body.y + index * rowHeight;
+        const done = stage.status === 'done';
+        const broken = stage.status === 'broken';
+        const tone = broken ? SEVERITY.red : done ? SEVERITY.proof : color;
+        this.applyGlow(tone, done ? 0.8 : 0.35, 8);
+        ctx.fillStyle = hsl(tone, broken ? 0.5 : done ? 0.42 : 0.2);
+        this.roundRect(rect.x, y + 1, rect.w, Math.max(4, rowHeight - 3), 4);
+        ctx.fill();
+        this.clearGlow();
+        ctx.fillStyle = hsl({ ...tone, l: clamp(tone.l - 0.28, 0.1, 0.5) }, 0.95);
+
+        // Der Zahlenwert bekommt seinen Platz zuerst, die Beschriftung den Rest.
+        let valueWidth = 0;
+        let valueText = '';
+        if (stage.value !== null && stage.value !== undefined && Number.isFinite(Number(stage.value))) {
+          valueText = Number(stage.value).toFixed(Number.isInteger(stage.value) ? 0 : 2);
+          valueWidth = ctx.measureText(valueText).width + 8;
+        }
+        const mark = done ? '✓ ' : broken ? '✕ ' : '▸ ';
+        const label = this.fitText(`${mark}${stage.label || stage.id}`, rect.w - 12 - valueWidth);
+        ctx.fillText(label, rect.x + 6, y + rowHeight / 2);
+        if (valueText) {
+          ctx.textAlign = 'right';
+          ctx.fillText(valueText, rect.x + rect.w - 6, y + rowHeight / 2);
+          ctx.textAlign = 'left';
+        }
+      });
+
+      if (overflow) {
+        const y = body.y + shownCount * rowHeight;
+        ctx.fillStyle = hsl({ ...color, l: clamp(color.l - 0.05, 0.2, 0.6) }, 0.75);
+        ctx.fillText(this.fitText(`+ ${total - shownCount} weitere Stufen`, rect.w - 12), rect.x + 6, y + rowHeight / 2);
       }
     });
   }
@@ -478,10 +563,15 @@ export class AutoPlanCrystallizer {
     this.roundRect(rect.x, rect.y, rect.w, rect.h, 6);
     ctx.fill();
     if (this.bounds.length < 2) {
-      ctx.font = '10px system-ui, sans-serif';
+      ctx.font = `${LIST_FONT}px system-ui, sans-serif`;
       ctx.fillStyle = hsl({ ...color, l: clamp(color.l - 0.05, 0.2, 0.6) }, 0.6);
       ctx.textBaseline = 'middle';
-      ctx.fillText('Schranken erscheinen, sobald die exakte Suche Zwischenlösungen meldet', rect.x + 8, rect.y + rect.h / 2);
+      ctx.textAlign = 'left';
+      ctx.fillText(
+        this.fitText('Schranken erscheinen, sobald die exakte Suche Zwischenlösungen meldet', rect.w - 16),
+        rect.x + 8,
+        rect.y + rect.h / 2
+      );
       return;
     }
     const values = this.bounds.flatMap(entry => [entry.value, entry.bound]).filter(Number.isFinite);
@@ -527,24 +617,74 @@ export class AutoPlanCrystallizer {
   drawScale(rect, color) {
     const ctx = this.context;
     if (!this.loads.length) return;
-    const sorted = [...this.loads].sort((left, right) => left.value - right.value);
-    const max = Math.max(1, ...sorted.map(entry => entry.value));
-    const barHeight = Math.min(9, (rect.h - 4) / sorted.length);
-    sorted.forEach((entry, index) => {
-      const y = rect.y + index * barHeight;
-      if (y + barHeight > rect.y + rect.h) return;
-      const staffColor = { h: hueForStaff(entry.staffId || String(index)), s: 0.5, l: 0.5 };
-      const width = (rect.w - 4) * (entry.value / max);
-      this.applyGlow(staffColor, 0.35, 6);
-      ctx.fillStyle = hsl(staffColor, 0.6);
-      this.roundRect(rect.x + 2, y + 1, Math.max(2, width), Math.max(2, barHeight - 2), 2);
-      ctx.fill();
-      this.clearGlow();
+    this.withinZone(rect, () => {
+      const titleHeight = 14;
+      const body = { x: rect.x, y: rect.y + titleHeight, w: rect.w, h: Math.max(0, rect.h - titleHeight) };
+
+      // Die Überschrift stand bisher *oberhalb* der eigenen Zone und wurde vom
+      // Nachbarn überschrieben. Sie gehört hinein.
+      ctx.font = `600 ${LIST_FONT}px system-ui, sans-serif`;
+      ctx.textBaseline = 'top';
+      ctx.textAlign = 'left';
+      ctx.fillStyle = hsl({ ...color, l: clamp(color.l - 0.1, 0.15, 0.6) }, 0.85);
+      ctx.fillText(this.fitText('Last je Person', rect.w), rect.x, rect.y);
+
+      const sorted = [...this.loads].sort((left, right) => left.value - right.value);
+      const max = Math.max(1, ...sorted.map(entry => entry.value));
+
+      // Richtungswechsel statt Ausdünnen: In einer flachen, breiten Zone stehen
+      // die Balken als Säulen nebeneinander. So bleibt die gesamte Belegschaft
+      // sichtbar, auch wenn nur dreißig Pixel Höhe zur Verfügung stehen —
+      // waagerechte Balken bräuchten dafür neun Zeilen.
+      if (body.h < sorted.length * SCALE_MIN_ROW && body.w / sorted.length >= 5) {
+        const columnWidth = body.w / sorted.length;
+        sorted.forEach((entry, index) => {
+          const staffColor = { h: hueForStaff(entry.staffId || String(index)), s: 0.5, l: 0.5 };
+          const height = Math.max(2, (body.h - 2) * clamp(entry.value / max, 0, 1));
+          this.applyGlow(staffColor, 0.35, 6);
+          ctx.fillStyle = hsl(staffColor, 0.6);
+          this.roundRect(
+            body.x + index * columnWidth + 1,
+            body.y + body.h - height,
+            Math.max(2, columnWidth - 2),
+            height,
+            2
+          );
+          ctx.fill();
+          this.clearGlow();
+        });
+        return;
+      }
+
+      const capacity = Math.max(1, Math.floor(body.h / SCALE_MIN_ROW));
+      const overflow = sorted.length > capacity;
+      // Bei Überzahl bleiben die *höchstbelasteten* Personen sichtbar — sie sind
+      // der Grund, warum Leximin überhaupt arbeitet.
+      const shown = overflow ? sorted.slice(-Math.max(1, capacity - 1)) : sorted;
+      const rowHeight = Math.min(11, body.h / Math.max(1, shown.length + (overflow ? 1 : 0)));
+
+      shown.forEach((entry, index) => {
+        const y = body.y + index * rowHeight;
+        const staffColor = { h: hueForStaff(entry.staffId || String(index)), s: 0.5, l: 0.5 };
+        const width = (rect.w - 4) * clamp(entry.value / max, 0, 1);
+        this.applyGlow(staffColor, 0.35, 6);
+        ctx.fillStyle = hsl(staffColor, 0.6);
+        this.roundRect(rect.x + 2, y + 1, Math.max(2, width), Math.max(2, rowHeight - 2), 2);
+        ctx.fill();
+        this.clearGlow();
+      });
+
+      if (overflow) {
+        ctx.font = `600 ${LIST_FONT}px system-ui, sans-serif`;
+        ctx.fillStyle = hsl({ ...color, l: clamp(color.l - 0.05, 0.2, 0.6) }, 0.75);
+        ctx.textBaseline = 'top';
+        ctx.fillText(
+          this.fitText(`+ ${sorted.length - shown.length} weniger belastete`, rect.w - 4),
+          rect.x + 2,
+          body.y + shown.length * rowHeight + 1
+        );
+      }
     });
-    ctx.font = '600 9px system-ui, sans-serif';
-    ctx.fillStyle = hsl({ ...color, l: clamp(color.l - 0.1, 0.15, 0.6) }, 0.8);
-    ctx.textBaseline = 'top';
-    ctx.fillText('Last je Person', rect.x + 2, rect.y - 10);
   }
 
   /** Der Kristallisationspuls: eine Welle, ein Mal, über das gesamte Feld. */

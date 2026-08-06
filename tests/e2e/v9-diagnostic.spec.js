@@ -41,9 +41,13 @@ test.describe('v9 diagnostic', () => {
     await page.click('#autoPlanStartBtn');
     await page.waitForSelector('#autoPlanStage:not([hidden])', { timeout: 15000 });
 
-    const phaseCards = page.locator('#autoPlanPhaseList .auto-plan-phase');
+    // v10.5: Die sechsteilige Phasenliste der Laufansicht ist entfallen — sie
+    // stand doppelt neben der Stufenleiste, die die acht Stufen der Engine
+    // selbst führt, und trug zu der Enge bei, in der sich Zeilen überlagerten.
+    // Geprüft wird deshalb die Stufenleiste: gleiche Zusage, eine Quelle.
+    const phaseCards = page.locator('#autoPlanV85Theatre ol > li');
     const count = await phaseCards.count();
-    expect(count).toBeGreaterThanOrEqual(6);
+    expect(count).toBeGreaterThanOrEqual(8);
     const dialogBox2 = await page.locator('#autoPlanDialog').boundingBox();
     for (let index = 0; index < count; index += 1) {
       await expect(phaseCards.nth(index)).toBeVisible();
@@ -55,8 +59,8 @@ test.describe('v9 diagnostic', () => {
     await page.waitForSelector('#autoPlanDialog.show-result', { timeout: 120000 });
     const resultTitle = await page.locator('#autoPlanResultTitle').innerText();
     expect(resultTitle.length).toBeGreaterThan(0);
-    const states = await page.locator('#autoPlanPhaseList .auto-plan-phase b').allInnerTexts();
-    const doneCount = states.filter(text => text.includes('erledigt')).length;
+    const states = await page.locator('#autoPlanV85Theatre ol > li > span').allInnerTexts();
+    const doneCount = states.filter(text => /fertig|erledigt/i.test(text)).length;
     expect(doneCount).toBeGreaterThanOrEqual(4);
 
     // 5. Dark mode: switch and verify no console errors.

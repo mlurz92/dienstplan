@@ -7,9 +7,11 @@
  * sondern von vier Regeln, aus denen sie folgt:
  *
  *   1. Eine Gitterebene je Zone. Keine Zone kennt die Position einer anderen.
- *   2. `min-width: 0` und `min-height: 0` auf jedem Gitter- und Flex-Kind.
- *      Ohne das erzwingt die automatische Mindestgröße den Überlauf – die mit
- *      Abstand häufigste Ursache abgeschnittener Inhalte.
+ *   2. `min-width: 0` auf jedem Gitter- und Flex-Kind — ohne das erzwingt die
+ *      automatische Mindestgröße den waagerechten Überlauf. Die *Höhe* wird
+ *      dagegen nur dort freigegeben, wo die Zone ihren Überlauf selbst scrollt:
+ *      Genau diese Mindesthöhe verhindert, dass eine Karte unter ihren Inhalt
+ *      zusammenfällt und ihn unerreichbar macht.
  *   3. `position: absolute` ausschließlich für Dekor, immer hinter einem
  *      `isolation: isolate` und immer mit `z-index: 0`.
  *   4. Scrollen ist Eigenschaft einer Zone, nie des Dialogs.
@@ -26,14 +28,37 @@
   min-width: 0;
 }
 
+/* NUR die Breite wird freigegeben, niemals die Höhe.
+ *
+ * Bis v10.5.0 stand hier zusätzlich `min-height: 0`. Das war ein schwerer
+ * Fehler: Die automatische Mindestgröße ist genau der Mechanismus, der ein
+ * Gitter- oder Flex-Kind daran hindert, unter seinen Inhalt zu schrumpfen.
+ * Weil die Ergebnisansicht ein Gitter mit fester Höhe ist, quetschte die Regel
+ * jede Ergebniskarte auf rund 22 Pixel zusammen — Vorschlagstabelle,
+ * Verteilungsbild und Suchnachweis waren nur noch als leere Streifen sichtbar,
+ * und der fertige Monatsvorschlag war nirgends erreichbar.
+ *
+ * Der Vertrag lautet deshalb: Höhe darf nur dort freigegeben werden, wo die
+ * Zone ihren Überlauf selbst scrollt (Abschnitt 1b). */
 .auto-plan-dialog[data-v10-layout="1"] .auto-plan-card,
 .auto-plan-dialog[data-v10-layout="1"] .auto-plan-panel,
 .auto-plan-dialog[data-v10-layout="1"] .auto-plan-group,
 .auto-plan-dialog[data-v10-layout="1"] .auto-plan-group-body,
 .auto-plan-dialog[data-v10-layout="1"] .auto-plan-field {
   min-width: 0;
-  min-height: 0;
   max-width: 100%;
+}
+
+/* 1b. Scrollende Zonen — und nur diese — dürfen unter ihren Inhalt schrumpfen.
+ * Jede hier genannte Zone besitzt eine eigene Bildlaufleiste; ihr Inhalt bleibt
+ * also erreichbar, auch wenn die Zone kleiner ist als er. */
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-stage,
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-visual,
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-console,
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-log,
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-log-stream,
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-limit-scroll {
+  min-height: 0;
 }
 
 /* Kein Textträger darf seinen Inhalt abschneiden. */
@@ -49,11 +74,37 @@
   hyphens: auto;
 }
 
-/* Breite Inhalte scrollen in ihrem eigenen Kasten – nie die Seite. */
-.auto-plan-dialog[data-v10-layout="1"] table {
-  display: block;
+/* Breite Tabellen scrollen in ihrem Rahmen – nie die Seite.
+ *
+ * Zu scrollen hat der *Rahmen*, nicht die Tabelle: `display: block` auf einer
+ * Tabelle hebt das Tabellenlayout auf, die Spalten verlieren ihre gemeinsame
+ * Breite und der klebende Tabellenkopf seinen Bezug. Die Vorschlagstabelle
+ * braucht ihre 680 Pixel Mindestbreite; sie bekommt sie hier und darf dafür in
+ * ihrem Rahmen waagerecht laufen. */
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-change-list,
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-load-table,
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-limit-scroll {
   max-width: 100%;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+/* Eingabefelder in Tabellenzellen bleiben in ihrer Zelle. Ohne
+   `box-sizing: border-box` addieren Innenabstand und Rahmen auf die gesetzte
+   Breite und schieben das Feld über die Zellkante. */
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-limit-table input,
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-limit-table select {
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+/* Der Tabellenkopf bleibt beim Blättern stehen — bei 31 Tageszeilen ist eine
+   Zeile ohne sichtbare Spaltenüberschrift nicht lesbar. */
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-proposal-table thead th,
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-load-table table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
 }
 
 /* ------------------------------------------------------------------ *
@@ -266,9 +317,19 @@
  * 4. Laufansicht – Animation und Konsole nebeneinander, nie übereinander
  * ------------------------------------------------------------------ */
 
-.auto-plan-dialog[data-v10-layout="1"] .auto-plan-stage {
+/* Der Abfragecontainer ist der Dialogkörper, nicht die Laufansicht selbst:
+   Eine Container-Abfrage wirkt ausschließlich auf *Nachfahren* des Containers.
+   Weil `container-name: autoplan-stage` bis v10.5.0 auf der Laufansicht saß und
+   die Regel darin ebenfalls die Laufansicht ansprach, wurde die zweispaltige
+   Aufteilung nie wirksam — Animation und Konsole standen immer untereinander,
+   und die Leinwand behielt gut zweihundert Pixel Höhe, in denen die
+   Prioritätsleiter nur fünf von zwölf Stufen zeigen konnte. */
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-body {
   container-type: inline-size;
-  container-name: autoplan-stage;
+  container-name: autoplan-dialog;
+}
+
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-stage {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: minmax(180px, 44%) minmax(0, 1fr);
@@ -276,7 +337,7 @@
   min-height: 0;
 }
 
-@container autoplan-stage (min-width: 900px) {
+@container autoplan-dialog (min-width: 900px) {
   .auto-plan-dialog[data-v10-layout="1"] .auto-plan-stage {
     grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.85fr);
     grid-template-rows: minmax(0, 1fr);
@@ -350,7 +411,7 @@
   overflow: hidden;
 }
 
-@container autoplan-stage (max-width: 720px) {
+@container autoplan-dialog (max-width: 720px) {
   .auto-plan-dialog[data-v10-layout="1"] #autoPlanPhaseList,
   .auto-plan-dialog[data-v10-layout="1"] .auto-plan-phase-list,
   .auto-plan-dialog[data-v10-layout="1"] #autoPlanV85Theatre ol {
@@ -364,6 +425,176 @@
   min-width: 0;
   max-width: 100%;
   overflow-wrap: anywhere;
+}
+
+/* ------------------------------------------------------------------ *
+ * 4a. Parameteransicht – Abstandsrhythmus und volle Zeilen für Banner
+ * ------------------------------------------------------------------ */
+
+/* Ein durchgehendes Abstandsmaß für alle drei Zustände. Zu wenig Rand lässt
+   Schrift an der Kante kleben, zu viel verschenkt Fläche; 14 Pixel außen und
+   12 Pixel zwischen den Karten halten beides im Gleichgewicht. Nach unten
+   kommt mehr, damit die letzte Karte nicht an der Dialogkante klebt. */
+.auto-plan-dialog[data-v10-layout="1"] #autoPlanConfig,
+.auto-plan-dialog[data-v10-layout="1"] #autoPlanStage,
+.auto-plan-dialog[data-v10-layout="1"] #autoPlanResult {
+  gap: 12px;
+  padding: 14px 14px 20px;
+}
+
+/* Das Engine-Band und der Null-Rot-Guardrail standen in impliziten
+   Gitterzeilen ohne Bereichszuweisung. Weil beide ihren Inhalt beschneiden,
+   trugen sie zur Zeilenhöhe nur ihren Innenabstand bei — die Zeile wurde
+   42 beziehungsweise 54 Pixel hoch, während der Inhalt knapp 300 brauchte.
+   Sichtbar war davon die erste Zeile, der Rest war fort. Beide bekommen
+   deshalb eine eigene Zeile über die volle Breite und eine Mindesthöhe, die
+   ihr Inhalt bestimmt. */
+.auto-plan-dialog[data-v10-layout="1"] #autoPlanConfig {
+  grid-template-areas:
+    "hero limits"
+    "validation limits"
+    "engine engine"
+    "guardrail guardrail";
+  /* Die beiden Bannerzeilen bekommen ausdrücklich die Höhe ihres Inhalts.
+     Ohne diese Angabe blieb die Engine-Zeile 32 Pixel hoch, das Band ragte
+     darüber hinaus und legte sich über den Guardrail darunter. */
+  grid-template-rows: auto auto max-content max-content;
+}
+
+.auto-plan-dialog[data-v10-layout="1"] #autoPlanConfig > #autoPlanV8Ribbon,
+.auto-plan-dialog[data-v10-layout="1"] #autoPlanConfig > .auto-plan-v85-ribbon {
+  grid-area: engine;
+  min-height: max-content;
+}
+
+.auto-plan-dialog[data-v10-layout="1"] #autoPlanConfig > .auto-plan-zero-red-guardrail {
+  grid-area: guardrail;
+  min-height: max-content;
+}
+
+@media (max-width: 940px) {
+  .auto-plan-dialog[data-v10-layout="1"] #autoPlanConfig {
+    grid-template-areas:
+      "hero"
+      "limits"
+      "validation"
+      "engine"
+      "guardrail";
+  }
+}
+
+/* `clip` beschneidet den Schmuck genauso wie `hidden`, macht den Kasten aber
+   nicht zum Scrollcontainer — nur so bleibt seine automatische Mindesthöhe
+   erhalten, und genau daran hing der Fehler oben. Bewusst nur für die beiden
+   Banner mit dekorativem Überstand, nicht für alle Karten. */
+.auto-plan-dialog[data-v10-layout="1"] #autoPlanV8Ribbon,
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-zero-red-guardrail {
+  overflow: clip;
+}
+
+/* Innenabstand der Karten: Text darf die Kante nicht berühren. */
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-card,
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-panel {
+  padding-inline: 14px;
+}
+
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-section-title {
+  padding-block: 10px;
+}
+
+/* ------------------------------------------------------------------ *
+ * 4b. Laufkonsole – jede Zeile behält ihre Höhe
+ * ------------------------------------------------------------------ */
+
+/* Die Konsole ist eine Spalte mit fester Außenhöhe. Ohne ausdrückliche
+   Flex-Angabe schrumpft jedes Kind (Vorgabe `flex-shrink: 1`) — die
+   Strangleiste und die alte Phasenliste fielen dadurch auf null Pixel
+   zusammen, behielten aber ihren sichtbaren Inhalt und malten ihn über die
+   Stufenleiste darunter. Genau das war die gemeldete Überlagerung.
+   Deshalb: Alles behält seine Eigenhöhe, allein das Protokoll teilt sich den
+   Rest, und die Konsole selbst scrollt. */
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-console > * {
+  flex: 0 0 auto;
+  min-height: auto;
+}
+
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-console > .auto-plan-log {
+  flex: 1 1 auto;
+  min-height: 132px;
+}
+
+/* Zonen ohne eigene Aussage in v10 verschwinden ganz, statt als leere
+   Null-Höhen-Kästen zwischen den übrigen zu stehen: Die Stufenliste der
+   Engine steht bereits als Stufenleiste darunter. */
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-console > #autoPlanPhaseList {
+  display: none;
+}
+
+/* Die Strangleiste bleibt — sie zeigt die parallelen Suchstränge — bekommt
+   aber ihre tatsächliche Höhe und einen Abstand nach unten. */
+.auto-plan-dialog[data-v10-layout="1"] #autoPlanV8Lanes {
+  overflow: hidden;
+  padding-bottom: 2px;
+}
+
+/* Stufenleiste: bricht um, statt acht Kacheln in eine 28-Pixel-Zeile zu
+   pressen. Zwei Zeilen zu je vier sind lesbar, eine Zeile zu acht nicht. */
+.auto-plan-dialog[data-v10-layout="1"] #autoPlanV85Theatre ol {
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  row-gap: 6px;
+}
+
+.auto-plan-dialog[data-v10-layout="1"] #autoPlanV85Theatre {
+  overflow: visible;
+}
+
+/* ------------------------------------------------------------------ *
+ * 4c. Ergebnisansicht – nichts wird gequetscht, die Zone scrollt
+ * ------------------------------------------------------------------ */
+
+/* `align-content: start` verhindert, dass das Gitter seine Zeilen an die
+   Zonenhöhe anpasst; `grid-auto-rows: max-content` gibt jeder Karte genau die
+   Höhe ihres Inhalts. Der Überlauf landet damit zuverlässig in der
+   Bildlaufleiste der Ergebniszone statt im Nichts. */
+.auto-plan-dialog[data-v10-layout="1"] #autoPlanResult {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-auto-rows: max-content;
+  align-content: start;
+  padding-inline: 2px;
+  padding-block-end: 8px;
+}
+
+.auto-plan-dialog[data-v10-layout="1"] #autoPlanResult > * {
+  min-height: auto;
+}
+
+/* Die Vorschlagstabelle ist der eigentliche Ertrag des Laufs. Sie bekommt
+   sichtbare Höhe und eine eigene senkrechte Bildlaufleiste, damit die
+   nachfolgenden Abschnitte erreichbar bleiben, ohne dass die Tabelle auf
+   wenige Zeilen zusammenfällt. */
+.auto-plan-dialog[data-v10-layout="1"] #autoPlanChangeList {
+  max-height: min(58vh, 620px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  border-radius: 10px;
+}
+
+.auto-plan-dialog[data-v10-layout="1"] #autoPlanLoadTable {
+  max-height: min(42vh, 420px);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+/* Der Suchnachweis stand als einzeilige Kachelreihe da, deren Werte unter der
+   Beschriftung abgeschnitten wurden. */
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-search-metrics {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-search-metrics > div {
+  min-height: auto;
+  overflow: visible;
 }
 
 /* ------------------------------------------------------------------ *
@@ -452,6 +683,23 @@
   line-height: 1.45;
   background: color-mix(in oklab, var(--orange, #d98324) 12%, transparent);
   overflow-wrap: anywhere;
+}
+
+/* Die Statusmarken der Vorschlagstabelle trugen ihre reine Signalfarbe als
+   Schrift auf einer nur 14 % eingefärbten Fläche. Gemessen 3,8:1 bis 4,2:1 —
+   knapp unter der Stufe AA. Die Fläche bleibt hell, die Schrift wird auf einen
+   dunkleren Ton derselben Farbe gelegt: Das Signal bleibt erkennbar, der Text
+   wird lesbar. */
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-row-status.yellow {
+  color: color-mix(in oklab, var(--yellow) 62%, #3a2a00 38%);
+}
+
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-row-status.orange {
+  color: color-mix(in oklab, var(--orange) 68%, #3a1f00 32%);
+}
+
+.auto-plan-dialog[data-v10-layout="1"] .auto-plan-row-status.red {
+  color: color-mix(in oklab, var(--red) 74%, #340d0d 26%);
 }
 
 /* ------------------------------------------------------------------ *
@@ -628,4 +876,61 @@ html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-scorecard > * {
 html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-guardrail-flow > li small,
 html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-switch small {
   color: var(--v85-muted);
+}
+
+/* Zweite gemessene Runde: Lauf- und Ergebnisansicht.
+ *
+ * Diese Bausteine waren in der ersten Runde nicht erfasst, weil die
+ * Kontrastmessung den Dialog nur im Parameterzustand sah. Der erweiterte Test
+ * durchläuft jetzt alle drei Zustände und fand 70 Stellen mit 1,06:1 bis
+ * 1,74:1 — heller Text auf fest verdrahteter heller Fläche, praktisch
+ * unsichtbar. Auch hier gilt: Fläche und Schrift gemeinsam umstellen. */
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-phase-narrative,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-engine-badge,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-live-metrics > div,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-search-metrics > div,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-run-config span,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-red-item,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-red-review,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-confirm-red,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-comment-label,
+html[data-color-scheme="dark"] .auto-plan-dialog #autoPlanConfirmNote {
+  background-color: color-mix(in oklab, var(--v85-surface-muted) 88%, transparent);
+  color: var(--v85-text);
+  border-color: color-mix(in oklab, var(--v85-border) 66%, transparent);
+}
+
+/* Beschriftungen innerhalb dieser Bausteine: gedämpft, aber lesbar. */
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-live-metrics span,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-search-metrics span,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-run-config span,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-phase-narrative > span,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-phase-narrative small,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-engine-badge span,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-red-item time,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-red-item ul,
+html[data-color-scheme="dark"] .auto-plan-dialog #autoPlanConfirmNote {
+  color: var(--v85-muted, #b7c1cb);
+}
+
+/* Werte und Namen dagegen in voller Tinte — sie tragen die Aussage. */
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-live-metrics strong,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-search-metrics strong,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-run-config b,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-phase-narrative strong,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-red-item strong,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-red-item li,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-red-item-actions label,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-red-item-actions button {
+  color: var(--v85-text, #e6edf3);
+}
+
+/* Die roten Marken behalten ihre Signalfarbe, bekommen aber eine dunkle
+   Unterlage: Ein rotes Wort auf hellrotem Grund ist im Dunkelmodus sonst
+   ebenso unlesbar wie zuvor. */
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-red-item-main > span,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-red-review-head > strong {
+  background-color: color-mix(in oklab, var(--red) 26%, #10161d 74%);
+  color: #ffd9d9;
+  border-color: color-mix(in oklab, var(--red) 46%, transparent);
 }
