@@ -99,13 +99,14 @@ test('Werkzeugleiste ist semantisch gruppiert und das Farbbadge bleibt frei vom 
   await expect(toolbar).toBeVisible();
   await expect(toolbar.locator('.toolbar-section')).toHaveCount(3);
   await expect(toolbar.locator('.toolbar-section-label')).toHaveText(['Planung', 'Daten', 'Ausgabe']);
-  await expect(toolbar.locator('.toolbar-section .tool-action')).toHaveCount(11);
+  // Zehn statt elf: Excel- und JSON-Import teilen sich einen Eingang.
+  await expect(toolbar.locator('.toolbar-section .tool-action')).toHaveCount(10);
   await expect(toolbar.locator('#autoPlanBtn')).toBeVisible();
   await expect(toolbar.locator('#autoPlanBtn .tool-icon')).toHaveCount(1);
   await expect(toolbar.locator('#toolbarOverflowBtn')).toHaveCount(1);
   await expect(page.locator('#todayBtn .tool-icon')).toHaveCount(1);
   await expect(page.locator('#clearMonthBtn')).toHaveClass(/tool-action--danger/);
-  await expect(page.locator('#excelImportInput').locator('xpath=..')).toHaveAttribute('aria-label', 'Excel-Datei importieren');
+  await expect(page.locator('#dataImportInput').locator('xpath=..')).toHaveAttribute('aria-label', 'Datei importieren – Excel, PDF oder JSON-Sicherung');
   const gear = toolbar.locator('#settingsBtn');
   await expect(gear).toBeVisible();
   await expect(gear).toHaveClass(/tool-action--pinned/);

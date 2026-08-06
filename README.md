@@ -22,8 +22,10 @@ DienstplanRAD verbindet kontrollierbare manuelle Monatsplanung mit einer bestät
 - regelgestützte Kandidatenlisten mit Grün/Gelb/Orange/Rot/Grau und vollständiger Begründung;
 - Abwesenheiten, Dienstwünsche, Optionen, Notizen und revisionsfähige Ausnahmebestätigungen;
 - Monatsstatistik, Sollvergleich, Wochenendäquivalente und offene Punkte;
-- Excel-/JSON-Import, Excel-/PDF-/JSON-Export — der Ausdruck passt garantiert auf
-  **eine** DIN-A4-Seite hochkant (siehe §5.1);
+- **ein Import für alle Dateien** — Excel-Mappen, PDF-Ausdrucke und
+  JSON-Sicherungen über dieselbe Schaltfläche (siehe §5.2);
+- Excel-/PDF-/JSON-Export — der Ausdruck passt garantiert auf **eine**
+  DIN-A4-Seite hochkant (siehe §5.1);
 - server-first Synchronisierung mit lokaler Offline-Sicherung;
 - Auto-Plan Studio für Konfiguration, laufende Beobachtung, vollständige Vorschlagsprüfung und atomare Übernahme.
 
@@ -382,6 +384,42 @@ Mitarbeitenden, langen externen Namen und voller Belegung, muss der Seitenbaum
 genau eine Seite enthalten — mit dem eigenen Satzspiegel und mit dem, den Chrome
 bei eingeschalteten Kopf- und Fußzeilen übrig lässt.
 
+### 5.2 Ein Import für alle Dateien
+
+Wer eine Datei hat, will sie importieren — und nicht zuvor entscheiden, welcher
+Knopf für sie zuständig ist. Die frühere Trennung in „Excel importieren“ und
+„JSON laden“ ist deshalb einer einzigen Schaltfläche gewichen. Die Endung und,
+wo sie lügt, die Dateisignatur entscheiden über den Weg.
+
+| Datei | Inhalt | Übernommen wird |
+|---|---|---|
+| Jahresmappe `.xlsx` | zwölf Monatsblätter, Personen in Zeilen, Tage in Spalten | BD, HG und Abwesenheiten |
+| Monatsplan `.xlsx` | Tag, Wochentag, BD, HG, RBN, 2. RBN | alle vier Felder |
+| Monatsplan `.pdf` | derselbe Plan als Ausdruck | alle vier Felder |
+| Neuroradiologie-Hintergrunddienstplan `.pdf`/`.xlsx` | Datum, Wochentag, 1. Dienst, 2. Dienst | **nur** 1. und 2. RBN |
+| Sicherung `.json` | vollständiger Stand | Gesamtwiederherstellung |
+
+**Wie ein PDF zur Tabelle wird.** Ein PDF kennt keine Tabellen, sondern
+Zeichenfolgen mit Koordinaten. `js/pdf-import.js` baut daraus wieder Zeilen und
+Spalten: Zeilen aus gleicher Grundlinie, Spalten aus wiederkehrenden
+*Mittelpunkten*. Die linke Kante taugt dafür nicht — bei zentriertem Zelltext
+wandert sie mit der Wortlänge, und ein kurzer Wochentag landet in der
+Nachbarspalte. Beide Schwellen (Zeilentoleranz, Spaltenabstand) leiten sich aus
+den Daten ab, nicht aus geratenen Konstanten.
+
+Das Auslesen selbst übernimmt pdf.js, nachgeladen bei Bedarf wie die
+Tabellenbibliothek. Die Rekonstruktion dagegen ist reine Rechnerei und deshalb
+in Node prüfbar: `tests/pdf-import.test.js` arbeitet mit den echten
+Textelementen zweier realer Ausdrucke.
+
+**Der Neuroradiologieplan** trägt nur die beiden Rufbereitschaften; BD und HG
+kommen darin nicht vor und bleiben beim Import unangetastet. Sein Kopf nennt
+den Monat als „Juli 26“ — zweistellig und damit für die Jahreserkennung
+unbrauchbar. Verlässlich ist die Datumsspalte, und genau daraus kommt der Monat.
+
+Am Verhalten nach dem Lesen ändert sich nichts: Derselbe Vorabbericht, dieselbe
+Rückfrage vor dem Ersetzen bestehender Werte, dieselbe atomare Übernahme.
+
 ## 6. Performance für Windows 11 und Chrome
 
 - rechenintensive Konstruktion und Perfektion in Modul-Web-Workern;
@@ -508,6 +546,8 @@ tests/e2e/v8-5-shell.spec.js       Browser-, Bootstrap- und Observer-Regressione
 tests/e2e/layout-contrast-v10-5.spec.js  Überlappungsfreiheit und WCAG-AA-Kontrast
 tests/e2e/studio-layout-v10-5.spec.js    Layoutvertrag der drei Studiozustände
 tests/e2e/print-single-page.spec.js      Ein Monat, eine A4-Seite (gemessen am PDF)
+js/file-import.js                        ein Eingang für Excel, PDF und JSON
+js/pdf-import.js                         Textpositionen zu Tabellenzeilen (pdf.js)
 tests/e2e/helpers/contrast.js            gemeinsame WCAG-Kontrastmessung
 ```
 

@@ -7,7 +7,7 @@ import { holidayName as getSaxonyHolidayName, isFirstRegularWorkdayAfter, parseI
 import { assignmentLabel, buildStats, clearedMonthData, collectIssues, evaluateCandidate, fmtGermanDate, getAbsence, getAbsenceSource, getAssignment, getEffectiveAbsence, getPlanningStaff, getOptions, getRoleProperties, getPreference, getStaffById, isExternalAssignment, labelForAbsence, labelForOption, labelForPreference, monthContentSummary, setAbsence, setAssignment, setOptions, setPreference, toggleOption, weekdayLabel } from './rules.js?v=20260806.1';
 import { getRbnOptions, isRbnValueAllowed, isSecondRbnAvailable, rbnDisplayName } from './rbn.js?v=20260806.1';
 import { additionalReasons, buildPickerModel, filterPickerModel, flattenPickerModel, loadSummary, nextSelectableIndex, primaryReason } from './picker-view.js?v=20260806.1';
-import { analyzeWorkbook } from './excel-import.js?v=20260806.1';
+import { readPlanFile } from './file-import.js?v=20260806.1';
 import { applyApplicationSettings } from './app-settings.js?v=20260806.1';
 
 const $ = selector => document.querySelector(selector);
@@ -136,7 +136,7 @@ function bindEvents() {
   $('#conflictDialog').addEventListener('close', () => { pendingConflict = null; });
   $('#pickerSearch').addEventListener('input', renderPickerList);
   $('#pickerSearch').addEventListener('keydown', onPickerSearchKeydown);
-  $('#excelImportInput').addEventListener('change', onExcelImport);
+  $('#dataImportInput').addEventListener('change', onFileImport);
   $('#exportExcelBtn').addEventListener('click', exportCurrentMonthToExcel);
   // Safari kennt kein `beforeprint`; deshalb wird beim Export zusätzlich
   // ausdrücklich vorbereitet und nach der Rückkehr aus dem Dialog aufgeräumt.
@@ -148,7 +148,6 @@ function bindEvents() {
   window.addEventListener('beforeprint', prepareForPrint);
   window.addEventListener('afterprint', restoreAfterPrint);
   $('#exportJsonBtn').addEventListener('click', exportJsonBackup);
-  $('#jsonImportInput').addEventListener('change', onJsonImport);
 }
 
 /**
@@ -1211,27 +1210,48 @@ async function releaseLegacyServiceWorker() {
 // höchstens einmal pro Tab (Marke in sessionStorage, vor dem Neuladen gesetzt)
 // und vor jeder eigenen Anfrage – init() bricht dafür oben ab.
 
-async function onExcelImport(event) {
+/**
+ * Ein Eingang für alle Dateien. Die Endung entscheidet über den Weg: Eine
+ * JSON-Sicherung stellt den Gesamtstand wieder her, Excel und PDF liefern
+ * Monatspläne in dieselbe Prüf- und Übernahmestrecke.
+ */
+async function onFileImport(event) {
   const file = event.target.files?.[0];
   if (!file) return;
   const reset = () => { event.target.value = ''; };
-  if (!window.XLSX) { alert('Excel-Bibliothek noch nicht geladen.'); reset(); return; }
-  let workbook;
-  // cellDates: Kopfzeilen tragen den Monat teils als echtes Datum statt als Text.
-  try { workbook = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true }); }
-  catch (error) { alert(`Excel-Datei konnte nicht gelesen werden: ${error.message}`); reset(); return; }
 
-  const sheets = workbook.SheetNames.map(name => ({
-    name,
-    rows: XLSX.utils.sheet_to_json(workbook.Sheets[name], { header: 1, defval: '', raw: true })
-  }));
-  const { imports, ignoredSheets } = analyzeWorkbook(sheets, {
-    staff: state.staff,
-    fallbackYear: state.currentYear,
-    fallbackMonth: state.currentMonth
-  });
+  let read;
+  try {
+    read = await readPlanFile(file, {
+      staff: state.staff,
+      fallbackYear: state.currentYear,
+      fallbackMonth: state.currentMonth,
+      // Die Tabellenbibliothek liegt global; `cellDates`, weil Kopfzeilen den
+      // Monat teils als echtes Datum statt als Text tragen.
+      readWorkbook: window.XLSX
+        ? buffer => {
+          const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
+          return workbook.SheetNames.map(name => ({
+            name,
+            rows: XLSX.utils.sheet_to_json(workbook.Sheets[name], { header: 1, defval: '', raw: true })
+          }));
+        }
+        : null
+    });
+  } catch (error) {
+    alert(error.message);
+    reset();
+    return;
+  }
+
+  if (read.kind === 'json') {
+    await restoreBackup(read.buffer, reset);
+    return;
+  }
+
+  const { imports, ignoredSheets } = read;
   if (!imports.length) {
-    alert(`Kein auswertbares Blatt gefunden.\n\nUnterstützt werden Jahresmappen mit Monatsblättern (${SHEET_NAMES.join(', ')}) und einzelne Monatspläne mit den Spalten Tag, Wochentag, BD, HG, RBN und 2. RBN.\n\nÜbersprungen: ${ignoredSheets.join(', ') || '–'}`);
+    alert(`Kein auswertbarer Inhalt gefunden.\n\nUnterstützt werden Jahresmappen mit Monatsblättern (${SHEET_NAMES.join(', ')}), einzelne Monatspläne mit den Spalten Tag, Wochentag, BD, HG, RBN und 2. RBN sowie der Hintergrunddienstplan der Neuroradiologie mit Datum, 1. Dienst und 2. Dienst — als Excel-Mappe wie als PDF-Ausdruck.\n\nÜbersprungen: ${ignoredSheets.join(', ') || '–'}`);
     reset();
     return;
   }
@@ -1263,8 +1283,8 @@ async function onExcelImport(event) {
   const unsafeTargets = imports.filter(item => !isMonthMergeSafe(item.year, item.month));
   if (unsafeTargets.length) {
     const labels = unsafeTargets.map(item => `${item.sheetName} ${item.year}`).join(', ');
-    setStatus('offline', 'Excel-Import abgebrochen – Zielmonat nicht verlässlich geladen');
-    alert(`Excel-Import abgebrochen. Für ${labels} konnte weder ein aktueller Serverstand noch ein ausdrücklich unsynchronisierter lokaler Arbeitsstand bestätigt werden. Bestehende Serverwerte werden deshalb nicht mit einem möglicherweise veralteten oder leeren Ersatzstand überschrieben.`);
+    setStatus('offline', 'Import abgebrochen – Zielmonat nicht verlässlich geladen');
+    alert(`Import abgebrochen. Für ${labels} konnte weder ein aktueller Serverstand noch ein ausdrücklich unsynchronisierter lokaler Arbeitsstand bestätigt werden. Bestehende Serverwerte werden deshalb nicht mit einem möglicherweise veralteten oder leeren Ersatzstand überschrieben.`);
     reset();
     return;
   }
@@ -1293,15 +1313,15 @@ async function onExcelImport(event) {
     if (item.skippedAbsenceNames.length) notes.push(`Abwesenheiten ohne bekannte Person übersprungen: ${item.skippedAbsenceNames.join(', ')}`);
     summaries.push(notes.join('; '));
   }
-  if (!touched.size) { alert(`Excel-Import ohne Änderungen beendet.\n\n${summaries.join('\n')}`); reset(); return; }
+  if (!touched.size) { alert(`Import ohne Änderungen beendet.\n\n${summaries.join('\n')}`); reset(); return; }
 
   const saveResults = await Promise.all([...touched.values()].map(async ([year, month]) => ({ year, month, result: await persistMonth(year, month) })));
   const failed = saveResults.filter(item => !item.result.ok);
-  if (failed.length) setStatus('offline', `Excel lokal importiert – ${failed.length} Serverfehler`);
+  if (failed.length) setStatus('offline', `Datei lokal importiert – ${failed.length} Serverfehler`);
   else if (state.dirty) setStatus('saving', 'Weitere Änderungen ausstehend …');
-  else setStatus('saved', 'Excel-Import gespeichert');
+  else setStatus('saved', 'Import gespeichert');
   render();
-  alert(`Excel-Import abgeschlossen.\n\n${summaries.join('\n')}\n\n${failed.length ? `Nur lokal gesichert für: ${failed.map(item => `${item.year}-${String(item.month).padStart(2, '0')}`).join(', ')}.` : 'Alle betroffenen Monate wurden lokal und auf dem Server gespeichert.'}`);
+  alert(`Import abgeschlossen.\n\n${summaries.join('\n')}\n\n${failed.length ? `Nur lokal gesichert für: ${failed.map(item => `${item.year}-${String(item.month).padStart(2, '0')}`).join(', ')}.` : 'Alle betroffenen Monate wurden lokal und auf dem Server gespeichert.'}`);
   reset();
 }
 
@@ -1363,12 +1383,15 @@ async function exportJsonBackup() {
   triggerDownload(blob, `dienstplanrad_backup_${stamp}.json`);
 }
 
-async function onJsonImport(event) {
-  const file = event.target.files?.[0];
-  if (!file) return;
+/**
+ * Vollständige Sicherung wiederherstellen. Kommt aus demselben Dateidialog wie
+ * die Monatspläne, geht aber einen eigenen Weg: Eine Sicherung ersetzt den
+ * Gesamtstand, sie wird nicht in einen Monat gemischt.
+ */
+async function restoreBackup(buffer, reset) {
   let payload;
-  try { payload = normalizeBackupPayload(JSON.parse(await file.text()), { strict: true }); }
-  catch (error) { alert(`JSON-Sicherung konnte nicht gelesen werden: ${error.message}`); event.target.value = ''; return; }
+  try { payload = normalizeBackupPayload(JSON.parse(new TextDecoder().decode(buffer)), { strict: true }); }
+  catch (error) { alert(`JSON-Sicherung konnte nicht gelesen werden: ${error.message}`); reset(); return; }
 
   // Bereits gestartete ältere Monats-PUTs müssen beendet sein, bevor der
   // Gesamtimport schreibt; andernfalls könnte ein später eintreffender alter PUT
@@ -1401,7 +1424,7 @@ async function onJsonImport(event) {
     alert(`Die Sicherung wurde lokal übernommen, der Serverimport wurde zurückgerollt: ${error.message}`);
   }
   render();
-  event.target.value = '';
+  reset();
 }
 
 function triggerDownload(blob, filename) {

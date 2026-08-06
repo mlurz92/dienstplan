@@ -32,8 +32,7 @@ export const TOOLBAR_GROUPS = Object.freeze([
     label: 'Daten',
     items: Object.freeze([
       Object.freeze({ id: 'reloadBtn', label: 'Serverstand neu laden', shortLabel: 'Neu laden', icon: 'refresh', tone: 'quiet' }),
-      Object.freeze({ id: 'excelImportInput', label: 'Excel-Datei importieren', shortLabel: 'Excel importieren', icon: 'import', hostSelector: 'label' }),
-      Object.freeze({ id: 'jsonImportInput', label: 'JSON-Sicherung laden', shortLabel: 'JSON laden', icon: 'restore', hostSelector: 'label' })
+      Object.freeze({ id: 'dataImportInput', label: 'Datei importieren – Excel, PDF oder JSON-Sicherung', shortLabel: 'Importieren', icon: 'import', hostSelector: 'label' })
     ])
   }),
   Object.freeze({

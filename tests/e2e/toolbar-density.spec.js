@@ -123,7 +123,8 @@ test('das Überlaufmenü zeigt die ausgelagerten Aktionen vollständig beschrift
   await trigger.click();
   await expect(panel).toBeVisible();
   await expect(trigger).toHaveAttribute('aria-expanded', 'true');
-  await expect(panel.locator('.tool-action')).toHaveCount(6);
+  // Fünf statt sechs: Excel- und JSON-Import teilen sich einen Eingang.
+  await expect(panel.locator('.tool-action')).toHaveCount(5);
   await expect(panel).toContainText('Neu laden');
   await expect(panel).toContainText('PDF');
   // Die Einstellungen wandern nicht mehr ins Menü: Das Zahnrad bleibt auch in

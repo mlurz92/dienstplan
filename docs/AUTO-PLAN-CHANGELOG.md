@@ -133,6 +133,29 @@ dunklem Grund (gemessene 1,3:1).
   belegt, dass es keine bloßen Bezeichner mehr enthält und die WASM-Datei
   danebenliegt.
 
+### Dateiimport vereinheitlicht, PDF kommt hinzu
+
+- **Eine Schaltfläche für alle Dateien.** „Excel importieren“ und „JSON laden“
+  waren getrennt, PDF gab es gar nicht. Jetzt entscheidet die Endung — und wo
+  sie lügt, die Dateisignatur: Ein PDF, das jemand `.xls` genannt hat, bleibt
+  ein PDF.
+- **PDF-Import** über pdf.js, nachgeladen bei Bedarf wie die
+  Tabellenbibliothek. `js/pdf-import.js` baut aus Textpositionen wieder Zeilen
+  und Spalten — Zeilen aus gleicher Grundlinie, Spalten aus wiederkehrenden
+  Mittelpunkten. Die linke Kante taugt dafür nicht: Bei zentriertem Zelltext
+  wandert sie mit der Wortlänge, und der Wochentag landete in der Nachbarspalte.
+- **Neuroradiologie-Hintergrunddienstplan** (`Datum | Wochentag | 1. Dienst |
+  2. Dienst | Sonstiges`) wird erkannt und liefert **ausschließlich** die beiden
+  Rufbereitschaften; BD und HG bleiben unangetastet. Der Monat kommt aus der
+  Datumsspalte, nicht aus dem Kopf — dort steht er nur zweistellig („Juli 26“).
+- Die Trennung zwischen Auslesen (Browser, pdf.js) und Rekonstruktion (reine
+  Rechnerei) macht den Importpfad in Node prüfbar. `tests/pdf-import.test.js`
+  arbeitet mit den echten Textelementen zweier realer Ausdrucke, nicht mit
+  erfundenen Beispielen.
+- Nachgewiesen an allen beigelegten Beispieldateien: Jahresmappe 2026 (zwölf
+  Monatsblätter mit Diensten und Abwesenheiten), zwei Monatsmappen, vier
+  PDF-Ausdrucke und der Neuroradiologieplan.
+
 ### Druckbild und Testumfang
 
 - **Das gewohnte Satzbild ist wiederhergestellt.** Die Kopfzeile
