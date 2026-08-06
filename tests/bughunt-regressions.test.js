@@ -235,11 +235,11 @@ test('Excel-Merge ist nur mit bestätigtem Serverstand oder bewusstem Dirty-Loka
   assert.equal(module.isMonthMergeSafe(2026, 8), true);
 });
 
-test('Excel-Import bricht vor dem Merge ab, wenn ein Zielmonat nicht verlässlich geladen wurde', async () => {
+test('Der Dateiimport bricht vor dem Merge ab, wenn ein Zielmonat nicht verlässlich geladen wurde', async () => {
   const source = await readFile(new URL('../js/app.js', import.meta.url), 'utf8');
   const guard = source.indexOf('const unsafeTargets = imports.filter');
   const merge = source.indexOf('const merge = mergeMonthData(targetMonth, item.monthData)');
   assert.ok(guard >= 0 && merge > guard);
-  assert.match(source, /Excel-Import abgebrochen – Zielmonat nicht verlässlich geladen/);
+  assert.match(source, /Import abgebrochen – Zielmonat nicht verlässlich geladen/);
 });
 

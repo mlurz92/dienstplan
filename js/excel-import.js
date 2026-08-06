@@ -68,6 +68,18 @@ const text = value => {
 const normalize = value => text(value).replace(/\s+/g, ' ').trim().toLowerCase();
 const withoutSalutation = value => normalize(value).replace(SALUTATIONS, '').trim();
 
+/** Vollständiges deutsches Datum `TT.MM.JJJJ` einer Zelle, sonst null. */
+function germanDate(value) {
+  if (value instanceof Date) {
+    return { year: value.getFullYear(), month: value.getMonth() + 1, day: value.getDate() };
+  }
+  const match = text(value).trim().match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+  if (!match) return null;
+  const [, day, month, year] = match.map(Number);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  return { year, month, day };
+}
+
 function parseDayNumber(value) {
   if (value instanceof Date) return value.getDate();
   const match = text(value).trim().match(/^(\d{1,2})/);
@@ -296,6 +308,70 @@ export function parsePlanSheet(sheetName, rows, { staff = [], fallbackYear, fall
 }
 
 /**
+ * Hintergrunddienstplan der Neuroradiologie.
+ *
+ * Aufbau: `Datum | Wochentag | 1. Dienst | 2. Dienst | Sonstiges`. Er trägt
+ * ausschließlich die beiden Rufbereitschaften — die Dienstspalten des eigenen
+ * Plans kommen darin nicht vor. Übernommen werden deshalb nur `rbn1` und
+ * `rbn2`; alles andere bleibt unberührt.
+ *
+ * Monat und Jahr stehen im Kopf als „Juli 26“ — zweistellig und damit für die
+ * Jahreserkennung unbrauchbar. Verlässlich ist die Datumsspalte selbst: Jede
+ * Zeile trägt ihr vollständiges Datum. Maßgeblich ist der Monat der ersten
+ * lesbaren Zeile; Zeilen aus anderen Monaten werden übergangen, statt still in
+ * den falschen Monat zu wandern.
+ */
+export function parseNeuroSheet(sheetName, rows, { fallbackYear, fallbackMonth } = {}) {
+  const headerIndex = (rows || []).findIndex(row => {
+    const cells = (row || []).map(normalize);
+    return cells.some(cell => /^1\.\s*dienst$/.test(cell)) && cells.some(cell => /^2\.\s*dienst$/.test(cell));
+  });
+  if (headerIndex < 0) return null;
+  const header = (rows[headerIndex] || []).map(normalize);
+  const columns = {
+    date: header.findIndex(cell => /^datum$/.test(cell)),
+    rbn1: header.findIndex(cell => /^1\.\s*dienst$/.test(cell)),
+    rbn2: header.findIndex(cell => /^2\.\s*dienst$/.test(cell))
+  };
+  if (columns.date < 0) columns.date = 0;
+
+  const dataRows = rows.slice(headerIndex + 1);
+  const dated = dataRows
+    .map(row => ({ row, date: germanDate(row?.[columns.date]) }))
+    .filter(entry => entry.date);
+  const first = dated[0]?.date;
+  const year = first?.year || fallbackYear;
+  const month = first?.month || fallbackMonth;
+  if (!year || !month) return null;
+
+  const result = emptyResult(sheetName, year, month);
+  result.usedFallbackYear = !first?.year;
+  result.usedFallbackMonth = !first?.month;
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const seenDays = new Set();
+
+  for (const { row, date } of dated) {
+    if (date.year !== year || date.month !== month) continue;
+    if (date.day > daysInMonth || seenDays.has(date.day)) continue;
+    const rbn1Raw = columns.rbn1 >= 0 ? text(row[columns.rbn1]).trim() : '';
+    const rbn2Raw = columns.rbn2 >= 0 ? text(row[columns.rbn2]).trim() : '';
+    if (!rbn1Raw && !rbn2Raw) continue;
+    seenDays.add(date.day);
+    const iso = toIsoDate(year, month, date.day);
+    if (rbn1Raw) {
+      result.monthData.days[iso].rbn1 = resolveRbnValue('rbn1', iso, rbn1Raw);
+      result.rbnValues += 1;
+    }
+    if (rbn2Raw) {
+      result.monthData.days[iso].rbn2 = resolveRbnValue('rbn2', iso, rbn2Raw);
+      result.rbnValues += 1;
+    }
+  }
+  if (!seenDays.size) return null;
+  return result;
+}
+
+/**
  * Gesamte Mappe auswerten. `sheets` ist eine Liste aus `{ name, rows }`.
  * Monatsblätter einer Jahresmappe haben Vorrang; jedes andere Blatt wird als
  * Einzelmonatsplan versucht.
@@ -310,10 +386,14 @@ export function analyzeWorkbook(sheets, { staff = [], fallbackYear, fallbackMont
     // Ein Monatsblatt heißt „April“, ein Einzelplan darf aber ebenso heißen:
     // Ohne den zweiten Versuch fiel ein vollständig lesbarer Einzelplan allein
     // wegen seines Namens aus dem Import heraus.
+    // Der Neuroradiologieplan steht vorn: Seine Kopfzeile ist eindeutig, und
+    // keiner der beiden anderen Parser erkennt ihn — er fiele sonst durch.
     const parsers = monthFromSheetName(name)
-      ? [() => parseMatrixSheet(name, rows, { staff, fallbackYear }),
+      ? [() => parseNeuroSheet(name, rows, { fallbackYear, fallbackMonth: monthFromSheetName(name) || fallbackMonth }),
+         () => parseMatrixSheet(name, rows, { staff, fallbackYear }),
          () => parsePlanSheet(name, rows, { staff, fallbackYear, fallbackMonth: monthFromSheetName(name) || fallbackMonth })]
-      : [() => parsePlanSheet(name, rows, { staff, fallbackYear, fallbackMonth }),
+      : [() => parseNeuroSheet(name, rows, { fallbackYear, fallbackMonth }),
+         () => parsePlanSheet(name, rows, { staff, fallbackYear, fallbackMonth }),
          () => parseMatrixSheet(name, rows, { staff, fallbackYear })];
 
     let parsed = null;
