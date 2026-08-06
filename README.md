@@ -7,7 +7,7 @@
 <p align="center"><strong>Regelgestützte Monatsplanung für Bereitschaftsdienst, Hintergrunddienst und neuroradiologische Rufbereitschaft</strong></p>
 
 > **Paketversion:** `0.10.5`  
-> **Regelwerk:** Eignungsregeln `v4.10`  
+> **Regelwerk:** Eignungsregeln `v4.11`  
 > **Auto-Plan:** Algorithmus `v10` — *Exact Boolean Rostering Core* (boolesches CP-SAT-Modell, lexikografische Leximin-Kaskade, Heuristik als Warmstart und Rückfallebene)  
 > **Feiertagsregion:** Sachsen (`SN`)  
 > **Betrieb:** Cloudflare Pages · Pages Functions · Workers KV · lokale Browser-Sicherung
@@ -514,6 +514,25 @@ Modell, Brücke und Orchestrierung sind seither drei getrennte Module.
   Einstellungs-Reitern und Dropdown-Menüs sind behoben.
 - **Korrigierte Becker-FZA-Ableitung** in `rules-core.js` wirkt konsistent in
   Audit, Statistik und Modell.
+
+### Regelwerk v4.11
+
+- **Neue Regel „Der Tag nach einem BD ist dienstfrei":** Wer Bereitschaftsdienst
+  getragen hat, ist am Folgetag für keinen weiteren Dienst verfügbar. Für den
+  Bereitschaftsdienst selbst galt das bereits als harte Sperre („BD bereits am
+  Vortag"); für den Hintergrunddienst fehlte die Entsprechung — er war lediglich
+  orange, wenn er *vor* einem eigenen BD lag, aber ungeprüft *danach*.
+  Der Hintergrunddienst am Folgetag ist damit rot und nicht wählbar.
+- **Ausnahme Wochenende:** Samstag und Sonntag bleibt der Hintergrunddienst
+  unmittelbar nach einem Bereitschaftsdienst zulässig. Genau darauf beruht die
+  Wochenendbündelung (Fr-BD · Sa-HG und Sa-BD · So-HG). Der **Freitag zählt
+  dabei nicht als Wochenende**: Ein Donnerstags-BD lässt den Freitag ebenso
+  dienstfrei wie jeden anderen Werktag.
+- Die Regel gilt an beiden Orten, an denen sie gelten muss: in der Regelengine,
+  die verbindlich entscheidet, und als harte Bedingung im Booleschen Modell
+  (`bdhg_*`, Gruppe „Ruhezeit nach Bereitschaftsdienst"). Fehlte sie im Modell,
+  schlüge das Schlussaudit jeden Vorschlag zurück, ohne dass die Suche wüsste,
+  warum. `tests/rest-day-after-bd.test.js` prüft beide Seiten.
 
 ### Regelwerk v4.10
 

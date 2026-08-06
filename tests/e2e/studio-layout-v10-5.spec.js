@@ -179,6 +179,23 @@ for (const scheme of ['light', 'dark']) {
       for (const entry of await collectContrast(page)) findings.push({ where, kind: 'kontrast', ...entry });
     };
 
+    // Die Wahl der Laufansicht muss ohne Aufklappen sichtbar sein: Eine
+    // Einstellung hinter einer geschlossenen Gruppe ist für die Bedienung nicht
+    // vorhanden — genau so war die Orbit-Ansicht abhandengekommen.
+    const visual = await page.evaluate(() => {
+      const select = document.getElementById('autoPlanV10VisualMode');
+      const group = select?.closest('details');
+      const rect = select?.getBoundingClientRect();
+      return {
+        options: select ? [...select.options].map(option => option.value) : [],
+        groupOpen: group ? group.open : null,
+        height: Math.round(rect?.height || 0)
+      };
+    });
+    expect(visual.options, 'Kristallisation und Orbit stehen zur Wahl').toEqual(['crystal', 'orbit']);
+    expect(visual.groupOpen, 'die Gruppe ist aufgeklappt').toBe(true);
+    expect(visual.height, 'die Auswahl ist sichtbar').toBeGreaterThan(10);
+
     await collect('parameter');
 
     // Kurzes Zeitbudget: Geprüft wird das Layout, nicht die Planqualität.

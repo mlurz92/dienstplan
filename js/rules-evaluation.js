@@ -498,6 +498,25 @@ function evaluateCandidateInternal({ state, monthData, dateIso, role, staffId, i
   }
 
   if (role === 'hg') {
+    // Der Tag nach einem Bereitschaftsdienst ist dienstfrei.
+    //
+    // Wer nachts Bereitschaft getragen hat, steht am Folgetag für keinen
+    // weiteren Dienst zur Verfügung. Für den Bereitschaftsdienst selbst ist das
+    // bereits als „BD bereits am Vortag" gesperrt; für den Hintergrunddienst
+    // fehlte die Entsprechung.
+    //
+    // AUSNAHME WOCHENENDE: Samstag und Sonntag ist der Hintergrunddienst
+    // unmittelbar nach einem Bereitschaftsdienst zulässig — das ist genau die
+    // Kopplung, auf der die Wochenendbündelung beruht (Fr-BD · Sa-HG und
+    // Sa-BD · So-HG). Der Freitag zählt hier bewusst *nicht* als Wochenende:
+    // Ein Donnerstags-BD lässt den Freitag genauso dienstfrei wie jeden
+    // anderen Werktag.
+    const previousBdOwn = getAssignment(state, prevDateIso, 'bd') === staffId;
+    const weekendHgAfterBd = weekday === 6 || weekday === 0;
+    if (previousBdOwn && !weekendHgAfterBd) {
+      push('red', 'BD am Vortag: Folgetag ist dienstfrei', { selection: 'blocked' });
+    }
+
     const hgAt = offset => getAssignment(state, toLocalIso(addDays(date, offset)), 'hg') === staffId;
     const neighbours = [-3, -2, -1, 1, 2, 3].filter(hgAt);
     const threeConsecutive = (hgAt(-2) && hgAt(-1)) || (hgAt(-1) && hgAt(1)) || (hgAt(1) && hgAt(2));
