@@ -8,6 +8,7 @@ import { assignmentLabel, buildStats, clearedMonthData, collectIssues, evaluateC
 import { getRbnOptions, isRbnValueAllowed, isSecondRbnAvailable, rbnDisplayName } from './rbn.js?v=20260806.1';
 import { additionalReasons, buildPickerModel, filterPickerModel, flattenPickerModel, loadSummary, nextSelectableIndex, primaryReason } from './picker-view.js?v=20260806.1';
 import { readPlanFile } from './file-import.js?v=20260806.1';
+import { loadXlsxEngine, readWorkbookSheets } from './xlsx-engine.js?v=20260806.1';
 import { applyApplicationSettings } from './app-settings.js?v=20260806.1';
 
 const $ = selector => document.querySelector(selector);
@@ -1226,17 +1227,9 @@ async function onFileImport(event) {
       staff: state.staff,
       fallbackYear: state.currentYear,
       fallbackMonth: state.currentMonth,
-      // Die Tabellenbibliothek liegt global; `cellDates`, weil Kopfzeilen den
-      // Monat teils als echtes Datum statt als Text tragen.
-      readWorkbook: window.XLSX
-        ? buffer => {
-          const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
-          return workbook.SheetNames.map(name => ({
-            name,
-            rows: XLSX.utils.sheet_to_json(workbook.Sheets[name], { header: 1, defval: '', raw: true })
-          }));
-        }
-        : null
+      // Die Tabellenbibliothek wird erst hier geholt — aus dem Repository,
+      // ersatzweise aus dem Netz.
+      readWorkbook: readWorkbookSheets
     });
   } catch (error) {
     alert(error.message);
@@ -1353,8 +1346,10 @@ function mergeMonthData(target, source) {
   return { added, replaced, unchanged, changed: added + replaced };
 }
 
-function exportCurrentMonthToExcel() {
-  if (!window.XLSX) { alert('Excel-Bibliothek noch nicht geladen.'); return; }
+async function exportCurrentMonthToExcel() {
+  let XLSX;
+  try { XLSX = await loadXlsxEngine(); }
+  catch (error) { alert(error.message); return; }
   const monthData = getMonthData(state.currentYear, state.currentMonth);
   const rows = [];
   rows.push(['Bereitschaftsdienstplan', '', getMonthLabel()]);

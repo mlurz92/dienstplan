@@ -399,6 +399,13 @@ wo sie lügt, die Dateisignatur entscheiden über den Weg.
 | Neuroradiologie-Hintergrunddienstplan `.pdf`/`.xlsx` | Datum, Wochentag, 1. Dienst, 2. Dienst | **nur** 1. und 2. RBN |
 | Sicherung `.json` | vollständiger Stand | Gesamtwiederherstellung |
 
+**Beide Bibliotheken liegen im Repository und werden erst bei Bedarf geladen.**
+Die Tabellenbibliothek hing zuvor als blockierendes `<script>` im Seitenkopf —
+950 Kilobyte bei jedem Aufruf, für einen Vorgang, der die Ausnahme ist. Damit
+entfällt zugleich ein Fehlerfall, den Nutzende nicht beheben konnten: Die
+Meldung „Excel-Bibliothek noch nicht geladen" trat auf, während die Seite noch
+lud.
+
 **Wie ein PDF zur Tabelle wird.** Ein PDF kennt keine Tabellen, sondern
 Zeichenfolgen mit Koordinaten. `js/pdf-import.js` baut daraus wieder Zeilen und
 Spalten: Zeilen aus gleicher Grundlinie, Spalten aus wiederkehrenden
@@ -412,7 +419,8 @@ Apache-2.0, 1,7 MB) — dieselbe Regel wie beim CP-SAT-WebAssembly: Was
 ausgeliefert wird, liegt im Repository; das Netz ist nur die Rückfallebene. Ein
 Import darf nicht daran scheitern, dass ein fremder Dienst gerade nicht
 erreichbar ist. Geladen wird erst beim ersten PDF, nicht beim Start.
-`npm run vendor:pdfjs` holt die Fassung, die `js/pdf-import.js` festlegt.
+`npm run vendor:libs` holt beide Bibliotheken in der Fassung, die der Quelltext
+festlegt — pdf.js aus `js/pdf-import.js`, SheetJS aus `js/xlsx-engine.js`.
 
 Die Rekonstruktion dagegen ist reine Rechnerei und deshalb in Node prüfbar:
 `tests/pdf-import.test.js` arbeitet mit den echten Textelementen zweier realer
@@ -546,6 +554,7 @@ auto-plan-studio-v9.css            Modal-Fit-Layout, kollabierbare Sektion, Anim
 auto-plan-studio-v10.css           Akkordeon, Laufansicht, Überlaufhärtung, Dark-Mode
 vendor/cpsat-js/                   lokal ausgelieferter CP-SAT-Solver (portable, Apache-2.0)
 vendor/pdfjs/                      lokal ausgeliefertes pdf.js für den PDF-Import (Apache-2.0)
+vendor/sheetjs/                    lokal ausgelieferte Tabellenbibliothek (Apache-2.0)
 _headers                           Cache- und Sicherheitskopfzeilen (bewusst ohne COEP)
 tests/auto-plan-v8-5.test.js       Solver- und Integrationsverträge
 tests/auto-plan-v10.test.js        Modell-, Kaskaden-, Leximin- und Kennzahlenverträge
