@@ -22,7 +22,8 @@ DienstplanRAD verbindet kontrollierbare manuelle Monatsplanung mit einer bestät
 - regelgestützte Kandidatenlisten mit Grün/Gelb/Orange/Rot/Grau und vollständiger Begründung;
 - Abwesenheiten, Dienstwünsche, Optionen, Notizen und revisionsfähige Ausnahmebestätigungen;
 - Monatsstatistik, Sollvergleich, Wochenendäquivalente und offene Punkte;
-- Excel-/JSON-Import, Excel-/PDF-/JSON-Export;
+- Excel-/JSON-Import, Excel-/PDF-/JSON-Export — der Ausdruck passt garantiert auf
+  **eine** DIN-A4-Seite hochkant (siehe §5.1);
 - server-first Synchronisierung mit lokaler Offline-Sicherung;
 - Auto-Plan Studio für Konfiguration, laufende Beobachtung, vollständige Vorschlagsprüfung und atomare Übernahme.
 
@@ -345,7 +346,43 @@ selbst scrollen. Die automatische Mindesthöhe ist der einzige Mechanismus, der
 eine Karte davor bewahrt, unter ihren Inhalt zusammenzufallen; wer sie pauschal
 abschaltet, macht Inhalte unerreichbar statt sie unterzubringen.
 
-## 5. Performance für Windows 11 und Chrome
+## 5. Druckausgabe
+
+### 5.1 Ein Monat, eine Seite
+
+Der Ausdruck ist ein Aushang. Er trägt in dieser Reihenfolge:
+
+1. **Kopf:** links zweizeilig „Bereitschaftsdienstplan" über „Monat JJJJ",
+   rechts auf derselben Höhe die Bezeichnung des Monatskontrasts
+   (etwa „Monatskontrast · Festival Fuchsia").
+2. **Planungstabelle** mit allen Spalten: Tag, Wochentag, BD, HG, RBN, 2. RBN.
+3. **Statistik** darunter, bewusst reduziert auf Mitarbeitende, BD und HG.
+
+Die Datei heißt `Dienstplan JJJJ-MM.pdf`: Der Dateiname stammt in allen
+gängigen Browsern aus dem Dokumenttitel, der für die Dauer des Drucks
+entsprechend gesetzt und danach zurückgenommen wird.
+
+**Höhenbudget statt fester Zeilenhöhen.** Feste Zeilenhöhen in Millimetern sind
+für genau einen Fall gerechnet und laufen in jedem anderen über: Mit zwölf statt
+acht Mitarbeitenden brauchte ein 31-Tage-Monat 289 mm und riss auf eine zweite
+Seite. Stattdessen steht je Block ein festes Budget, und die Zeilenhöhe ergibt
+sich als Budget geteilt durch die tatsächliche Zeilenzahl — `--print-plan-rows`
+und `--print-stat-rows` setzt die Anwendung beim Rendern. Die Gesamthöhe ist
+damit von der Zahl der Tage und der Mitarbeitenden unabhängig und liegt bei rund
+250 mm.
+
+Die verbleibenden knapp 30 mm bis zum Satzspiegel sind bewusste Reserve: Chrome
+vergrößert die Ränder, sobald in seinem Druckdialog Kopf- und Fußzeilen
+eingeschaltet sind — und das ist die Voreinstellung. Ein Ausdruck, der nur ohne
+sie passt, passt praktisch nicht.
+
+`tests/e2e/print-single-page.spec.js` prüft nicht die gerechnete Höhe, sondern
+das erzeugte PDF: Für alle zwölf Monate, im Ungünstigstfall aus zwölf
+Mitarbeitenden, langen externen Namen und voller Belegung, muss der Seitenbaum
+genau eine Seite enthalten — mit dem eigenen Satzspiegel und mit dem, den Chrome
+bei eingeschalteten Kopf- und Fußzeilen übrig lässt.
+
+## 6. Performance für Windows 11 und Chrome
 
 - rechenintensive Konstruktion und Perfektion in Modul-Web-Workern;
 - reservierte UI-Kerne für Eingaben, Fortschritt und Animation;
@@ -361,7 +398,7 @@ abschaltet, macht Inhalte unerreichbar statt sie unterzubringen.
 
 ---
 
-## 6. Einstellungen und Persistenz
+## 7. Einstellungen und Persistenz
 
 Gespeichert und über den Bootstrap-Pfad synchronisiert werden unter anderem:
 
@@ -383,7 +420,7 @@ Solverfelder werden bei jedem Lauf erneut in die Laufkonfiguration übertragen.
 
 ---
 
-## 7. Datenhaltung und Cloudflare
+## 8. Datenhaltung und Cloudflare
 
 - **Pages:** statische Anwendung;
 - **Pages Functions:** Bootstrap, Monatsdaten, Personal, RBN-Namen, Einstellungen, Import/Export;
@@ -394,7 +431,7 @@ KV besitzt Eventual Consistency. Die Anwendung verwendet deshalb Revisionsständ
 
 ---
 
-## 8. Lokale Entwicklung
+## 9. Lokale Entwicklung
 
 Voraussetzungen: Node.js 24, npm.
 
@@ -415,7 +452,7 @@ Cloudflare Pages wird aus dem Repository-Root gebaut. Das KV-Binding lautet `DIE
 
 ---
 
-## 9. Tests
+## 10. Tests
 
 ### Modultests
 
@@ -444,7 +481,7 @@ Cloudflare Pages wird aus dem Repository-Root gebaut. Das KV-Binding lautet `DIE
 
 ---
 
-## 10. Projektstruktur v10.5
+## 11. Projektstruktur v10.5
 
 ```text
 js/auto-plan-model.js              Boolean-One-Hot-Modell (solverfrei, in Node testbar)
@@ -470,6 +507,7 @@ tests/auto-plan-v10.test.js        Modell-, Kaskaden-, Leximin- und Kennzahlenve
 tests/e2e/v8-5-shell.spec.js       Browser-, Bootstrap- und Observer-Regressionen
 tests/e2e/layout-contrast-v10-5.spec.js  Überlappungsfreiheit und WCAG-AA-Kontrast
 tests/e2e/studio-layout-v10-5.spec.js    Layoutvertrag der drei Studiozustände
+tests/e2e/print-single-page.spec.js      Ein Monat, eine A4-Seite (gemessen am PDF)
 tests/e2e/helpers/contrast.js            gemeinsame WCAG-Kontrastmessung
 ```
 
@@ -480,7 +518,7 @@ Modell, Brücke und Orchestrierung sind seither drei getrennte Module.
 
 ---
 
-## 11. Release 0.9.1
+## 12. Release 0.9.1
 
 ### Auto-Plan v9.5 („Correct Engine“)
 
@@ -581,7 +619,7 @@ Modell, Brücke und Orchestrierung sind seither drei getrennte Module.
 - 402 Modultests und 41 Browsertests grün; E2E-Verträge auf den v9-Stand
   gehoben (Revision, Ribbon-Identität, Scroll-Vertrag des Studios).
 
-## 12. Release 0.9.0
+## 13. Release 0.9.0
 
 ### Neu
 
@@ -624,7 +662,7 @@ Modell, Brücke und Orchestrierung sind seither drei getrennte Module.
 
 ---
 
-## 12. Grenzen
+## 14. Grenzen
 
 - Eine vollständige Null-Rot-Belegung kann mathematisch unmöglich sein.
 - Die Zertifizierung beweist lokale Optimalität für die vollständig geprüften

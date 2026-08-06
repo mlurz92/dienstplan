@@ -133,6 +133,28 @@ dunklem Grund (gemessene 1,3:1).
   belegt, dass es keine bloßen Bezeichner mehr enthält und die WASM-Datei
   danebenliegt.
 
+### Druckausgabe – ein Monat, eine Seite
+
+- **Der Ausdruck riss auf eine zweite Seite,** sobald mehr als acht Personen im
+  Plan standen. Die Zeilenhöhen waren in Millimetern fest verdrahtet und für
+  genau einen Fall gerechnet; mit zwölf Mitarbeitenden brauchte ein
+  31-Tage-Monat 289 mm bei 279 mm Satzspiegel. Jetzt steht je Block ein festes
+  Höhenbudget, und die Zeilenhöhe ergibt sich als Budget geteilt durch die
+  tatsächliche Zeilenzahl (`--print-plan-rows`, `--print-stat-rows` aus
+  `syncPrintMetrics`). Die Gesamthöhe ist damit von der Zahl der Tage und der
+  Mitarbeitenden unabhängig und liegt bei rund 250 mm.
+- **Reserve gegen Chromes Kopf- und Fußzeilen:** Sind sie im Druckdialog
+  eingeschaltet — die Voreinstellung —, vergrößert Chrome die Ränder. Der
+  Ausdruck hält jetzt auch diesen kleineren Satzspiegel ein.
+- **Kopf nach Vorgabe:** links zweizeilig „Bereitschaftsdienstplan" über
+  „Monat JJJJ", rechts auf derselben Höhe die Bezeichnung des Monatskontrasts.
+  Darunter die Planungstabelle mit allen Spalten, darunter die Statistik,
+  reduziert auf Mitarbeitende, BD und HG.
+- **Dateiname** `Dienstplan JJJJ-MM.pdf`, abgeleitet aus dem Dokumenttitel.
+- `tests/e2e/print-single-page.spec.js` prüft das erzeugte PDF selbst: Für alle
+  zwölf Monate im Ungünstigstfall muss der Seitenbaum genau eine Seite
+  enthalten — mit eigenem Satzspiegel und mit dem der Kopf-/Fußzeilen.
+
 ### Regelwerk v4.11 – der Tag nach einem Bereitschaftsdienst
 
 - **Neue harte Regel:** Wer Bereitschaftsdienst getragen hat, ist am Folgetag

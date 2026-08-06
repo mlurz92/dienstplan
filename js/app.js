@@ -320,7 +320,29 @@ function render() {
   $('#monthTitle').textContent = getMonthLabel();
   renderPlanTable(monthData);
   renderStats(monthData);
+  syncPrintMetrics(monthData);
   scheduleIssueRender(monthData, generation);
+}
+
+/**
+ * Teilt dem Druckbild mit, wie viele Zeilen es zu tragen hat.
+ *
+ * Der Ausdruck muss auf **eine** A4-Seite hochkant passen — bei 28 wie bei 31
+ * Tagen und bei acht wie bei zwölf Mitarbeitenden. Feste Zeilenhöhen in
+ * Millimetern können das nicht leisten: Sie sind für einen Fall gerechnet und
+ * laufen in jedem anderen über. Deshalb steht im Druck ein festes
+ * Höhenbudget, und die Zeilenhöhe ergibt sich als Budget geteilt durch die
+ * tatsächliche Zeilenzahl. Beide Zahlen kennt nur die Anwendung, nicht das
+ * Stylesheet — also werden sie hier als benutzerdefinierte Eigenschaften
+ * hinterlegt.
+ */
+function syncPrintMetrics(monthData) {
+  const root = document.documentElement;
+  const planRows = Math.max(1, Object.keys(monthData?.days || {}).length);
+  // Personalzeilen plus die abschließende „Offen"-Zeile.
+  const statRows = Math.max(1, document.querySelectorAll('#statsGrid .distribution-table tbody tr').length);
+  root.style.setProperty('--print-plan-rows', String(planRows));
+  root.style.setProperty('--print-stat-rows', String(statRows));
 }
 
 function scheduleIssueRender(monthData, generation) {
