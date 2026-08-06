@@ -4,7 +4,7 @@ import { installRichTooltips, setRichTooltip } from './rich-tooltip-v8-5.js?v=20
 import { state } from './state.js?v=20260806.1';
 
 const RELEASE = '20260806.1';
-const STYLESHEETS = Object.freeze(['/app-v8-5.css', '/toolbar-v8-5.css', '/app-v9.css']);
+const STYLESHEETS = Object.freeze(['/app-v8-5.css', '/toolbar-v8-5.css', '/app-v9.css', '/dark-contrast.css']);
 const NAV_ICONS = Object.freeze({
   prevMonthBtn: '<svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 5-7 7 7 7"/></svg>',
   nextMonthBtn: '<svg class="tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>'

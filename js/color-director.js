@@ -80,6 +80,7 @@ const easeSpectrum = t => t * t * t * (t * (t * 6 - 15) + 10);
 
 let animationHandle = null;
 let activeKey = null;
+let activeSchemeKey = null;
 let animatingKey = null;
 
 function playSpectrumSweep(root, accent) {
@@ -116,7 +117,12 @@ function spectrumEnabled() {
   return mode === undefined || mode === 'spectrum';
 }
 
-export function applySpectrumProfile(year, month, { animate = true } = {}) {
+/** Das aktive Erscheinungsbild — es entscheidet über Tinte und Grundfläche. */
+function activeScheme() {
+  return document.documentElement.dataset.colorScheme === 'dark' ? 'dark' : 'light';
+}
+
+export function applySpectrumProfile(year, month, { animate = true, scheme = activeScheme() } = {}) {
   if (typeof document === 'undefined') return null;
   const root = document.documentElement;
   if (!spectrumEnabled()) {
@@ -125,8 +131,11 @@ export function applySpectrumProfile(year, month, { animate = true } = {}) {
     return null;
   }
   const palette = colorProfileForDate(year, month);
-  const target = spectrumVariables(palette);
-  const changed = activeKey !== palette.key;
+  const target = spectrumVariables(palette, { scheme });
+  // Ein Wechsel des Erscheinungsbilds ändert dieselben Variablen wie ein
+  // Monatswechsel und muss deshalb genauso neu geschrieben werden.
+  const changed = activeKey !== palette.key || activeSchemeKey !== scheme;
+  activeSchemeKey = scheme;
   const first = activeKey === null;
 
   root.dataset.colorDirector = 'trend-atlas-v3';
@@ -218,6 +227,12 @@ function initializeColorDirector() {
   // Eine Änderung des Farbsystems in den Einstellungen wirkt sofort, ohne dass
   // die Seite neu geladen werden muss.
   window.addEventListener('appsettingschange', update);
+  // Hell/Dunkel wechselt die Grundfläche, auf die der Monatsakzent gerechnet
+  // ist. Ohne diese Neuberechnung bliebe die helle Tinte im Dunkelmodus stehen.
+  window.addEventListener('appcolorschemechange', () => {
+    const { year, month } = selectedDate();
+    applySpectrumProfile(year, month, { animate: false });
+  });
 }
 
 if (typeof document !== 'undefined') {

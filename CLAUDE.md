@@ -32,6 +32,7 @@ nicht nach jede Änderung.** Maßgeblich ist, was die Änderung berühren kann:
 | PDF-Export (`js/pdf-document.js`, `js/pdf-export.js`) | `node --test tests/pdf-export.test.js` |
 | Druckausgabe (`styles.css` `@media print`) | `tests/e2e/print-single-page.spec.js` |
 | Studio-Layout | `tests/e2e/studio-layout-v10-5.spec.js` |
+| Farbtoken, Dunkelmodus (`js/color-atlas-engine.js`, `dark-contrast.css`) | `tests/e2e/dark-contrast.spec.js` |
 | **Vor Commit und Merge** | `npm run check && npm test`, Browsertests nur für die berührten Flächen |
 | **Vor einem Release** | `npm run verify` |
 
@@ -98,6 +99,7 @@ js/auto-plan-studio-*.js  Oberfläche des Studios, additiv geschichtet
 js/app.js                 Monatsansicht, Rendering, Druckvorbereitung
 js/pdf-document.js        minimaler PDF-Schreiber (Flächen, Linien, Text)
 js/pdf-export.js          Satzbild des Monatsblatts, Direktdownload
+dark-contrast.css         Lesekontrast im Dunkelmodus (zuletzt geladen)
 js/file-import.js         ein Eingang für Excel, PDF und JSON
 js/pdf-import.js          Textpositionen zu Tabellenzeilen (pdf.js)
 functions/                Cloudflare Pages Functions (KV-Zugriff)

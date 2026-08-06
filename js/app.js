@@ -167,7 +167,10 @@ function prepareForPrint() {
   // Rückfallebene angestoßen und schreibt die Farbvariablen nicht mehr, solange
   // der Director geladen ist.
   applyMonthTheme(state.currentMonth, { animate: false });
-  applySpectrumProfile(resolveThemeYear(state.currentYear), state.currentMonth, { animate: false });
+  // Papier ist weiß. Im Dunkelmodus trägt der Direktor helle Tinte auf dunkle
+  // Flächen — gedruckt ergäbe das ein fast unlesbares Blatt. Für die Dauer des
+  // Drucks gelten deshalb die hellen Werte.
+  applySpectrumProfile(resolveThemeYear(state.currentYear), state.currentMonth, { animate: false, scheme: 'light' });
   if (titleBeforePrint === null) titleBeforePrint = document.title;
   document.title = printDocumentTitle();
 }
@@ -176,6 +179,7 @@ function restoreAfterPrint() {
   if (titleBeforePrint === null) return;
   document.title = titleBeforePrint;
   titleBeforePrint = null;
+  applySpectrumProfile(resolveThemeYear(state.currentYear), state.currentMonth, { animate: false });
 }
 
 function ensureYearOption(year) {
