@@ -679,7 +679,7 @@ Container-Abfragen dem tatsächlich verfügbaren Platz, nicht der Fensterbreite.
 | Gewicht des Gedächtnisses | Wirkung der Vorlast auf den Startwert |
 | Stabilität | Rang der Minimal-Perturbation in der Kaskade |
 | Bei Unlösbarkeit | melden, Korrekturmenge anzeigen oder anwenden |
-| Laufansicht | Kristallisation oder Orbit |
+| Laufansicht | Kristallisation, Weberei, Kaskade oder Orbit |
 
 Entfallen sind die neun `cpSat*Weight`-Gewichte, das nie umgesetzte
 Fairness-Profil, der beim portablen Build bedeutungslose Worker-Regler sowie
@@ -695,7 +695,36 @@ Personalmaxima und sämtliche fachlichen Regeln gelten unabhängig davon weiter.
 Zwei Schaltflächen füllen die Vorschlagswerte ein beziehungsweise leeren alle
 Grenzen.
 
-### 7.4 Die Laufansicht „Kristallisation"
+### 7.4 Die vier Laufansichten
+
+Dieselben Meldungen des Laufs, vier Fragen. Die Wahl steht im Studio unter
+„Darstellung des Laufs" und wird lokal gemerkt; sie kostet keine Rechenzeit der
+Suche, sondern liest nur mit. Alle vier speisen sich ausschließlich aus echten
+Ereignissen — nichts wird interpoliert, um Betrieb vorzutäuschen —, und alle
+respektieren `prefers-reduced-motion` sowie die Bewegungseinstellung der
+Anwendung.
+
+| Ansicht | Frage |
+| --- | --- |
+| Kristallisation | Wie fällt der Suchraum zusammen? (Voreinstellung) |
+| Weberei | Was steht am Ende im Plan — Person für Person, Tag für Tag? |
+| Kaskade | Wie arbeitet sich das Verfahren durch seine Rangfolge? |
+| Orbit | Die frühere Ringdarstellung, unverändert erhalten |
+
+**Der Glanz folgt der Farbe.** Der Glow ist keine feste Größe: Wärme, Sättigung
+und Helligkeit bestimmen Radius und Intensität. Ein warmer, satter Ton trägt
+weiter als ein kühler, blasser; eine dunkle Farbe braucht mehr Radius, um
+überhaupt zu leuchten, eine sehr helle würde sonst ausbrennen. Rote Warnungen
+wirken dadurch heiß und drängend, grüne Bestätigungen ruhig. Die Regel steht
+einmal im gemeinsamen Unterbau `js/auto-plan-visual-kit.js` und gilt für alle
+Ansichten; dort liegen auch Farbwelt, Auflösungsanpassung, Zeitschleife,
+Zonenschnitt und Textkürzung.
+
+**Lesbarkeit geht vor Vollständigkeit.** Jede Liste hat eine Mindestzeilenhöhe.
+Passen nicht alle Einträge, zeigt die Ansicht einen Ausschnitt und weist die
+Zahl der übrigen aus, statt die Zeilen ineinanderlaufen zu lassen.
+
+#### „Kristallisation"
 
 Die Ansicht zeigt nicht, *dass* gerechnet wird, sondern *was* gerechnet wird.
 Vier Ebenen, alle aus echten Ereignissen des Laufs gespeist — nichts wird
@@ -721,9 +750,60 @@ weiter als ein kühler, blasser; eine dunkle Farbe braucht mehr Radius, um
 überhaupt zu leuchten, eine sehr helle würde sonst ausbrennen. Rote Warnungen
 wirken dadurch heiß und drängend, grüne Bestätigungen ruhig.
 
-Bei `prefers-reduced-motion: reduce` entfallen Fächern und Puls; Raster, Kurven
-und Balken bleiben als ruhige Zustandsanzeige. Die **Orbit-Ansicht** der
-früheren Fassungen bleibt als Alternative wählbar.
+Bei reduzierter Bewegung entfallen Fächern und Puls; Raster, Kurven und Balken
+bleiben als ruhige Zustandsanzeige.
+
+#### „Weberei"
+
+Der Monat als Gewebe — genau die Tabelle, die am Ende im Dienstplan steht:
+
+1. **Kette** — ein senkrechter Faden je Kalendertag. Solange ein Tag offene
+   Felder hat, steht sein Faden unter Spannung und schwingt; ist er vollständig
+   belegt, kommt er zur Ruhe. Wochenenden liegen in einer dunkleren Bahn.
+2. **Schuss** — eine waagerechte Zeile je Person, in fester Reihenfolge. Sie
+   springt nie um, damit das Auge einer Person folgen kann; die geplante
+   Belegschaft steht von Beginn an im Stoff, auch ohne Dienst.
+3. **Knoten** — eine getroffene Zuordnung. Der Bereitschaftsdienst webt einen
+   vollen Knoten in die obere Hälfte der Zeile, der Hintergrunddienst einen
+   offenen in die untere. Fixpunkte sind von Beginn an eingewebt und ruhig; was
+   die Suche entscheidet, rastet sichtbar ein.
+4. **Schiffchen** — nach jeder Entscheidung fährt ein Lichtschiffchen die
+   betroffene Zeile bis zum neuen Knoten: die einzige schnelle Bewegung der
+   Ansicht, und damit die Antwort auf „wo wird gerade gearbeitet?".
+5. **Lastwaage rechts** — die Last je Person im selben Zeilenraster.
+   Leximin wird ablesbar: Die Kante rechts wird gerade, während links der Stoff
+   wächst. Bis zur ersten Lastmeldung zählt der Stoff selbst.
+6. **Webkante unten** — Anteil der gewebten an allen Feldern des Monats.
+
+Ist die Optimalität bewiesen oder der Lauf fertig, läuft **einmal** die
+Abschlusskante durch den Stoff: ein heller Schuss von oben nach unten.
+
+#### „Kaskade"
+
+Die Ansicht zeigt das Verfahren selbst. Der Kern löst nicht ein Ziel, sondern
+eine geordnete Folge — erst die wichtigste Stufe bis zum Beweis, dann die
+nächste unter der Auflage, die erste nicht mehr zu verschlechtern:
+
+1. **Becken** — eines je Zielstufe, treppab in der Rangfolge der Kaskade.
+2. **Wasserlinie** — die Höhe des Bandes am Beckenboden ist die verbliebene
+   Ungewissheit zwischen Zielwert und bewiesener unterer Schranke. Sie sinkt im
+   Takt der Zwischenlösungen auf eine Linie: Der Beweis wird zum Standbild.
+   Der Maßstab ist die größte je gesehene Lücke *dieser* Stufe — sonst stünde
+   das Band scheinbar still, obwohl es sich schließt.
+3. **Gefrieren und Überlauf** — eine bewiesene Stufe erstarrt, bekommt Haken und
+   eingravierten Wert, und lässt Wasser ins nächste Becken fallen: Ihr Ergebnis
+   wird zur Auflage der folgenden Stufe. Ein bewiesenes Becken taut nicht wieder
+   auf; eine unlösbare Stufe bricht, eine am Zeitbudget gescheiterte bleibt
+   offen.
+4. **Entscheidungsstrom** — jede erstmals gesehene Zuordnung fällt als Tropfen
+   in der Farbe ihrer Person. Die Dichte ist die tatsächliche
+   Entscheidungsrate, kein Taktgeber.
+
+Eine geschlossene Lücke gilt nur dann als Beweis, wenn überhaupt ein Ziel
+minimiert wird: Die vorgeschaltete Zulässigkeitssuche läuft ohne Zielfunktion
+und meldet Zielwert wie Schranke als null. Alle drei jüngeren Ansichten prüfen
+das ausdrücklich — bis v10.4 kristallisierte die Darstellung sonst sofort beim
+ersten Zwischenergebnis und stand die restliche Optimierung still.
 
 ### 7.5 Ergebnisansicht
 
@@ -1038,6 +1118,11 @@ und den Ausdruck als gemessenes PDF — ein Monat, eine A4-Seite.
   teuersten Fall aus zwölf Mitarbeitenden, langen externen Namen und voller
   Belegung, mit eigenem Satzspiegel und mit dem, den Chrome bei eingeschalteten
   Kopf- und Fußzeilen übrig lässt.
+- **Laufansichten.** `tests/auto-plan-run-views.test.js` fährt jede der drei
+  jüngeren Ansichten durch einen vollständigen Lauf gegen eine aufzeichnende
+  Ersatzleinwand — samt der Randfälle, die im Browser sonst nur eine schwarze
+  Fläche hinterlassen: winzige Leinwand, leerer Monat, Zwischenlösung vor dem
+  Stufenplan, geschlossene Lücke ohne Zielfunktion, fehlender Leinwandkontext.
 - **Lesbarkeit.** `tests/e2e/dark-contrast.spec.js` und
   `tests/e2e/layout-contrast-v10-5.spec.js` messen jeden sichtbaren Textknoten
   gegen den *tatsächlich wirksamen* Hintergrund: halbtransparente Schichten
@@ -1081,7 +1166,11 @@ js/auto-planner-v10.js             lexikografische Kaskade, Leximin, Konfliktdia
 js/auto-planner-v8-5.js            Heuristik: Warmstart, Rückfallebene, Phasenvertrag
 js/auto-planner-optimizer.js       Ruin-and-Recreate-Perfektion
 js/auto-plan-studio-*.js           Oberfläche des Studios, additiv geschichtet
-js/auto-plan-crystallize.js        Kristallisations-Animation mit farbabhängigem Glow
+js/auto-plan-visual-kit.js         Unterbau der Laufansichten: Farbwelt, Glow-Regel, Leinwand
+js/auto-plan-crystallize.js        Laufansicht „Kristallisation": Zusammenfall des Suchraums
+js/auto-plan-weave.js              Laufansicht „Weberei": entstehender Plan als Gewebe
+js/auto-plan-cascade.js            Laufansicht „Kaskade": Zielstufen als Becken
+js/auto-plan-visualizer.js         Laufansicht „Orbit": Ringdarstellung der Suche
 js/color-atlas-*.js                Trend-Atlas und Ableitung der Monatstoken
 js/color-director.js               Farbverlauf, Plakette, Erscheinungsbild
 js/app-theme-v8-5.js               Hell-/Dunkelcontroller (Start: hell)
