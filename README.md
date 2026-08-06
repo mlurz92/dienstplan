@@ -383,6 +383,16 @@ Farben aus demselben Monatsprofil ab wie die Oberfläche
 davon, wo der Farbverlauf auf dem Bildschirm gerade steht: Er trägt immer die
 Zielfarbe des Monats, nie einen Zwischenton.
 
+**Samstag, Sonntag und Feiertag bleiben unterscheidbar.** Die Oberfläche
+mischt den Monatsakzent zu 16, 25 und 34 Prozent mit Weiß. Bei einem hellen
+Akzent liegen die drei Ergebnisse dicht beieinander — im Juni 2026 auf 240, 232
+und 223 — und auf dem Papier sahen Samstag, Sonntag und Feiertag gleich aus. Am
+Bildschirm hilft dort noch der Zusammenhang, der Ausdruck hat nur die Fläche.
+Die drei Stufen sind deshalb nicht als Mischanteil, sondern als feste
+Helligkeit in OkLCh gesetzt, im Farbton des Monats; die Wochentagsspalte liegt
+immer eine Stufe tiefer als die Zeile, auf der sie steht. Der Abstand ist damit
+in jedem Monat derselbe — `tests/pdf-export.test.js` prüft ihn für alle zwölf.
+
 Beide Module kennen kein DOM. Der Inhalt des Blattes und das erzeugte PDF sind
 deshalb in Node prüfbar — `tests/pdf-export.test.js`.
 

@@ -15,7 +15,7 @@
  */
 
 import { createPdfDocument, fitText, textWidth } from './pdf-document.js?v=20260806.1';
-import { colorProfileForDate, spectrumVariables } from './color-atlas-engine.js?v=20260806.1';
+import { colorProfileForDate, labToLch, oklchToRgb, rgbToOklab, spectrumVariables } from './color-atlas-engine.js?v=20260806.1';
 import { assignmentLabel, weekdayLabel } from './rules-core.js?v=20260806.1';
 import { buildStats } from './rules-reporting.js?v=20260806.1';
 import { rbnDisplayName } from './rbn.js?v=20260806.1';
@@ -45,6 +45,39 @@ const rgb = value => (Array.isArray(value) ? value.slice(0, 3).map(part => Math.
 /** Farbmischung wie `color-mix(in srgb, …)` im Stylesheet. */
 const mixSrgb = (color, amount, other = WHITE) =>
   rgb(color).map((part, index) => Math.round(part * amount + other[index] * (1 - amount)));
+
+/**
+ * Helligkeitsstufen der Wochenend- und Feiertagszeilen in OkLCh.
+ *
+ * Die Oberfläche mischt den Monatsakzent zu 16, 25 und 34 Prozent mit Weiß.
+ * Bei einem hellen Akzent liegen die drei Ergebnisse dicht beieinander — im
+ * Juni 2026 (Mineralblau) auf 240, 232 und 223: auf dem Papier nicht mehr
+ * unterscheidbar. Der Ausdruck kennt keinen Tooltip und keine Interaktion, die
+ * Fläche ist dort das einzige Unterscheidungsmerkmal. Deshalb werden die
+ * Stufen hier nicht als Mischanteil, sondern als feste Helligkeit gesetzt: Der
+ * Abstand ist damit in jedem Monat derselbe, unabhängig davon, wie hell der
+ * Akzent ausfällt. Der Farbton bleibt der des Monats.
+ */
+const ROW_TONES = Object.freeze({
+  saturday: { lightness: 0.945, chroma: 0.42 },
+  sunday: { lightness: 0.895, chroma: 0.60 },
+  holiday: { lightness: 0.845, chroma: 0.78 }
+});
+
+/** Zeilenfläche im Farbton des Monats auf einer festen Helligkeitsstufe. */
+function rowTone(accent, tone) {
+  const [, chroma, hue] = labToLch(rgbToOklab([...accent, 1]));
+  return rgb(oklchToRgb(tone.lightness, Math.min(0.09, chroma * tone.chroma), hue));
+}
+
+/** Die drei Zeilenflächen eines Monats — für die Prüfung ihres Abstands. */
+export function planRowTones(accent) {
+  return {
+    saturday: rowTone(accent, ROW_TONES.saturday),
+    sunday: rowTone(accent, ROW_TONES.sunday),
+    holiday: rowTone(accent, ROW_TONES.holiday)
+  };
+}
 
 const WEEKDAY_LONG = Object.freeze({
   Mo: 'Montag', Di: 'Dienstag', Mi: 'Mittwoch', Do: 'Donnerstag',
@@ -130,9 +163,16 @@ function drawPlanTable(pdf, model, top) {
   const weekdayBg = rgb(colors['--weekday-field-bg']);
   const rowBg = Object.freeze({
     weekday: WHITE,
-    saturday: rgb(colors['--saturday-row-bg']),
-    sunday: rgb(colors['--sunday-row-bg']),
-    holiday: rgb(colors['--holiday-row-bg'])
+    saturday: rowTone(accent, ROW_TONES.saturday),
+    sunday: rowTone(accent, ROW_TONES.sunday),
+    holiday: rowTone(accent, ROW_TONES.holiday)
+  });
+  const deeper = tone => rowTone(accent, { lightness: tone.lightness - 0.06, chroma: tone.chroma * 1.3 });
+  const weekdayCell = Object.freeze({
+    weekday: weekdayBg,
+    saturday: deeper(ROW_TONES.saturday),
+    sunday: deeper(ROW_TONES.sunday),
+    holiday: deeper(ROW_TONES.holiday)
   });
 
   const widths = COLUMN_SHARES.map(share => share * PAGE.contentWidth);
@@ -158,7 +198,10 @@ function drawPlanTable(pdf, model, top) {
     const y = top + HEAD_ROW + index * rowHeight;
     const background = rowBg[row.kind];
     if (background !== WHITE) pdf.rect(LEFT, y, PAGE.contentWidth, rowHeight, { fill: background });
-    pdf.rect(edges[1], y, widths[1], rowHeight, { fill: weekdayBg });
+    // Die Wochentagsspalte bleibt der senkrechte Anker und liegt deshalb
+    // immer eine Stufe tiefer als die Zeile, auf der sie steht — sonst risse
+    // sie an Wochenenden als hellere Fläche aus der eigenen Zeile heraus.
+    pdf.rect(edges[1], y, widths[1], rowHeight, { fill: weekdayCell[row.kind] });
     if (marker[row.kind]) pdf.rect(LEFT, y, 1.1, rowHeight, { fill: marker[row.kind] });
     pdf.rect(edges[1], y, 0.8, rowHeight, { fill: row.kind === 'holiday' ? ink : accentStrong });
   });
