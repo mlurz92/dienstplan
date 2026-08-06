@@ -72,6 +72,14 @@ test('Bootstrap beendet load und bleibt nach späten DOM-Einbauten responsiv', a
 test('Hell-/Dunkelmodus wechselt atomar und bleibt nach Reload erhalten', async ({ page }) => {
   const toggle = page.locator('#themeModeBtn');
   await expect(toggle).toBeVisible();
+
+  // Der Umschalter ist ein reines Piktogramm — keine Beschriftung, schmal.
+  // (Übernommen aus der früheren v9-Diagnosespur, die dafür einen eigenen
+  // vollständigen Planungslauf startete.)
+  expect((await toggle.innerText()).trim()).toBe('');
+  expect(await toggle.innerHTML()).not.toMatch(/Hell|Dunkel/);
+  expect((await toggle.boundingBox()).width).toBeLessThanOrEqual(42);
+
   const before = await page.locator('html').getAttribute('data-color-scheme');
   await toggle.click();
   const after = before === 'dark' ? 'light' : 'dark';

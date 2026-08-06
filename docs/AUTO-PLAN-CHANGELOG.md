@@ -133,6 +133,27 @@ dunklem Grund (gemessene 1,3:1).
   belegt, dass es keine bloßen Bezeichner mehr enthält und die WASM-Datei
   danebenliegt.
 
+### Druckbild und Testumfang
+
+- **Das gewohnte Satzbild ist wiederhergestellt.** Die Kopfzeile
+  „Bereitschaftsdienstplan" stand kurzzeitig in 10 pt fett statt in der
+  gewohnten kleinen, gesperrten Versalschrift. Zurückgenommen.
+- **Zeilenhöhen mit Obergrenze:** `min(Referenzhöhe, Budget ÷ Zeilenzahl)`.
+  Damit sieht ein normaler Monat aus wie zuvor, und erst wenn es eng wird —
+  mehr Tage, mehr Mitarbeitende — schrumpfen die Zeilen so weit wie nötig.
+  Geprüft mit acht und mit zwölf Mitarbeitenden: je eine Seite.
+- **Testumfang reduziert.** Die Browsersuite lief 5,3 Minuten und prüfte an
+  mehreren Stellen dasselbe. Entfernt beziehungsweise zusammengelegt:
+  die v9-Diagnosespur (ihre einzige eigene Zusage, das reine Piktogramm des
+  Themenumschalters, steht jetzt in der Shell-Suite), der zweite
+  Optimierungslauf des Studio-Layouttests (Hell und Dunkel unterscheiden sich
+  in der Palette, nicht im Ergebnis), die doppelte Kontrastmessung des
+  Studios, zwölf Druckmonate auf drei kennzeichnende und fünf Prüfbreiten auf
+  drei. Ergebnis: 3,9 statt 5,3 Minuten bei unveränderter Aussage.
+- **Neu: `CLAUDE.md`** mit Befehlen, Konventionen, Grenzen und einer
+  Testdisziplin, die festhält, welche Prüfung zu welcher Änderung gehört —
+  statt reflexhaft die ganze Suite zu fahren.
+
 ### Druckausgabe – ein Monat, eine Seite
 
 - **Der Ausdruck riss auf eine zweite Seite,** sobald mehr als acht Personen im

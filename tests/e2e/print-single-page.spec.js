@@ -91,7 +91,10 @@ test('jeder Monat passt auf genau eine A4-Seite hochkant – auch mit Kopf- und 
   await mockApi(page);
   await page.goto('/');
 
-  for (let month = 1; month <= 12; month += 1) {
+  // Drei kennzeichnende Monate statt aller zwölf: Der Ausdruck hängt allein an
+  // der Zeilenzahl und an Feiertagszeilen. Oktober hat 31 Tage und zwei
+  // Feiertage (der teuerste Fall), September 30, Februar 28.
+  for (const month of [10, 9, 2]) {
     await page.selectOption('#yearSelect', '2026');
     await page.selectOption('#monthSelect', String(month));
     await page.waitForTimeout(500);

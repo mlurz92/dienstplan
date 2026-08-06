@@ -153,17 +153,27 @@ const OVERLAPS = () => {
   return problems;
 };
 
-for (const scheme of ['light', 'dark']) {
-  test(`Studio-Layout: nichts abgeschnitten, nichts überlagert · ${scheme}`, async ({ page }) => {
+/**
+ * Ein einziger Optimierungslauf für beide Erscheinungsbilder.
+ *
+ * Der Lauf ist mit Abstand der teuerste Teil dieses Tests. Ihn je Erscheinungs-
+ * bild zu wiederholen kostete gut zwei Minuten und brachte nichts: Hell und
+ * Dunkel unterscheiden sich in der Palette, nicht im Ergebnis. Gemessen wird
+ * deshalb einmal gerechnet und zweimal geschaut.
+ */
+const setScheme = (page, mode) => page.evaluate(value => {
+  document.documentElement.dataset.colorScheme = value;
+  document.documentElement.style.colorScheme = value;
+  try { localStorage.setItem('dienstplanrad:color-scheme:v1', value); } catch { /* egal */ }
+}, mode);
+
+{
+  test('Studio-Layout: nichts abgeschnitten, nichts überlagert, alles lesbar', async ({ page }) => {
     test.setTimeout(300000);
     await mockApi(page);
     await page.setViewportSize({ width: 1440, height: 940 });
     await page.goto('/');
-    await page.evaluate(mode => {
-      document.documentElement.dataset.colorScheme = mode;
-      document.documentElement.style.colorScheme = mode;
-      try { localStorage.setItem('dienstplanrad:color-scheme:v1', mode); } catch { /* egal */ }
-    }, scheme);
+    await setScheme(page, 'light');
     await page.selectOption('#yearSelect', '2026');
     await page.selectOption('#monthSelect', '7');
     await page.locator('#autoPlanBtn').click();
@@ -171,12 +181,17 @@ for (const scheme of ['light', 'dark']) {
     await page.waitForTimeout(1000);
 
     const findings = [];
+    // Geometrie ist vom Erscheinungsbild unabhängig und wird einmal gemessen;
+    // der Lesekontrast hängt an der Palette und wird in beiden geprüft.
     const collect = async where => {
       for (const entry of await page.evaluate(CLIPPED)) findings.push({ where, kind: 'abgeschnitten', ...entry });
       for (const entry of await page.evaluate(OVERLAPS)) findings.push({ where, kind: 'überlagert', ...entry });
-      // Lesbarkeit gehört zum Layoutvertrag: Was sichtbar ist, muss auch
-      // lesbar sein — in beiden Erscheinungsbildern.
-      for (const entry of await collectContrast(page)) findings.push({ where, kind: 'kontrast', ...entry });
+      for (const scheme of ['light', 'dark']) {
+        await setScheme(page, scheme);
+        await page.waitForTimeout(180);
+        for (const entry of await collectContrast(page)) findings.push({ where, scheme, kind: 'kontrast', ...entry });
+      }
+      await setScheme(page, 'light');
     };
 
     // Die Wahl der Laufansicht muss ohne Aufklappen sichtbar sein: Eine
