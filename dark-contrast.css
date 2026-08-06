@@ -1,0 +1,139 @@
+/* ==========================================================================
+   Lesekontrast im Dunkelmodus
+   ==========================================================================
+
+   Die Anwendung ist aus einer hellen Oberfläche gewachsen. Zwei Annahmen
+   stecken deshalb tief in den Grundregeln von `styles.css`:
+
+     1. Bedienelemente stehen auf einer weißen Fläche und tragen dunkle Schrift
+        (`button { background: linear-gradient(#fff …); color: #17202a }`).
+     2. Beschriftungen aus dem Monatskontrast sind dunkle Tinte auf hellem
+        Grund.
+
+   Im Dunkelmodus stimmt beides nicht mehr. Die zweite Annahme ist an der
+   Quelle behoben — der Farbdirektor rechnet seine Token seit dieser Fassung
+   für das aktive Erscheinungsbild. Die erste lässt sich dort nicht beheben:
+   Sie steht als feste Farbe in den Grundregeln, und jede Fläche, die davon
+   erbt, trug im Dunkeln dunkle Schrift auf dunklem Grund — Tageskacheln der
+   Mehrtagesauswahl, Dialogschaltflächen, Namen in der Plantabelle.
+
+   Diese Datei ist die eine Stelle, an der beide Annahmen für das dunkle
+   Erscheinungsbild aufgelöst werden. Sie wird zuletzt geladen und arbeitet
+   ausschließlich über `html[data-color-scheme="dark"]`; im Hellmodus ist sie
+   ohne jede Wirkung.
+   ========================================================================== */
+
+/* Bedienelemente ----------------------------------------------------------
+
+   Der Ausschluss ist der eigentliche Inhalt der Regel: Werkzeugleiste, Studio
+   und Auswahlfelder in der Tabelle bringen ihre eigene dunkle Behandlung mit.
+   Wer sie hier überschreibt, macht sie ein zweites Mal — mit dem Ergebnis,
+   dass am Ende keine der beiden Fassungen mehr stimmt. */
+html[data-color-scheme="dark"] :is(button, .file-btn):not(.tool-action):not(.assignment-btn):not(.cell-summary-button):not(.close-btn):not(.batch-day):not(.picker-option):not(.auto-plan-dialog *) {
+  background:
+    linear-gradient(180deg,
+      color-mix(in oklab, var(--v85-surface-muted) 86%, var(--month-accent) 14%),
+      color-mix(in oklab, var(--v85-surface) 92%, var(--month-accent) 8%));
+  border-color: color-mix(in oklab, var(--v85-border) 62%, transparent);
+  color: var(--v85-text);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, white 14%, transparent),
+    0 1px 2px rgba(0, 0, 0, .34);
+}
+
+html[data-color-scheme="dark"] :is(button, .file-btn):not(.tool-action):not(.auto-plan-dialog *):hover {
+  border-color: color-mix(in oklab, var(--month-accent) 52%, var(--v85-border));
+  background:
+    linear-gradient(180deg,
+      color-mix(in oklab, var(--v85-surface-muted) 74%, var(--month-accent) 26%),
+      color-mix(in oklab, var(--v85-surface) 84%, var(--month-accent) 16%));
+}
+
+/* Die weiße Lichtkante der hellen Schaltfläche liegt im Dunkeln als milchiger
+   Schleier über der eigenen Beschriftung. */
+html[data-color-scheme="dark"] button::before,
+html[data-color-scheme="dark"] .file-btn::before { display: none; }
+
+/* Flächen, die ihren Grund von der Zeile oder Kachel beziehen, dürfen keine
+   eigene bekommen — nur die Schrift muss aus der dunklen Palette stammen. */
+html[data-color-scheme="dark"] :is(.assignment-btn, .cell-summary-button, .batch-day, .batch-day *, .picker-option, .picker-option *) {
+  color: var(--v85-text);
+}
+html[data-color-scheme="dark"] :is(.batch-day, .picker-option) small,
+html[data-color-scheme="dark"] .assignment-btn .assignment-name:empty::after {
+  color: var(--v85-muted);
+}
+
+/* Der Gedankenstrich einer unbesetzten Zuweisung war der leiseste Text der
+   Anwendung: `--muted` der hellen Palette auf dunkler Zeile. */
+html[data-color-scheme="dark"] .assignment-btn { color: var(--v85-text); }
+
+/* Kopfflächen mit hellem Verlauf --------------------------------------------
+
+   `linear-gradient(#fff, transparent)` als Kopf einer Karte ergibt im Dunkeln
+   eine weiße Bank, auf der die helle Überschrift verschwindet. */
+html[data-color-scheme="dark"] .picker-header {
+  background: linear-gradient(180deg,
+    color-mix(in oklab, var(--v85-surface-muted) 82%, var(--month-accent) 18%),
+    transparent);
+  border-bottom-color: color-mix(in oklab, var(--v85-border) 60%, transparent);
+}
+html[data-color-scheme="dark"] .picker-role { color: color-mix(in oklab, var(--month-accent) 72%, white 28%); }
+html[data-color-scheme="dark"] .picker-current { color: var(--v85-muted); }
+html[data-color-scheme="dark"] .picker-current strong { color: var(--v85-text); }
+
+/* Der ausgewählte Reiter der Einstellungen trug einen hellen Verlauf und
+   gleichzeitig die helle Schrift der dunklen Palette. */
+html[data-color-scheme="dark"] .settings-tabs button[aria-selected="true"] {
+  color: var(--v85-text);
+}
+
+/* Textfarben aus dem Hellmodus ---------------------------------------------
+
+   Feste Grauwerte (`#67717c`, `#30363d`) sind auf dunklem Grund kaum vom
+   Hintergrund zu unterscheiden. */
+html[data-color-scheme="dark"] :is(.subline, .status-wrap, .section-note, .picker-empty, .issue-text span, .rbn2-inactive-note) {
+  color: var(--v85-muted);
+}
+html[data-color-scheme="dark"] :is(.eyebrow, .issue-text strong) { color: var(--v85-text); }
+
+/* Auto-Plan Studio --------------------------------------------------------
+
+   Das Studio bringt eine ausführliche dunkle Fassung mit — drei Flächen sind
+   ihr aber entgangen, weil sie ihre Farbe aus dem Monatsakzent *auf Weiß*
+   mischen: die Kopfleiste, die Fußleiste und die Startschaltfläche. Im Dunkeln
+   standen dort helle Beschriftungen auf einer fast weißen Bank.
+
+   Die Selektoren sind absichtlich eine Stufe spezifischer als die des Studios:
+   Dessen Stylesheet wird erst beim Öffnen des Dialogs nachgeladen und stünde
+   sonst später in der Kaskade. */
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-header {
+  background-image: linear-gradient(180deg,
+    color-mix(in oklab, var(--v85-surface-muted) 78%, var(--month-accent) 22%),
+    transparent);
+}
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-footer {
+  background-image: linear-gradient(0deg,
+    color-mix(in oklab, var(--v85-surface-muted) 82%, var(--month-accent) 18%),
+    transparent);
+}
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-footer button.auto-plan-start,
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-footer button {
+  background-image: linear-gradient(180deg,
+    color-mix(in oklab, var(--v85-surface-muted) 72%, var(--month-accent) 28%),
+    color-mix(in oklab, var(--v85-surface) 84%, var(--month-accent) 16%));
+  border-color: color-mix(in oklab, var(--month-accent) 46%, var(--v85-border));
+  color: var(--v85-text);
+}
+html[data-color-scheme="dark"] .auto-plan-dialog button.auto-plan-mini {
+  background-image: none;
+  background-color: color-mix(in oklab, var(--v85-surface-muted) 88%, var(--month-accent) 12%);
+  border-color: color-mix(in oklab, var(--v85-border) 62%, transparent);
+  color: var(--v85-text);
+}
+html[data-color-scheme="dark"] .auto-plan-dialog .auto-plan-close {
+  background-image: none;
+  background-color: color-mix(in oklab, var(--v85-surface-muted) 84%, var(--month-accent) 16%);
+  border-color: color-mix(in oklab, var(--v85-border) 62%, transparent);
+  color: var(--v85-text);
+}

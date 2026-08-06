@@ -141,6 +141,7 @@ export function mixOklch(fromRgb, toRgb, amount) {
   );
 }
 const mixWithWhite = (color, amount) => mixOklch([255, 255, 255, 1], color, amount);
+const mixWithBase = (color, amount, dark) => mixOklch(dark ? DARK_BASE : [255, 255, 255, 1], color, amount);
 
 export function perceptualDistance(first, second) {
   const a = rgbToOklab(first);
@@ -403,18 +404,49 @@ export function colorProfileForDate(year, month) {
   return Object.freeze({ ...canonical, key: `${safeYear}-${String(safeMonth).padStart(2, '0')}`, year: safeYear });
 }
 
-export function spectrumVariables(palette) {
+/**
+ * Die Grundfläche, in die der Monatsakzent eingemischt wird.
+ *
+ * Im hellen Erscheinungsbild ist das Weiß. Im dunklen wäre es das genaue
+ * Gegenteil: Eine Wochenendzeile ist dort keine aufgehellte, sondern eine
+ * angehobene dunkle Fläche. Wird trotzdem gegen Weiß gemischt, entstehen
+ * cremefarbene Inseln in einer dunklen Oberfläche — und jede Beschriftung
+ * darauf, die auf die dunkle Palette gerechnet ist, wird unlesbar.
+ */
+const DARK_BASE = Object.freeze([21, 28, 36, 1]);
+
+/**
+ * Die Farbtoken des Monats für ein Erscheinungsbild.
+ *
+ * `scheme` entscheidet über Grundfläche und Tinte, nicht über den Farbton:
+ * Der Monatskontrast bleibt in beiden Fällen derselbe Farbton, er wird nur
+ * einmal auf Weiß und einmal auf die dunkle Grundfläche abgebildet. Ohne
+ * diesen Parameter schrieb der Direktor immer die hellen Werte — und weil er
+ * sie mit `!important` an die Wurzel setzt, konnte kein Stylesheet sie im
+ * Dunkelmodus noch korrigieren.
+ */
+export function spectrumVariables(palette, { scheme = 'light' } = {}) {
   const accent = palette.accent;
   const [L, C, h] = labToLch(rgbToOklab(accent));
   const strong = oklchToRgb(clamp(L - .16, .40, .52), C * .94, h);
-  const ink = oklchToRgb(.285, clamp(C * .72, .055, .14), h);
+  const dark = scheme === 'dark';
+  // Im Dunkeln ist die Tinte hell und der kräftige Akzent muss aufhellen statt
+  // abzudunkeln — sonst steht er als dunkle Schrift auf dunklem Grund.
+  const ink = dark
+    ? oklchToRgb(.955, Math.min(.035, C * .34), h)
+    : oklchToRgb(.285, clamp(C * .72, .055, .14), h);
   const values = {
     '--month-accent': accent,
-    '--month-accent-strong': strong,
+    '--month-accent-strong': dark ? oklchToRgb(clamp(L + .10, .74, .88), C * .86, h) : strong,
     '--month-ink': ink,
     '--month-glow': [...oklchToRgb(clamp(L + .04, .60, .78), C * 1.04, h).slice(0, 3), .38],
-    '--month-panel-tint': [...mixWithWhite(accent, .22).slice(0, 3), .28]
+    '--month-panel-tint': [...mixWithBase(accent, .22, dark).slice(0, 3), .28]
   };
-  for (const [name, amount] of Object.entries(SURFACE_MIX)) values[name] = mixWithWhite(accent, amount);
+  for (const [name, amount] of Object.entries(SURFACE_MIX)) {
+    // Im Dunkeln trägt dieselbe Staffelung weniger weit: Der Abstand zwischen
+    // Werktag, Samstag, Sonntag und Feiertag entsteht dort über die Anhebung
+    // der Fläche, und die verträgt weniger Sättigung als eine Aufhellung.
+    values[name] = mixWithBase(accent, dark ? amount * .62 : amount, dark);
+  }
   return values;
 }

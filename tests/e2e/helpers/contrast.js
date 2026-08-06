@@ -31,13 +31,35 @@ const CONTRAST_HELPERS = `
       a: 1
     };
   }
+  /**
+   * Der hellste Farbstopp eines Verlaufs.
+   *
+   * Eine Schaltfläche trägt ihre Fläche oft als \`background-image\`, nicht als
+   * \`background-color\`. Wer nur die Farbe liest, misst gegen die Fläche des
+   * Elternelements und meldet Fehler, wo keine sind — oder schlimmer: übersieht
+   * eine weiße Bank unter weißer Schrift. Gewertet wird der hellste Stopp: Er
+   * ist der ungünstigste Fall für helle Schrift.
+   */
+  function gradientLayer(style) {
+    const image = style.backgroundImage;
+    if (!image || image === 'none') return null;
+    const stops = [...String(image).matchAll(/rgba?\([^)]+\)/g)]
+      .map(match => parseColor(match[0]))
+      .filter(color => color && color.a > 0.35);
+    if (!stops.length) return null;
+    return stops.reduce((brightest, color) => (luminance(color) > luminance(brightest) ? color : brightest));
+  }
   function effectiveBackground(element) {
     let current = element;
     let stack = { r: 255, g: 255, b: 255, a: 1 };
     const layers = [];
     while (current && current.nodeType === 1) {
-      const color = parseColor(getComputedStyle(current).backgroundColor);
+      const style = getComputedStyle(current);
+      const gradient = gradientLayer(style);
+      if (gradient) layers.push(gradient);
+      const color = parseColor(style.backgroundColor);
       if (color && color.a > 0) layers.push(color);
+      if (gradient && gradient.a >= 0.999) break;
       if (color && color.a >= 0.999) break;
       current = current.parentElement;
     }

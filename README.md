@@ -65,10 +65,38 @@ Der Schalter wechselt direkt zwischen `light` und `dark` und trägt ausschließl
 Sonnen- beziehungsweise Mondpiktogramm – ohne sichtbare Beschriftung. Die Anwendung
 startet standardmäßig im hellen Erscheinungsbild; eine ausdrücklich gespeicherte
 Auswahl bleibt erhalten. Die Auswahl wird lokal gespeichert und vor Abschluss des
-Anwendungs-Bootstraps angewendet, damit kein Farbblitz entsteht. Im Dunkelmodus
-werden die Farbtoken der gesamten Anwendung kohärent auf die dunkle Palette
-abgebildet – Tabellen, Badges, Picker, Dialoge, Einstellungen und Formulare
-besitzen damit durchgehend lesbare Kontraste.
+Anwendungs-Bootstraps angewendet, damit kein Farbblitz entsteht.
+
+**Die Monatstoken werden für das aktive Erscheinungsbild gerechnet.** Der
+Farbdirektor schrieb seine Variablen früher immer für eine weiße Fläche:
+`--month-ink` war dunkle Tinte, `--saturday-row-bg` eine aufgehellte Fläche.
+Er setzt sie als Inline-Wert mit `!important` an `<html>` — kein Stylesheet
+konnte das im Dunkelmodus noch korrigieren. Entsprechend stand dunkle Tinte auf
+dunklem Grund, und cremefarbene Wochenendflächen lagen als helle Inseln in der
+dunklen Oberfläche. `spectrumVariables(palette, { scheme })` kennt jetzt das
+Erscheinungsbild: Der Farbton des Monats bleibt derselbe, er wird nur einmal
+auf Weiß und einmal auf die dunkle Grundfläche abgebildet. Ein Wechsel des
+Erscheinungsbilds rechnet die Token neu.
+
+**Was sich nicht an der Quelle lösen lässt, steht in `dark-contrast.css`.** Die
+Grundregeln in `styles.css` setzen für Bedienelemente eine weiße Fläche mit
+fester dunkler Schrift. Alles, was davon erbt, trug im Dunkelmodus dunkle
+Schrift auf dunklem Grund — die Tageskacheln der Mehrtagesauswahl, die
+Schaltflächen der Dialoge, die Namen in der Plantabelle, die Kopf- und
+Fußleiste des Studios. Diese Datei wird zuletzt geladen, wirkt ausschließlich
+über `html[data-color-scheme="dark"]` und ist im Hellmodus ohne jede Wirkung.
+
+Für den Druck gelten weiterhin die hellen Werte: Papier ist weiß, und
+`prepareForPrint` stellt sie für die Dauer des Drucks her. Der PDF-Export
+rechnet ohnehin mit den hellen Token, weil er das Blatt selbst erzeugt.
+
+**Gemessen statt behauptet.** `tests/e2e/dark-contrast.spec.js` führt die
+Kontrastmessung über Hauptansicht, Einstellungen, Abwesenheiten, Wünsche,
+Auswahldialog und Studio. Die Messung selbst war zuvor blind für Verläufe: Sie
+las nur `background-color`, und die Flächen der Bedienelemente sind Verläufe —
+eine weiße Bank unter weißer Schrift fiel damit durch. Sie wertet jetzt den
+hellsten Farbstopp eines Verlaufs, also den ungünstigsten Fall für helle
+Schrift.
 
 Die Monatskontrastfarbe bleibt in beiden Modi die Akzentquelle für:
 
