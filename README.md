@@ -323,6 +323,28 @@ weiße Flächen aus einer Zeit ohne Dunkelmodus und die kräftige Monatsfarbe al
 Schriftfarbe auf dunklem Grund — gemessene 1,3:1. Beides ist behoben; beide
 Erscheinungsbilder sind bei allen fünf Breiten grün.
 
+#### Der Layoutvertrag der drei Studiozustände
+
+Diese erste Prüfung sah den Dialog allerdings nur im Parameterzustand — und
+genau deshalb blieb unbemerkt, dass die Ergebnisansicht jede Karte auf 22 Pixel
+zusammenquetschte und der fertige Monatsvorschlag unerreichbar war.
+`tests/e2e/studio-layout-v10-5.spec.js` schließt diese Lücke: Er durchläuft
+**Parameter, Lauf und Ergebnis** in beiden Erscheinungsbildern und prüft drei
+Zusagen.
+
+- **Nichts verschwindet.** Kein Kasten, der seinen Inhalt beschneidet, darf mehr
+  Inhalt haben, als er zeigt. Zonen mit eigener Bildlaufleiste sind ausgenommen —
+  dort ist der Inhalt erreichbar. Absolut positioniertes Dekor zählt nicht mit.
+- **Nichts überlagert sich.** Keine zwei im Fluss stehenden Geschwister dürfen
+  sich schneiden.
+- **Alles bleibt lesbar,** gemessen gegen den tatsächlich wirksamen Hintergrund.
+
+Daraus folgt der Vertrag, an dem sich die Layoutschicht ausrichtet: `min-width: 0`
+gilt überall, `min-height: 0` **ausschließlich** für Zonen, die ihren Überlauf
+selbst scrollen. Die automatische Mindesthöhe ist der einzige Mechanismus, der
+eine Karte davor bewahrt, unter ihren Inhalt zusammenzufallen; wer sie pauschal
+abschaltet, macht Inhalte unerreichbar statt sie unterzubringen.
+
 ## 5. Performance für Windows 11 und Chrome
 
 - rechenintensive Konstruktion und Perfektion in Modul-Web-Workern;
@@ -447,6 +469,8 @@ tests/auto-plan-v8-5.test.js       Solver- und Integrationsverträge
 tests/auto-plan-v10.test.js        Modell-, Kaskaden-, Leximin- und Kennzahlenverträge
 tests/e2e/v8-5-shell.spec.js       Browser-, Bootstrap- und Observer-Regressionen
 tests/e2e/layout-contrast-v10-5.spec.js  Überlappungsfreiheit und WCAG-AA-Kontrast
+tests/e2e/studio-layout-v10-5.spec.js    Layoutvertrag der drei Studiozustände
+tests/e2e/helpers/contrast.js            gemeinsame WCAG-Kontrastmessung
 ```
 
 `js/auto-planner-v9.js` und `js/auto-plan-cp-sat.js` sind in v10.5 entfallen:

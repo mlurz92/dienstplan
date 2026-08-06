@@ -133,6 +133,60 @@ dunklem Grund (gemessene 1,3:1).
   belegt, dass es keine bloßen Bezeichner mehr enthält und die WASM-Datei
   danebenliegt.
 
+### Dritte Prüfrunde – Layout aller drei Studiozustände
+
+Ausgangspunkt waren drei Meldungen aus dem laufenden Betrieb: eine Leiste, die
+etwas überdeckt; unlesbar kleine Schrift neben der Animation; und ein fertiger
+Monatsvorschlag, der nirgends zu sehen war. Alle drei ließen sich auf messbare
+Layoutfehler zurückführen.
+
+- **Die Ergebnisansicht quetschte jede Karte auf 22 Pixel.** Die Grundsicherung
+  gegen Überlauf setzte `min-height: 0` auf jede Karte. Genau diese automatische
+  Mindestgröße verhindert aber, dass ein Gitterkind unter seinen Inhalt
+  schrumpft. In der Ergebniszone mit fester Höhe fielen dadurch Suchnachweis,
+  Vorschlagstabelle und Verteilungsbild zu leeren Streifen zusammen — der
+  fertige Vorschlag war unerreichbar. Die Höhe wird jetzt nur noch dort
+  freigegeben, wo die Zone ihren Überlauf selbst scrollt.
+- **Tabellen waren pauschal `display: block`.** Das hebt das Tabellenlayout auf:
+  Spalten verlieren ihre gemeinsame Breite, der klebende Kopf seinen Bezug. Jetzt
+  scrollt der Rahmen, nicht die Tabelle; der Kopf bleibt beim Blättern stehen.
+- **Die Container-Abfrage der Laufansicht zielte auf ihren eigenen Container.**
+  Eine Abfrage wirkt nur auf Nachfahren — die zweispaltige Aufteilung wurde nie
+  wirksam, Animation und Konsole standen immer untereinander, und die Leinwand
+  behielt gut zweihundert Pixel Höhe. Container ist jetzt der Dialogkörper.
+- **Die Laufkonsole ließ ihre Zeilen auf null Pixel schrumpfen.** Strangleiste
+  und alte Phasenliste behielten dabei ihren sichtbaren Inhalt und malten ihn
+  über die Stufenleiste — die gemeldete Überlagerung. Jede Zeile behält jetzt
+  ihre Eigenhöhe, allein das Protokoll teilt sich den Rest. Die doppelte
+  Phasenliste entfällt.
+- **Engine-Band und Null-Rot-Guardrail standen in impliziten Gitterzeilen** ohne
+  Bereichszuweisung und trugen als beschneidende Kästen nur ihren Innenabstand
+  zur Zeilenhöhe bei: 54 Pixel für knapp 300 Pixel Inhalt. Beide haben jetzt
+  eine eigene Zeile über die volle Breite.
+- **Die Kristallisation schnitt unten ab und war rechts unlesbar.** Die
+  Lastwaage schrieb ihre Überschrift *oberhalb* der eigenen Zone und verwarf
+  stillschweigend jeden Balken, der nicht mehr passte; die Prioritätsleiter
+  rechnete die Zeilenhöhe bis auf wenige Pixel herunter, während die Schrift
+  fest bei zehn Pixeln blieb. Jetzt gilt eine Mindestzeilenhöhe, jede Zone
+  beschneidet ihre eigene Zeichnung, Beschriftungen werden auf die verfügbare
+  Breite gemessen und gekürzt, und die Lastwaage wechselt in flachen Zonen auf
+  Säulen — so bleibt die gesamte Belegschaft sichtbar.
+- **Abstandsrhythmus:** 14 Pixel Zonenrand, 12 Pixel zwischen den Karten, mehr
+  Raum nach unten. Text klebt nicht mehr an der Kante, ohne Fläche zu verschenken.
+- **Dunkelmodus, zweite Runde:** Die Kontrastmessung sah den Dialog bisher nur im
+  Parameterzustand. Über alle drei Zustände gemessen fanden sich 70 Stellen mit
+  1,06:1 bis 1,74:1 — heller Text auf fest verdrahteter heller Fläche in
+  Laufmetriken, Zustandsbanner, Suchnachweis und Rot-Prüfung. Fläche und Schrift
+  sind dort gemeinsam auf die Dunkelpalette gelegt. Die Statusmarken der
+  Vorschlagstabelle lagen im Hellmodus bei 3,8:1 und tragen jetzt einen
+  dunkleren Ton derselben Signalfarbe.
+- **Neuer Test `tests/e2e/studio-layout-v10-5.spec.js`:** Er durchläuft
+  Parameter, Lauf und Ergebnis in beiden Erscheinungsbildern und prüft drei
+  Zusagen — nichts wird abgeschnitten, nichts überlagert sich, alles bleibt
+  lesbar — und dass die Vorschlagstabelle am Ende tatsächlich sichtbare
+  Tageszeilen hat. Die Kontrastmessung liegt jetzt in
+  `tests/e2e/helpers/contrast.js` und wird von beiden Layouttests genutzt.
+
 ### Mathematisches Audit der Heuristik
 
 - **UCB-Normierung:** Der Ausbeutungsterm der kostenbewussten Operatorwahl war
