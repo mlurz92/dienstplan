@@ -25,7 +25,9 @@ test('director updates run as one continuous transition instead of a hard write'
   assert.match(initializer, /new MutationObserver\(update\)/);
   assert.match(initializer, /monthSelect'\)\?\.addEventListener\('change', update\)/);
   assert.match(initializer, /yearSelect'\)\?\.addEventListener\('change', update\)/);
-  assert.match(colorDirector, /export function applySpectrumProfile\(year, month, \{ animate = true \} = \{\}\)/);
+  // Das Erscheinungsbild ist ein zweiter Parameter mit Vorgabewert: Der Aufruf
+  // aus der Oberfläche bleibt unverändert, der Druck kann Hell erzwingen.
+  assert.match(colorDirector, /export function applySpectrumProfile\(year, month, \{ animate = true, scheme = activeScheme\(\) \} = \{\}\)/);
 });
 
 test('a running transition towards the same month is never restarted', () => {
@@ -99,6 +101,7 @@ test('the base theme never overwrites the colours owned by the director', () => 
 
 test('printing settles the director transition instead of the base theme', () => {
   const prepare = app.slice(app.indexOf('function prepareForPrint()'), app.indexOf('function restoreAfterPrint()'));
-  assert.match(prepare, /applySpectrumProfile\(resolveThemeYear\(state\.currentYear\), state\.currentMonth, \{ animate: false \}\)/);
+  // Papier ist weiß: Der Druck erzwingt die hellen Monatstoken.
+  assert.match(prepare, /applySpectrumProfile\(resolveThemeYear\(state\.currentYear\), state\.currentMonth, \{ animate: false, scheme: 'light' \}\)/);
   assert.match(app, /import \{ applySpectrumProfile \} from '\.\/color-director\.js\?v=20260806\.1';/);
 });

@@ -519,6 +519,70 @@ function candidateKey(candidate, role, strategy) {
     : [LEVEL_RANK[candidate.evaluation?.level] ?? 9, ...vector.map(value => -value), load, aaHg, currentHg, candidate.order];
 }
 
+/**
+ * Bleibt der Nachbardienst derselben Person gültig, wenn dieses Feld besetzt
+ * wird?
+ *
+ * Die Kandidatenprüfung bewertet immer nur das Feld, das gerade besetzt wird.
+ * Mehrere Regeln des Regelwerks sind aber gerichtet: „BD am Vortag: Folgetag
+ * ist dienstfrei" wertet den **Hintergrunddienst** ab, nicht den
+ * Bereitschaftsdienst, der ihn ungültig macht. Wird der HG zuerst gesetzt und
+ * der BD des Vortags später, sieht die Kandidatenprüfung des BD nichts — und
+ * die Bewertung des HG stammt aus einer Zeit, in der der BD noch nicht stand.
+ *
+ * Der Suchstrahl trug solche Knoten deshalb bis zum Ende durch, und erst das
+ * Schlussaudit prüfte wieder frisch. Ergebnis: Ein vollständiger Monat kam mit
+ * zwei bis vier nicht wählbaren Zuweisungen aus der Konstruktion, wurde vom
+ * Audit verworfen — und der Lauf meldete am Ende null Vorschläge bei 56 offenen
+ * Feldern. Nicht die Suche war zu schwach, sie prüfte nur in die falsche
+ * Richtung.
+ *
+ * Das Fenster umfasst drei Kalendertage in beide Richtungen. Das ist keine
+ * runde Zahl, sondern die Reichweite der weitesten gerichteten Regel: Der
+ * Freizeitausgleich nach einem Samstags-BD sperrt den nächsten regulären
+ * Werktag, über ein Wochenende hinweg also den übernächsten Tag. Alles
+ * darüber hinaus prüft das Regelwerk symmetrisch — ein BD-Wochenende neben
+ * einem BD-Wochenende sieht beide Seiten und fällt schon bei der zweiten
+ * Zuweisung auf.
+ */
+const NEIGHBOUR_WINDOW = [-3, -2, -1, 1, 2, 3];
+
+function neighbourRemainsValid({ state, monthData, dateIso, role, staffId, mode, stats }) {
+  const neighbours = [];
+  // Der Kalendertag wird einmal geparst; die Prüfung läuft je Kandidat, und
+  // sechs Datumsobjekte je Kandidat summieren sich über hunderttausend
+  // Bewertungen spürbar.
+  const anchor = parseIso(dateIso);
+  for (const offset of NEIGHBOUR_WINDOW) {
+    const date = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() + offset);
+    const iso = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    const day = monthData?.days?.[iso];
+    if (!day) continue;
+    for (const otherRole of ROLE_ORDER) {
+      if (day[otherRole] === staffId) neighbours.push({ dateIso: iso, role: otherRole });
+    }
+  }
+  if (!neighbours.length) return true;
+
+  const probe = {
+    ...monthData,
+    days: { ...monthData.days, [dateIso]: { ...monthData.days[dateIso], [role]: staffId } }
+  };
+  const sandbox = simulatedState(state, probe);
+  syncPeerCache(probe);
+  try {
+    for (const neighbour of neighbours) {
+      stats.candidateEvaluations += 1;
+      const evaluation = evaluateCandidate({ state: sandbox, monthData: probe, ...neighbour, staffId });
+      if (evaluation?.canSelect === false || evaluation?.level === 'gray') return false;
+      if (mode === SEARCH_MODE.STRICT && evaluation?.level === 'red') return false;
+    }
+    return true;
+  } finally {
+    syncPeerCache(monthData);
+  }
+}
+
 function createCandidateResolver(state, mode, strategy, config, stats) {
   const cache = new WeakMap();
   return (monthData, dateIso, role) => {
@@ -542,6 +606,10 @@ function createCandidateResolver(state, mode, strategy, config, stats) {
       if (mode === SEARCH_MODE.STRICT && candidate.evaluation?.level === 'red') return false;
       if (!respectsLimits(monthData, candidate.person.id, role, config, ledgerFor(monthData, stats))) {
         stats.limitRejects += 1;
+        return false;
+      }
+      if (!neighbourRemainsValid({ state, monthData, dateIso, role, staffId: candidate.person.id, mode, stats })) {
+        stats.neighbourRejects += 1;
         return false;
       }
       return true;
@@ -962,11 +1030,29 @@ function exactComplete({ state, seeds, baseline, config, mode, candidatesFor, bu
 }
 
 async function runPass({ state, baseline, config, mode, strategy, width, branch, exactBudget, lookahead, label, progressStart, progressSpan, passIndex, onProgress, signal }) {
-  const stats = { id: `${mode}-${strategy}-${passIndex}`, mode, strategy, beamWidth: width, branchLimit: branch, exploredNodes: 0, generatedNodes: 0, candidateEvaluations: 0, limitRejects: 0, deadEnds: 0, exactNodes: 0, forwardChecks: 0, forwardChecksAtSlot: 0, maxBeam: 1, assignmentLedgerHits: 0, assignmentLedgerMisses: 0, complete: false };
+  const stats = { id: `${mode}-${strategy}-${passIndex}`, mode, strategy, beamWidth: width, branchLimit: branch, exploredNodes: 0, generatedNodes: 0, candidateEvaluations: 0, limitRejects: 0, neighbourRejects: 0, deadEnds: 0, exactNodes: 0, forwardChecks: 0, forwardChecksAtSlot: 0, maxBeam: 1, assignmentLedgerHits: 0, assignmentLedgerMisses: 0, complete: false };
   const candidatesFor = createCandidateResolver(state, mode, strategy, config, stats);
   let beam = [emptyNode(clone(baseline), stats)];
   const allSlots = baselineOpenSlots(baseline);
   let processed = 0;
+
+  /**
+   * Der tiefste Suchstrahl, der noch Varianten getragen hat.
+   *
+   * Bricht der Strahl zusammen — weil ein Feld keinen zulässigen Kandidaten
+   * mehr hat oder die Auslese alle Nachfolger verwirft —, war die gesamte
+   * bereits aufgebaute Belegung verloren: Der Lauf endete auf dem leeren
+   * Ausgangsmonat und meldete null Vorschläge. Bei einem vollen Monat mit
+   * achtköpfigem Team passiert genau das; nach anderthalb Minuten Rechenzeit
+   * stand die Meldung „keine vollständige Belegung · 56 Felder offen", ohne
+   * dass ein einziges der 50 lösbaren Felder vorgeschlagen worden wäre.
+   *
+   * Der Rückfall bewahrt stattdessen den letzten tragfähigen Stand. Er ist
+   * unvollständig und wird als solcher ausgewiesen — aber er zeigt, wo der
+   * Monat wirklich klemmt, und der exakte Abschluss weiter unten kann von dort
+   * aus die letzten Felder schließen.
+   */
+  let fallback = beam;
 
   let remaining = [...allSlots];
   while (remaining.length && beam.length) {
@@ -974,6 +1060,7 @@ async function runPass({ state, baseline, config, mode, strategy, width, branch,
       const selected = selectNextSlot(beam[0], remaining, candidatesFor);
       if (!selected?.domain) {
         stats.deadEnds += beam.length;
+        fallback = beam;
         beam = [];
         break;
       }
@@ -993,6 +1080,7 @@ async function runPass({ state, baseline, config, mode, strategy, width, branch,
         }
       }
       beam = pruneBeam({ state, nodes: expanded, baseline, config, mode, futureSlots: future, candidatesFor, width, lookahead, stats });
+      if (beam.length) fallback = beam;
       remaining = roleRemaining;
       processed += 1;
       await report(onProgress, {
@@ -1004,9 +1092,13 @@ async function runPass({ state, baseline, config, mode, strategy, width, branch,
       await yieldToBrowser();
   }
 
-  let best = selectBest(state, beam.length ? beam : [emptyNode(clone(baseline))], baseline, config);
-  if (best?.objective.unfilled > 0 && beam.length) {
-    const exact = exactComplete({ state, seeds: beam.slice(0, 8), baseline, config, mode, candidatesFor, budget: exactBudget, signal, stats });
+  const seeds = beam.length ? beam : fallback;
+  let best = selectBest(state, seeds, baseline, config);
+  // Gerade der zusammengebrochene Strahl ist der Fall, in dem der exakte
+  // Abschluss am meisten leistet: Es sind nur noch wenige Felder offen, und
+  // sein Budget ist ohnehin auf eine Handvoll Restfelder begrenzt.
+  if (best?.objective.unfilled > 0 && seeds.length) {
+    const exact = exactComplete({ state, seeds: seeds.slice(0, 8), baseline, config, mode, candidatesFor, budget: exactBudget, signal, stats });
     if (exact && compareVectors(exact.objective.key, best.objective.key) < 0) best = exact;
   }
   stats.complete = Boolean(best && !best.objective.unfilled && admissible(best.objective, mode));
