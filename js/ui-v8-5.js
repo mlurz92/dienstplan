@@ -17,7 +17,7 @@ const ACTION_COPY = Object.freeze({
   reloadBtn: ['Neu laden', 'Den aktuellen Monat erneut vom Server laden; lokale Änderungen bleiben geschützt.'],
   dataImportInput: ['Importieren', 'Jahresmappe, Monatsplan oder Neuroradiologie-Hintergrunddienstplan einlesen — als Excel-Mappe oder als PDF-Ausdruck. Eine JSON-Sicherung stellt denselben Weg den Gesamtstand wieder her.'],
   exportExcelBtn: ['Excel', 'Den sichtbaren Monatsplan als Excel-Arbeitsmappe exportieren.'],
-  exportPdfBtn: ['PDF', 'Die druckoptimierte Monatsansicht öffnen und als PDF ausgeben.'],
+  exportPdfBtn: ['PDF', 'Den Monatsplan als PDF-Datei herunterladen — A4 hochkant, eine Seite.'],
   exportJsonBtn: ['Sichern', 'Eine vollständige, wieder einlesbare JSON-Sicherung aller Plandaten erstellen.'],
   settingsBtn: ['Einstellungen', 'Darstellung, Arbeitsweise und Auto-Plan-Voreinstellungen öffnen.'],
   autoPlanBtn: ['Auto-Plan', 'Auto-Plan Studio v9 öffnen, die hybride exakte Suche (CP-SAT) parametrieren und den vollständigen Monatsvorschlag prüfen.']

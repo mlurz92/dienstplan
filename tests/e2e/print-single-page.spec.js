@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { DEFAULT_STAFF } from '../../js/defaults.js';
+import { readFile } from 'node:fs/promises';
 
 /**
  * Der Ausdruck passt auf **eine** DIN-A4-Seite hochkant.
@@ -156,18 +157,26 @@ test('der Ausdruck trägt Kopf, alle Planspalten und die reduzierte Statistik', 
   await page.emulateMedia({ media: 'screen' });
 });
 
-test('der PDF-Export heißt „Dienstplan JJJJ-MM"', async ({ page }) => {
+test('der PDF-Export lädt „Dienstplan JJJJ-MM.pdf" direkt herunter', async ({ page }) => {
   await mockApi(page);
   await page.goto('/');
-  await page.evaluate(() => { window.print = () => {}; });
   await page.selectOption('#yearSelect', '2026');
   await page.selectOption('#monthSelect', '9');
   await page.waitForTimeout(400);
 
-  // Der Dateiname stammt in allen gängigen Browsern aus dem Dokumenttitel.
-  await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
-  expect(await page.title()).toBe('Dienstplan 2026-09');
+  // Kein Druckdialog mehr: Der Klick liefert die fertige Datei. Wäre der Weg
+  // noch `window.print()`, käme hier nie ein Download an.
+  const [exported] = await Promise.all([
+    page.waitForEvent('download'),
+    page.click('#exportPdfBtn')
+  ]);
+  expect(exported.suggestedFilename()).toBe('Dienstplan 2026-09.pdf');
 
-  await page.evaluate(() => window.dispatchEvent(new Event('afterprint')));
-  expect(await page.title()).not.toBe('Dienstplan 2026-09');
+  const raw = (await readFile(await exported.path())).toString('latin1');
+  expect(raw.startsWith('%PDF')).toBe(true);
+  expect(pdfPageCount(Buffer.from(raw, 'latin1'))).toBe(1);
+  expect(raw).toContain('(September 2026) Tj');
+  expect(raw).toContain('(BEREITSCHAFTSDIENSTPLAN) Tj');
+  // Zwölf Mitarbeitende, volle Belegung — der Ungünstigstfall bleibt einseitig.
+  expect(raw).toContain('(Offen) Tj');
 });

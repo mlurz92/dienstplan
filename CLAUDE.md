@@ -29,6 +29,7 @@ nicht nach jede Änderung.** Maßgeblich ist, was die Änderung berühren kann:
 | Regelengine (`js/rules*.js`) | `npm test` |
 | Dateiimport (`js/*-import.js`) | `node --test tests/pdf-import.test.js tests/file-import.test.js tests/excel-import.test.js` |
 | Auto-Plan-Engine/Modell/Solver | `node --test tests/auto-plan-v10.test.js` und die betroffene Regeldatei |
+| PDF-Export (`js/pdf-document.js`, `js/pdf-export.js`) | `node --test tests/pdf-export.test.js` |
 | Druckausgabe (`styles.css` `@media print`) | `tests/e2e/print-single-page.spec.js` |
 | Studio-Layout | `tests/e2e/studio-layout-v10-5.spec.js` |
 | **Vor Commit und Merge** | `npm run check && npm test`, Browsertests nur für die berührten Flächen |
@@ -82,6 +83,8 @@ js/auto-plan-solver.js    Brücke zur CP-SAT-WebAssembly-Bindung
 js/auto-planner-v10.js    lexikografische Kaskade, Leximin, Konfliktdiagnose
 js/auto-plan-studio-*.js  Oberfläche des Studios, additiv geschichtet
 js/app.js                 Monatsansicht, Rendering, Druckvorbereitung
+js/pdf-document.js        minimaler PDF-Schreiber (Flächen, Linien, Text)
+js/pdf-export.js          Satzbild des Monatsblatts, Direktdownload
 js/file-import.js         ein Eingang für Excel, PDF und JSON
 js/pdf-import.js          Textpositionen zu Tabellenzeilen (pdf.js)
 functions/                Cloudflare Pages Functions (KV-Zugriff)

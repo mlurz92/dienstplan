@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 
 function emptyMonth(year, month) {
   const days = {};
@@ -34,7 +35,7 @@ const readSurface = page => page.evaluate(() => ({
   badge: document.getElementById('monthPaletteLabel')?.textContent || ''
 }));
 
-test('PDF-Export lässt den Monatskontrast unverändert und kräftig', async ({ page }) => {
+test('Der PDF-Export lässt den Monatskontrast auf dem Bildschirm unverändert', async ({ page }) => {
   await mockApi(page);
   await page.goto('/');
   await page.evaluate(() => { window.print = () => {}; });
@@ -56,7 +57,11 @@ test('PDF-Export lässt den Monatskontrast unverändert und kräftig', async ({ 
   const before = await readSurface(page);
   expect(before.priority).toBe('important');
 
-  await page.click('#exportPdfBtn');
+  const [exported] = await Promise.all([
+    page.waitForEvent('download'),
+    page.click('#exportPdfBtn')
+  ]);
+  expect(exported.suggestedFilename()).toBe('Dienstplan 2026-07.pdf');
   const duringExport = await readSurface(page);
   expect(duringExport).toEqual(before);
 
@@ -75,11 +80,10 @@ test('PDF-Export lässt den Monatskontrast unverändert und kräftig', async ({ 
   expect(await readSurface(page)).toEqual(before);
 });
 
-test('Druck während des Farbverlaufs friert die Zielfarbe ein, nicht einen Zwischenton', async ({ page }) => {
+test('Ein Export mitten im Farbverlauf trägt die Zielfarbe, nicht einen Zwischenton', async ({ page }) => {
   await mockApi(page);
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.goto('/');
-  await page.evaluate(() => { window.print = () => {}; });
   await page.selectOption('#yearSelect', '2026');
   await page.selectOption('#monthSelect', '7');
   await expect(page.locator('html')).toHaveAttribute('data-spectrum-motion', 'settled');
@@ -91,12 +95,22 @@ test('Druck während des Farbverlaufs friert die Zielfarbe ein, nicht einen Zwis
     return { accent: `rgb(${r}, ${g}, ${b})`, name: palette.name };
   });
 
+  // Der Export erzeugt das Blatt selbst und liest die Farbe aus dem
+  // Monatsprofil, nicht vom Bildschirm. Er ist damit unabhängig davon, wo der
+  // Verlauf gerade steht — und genau das prüft dieser Klick mitten hinein.
   await page.selectOption('#monthSelect', '1');
-  await page.click('#exportPdfBtn');
+  const [exported] = await Promise.all([
+    page.waitForEvent('download'),
+    page.click('#exportPdfBtn')
+  ]);
+  expect(exported.suggestedFilename()).toBe('Dienstplan 2026-01.pdf');
 
-  const frozen = await readSurface(page);
-  expect(frozen.accent).toBe(target.accent);
-  expect(frozen.priority).toBe('important');
-  expect(frozen.badge).toBe(`Monatskontrast · ${target.name}`);
+  const bytes = await readFile(await exported.path());
+  const raw = bytes.toString('latin1');
+  expect(raw.startsWith('%PDF')).toBe(true);
+  expect(raw).toContain(`(Monatskontrast \\267 ${target.name}) Tj`.replace('\\267', '\xb7'));
+
+  // Auf dem Bildschirm läuft der Verlauf ungestört zu Ende.
+  await expect.poll(async () => (await readSurface(page)).accent).toBe(target.accent);
   await expect(page.locator('html')).toHaveAttribute('data-spectrum-motion', 'settled');
 });
