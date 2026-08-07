@@ -204,6 +204,11 @@ export class AutoPlanWeaver extends CanvasStage {
     this.closeSeam();
   }
 
+  /** Abschlusskante und Schiffchen sind die Ausklänge dieser Ansicht. */
+  isAnimating() {
+    return super.isAnimating() || this.seam > 0 || Boolean(this.shuttle);
+  }
+
   step(delta) {
     const speed = this.reducedMotion ? 6 : 3.1;
     let woven = 0;

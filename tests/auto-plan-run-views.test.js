@@ -371,3 +371,81 @@ test('teure Bilder senken den Detailgrad, günstige heben ihn wieder', () => {
     world.restore();
   }
 });
+
+/**
+ * Abschlussanimationen laufen zu Ende.
+ *
+ * Regression aus v10.6: Mit der Budgetsteuerung hört die Schleife auf, Bilder
+ * anzufordern, sobald die Betriebsart nicht mehr „laufend" ist — und `finish()`
+ * setzt genau das. Die Ausklänge gehören aber den Ansichten: die Abschlusskante
+ * der Weberei, der Kristallisationspuls, der Beweisring der Kaskade. Der
+ * Unterbau kann sie nicht kennen, also muss er fragen. Ohne diese Frage stand
+ * die Kante nach einem Bild bei 0,98 und verschwand mit dem Dialog, statt
+ * durch den Stoff zu laufen.
+ */
+test('Weberei: die Abschlusskante läuft nach finish zu Ende', () => {
+  const world = environment();
+  try {
+    const view = createRunView('weave', world.canvas, monthFixture(), {}).instance;
+    world.tick(16);
+    view.finish();
+    assert.ok(view.seam > 0.9, 'die Kante beginnt am oberen Rand');
+
+    let now = 32;
+    let frames = 0;
+    while (world.pending && frames < 400) {
+      now += 33;
+      world.tick(now);
+      frames += 1;
+    }
+    assert.ok(frames > 20, `die Kante bekommt Bilder (waren ${frames})`);
+    assert.equal(view.seam, 0, 'und ist am Ende durchgelaufen');
+    view.stop();
+  } finally {
+    world.restore();
+  }
+});
+
+test('Kristallisation: der Beweispuls läuft nach finish zu Ende', () => {
+  const world = environment();
+  try {
+    const view = createRunView('crystal', world.canvas, monthFixture(), {}).instance;
+    world.tick(16);
+    // Ein Beweis unmittelbar vor dem Ende ist der Normalfall: Die Kaskade
+    // schließt ihre letzte Stufe, und der Lauf ist fertig.
+    view.update(RUN[5]);
+    view.finish();
+    assert.ok(view.pulse > 0.9);
+
+    let now = 32;
+    let frames = 0;
+    while (world.pending && frames < 400) {
+      now += 33;
+      world.tick(now);
+      frames += 1;
+    }
+    assert.ok(frames > 20, `der Puls bekommt Bilder (waren ${frames})`);
+    assert.equal(view.pulse, 0);
+    view.stop();
+  } finally {
+    world.restore();
+  }
+});
+
+test('verdeckte Leinwand hat Vorrang vor jeder Abschlussanimation', () => {
+  // Sonst wäre die Reparatur der Ausklänge ein Weg, die Sichtbarkeitssperre
+  // auszuhebeln: Ein Ausklang auf einer unsichtbaren Fläche ist reine Wärme.
+  const world = environment();
+  try {
+    const view = createRunView('weave', world.canvas, monthFixture(), {}).instance;
+    world.tick(16);
+    view.finish();
+    world.hide();
+    while (world.pending) world.tick(200);
+    assert.equal(world.pending, 0, 'verdeckt wird nicht weitergezeichnet');
+    assert.ok(view.seam > 0, 'der Ausklang ist nur angehalten, nicht verworfen');
+    view.stop();
+  } finally {
+    world.restore();
+  }
+});

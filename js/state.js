@@ -342,8 +342,21 @@ function yieldToBrowser() {
  * blockierten den Hauptthread gemessen mehrere hundert Millisekunden – genau
  * während der laufenden Wechselanimation. Zwischen zwei Übernahmen wird deshalb
  * abgegeben, sodass Bewegung und Eingaben durchlaufen können.
+ *
+ * VORLADEN HEISST EINMAL LADEN
+ *
+ * Bis v10.6 filterte der Vorabruf nur nach nicht synchronisierten Monaten und
+ * holte alles Übrige bei **jeder** Navigation erneut — im Dezember dreizehn
+ * Abrufe je Klick, gemessen zehn allein beim Blättern zwischen zwei Monaten,
+ * für Daten, die Sekunden zuvor angekommen waren. Jeder davon ist ein KV-Lesen.
+ *
+ * Was in dieser Sitzung bereits vom Server kam, wird deshalb übersprungen. Das
+ * ist gefahrlos, weil es nur den Vorrat betrifft: Der *angezeigte* Monat läuft
+ * über `loadMonth` und wird immer frisch geholt. Wer ausdrücklich den
+ * Serverstand neu lädt, bekommt mit `force` auch den Vorrat neu — sonst wäre
+ * die Schaltfläche „Neu laden" die einzige, die nicht täte, was sie sagt.
  */
-export async function warmAdjacentMonths(year, month) {
+export async function warmAdjacentMonths(year, month, { force = false } = {}) {
   restoreSyncState();
   const previousReady = state.serverReady;
   const prev = new Date(year, month - 2, 1);
@@ -355,7 +368,11 @@ export async function warmAdjacentMonths(year, month) {
   for (let historicalMonth = 1; historicalMonth < month; historicalMonth += 1) addRequest(year, historicalMonth);
 
   const pending = [...requestedMonths.values()]
-    .filter(([requestedYear, requestedMonth]) => !state.dirtyMonths.has(monthKey(requestedYear, requestedMonth)))
+    .filter(([requestedYear, requestedMonth]) => {
+      const key = monthKey(requestedYear, requestedMonth);
+      if (state.dirtyMonths.has(key)) return false;
+      return force || state.monthSources.get(key) !== 'server';
+    })
     .map(([requestedYear, requestedMonth]) => ({
       requestedYear,
       requestedMonth,
