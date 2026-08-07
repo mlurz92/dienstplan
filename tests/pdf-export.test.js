@@ -130,35 +130,39 @@ test('der Export druckt die eingestellte Monatsfarbe, nicht immer den Trend-Atla
   assert.equal(accents.size, 6);
 });
 
-test('die drei Tonlagen teilen sich einen einmal durchlaufenen Farbkreis', async () => {
-  const { RAINBOW_FAMILIES, RAINBOW_PALETTES, rainbowProfileForDate } = await import('../js/color-rainbow.js');
-  const { labToLch, rgbToOklab } = await import('../js/color-atlas-engine.js');
+test('jede Tonlage läuft einmal vorwärts um den Kreis und hält ihre Monate auseinander', async () => {
+  const { MIN_FAMILY_DISTANCE, RAINBOW_FAMILIES, RAINBOW_PALETTES, rainbowProfileForDate } = await import('../js/color-rainbow.js');
+  const { labToLch, perceptualDistance, rgbToOklab } = await import('../js/color-atlas-engine.js');
   const hue = palette => (labToLch(rgbToOklab(palette.accent))[2] * 180 / Math.PI + 360) % 360;
 
   for (const family of RAINBOW_FAMILIES) {
     const palettes = RAINBOW_PALETTES[family];
     assert.equal(palettes.length, 12);
-    // Der Kreis wird von Januar bis Dezember genau einmal vorwärts durchlaufen.
     for (let month = 2; month <= 12; month += 1) {
       assert.ok(hue(palettes[month - 1]) > hue(palettes[month - 2]),
         `${family}: Monat ${month} liegt im Farbkreis nicht hinter Monat ${month - 1}`);
     }
-    assert.equal(new Set(palettes.map(palette => palette.accentHex)).size, 12);
-  }
 
-  // Derselbe Monat trägt in allen drei Tonlagen denselben Farbton — nur
-  // Helligkeit und Buntheit unterscheiden sie.
-  for (let month = 1; month <= 12; month += 1) {
-    const [base, ...others] = RAINBOW_FAMILIES.map(family => RAINBOW_PALETTES[family][month - 1]);
-    for (const other of others) {
-      const delta = Math.abs(hue(base) - hue(other));
-      assert.ok(Math.min(delta, 360 - delta) < 3, `Monat ${month}: Farbton weicht um ${delta.toFixed(1)}° ab`);
+    // Der Fehler der ersten Fassung: Bei fester Helligkeit und Buntheit fielen
+    // benachbarte Monate wahrnehmbar zusammen — sichtbar vor allem im Grün, wo
+    // die Gamut-Anpassung die Buntheit zurücknimmt. Geprüft wird deshalb nicht
+    // der Farbton, sondern der wahrgenommene Abstand, und zwar über alle Paare.
+    for (let first = 0; first < 12; first += 1) {
+      for (let second = first + 1; second < 12; second += 1) {
+        const distance = perceptualDistance(palettes[first].accent, palettes[second].accent);
+        assert.ok(distance >= MIN_FAMILY_DISTANCE,
+          `${family}: ${palettes[first].name} und ${palettes[second].name} liegen nur ${distance.toFixed(3)} auseinander`);
+      }
     }
+    assert.equal(new Set(palettes.map(palette => palette.name)).size, 12, `${family}: jede Farbe hat einen eigenen Namen`);
   }
 
   // Klassische Regenbogenfarben — Rot ist Rot, Gelb ist Gelb.
   assert.equal(RAINBOW_PALETTES.rainbow[0].accentHex, '#ff0000');
   assert.equal(RAINBOW_PALETTES.rainbow[3].accentHex, '#ffdd00');
+  // Pastell bleibt hell, Juwel bleibt tief — sonst wären es zwei Namen für dasselbe.
+  assert.ok(RAINBOW_PALETTES.pastel.every(palette => palette.lightness > 0.76));
+  assert.ok(RAINBOW_PALETTES.deep.every(palette => palette.lightness < 0.68));
   // Die Folge ist jahresunabhängig — derselbe Monat trägt in jedem Jahr dieselbe Farbe.
   assert.deepEqual(rainbowProfileForDate(2031, 4).accent, rainbowProfileForDate(2026, 4).accent);
 });

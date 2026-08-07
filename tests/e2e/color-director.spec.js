@@ -73,7 +73,7 @@ test('the same month changes strongly with the year while the 24-year cycle stay
   expect(new Set(samples.map(sample => sample.mood)).size).toBe(5);
 });
 
-test('Regenbogen, Pastell und Tiefton färben die zwölf Monate sichtbar ein', async ({ page }) => {
+test('Regenbogen, Pastell und Juwel färben die zwölf Monate sichtbar ein', async ({ page }) => {
   await mockApi(page);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
