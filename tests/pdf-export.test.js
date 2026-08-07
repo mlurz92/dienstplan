@@ -113,3 +113,32 @@ test('Samstag, Sonntag und Feiertag sind in jedem Monat sicher zu unterscheiden'
     }
   }
 });
+
+test('der Export druckt die eingestellte Monatsfarbe, nicht immer den Trend-Atlas', async () => {
+  const { monthColorProfile } = await import('../js/month-palette.js');
+  const month = monthWithPlan(2026, 9);
+  for (const mode of ['spectrum', 'rainbow', 'classic', 'neutral']) {
+    const expected = monthColorProfile(2026, 9, mode);
+    const model = buildPlanPdfModel(planState, month, { mode });
+    assert.equal(model.paletteLabel, `Monatskontrast · ${expected.name}`);
+    assert.deepEqual(model.colors['--month-accent'], expected.variables['--month-accent']);
+  }
+  // Die Modi dürfen nicht auf dieselbe Fläche zusammenfallen — sonst wäre die
+  // Auswahl im Ausdruck folgenlos.
+  const accents = new Set(['spectrum', 'rainbow', 'classic', 'neutral']
+    .map(mode => buildPlanPdfModel(planState, month, { mode }).colors['--month-accent'].slice(0, 3).join(',')));
+  assert.equal(accents.size, 4);
+});
+
+test('der Regenbogen führt die zwölf Monate einmal um den Farbkreis', async () => {
+  const { RAINBOW_PALETTES, rainbowProfileForDate } = await import('../js/color-rainbow.js');
+  const { labToLch, rgbToOklab } = await import('../js/color-atlas-engine.js');
+  const hue = palette => (labToLch(rgbToOklab(palette.accent))[2] * 180 / Math.PI + 360) % 360;
+  assert.equal(RAINBOW_PALETTES.length, 12);
+  for (let month = 1; month <= 12; month += 1) {
+    const step = ((hue(RAINBOW_PALETTES[month % 12]) - hue(RAINBOW_PALETTES[month - 1])) + 360) % 360;
+    assert.ok(Math.abs(step - 30) < 6, `Schritt von Monat ${month} auf ${month % 12 + 1}: ${step.toFixed(1)}°`);
+  }
+  // Die Folge ist jahresunabhängig — derselbe Monat trägt in jedem Jahr dieselbe Farbe.
+  assert.deepEqual(rainbowProfileForDate(2031, 4).accent, rainbowProfileForDate(2026, 4).accent);
+});

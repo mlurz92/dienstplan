@@ -24,7 +24,8 @@ export const DEFAULT_SETTINGS = Object.freeze({
     richTooltips: true,
     /**
      * Monatsfarbsystem. `spectrum` ist der Trend-Atlas des Color Directors,
-     * `classic` die feste Monatspalette, `neutral` schaltet die Einfärbung ab.
+     * `rainbow` die zwölf Regenbogenschritte, `classic` die feste
+     * Monatspalette, `neutral` schaltet die Einfärbung ab.
      */
     monthColors: 'spectrum',
     weekendEmphasis: true,
@@ -224,7 +225,7 @@ export function normalizeSettings(value, { strict = false } = {}) {
       density: normalizedEnum(appearance.density, new Set(['comfortable', 'compact']), DEFAULT_SETTINGS.appearance.density, 'settings.appearance.density', strict),
       motion: normalizedEnum(appearance.motion, new Set(['system', 'reduced']), DEFAULT_SETTINGS.appearance.motion, 'settings.appearance.motion', strict),
       richTooltips: normalizedBoolean(appearance.richTooltips, DEFAULT_SETTINGS.appearance.richTooltips, 'settings.appearance.richTooltips', strict),
-      monthColors: normalizedEnum(appearance.monthColors, new Set(['spectrum', 'classic', 'neutral']), DEFAULT_SETTINGS.appearance.monthColors, 'settings.appearance.monthColors', strict),
+      monthColors: normalizedEnum(appearance.monthColors, new Set(['spectrum', 'rainbow', 'classic', 'neutral']), DEFAULT_SETTINGS.appearance.monthColors, 'settings.appearance.monthColors', strict),
       weekendEmphasis: normalizedBoolean(appearance.weekendEmphasis, DEFAULT_SETTINGS.appearance.weekendEmphasis, 'settings.appearance.weekendEmphasis', strict),
       ambientBackdrop: normalizedBoolean(appearance.ambientBackdrop, DEFAULT_SETTINGS.appearance.ambientBackdrop, 'settings.appearance.ambientBackdrop', strict)
     },

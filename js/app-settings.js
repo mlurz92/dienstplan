@@ -67,6 +67,7 @@ function dialogMarkup() {
             <label><span>Monatsfarbsystem</span><small>Der Trend-Atlas gibt jedem Monat einen eigenen Kontrast; klassisch nutzt die feste Monatspalette, neutral verzichtet darauf.</small>
               <select id="settingsMonthColors">
                 <option value="spectrum">Trend-Atlas · empfohlen</option>
+                <option value="rainbow">Regenbogen · zwölf Monate im Farbkreis</option>
                 <option value="classic">Klassische Monatspalette</option>
                 <option value="neutral">Neutral, ohne Monatsfarbe</option>
               </select>

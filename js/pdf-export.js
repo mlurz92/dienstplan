@@ -15,7 +15,8 @@
  */
 
 import { createPdfDocument, fitText, textWidth } from './pdf-document.js?v=20260806.1';
-import { colorProfileForDate, labToLch, oklchToRgb, rgbToOklab, spectrumVariables } from './color-atlas-engine.js?v=20260806.1';
+import { labToLch, oklchToRgb, rgbToOklab } from './color-atlas-engine.js?v=20260806.1';
+import { activeMonthColorMode, monthColorProfile } from './month-palette.js?v=20260806.1';
 import { assignmentLabel, weekdayLabel } from './rules-core.js?v=20260806.1';
 import { buildStats } from './rules-reporting.js?v=20260806.1';
 import { rbnDisplayName } from './rbn.js?v=20260806.1';
@@ -95,11 +96,14 @@ export function planPdfFileName(year, month) {
  * Bewusst getrennt vom Zeichnen: Der Inhalt lässt sich so prüfen, ohne ein PDF
  * zu erzeugen, und das Zeichnen kennt keine Fachlogik mehr.
  */
-export function buildPlanPdfModel(state, monthData) {
+export function buildPlanPdfModel(state, monthData, { mode = activeMonthColorMode() } = {}) {
   const year = monthData.year;
   const month = monthData.month;
   const staff = state?.staff || [];
-  const palette = colorProfileForDate(year, month);
+  // Gedruckt wird, was zu sehen ist: Das eingestellte Farbsystem entscheidet
+  // über die Palette, nicht der Trend-Atlas. Das Papier ist immer hell, deshalb
+  // bleibt das Erscheinungsbild hier unabhängig vom Dunkelmodus.
+  const { name: paletteName, variables } = monthColorProfile(year, month, mode, { scheme: 'light' });
 
   const rows = Object.entries(monthData.days || {}).map(([iso, day]) => {
     const short = weekdayLabel(iso);
@@ -131,8 +135,8 @@ export function buildPlanPdfModel(state, monthData) {
     month,
     title: `${MONTH_NAMES[month - 1]} ${year}`,
     eyebrow: 'Bereitschaftsdienstplan',
-    paletteLabel: `Monatskontrast · ${palette.name}`,
-    colors: spectrumVariables(palette),
+    paletteLabel: `Monatskontrast · ${paletteName}`,
+    colors: variables,
     rows,
     stats
   };

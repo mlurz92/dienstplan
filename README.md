@@ -403,8 +403,16 @@ Der Farbwechsel läuft als Interpolation in OkLCh über eine rAF-Schleife; ein
 heller Sweep begleitet ihn. Der Direktor besitzt die sichtbare Farbe: Das
 Basistheme schreibt die Farbvariablen nicht, solange er geladen ist.
 
-**Drei Farbsysteme** stehen zur Wahl: `spectrum` (Trend-Atlas, Standard),
-`classic` (feste Monatspalette) und `neutral` (keine Einfärbung).
+**Vier Farbsysteme** stehen zur Wahl: `spectrum` (Trend-Atlas, Standard),
+`rainbow` (Regenbogen), `classic` (feste Monatspalette) und `neutral` (keine
+Einfärbung).
+
+Der Regenbogen (`js/color-rainbow.js`) ist der Gegenentwurf zum Atlas: Der
+Januar beginnt beim Rot, jeder Folgemonat rückt um genau ein Zwölftel des
+Farbkreises weiter, der Dezember schließt wieder auf. Die Folge ist
+jahresunabhängig — derselbe Monat trägt in jedem Jahr dieselbe Farbe. Token,
+Übergang und Plakette kommen aus demselben Weg wie beim Atlas; der Direktor
+fährt beide Systeme.
 
 ### 5.2 Hell und Dunkel
 
@@ -963,10 +971,15 @@ jeder Betrachter mit — es wird deshalb weder eine Schrift eingebettet noch ein
 Fremdbibliothek ausgeliefert. Das Ergebnis ist echter Vektortext: durchsuchbar,
 beim Vergrößern scharf und rund 20 statt 150 Kilobyte groß.
 
-`js/pdf-export.js` setzt darauf das Satzbild und leitet die Farben aus demselben
-Monatsprofil ab wie die Oberfläche. Der Export ist damit unabhängig davon, wo
-der Farbverlauf auf dem Bildschirm gerade steht: Er trägt immer die Zielfarbe
-des Monats, nie einen Zwischenton. Beide Module kennen kein DOM und sind
+`js/pdf-export.js` setzt darauf das Satzbild und fragt die Farbe dort, wo auch
+die Oberfläche sie herbekommt: bei `js/month-palette.js`, dem einen Ort für das
+eingestellte Farbsystem. Gedruckt wird damit die Farbe, die zu sehen ist — mit
+Regenbogen der Regenbogenton, mit `classic` die klassische Palette, mit
+`neutral` der Grundton des Stylesheets. Zuvor griff der Export immer zum
+Trend-Atlas und druckte eine Farbe, die auf dem Bildschirm gar nicht vorkam.
+Unabhängig bleibt er vom Stand des Farbverlaufs: Er trägt immer die Zielfarbe
+des Monats, nie einen Zwischenton. Papier ist immer hell, deshalb rechnet der
+Export stets auf das helle Erscheinungsbild. Die Module kennen kein DOM und sind
 deshalb in Node prüfbar.
 
 **Samstag, Sonntag und Feiertag bleiben unterscheidbar.** Die Oberfläche mischt
@@ -1070,7 +1083,7 @@ nur gespeichert und nirgends gelesen wird.
 |---|---|---|
 | Farbschema | hell | `light`, `dark` (lokal, vor dem Bootstrap) |
 | Informationsdichte | `comfortable` | `comfortable`, `compact` |
-| Monatsfarbsystem | `spectrum` | `spectrum`, `classic`, `neutral` |
+| Monatsfarbsystem | `spectrum` | `spectrum`, `rainbow`, `classic`, `neutral` |
 | Erklärende Tooltips | an | an, aus |
 | Wochenenden und Feiertage hervorheben | an | an, aus |
 | Atmosphärischer Hintergrund | an | an, aus |
@@ -1256,7 +1269,9 @@ js/auto-plan-weave.js              Laufansicht „Weberei": entstehender Plan al
 js/auto-plan-cascade.js            Laufansicht „Kaskade": Zielstufen als Becken
 js/auto-plan-visualizer.js         Laufansicht „Orbit": Ringdarstellung der Suche
 js/color-atlas-*.js                Trend-Atlas und Ableitung der Monatstoken
+js/color-rainbow.js                Regenbogen: zwölf Monate im Farbkreis
 js/color-director.js               Farbverlauf, Plakette, Erscheinungsbild
+js/month-palette.js                die sichtbare Monatsfarbe je Farbsystem
 js/app-theme-v8-5.js               Hell-/Dunkelcontroller (Start: hell)
 js/rich-tooltip-v8-5.js            zentrale ARIA-Tooltips
 js/ui-controls.js / ui-v8-5.js     Command Bar, Dichtestufen, Stylesheet-Einbau

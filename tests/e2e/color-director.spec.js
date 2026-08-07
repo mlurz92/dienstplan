@@ -72,3 +72,36 @@ test('the same month changes strongly with the year while the 24-year cycle stay
   expect(new Set(samples.map(sample => sample.accent)).size).toBe(5);
   expect(new Set(samples.map(sample => sample.mood)).size).toBe(5);
 });
+
+test('die Regenbogenpalette führt die zwölf Monate sichtbar um den Farbkreis', async ({ page }) => {
+  await mockApi(page);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/');
+  // Der Modus wird gesetzt wie vom Einstellungsmodal: Attribut an der Wurzel
+  // plus das Ereignis, auf das der Director hört.
+  await page.evaluate(() => {
+    document.documentElement.dataset.monthColors = 'rainbow';
+    window.dispatchEvent(new Event('appsettingschange'));
+  });
+  await expect(page.locator('html')).toHaveAttribute('data-color-director', 'rainbow-v1');
+  await page.selectOption('#yearSelect', '2026');
+
+  const hues = [];
+  for (let month = 1; month <= 12; month += 1) {
+    await page.selectOption('#monthSelect', String(month));
+    await expect(page.locator('html')).toHaveAttribute('data-spectrum-key', `rainbow-2026-${String(month).padStart(2, '0')}`);
+    hues.push(await page.evaluate(() => {
+      const [r, g, b] = getComputedStyle(document.documentElement).getPropertyValue('--month-accent')
+        .match(/[\d.]+/g).slice(0, 3).map(Number);
+      const max = Math.max(r, g, b), min = Math.min(r, g, b);
+      if (max === min) return 0;
+      const delta = max - min;
+      const raw = max === r ? (g - b) / delta : max === g ? 2 + (b - r) / delta : 4 + (r - g) / delta;
+      return (raw * 60 + 360) % 360;
+    }));
+  }
+  expect(new Set(hues.map(Math.round)).size).toBe(12);
+  // Der Kreis wird genau einmal durchlaufen: jeder Schritt vorwärts, ein Umbruch.
+  const wraps = hues.filter((hue, index) => index > 0 && hue < hues[index - 1]).length;
+  expect(wraps).toBeLessThanOrEqual(1);
+});
