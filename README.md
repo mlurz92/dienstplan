@@ -403,16 +403,28 @@ Der Farbwechsel läuft als Interpolation in OkLCh über eine rAF-Schleife; ein
 heller Sweep begleitet ihn. Der Direktor besitzt die sichtbare Farbe: Das
 Basistheme schreibt die Farbvariablen nicht, solange er geladen ist.
 
-**Vier Farbsysteme** stehen zur Wahl: `spectrum` (Trend-Atlas, Standard),
-`rainbow` (Regenbogen), `classic` (feste Monatspalette) und `neutral` (keine
-Einfärbung).
+**Sechs Farbsysteme** stehen zur Wahl: `spectrum` (Trend-Atlas, Standard),
+`rainbow`, `pastel` und `deep` als die drei Tonlagen des Farbkreises, `classic`
+(feste Monatspalette) und `neutral` (keine Einfärbung).
 
-Der Regenbogen (`js/color-rainbow.js`) ist der Gegenentwurf zum Atlas: Der
-Januar beginnt beim Rot, jeder Folgemonat rückt um genau ein Zwölftel des
-Farbkreises weiter, der Dezember schließt wieder auf. Die Folge ist
-jahresunabhängig — derselbe Monat trägt in jedem Jahr dieselbe Farbe. Token,
-Übergang und Plakette kommen aus demselben Weg wie beim Atlas; der Direktor
-fährt beide Systeme.
+Die Regenbogenfamilie (`js/color-rainbow.js`) ist der Gegenentwurf zum Atlas:
+Der Januar beginnt beim Rot, und die zwölf Monate gehen der Reihe nach durch das
+Spektrum bis zum Magenta. Die Folge ist jahresunabhängig — derselbe Monat trägt
+in jedem Jahr dieselbe Farbe.
+
+| Tonlage | Charakter |
+| --- | --- |
+| `rainbow` | die klassischen Regenbogenfarben, volle sRGB-Werte |
+| `pastel` | dieselben zwölf Farbtöne, hell und zart |
+| `deep` | dieselben zwölf Farbtöne, satt und tief |
+
+Die Regenbogenfarben sind gesetzt und nicht gerechnet: Ein
+wahrnehmungsgleichmäßiger Kreis wäre gleichmäßiger im Schritt, kennt aber kein
+leuchtendes Gelb — bei fester Helligkeit wird daraus Gold. Hier hat die
+erwartete Farbe Vorrang vor dem gleichmäßigen Abstand. `pastel` und `deep`
+ändern nur Helligkeit und Buntheit, nie den Farbton; die Zuordnung „Monat →
+Farbe" bleibt über alle drei dieselbe. Token, Übergang und Plakette kommen aus
+demselben Weg wie beim Atlas; der Direktor fährt alle vier Systeme.
 
 ### 5.2 Hell und Dunkel
 
@@ -687,7 +699,7 @@ Container-Abfragen dem tatsächlich verfügbaren Platz, nicht der Fensterbreite.
 | Gewicht des Gedächtnisses | Wirkung der Vorlast auf den Startwert |
 | Stabilität | Rang der Minimal-Perturbation in der Kaskade |
 | Bei Unlösbarkeit | melden, Korrekturmenge anzeigen oder anwenden |
-| Laufansicht | Kristallisation, Weberei, Kaskade oder Orbit |
+| Laufansicht | Kristallisation, Weberei, Kaskade, Prisma oder Orbit |
 
 Entfallen sind die neun `cpSat*Weight`-Gewichte, das nie umgesetzte
 Fairness-Profil, der beim portablen Build bedeutungslose Worker-Regler sowie
@@ -703,11 +715,11 @@ Personalmaxima und sämtliche fachlichen Regeln gelten unabhängig davon weiter.
 Zwei Schaltflächen füllen die Vorschlagswerte ein beziehungsweise leeren alle
 Grenzen.
 
-### 7.4 Die vier Laufansichten
+### 7.4 Die fünf Laufansichten
 
-Dieselben Meldungen des Laufs, vier Fragen. Die Wahl steht im Studio unter
+Dieselben Meldungen des Laufs, fünf Fragen. Die Wahl steht im Studio unter
 „Darstellung des Laufs" und wird lokal gemerkt; sie kostet keine Rechenzeit der
-Suche, sondern liest nur mit. Alle vier speisen sich ausschließlich aus echten
+Suche, sondern liest nur mit. Alle fünf speisen sich ausschließlich aus echten
 Ereignissen — nichts wird interpoliert, um Betrieb vorzutäuschen —, und alle
 respektieren `prefers-reduced-motion` sowie die Bewegungseinstellung der
 Anwendung.
@@ -717,6 +729,7 @@ Anwendung.
 | Kristallisation | Wie fällt der Suchraum zusammen? (Voreinstellung) |
 | Weberei | Was steht am Ende im Plan — Person für Person, Tag für Tag? |
 | Kaskade | Wie arbeitet sich das Verfahren durch seine Rangfolge? |
+| Prisma | Woraufhin wird gerade gerechnet — welche Zielstufe leuchtet? |
 | Orbit | Die frühere Ringdarstellung, unverändert erhalten |
 
 **Der Glanz folgt der Farbe.** Der Glow ist keine feste Größe: Wärme, Sättigung
@@ -779,12 +792,12 @@ eine Ansicht zu halten hat — `update()`, `finish()`, `stop()`, kein Werfen ohn
 Leinwandkontext — und welche Felder eine Fortschrittsmeldung trägt.
 
 Eine Doppeldeutung bleibt bewusst bestehen: `canvas.dataset.renderMode` trägt
-bei den drei jüngeren Ansichten den Lebenszyklus, bei Orbit die
+bei den vier jüngeren Ansichten den Lebenszyklus, bei Orbit die
 Darstellungsgüte ihrer Animationsrichtlinie. Vereinheitlichen ließe sich das
 nicht folgenlos — `auto-plan-studio-v7-5.css` färbt danach ihre Güteplakette,
 und ein Browsertest prüft den Wert. Beobachtbares Verhalten ist gebunden, ob
 zugesagt oder nicht; die Doppeldeutung steht deshalb geschrieben statt still
-umbenannt. Einheitlich über alle vier ist `canvas.dataset.runView` mit der
+umbenannt. Einheitlich über alle fünf ist `canvas.dataset.runView` mit der
 Marke der laufenden Ansicht.
 
 #### „Kristallisation"
@@ -876,9 +889,31 @@ und bekommt stattdessen einen wandernden Lichtgrat.
 
 Eine geschlossene Lücke gilt nur dann als Beweis, wenn überhaupt ein Ziel
 minimiert wird: Die vorgeschaltete Zulässigkeitssuche läuft ohne Zielfunktion
-und meldet Zielwert wie Schranke als null. Alle drei jüngeren Ansichten prüfen
+und meldet Zielwert wie Schranke als null. Alle vier jüngeren Ansichten prüfen
 das ausdrücklich — bis v10.4 kristallisierte die Darstellung sonst sofort beim
 ersten Zwischenergebnis und stand die restliche Optimierung still.
+
+#### „Prisma"
+
+Ein Strahl fällt von links auf ein Prisma und wird dort in die Zielstufen
+aufgefächert — je Stufe ein Spektralband, in Regenbogenreihenfolge von Rot bis
+Violett, oben die wichtigste:
+
+1. **Strahl** — der laufende Prozess. Seine Dicke folgt dem Fortschritt, seine
+   Farbe der Phase; eine rote Bewertung färbt ihn kurz um.
+2. **Prisma** — der Punkt, an dem aus einem Suchlauf getrennte Ziele werden. Im
+   Beweis blitzt es auf.
+3. **Bänder** — ein wartendes Band liegt matt, das laufende atmet, ein
+   bewiesenes leuchtet bis zum Rand und trägt Wert und Haken. Ein bewiesenes
+   Band erlischt nicht wieder; was beim Ende noch lief, bleibt offen.
+4. **Funken** — jede erstmals gesehene Zuordnung fliegt in der Farbe ihrer
+   Person den Strahl entlang und knickt am Prisma in das Band ihrer Stufe ab.
+   Genau dieser Knick ist die Aussage der Ansicht: Vor dem Prisma ist es ein
+   Lauf, dahinter sind es unterscheidbare Ziele.
+
+Ohne Stufenplan zeigt das Prisma sieben Bänder — das volle Spektrum steht dann
+für „noch nichts aufgeteilt". Bei reduzierter Bewegung entfallen Funken, Atmen
+und Blitz; Strahl, Prisma und Bänder bleiben als ruhige Zustandsanzeige stehen.
 
 ### 7.5 Ergebnisansicht
 
@@ -1267,6 +1302,7 @@ js/auto-plan-visual-effects.js     Effektbausteine: Scheinplättchen, Partikel- 
 js/auto-plan-crystallize.js        Laufansicht „Kristallisation": Zusammenfall des Suchraums
 js/auto-plan-weave.js              Laufansicht „Weberei": entstehender Plan als Gewebe
 js/auto-plan-cascade.js            Laufansicht „Kaskade": Zielstufen als Becken
+js/auto-plan-prism.js              Laufansicht „Prisma": Zielstufen als Spektralbänder
 js/auto-plan-visualizer.js         Laufansicht „Orbit": Ringdarstellung der Suche
 js/color-atlas-*.js                Trend-Atlas und Ableitung der Monatstoken
 js/color-rainbow.js                Regenbogen: zwölf Monate im Farbkreis

@@ -3,7 +3,7 @@
  */
 import { SPECTRUM_DURATION_MS, VARIABLE_NAMES } from './color-atlas-data.js';
 import { colorProfileForDate, spectrumVariables, mixOklch } from './color-atlas-engine.js?v=20260806.1';
-import { rainbowProfileForDate } from './color-rainbow.js?v=20260806.1';
+import { RAINBOW_FAMILIES, rainbowProfileForDate } from './color-rainbow.js?v=20260806.1';
 
 export * from './color-atlas-data.js';
 export * from './color-atlas-engine.js?v=20260806.1';
@@ -109,21 +109,22 @@ function playSpectrumSweep(root, accent) {
 /**
  * Das Monatsfarbsystem ist wählbar.
  *
- * `spectrum` ist der Trend-Atlas dieses Moduls, `rainbow` der Farbkreis aus
- * `color-rainbow.js` — beide fährt der Director selbst, weil beide dieselbe
- * Ableitung der Token und denselben Übergang nutzen. `classic` überlässt die
- * Einfärbung der festen Monatspalette aus `theme.js`, `neutral` verzichtet ganz
- * darauf. In diesen beiden Fällen tritt der Director zurück, statt seine
- * Variablen gegen die der anderen Quelle zu setzen.
+ * `spectrum` ist der Trend-Atlas dieses Moduls, `rainbow`, `pastel` und `deep`
+ * sind die drei Tonlagen des Farbkreises aus `color-rainbow.js` — alle vier
+ * fährt der Director selbst, weil alle dieselbe Ableitung der Token und
+ * denselben Übergang nutzen. `classic` überlässt die Einfärbung der festen
+ * Monatspalette aus `theme.js`, `neutral` verzichtet ganz darauf. In diesen
+ * beiden Fällen tritt der Director zurück, statt seine Variablen gegen die der
+ * anderen Quelle zu setzen.
  */
 function directorMode() {
   const mode = document.documentElement.dataset.monthColors;
   if (mode === undefined || mode === 'spectrum') return 'spectrum';
-  return mode === 'rainbow' ? 'rainbow' : null;
+  return RAINBOW_FAMILIES.includes(mode) ? mode : null;
 }
 
 function paletteForMode(mode, year, month) {
-  return mode === 'rainbow' ? rainbowProfileForDate(year, month) : colorProfileForDate(year, month);
+  return mode === 'spectrum' ? colorProfileForDate(year, month) : rainbowProfileForDate(year, month, mode);
 }
 
 /** Das aktive Erscheinungsbild — es entscheidet über Tinte und Grundfläche. */
@@ -148,7 +149,7 @@ export function applySpectrumProfile(year, month, { animate = true, scheme = act
   activeSchemeKey = scheme;
   const first = activeKey === null;
 
-  root.dataset.colorDirector = mode === 'rainbow' ? 'rainbow-v1' : 'trend-atlas-v3';
+  root.dataset.colorDirector = mode === 'spectrum' ? 'trend-atlas-v3' : `${mode}-v1`;
   root.dataset.spectrumPalette = palette.name;
   root.dataset.spectrumMood = palette.mood;
   root.dataset.spectrumKey = palette.key;
