@@ -340,9 +340,15 @@ export class CanvasStage {
       this.averageFrameMs = this.averageFrameMs ? this.averageFrameMs * 0.8 + cost * 0.2 : cost;
     }
 
-    // Ruhezustände fordern kein neues Bild an. Sie werden über `wake()` wieder
-    // geweckt, wenn Sichtbarkeit oder Zustand sich ändern.
-    if (!this.policy.continuous && !this.particles.live && !this.ripples.live) {
+    // Eine verdeckte Leinwand ruht immer — auch mitten in einem Ausklang. Ein
+    // Ausklang, den niemand sieht, ist reine Wärme; er wird beim Sichtbarwerden
+    // fortgesetzt, nicht verworfen.
+    if (!this.documentVisible || !this.intersecting) {
+      this.frame = null;
+      return;
+    }
+    // Sonst ruhen nur Ansichten, die wirklich nichts mehr zu zeigen haben.
+    if (!this.policy.continuous && !this.isAnimating()) {
       this.frame = null;
       return;
     }
@@ -412,6 +418,20 @@ export class CanvasStage {
   step() {}
 
   draw() {}
+
+  /**
+   * Läuft gerade noch etwas aus?
+   *
+   * `finish()` versetzt die Ansicht in eine ruhende Betriebsart — der Lauf ist
+   * vorbei, das Bild soll stehen. Genau in diesem Moment beginnen aber die
+   * Ausklänge: die Abschlusskante der Weberei, der Kristallisationspuls, der
+   * Beweisring der Kaskade. Der Unterbau kennt sie nicht; er fragt deshalb.
+   * Unterklassen mit eigenem Ausklang erweitern diese Antwort — wer es
+   * vergisst, dessen Animation steht nach einem Bild still.
+   */
+  isAnimating() {
+    return Boolean(this.particles.live || this.ripples.live);
+  }
 
   /** Die Farbe der laufenden Phase: Monatsfarbe, um den Phasenversatz gedreht. */
   phaseColor() {

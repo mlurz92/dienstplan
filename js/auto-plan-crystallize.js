@@ -168,6 +168,11 @@ export class AutoPlanCrystallizer extends CanvasStage {
     for (const cell of this.cells) if (cell.staffId) cell.settle = 1;
   }
 
+  /** Der Kristallisationspuls ist der Ausklang dieser Ansicht. */
+  isAnimating() {
+    return super.isAnimating() || this.pulse > 0 || this.cells.some(cell => cell.settle > 0 && cell.settle < 1);
+  }
+
   step(delta) {
     const speed = this.reducedMotion ? 6 : 2.4;
     for (const cell of this.cells) {

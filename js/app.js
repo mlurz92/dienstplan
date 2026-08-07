@@ -250,7 +250,9 @@ async function openCurrentMonth(year, month, forceServer = false) {
   setStatus('loading', forceServer ? 'Lädt Serverstand …' : 'Lädt …');
   await loadMonth(year, month, { forceServer });
   if (requestId !== monthRequestId) return;
-  await warmAdjacentMonths(year, month);
+  // „Serverstand neu laden" erneuert auch den Vorrat; gewöhnliches Blättern
+  // begnügt sich mit dem, was diese Sitzung schon vom Server hat.
+  await warmAdjacentMonths(year, month, { force: forceServer });
   if (requestId !== monthRequestId) return;
 
   if (state.dirty || isMonthDirty(year, month)) setStatus('offline', 'Lokale Änderungen noch nicht synchronisiert');

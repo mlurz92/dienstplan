@@ -739,6 +739,14 @@ Unterbau und damit für jede Ansicht gleich:
    oder dem nächsten Sichtbarwerden geweckt. Eine Animation, die niemand sieht,
    ist reine Wärme.
 
+Die Ruhe hat eine Ausnahme, und sie hat den Unterbau eine Regression gekostet:
+`finish()` versetzt die Ansicht in eine ruhende Betriebsart — und genau dann
+*beginnen* die Ausklänge (Abschlusskante, Kristallisationspuls, Beweisring).
+Der Unterbau kennt sie nicht, also fragt er über `isAnimating()` nach. Eine
+Ansicht mit eigenem Ausklang erweitert diese Antwort; wer es vergisst, dessen
+Animation steht nach einem Bild still. Die Sichtbarkeitssperre bleibt davon
+unberührt: Ein Ausklang auf verdeckter Fläche wird angehalten, nicht verworfen.
+
 **Billige Pracht.** Der Glanz kam bis v10.6 aus `shadowBlur` — der teuersten
 Einstellung des 2D-Kontexts, gesetzt je Element und je Bild. Er kommt jetzt aus
 vorgerenderten Verlaufsplättchen, additiv aufgetragen: gleiche Optik, ein
@@ -1182,13 +1190,21 @@ und den Ausdruck als gemessenes PDF — ein Monat, eine A4-Seite.
   Ersatzleinwand — samt der Randfälle, die im Browser sonst nur eine schwarze
   Fläche hinterlassen: winzige Leinwand, leerer Monat, Zwischenlösung vor dem
   Stufenplan, geschlossene Lücke ohne Zielfunktion, fehlender Leinwandkontext.
+- **Vorladen heißt einmal laden.** `tests/e2e/month-prefetch.spec.js` zählt die
+  Abrufe, nicht die Absicht: Ein Schritt vorwärts holt höchstens den neuen
+  Nachbarn, ein bereits geladener Monat gar nichts, und „Neu laden" erneuert
+  weiterhin den ganzen Vorrat. Der Test stellt sich dafür einen erreichbaren
+  Server — ohne gültige Antworten wird die Herkunft eines Monats nie `server`,
+  der Übersprung greift nicht, und die Messung wäre wertlos.
 - **Sparsamkeit.** Die drei Bremsen sind Zusagen, also geprüft:
   `tests/auto-plan-run-views.test.js` verlangt, dass die Schleife bei verdeckter
   Leinwand kein Bild mehr anfordert, von einer Meldung wieder anläuft, beim
   Anhalten jeden Beobachter abmeldet und bei teuren Bildern den Detailgrad
   zurücknimmt. `tests/auto-plan-visual-effects.test.js` hält die Vorräte auf
   ihrer Kapazität fest — ein unbemerktes Wachstum fiele erst nach langer
-  Laufzeit als steigender Speicherverbrauch auf.
+  Laufzeit als steigender Speicherverbrauch auf. Dazu, dass die Ausklänge nach
+  `finish()` zu Ende laufen — die Budgetsteuerung hatte sie nach einem einzigen
+  Bild angehalten.
 - **Lesbarkeit.** `tests/e2e/dark-contrast.spec.js` und
   `tests/e2e/layout-contrast-v10-5.spec.js` messen jeden sichtbaren Textknoten
   gegen den *tatsächlich wirksamen* Hintergrund: halbtransparente Schichten

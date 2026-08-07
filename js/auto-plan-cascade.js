@@ -167,6 +167,11 @@ export class AutoPlanCascade extends CanvasStage {
     for (const stage of this.stages) if (stage.status === 'running') stage.status = 'open';
   }
 
+  /** Beweisring und fallende Tropfen sind die Ausklänge dieser Ansicht. */
+  isAnimating() {
+    return super.isAnimating() || this.splash > 0 || this.drops.length > 0;
+  }
+
   step(delta) {
     const speed = this.reducedMotion ? 6 : 2.6;
     for (const stage of this.stages) {
