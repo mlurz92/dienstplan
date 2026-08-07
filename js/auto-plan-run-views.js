@@ -33,8 +33,8 @@
  * `canvas.dataset.renderMode` ist öffentlich, trägt aber je nach Ansicht
  * Verschiedenes:
  *
- *   Kristallisation, Weberei, Kaskade   den *Lebenszyklus*: `running`,
- *                                       `complete`, `stopped`, `unavailable`.
+ *   Kristallisation, Weberei, Kaskade,  den *Lebenszyklus*: `running`,
+ *   Prisma                              `complete`, `stopped`, `unavailable`.
  *   Orbit                               die *Darstellungsgüte* der
  *                                       Animationsrichtlinie: `full`,
  *                                       `balanced`, `constrained`, `hidden`,
@@ -75,6 +75,7 @@
 import { AutoPlanCrystallizer } from './auto-plan-crystallize.js?v=20260806.1';
 import { AutoPlanWeaver } from './auto-plan-weave.js?v=20260806.1';
 import { AutoPlanCascade } from './auto-plan-cascade.js?v=20260806.1';
+import { AutoPlanPrism } from './auto-plan-prism.js?v=20260806.1';
 import { AutoPlanVisualizer } from './auto-plan-visualizer.js?v=20260806.1';
 
 /**
@@ -99,6 +100,12 @@ export const RUN_VIEWS = Object.freeze([
     label: 'Kaskade',
     hint: 'zeigt die lexikografische Rangfolge als Becken, deren Ungewissheitsband sich bis zum Beweis schließt',
     create: (canvas, monthData, context) => new AutoPlanCascade(canvas, monthData, context)
+  }),
+  Object.freeze({
+    id: 'prism',
+    label: 'Prisma',
+    hint: 'zeigt den Lauf als Lichtstrahl, den ein Prisma in die Zielstufen auffächert — je Stufe ein Spektralband von Rot bis Violett',
+    create: (canvas, monthData, context) => new AutoPlanPrism(canvas, monthData, context)
   }),
   Object.freeze({
     id: 'orbit',

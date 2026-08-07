@@ -117,7 +117,7 @@ test('Samstag, Sonntag und Feiertag sind in jedem Monat sicher zu unterscheiden'
 test('der Export druckt die eingestellte Monatsfarbe, nicht immer den Trend-Atlas', async () => {
   const { monthColorProfile } = await import('../js/month-palette.js');
   const month = monthWithPlan(2026, 9);
-  for (const mode of ['spectrum', 'rainbow', 'classic', 'neutral']) {
+  for (const mode of ['spectrum', 'rainbow', 'pastel', 'deep', 'classic', 'neutral']) {
     const expected = monthColorProfile(2026, 9, mode);
     const model = buildPlanPdfModel(planState, month, { mode });
     assert.equal(model.paletteLabel, `Monatskontrast · ${expected.name}`);
@@ -125,20 +125,40 @@ test('der Export druckt die eingestellte Monatsfarbe, nicht immer den Trend-Atla
   }
   // Die Modi dürfen nicht auf dieselbe Fläche zusammenfallen — sonst wäre die
   // Auswahl im Ausdruck folgenlos.
-  const accents = new Set(['spectrum', 'rainbow', 'classic', 'neutral']
+  const accents = new Set(['spectrum', 'rainbow', 'pastel', 'deep', 'classic', 'neutral']
     .map(mode => buildPlanPdfModel(planState, month, { mode }).colors['--month-accent'].slice(0, 3).join(',')));
-  assert.equal(accents.size, 4);
+  assert.equal(accents.size, 6);
 });
 
-test('der Regenbogen führt die zwölf Monate einmal um den Farbkreis', async () => {
-  const { RAINBOW_PALETTES, rainbowProfileForDate } = await import('../js/color-rainbow.js');
+test('die drei Tonlagen teilen sich einen einmal durchlaufenen Farbkreis', async () => {
+  const { RAINBOW_FAMILIES, RAINBOW_PALETTES, rainbowProfileForDate } = await import('../js/color-rainbow.js');
   const { labToLch, rgbToOklab } = await import('../js/color-atlas-engine.js');
   const hue = palette => (labToLch(rgbToOklab(palette.accent))[2] * 180 / Math.PI + 360) % 360;
-  assert.equal(RAINBOW_PALETTES.length, 12);
-  for (let month = 1; month <= 12; month += 1) {
-    const step = ((hue(RAINBOW_PALETTES[month % 12]) - hue(RAINBOW_PALETTES[month - 1])) + 360) % 360;
-    assert.ok(Math.abs(step - 30) < 6, `Schritt von Monat ${month} auf ${month % 12 + 1}: ${step.toFixed(1)}°`);
+
+  for (const family of RAINBOW_FAMILIES) {
+    const palettes = RAINBOW_PALETTES[family];
+    assert.equal(palettes.length, 12);
+    // Der Kreis wird von Januar bis Dezember genau einmal vorwärts durchlaufen.
+    for (let month = 2; month <= 12; month += 1) {
+      assert.ok(hue(palettes[month - 1]) > hue(palettes[month - 2]),
+        `${family}: Monat ${month} liegt im Farbkreis nicht hinter Monat ${month - 1}`);
+    }
+    assert.equal(new Set(palettes.map(palette => palette.accentHex)).size, 12);
   }
+
+  // Derselbe Monat trägt in allen drei Tonlagen denselben Farbton — nur
+  // Helligkeit und Buntheit unterscheiden sie.
+  for (let month = 1; month <= 12; month += 1) {
+    const [base, ...others] = RAINBOW_FAMILIES.map(family => RAINBOW_PALETTES[family][month - 1]);
+    for (const other of others) {
+      const delta = Math.abs(hue(base) - hue(other));
+      assert.ok(Math.min(delta, 360 - delta) < 3, `Monat ${month}: Farbton weicht um ${delta.toFixed(1)}° ab`);
+    }
+  }
+
+  // Klassische Regenbogenfarben — Rot ist Rot, Gelb ist Gelb.
+  assert.equal(RAINBOW_PALETTES.rainbow[0].accentHex, '#ff0000');
+  assert.equal(RAINBOW_PALETTES.rainbow[3].accentHex, '#ffdd00');
   // Die Folge ist jahresunabhängig — derselbe Monat trägt in jedem Jahr dieselbe Farbe.
   assert.deepEqual(rainbowProfileForDate(2031, 4).accent, rainbowProfileForDate(2026, 4).accent);
 });
