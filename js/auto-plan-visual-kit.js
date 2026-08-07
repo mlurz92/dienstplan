@@ -15,12 +15,35 @@
  * rote Warnungen heiß und drängend, grüne Bestätigungen ruhig, und die
  * Monatsfarbe bleibt in jedem Monat gleich präsent, ohne je zu schreien.
  *
+ * DIE ANIMATION KONKURRIERT NIE MIT DEM SOLVER
+ *
+ * Drei Bremsen, alle hier und damit für jede Ansicht gleich:
+ *
+ *   1. Takt      Gezeichnet wird höchstens rund dreißig Mal je Sekunde, nicht
+ *                so oft wie die Anzeige kann. Der Unterschied ist unsichtbar,
+ *                die Ersparnis ist die Hälfte.
+ *   2. Budget    Die gemessene Bilddauer entscheidet über Detailgrad und
+ *                Partikelzahl (`auto-plan-animation-policy.js`, dieselbe reine
+ *                Funktion, die Orbit seit v7.5 verwendet). Wird es eng, zeigt
+ *                die Ansicht weniger — nie etwas anderes.
+ *   3. Sichtbar  Ist das Fenster verdeckt oder die Leinwand aus dem Bild
+ *                gescrollt, ruht die Schleife vollständig. Eine Animation, die
+ *                niemand sieht, ist reine Wärme.
+ *
+ * Der Detailgrad steht als `canvas.dataset.renderDetail` am Element. Er ist
+ * bewusst **nicht** `renderMode`: Dort steht bei diesen Ansichten der
+ * Lebenszyklus, und Orbit legt seine Güte dort ab — zwei Bedeutungen auf einem
+ * Attribut sind schon eine zu viel.
+ *
  * LESBARKEIT GEHT VOR VOLLSTÄNDIGKEIT
  *
  * Jede Liste hat eine Mindestzeilenhöhe. Passen nicht alle Einträge, wird ein
  * Ausschnitt gezeigt und die Zahl der übrigen ausgewiesen — eine Zeile, die man
  * nicht lesen kann, ist keine Information, sondern Rauschen.
  */
+
+import { renderPolicyFor } from './auto-plan-animation-policy.js?v=20260806.1';
+import { GlowAtlas, ParticlePool, RipplePool } from './auto-plan-visual-effects.js?v=20260806.1';
 
 export const TAU = Math.PI * 2;
 
@@ -158,9 +181,25 @@ export class CanvasStage {
     this.severity = null;
     this.severityUntil = 0;
     this.lastFrame = 0;
+    this.lastPaint = 0;
     this.width = 640;
     this.height = 320;
     this.startedAt = nowMs();
+
+    // Budget und Sichtbarkeit.
+    this.averageFrameMs = 0;
+    this.documentVisible = globalThis.document?.visibilityState !== 'hidden';
+    this.intersecting = true;
+    this.finished = false;
+    this.policy = renderPolicyFor({ reduced: this.reducedMotion });
+
+    // Effektvorräte. Sie kosten im Ruhezustand nichts und ersparen im Betrieb
+    // jedes `shadowBlur` und jede Neuanlage im Bild.
+    this.glow = new GlowAtlas();
+    this.particles = new ParticlePool(options.particleCapacity ?? 220);
+    this.ripples = new RipplePool(options.rippleCapacity ?? 24);
+    this.staticLayers = new Map();
+
     if (canvas?.dataset) canvas.dataset.renderMode = this.context ? 'running' : 'unavailable';
   }
 
@@ -171,13 +210,41 @@ export class CanvasStage {
       ? new ResizeObserver(() => this.resize())
       : null;
     this.resizeObserver?.observe(this.canvas);
+
+    // Eine verdeckte Leinwand zeichnet nicht. Beide Wege dorthin — verstecktes
+    // Fenster und aus dem Bild gescrollte Fläche — werden beobachtet und beim
+    // Anhalten wieder abgemeldet; ein hängender Beobachter hielte die Ansicht
+    // nach dem Schließen des Dialogs am Leben.
+    this.onVisibility = () => {
+      this.documentVisible = globalThis.document?.visibilityState !== 'hidden';
+      this.wake();
+    };
+    globalThis.document?.addEventListener?.('visibilitychange', this.onVisibility);
+    this.intersectionObserver = typeof IntersectionObserver === 'function'
+      ? new IntersectionObserver(entries => {
+        this.intersecting = entries.some(entry => entry.isIntersecting);
+        this.wake();
+      })
+      : null;
+    this.intersectionObserver?.observe(this.canvas);
+
     this.resize();
     this.loop = this.loop.bind(this);
     this.frame = requestAnimationFrame(this.loop);
   }
 
+  /** Nach einer Pause wieder anlaufen, ohne die Schleife doppelt zu starten. */
+  wake() {
+    if (!this.running || !this.context || this.frame) return;
+    this.lastFrame = 0;
+    this.frame = requestAnimationFrame(this.loop);
+  }
+
   resize() {
     if (!this.canvas || !this.context) return;
+    // Die Standebene gilt für genau eine Größe; nach einer Änderung ist sie
+    // wertlos und würde verzerrt aufgetragen.
+    this.staticLayers.clear();
     const ratio = Math.min(2, globalThis.devicePixelRatio || 1);
     const rect = this.canvas.getBoundingClientRect();
     const width = Math.max(320, Math.floor(rect.width || this.canvas.clientWidth || 640));
@@ -203,12 +270,18 @@ export class CanvasStage {
       this.severity = SEVERITY[update.level];
       this.severityUntil = nowMs() + 900;
     }
+    // In den ruhenden Betriebsarten — reduzierte Bewegung, verdeckte Leinwand,
+    // fertiger Lauf — läuft keine Schleife. Eine Meldung ändert dort den
+    // Zustand, ohne dass jemand ihn zeichnete; sie muss also selbst wecken.
+    this.wake();
   }
 
   finish() {
     if (this.canvas?.dataset) this.canvas.dataset.renderMode = 'complete';
     this.phase = 'complete';
     this.progress = 1;
+    this.finished = true;
+    this.wake();
   }
 
   stop() {
@@ -218,15 +291,122 @@ export class CanvasStage {
     this.frame = null;
     this.resizeObserver?.disconnect();
     this.resizeObserver = null;
+    this.intersectionObserver?.disconnect();
+    this.intersectionObserver = null;
+    if (this.onVisibility) globalThis.document?.removeEventListener?.('visibilitychange', this.onVisibility);
+    this.onVisibility = null;
+    this.particles.clear();
+    this.ripples.clear();
+    this.staticLayers.clear();
   }
 
+  /**
+   * Die Schleife.
+   *
+   * Sie tut drei Dinge in dieser Reihenfolge: Budget bestimmen, Zustand
+   * fortschreiben, zeichnen — und das letzte nur, wenn der Takt es erlaubt. Der
+   * Zustand läuft dabei **immer** weiter: Eine Bewegung, die nur bei jedem
+   * zweiten Bild fortschreitet, ruckelt; eine, die weiterläuft und seltener
+   * gezeigt wird, ist bloß weicher abgetastet.
+   */
   loop(now) {
     if (!this.running || !this.context) return;
     const delta = this.lastFrame ? Math.min(0.12, (now - this.lastFrame) / 1000) : 0.016;
     this.lastFrame = now;
+
+    this.policy = renderPolicyFor({
+      active: this.running,
+      visible: this.documentVisible && this.intersecting,
+      reduced: this.reducedMotion,
+      finished: this.finished,
+      averageFrameMs: this.averageFrameMs
+    });
+    if (this.canvas?.dataset) this.canvas.dataset.renderDetail = this.policy.mode;
+
     this.step(delta);
-    this.draw(now);
+    this.particles.step(delta);
+    this.ripples.step(delta);
+
+    const interval = this.policy.frameIntervalMs;
+    const due = !interval || !this.lastPaint || now - this.lastPaint >= interval;
+    if (due) {
+      const startedAt = nowMs();
+      this.draw(now);
+      this.lastPaint = now;
+      // Gleitender Mittelwert: Ein einzelnes teures Bild — etwa während das
+      // Betriebssystem etwas anderes tut — soll die Darstellung nicht dauerhaft
+      // herabstufen, eine anhaltende Überlastung aber sehr wohl.
+      const cost = nowMs() - startedAt;
+      this.averageFrameMs = this.averageFrameMs ? this.averageFrameMs * 0.8 + cost * 0.2 : cost;
+    }
+
+    // Ruhezustände fordern kein neues Bild an. Sie werden über `wake()` wieder
+    // geweckt, wenn Sichtbarkeit oder Zustand sich ändern.
+    if (!this.policy.continuous && !this.particles.live && !this.ripples.live) {
+      this.frame = null;
+      return;
+    }
     this.frame = requestAnimationFrame(this.loop);
+  }
+
+  /**
+   * Zwischengespeicherte Standebene.
+   *
+   * Raster, Beschriftungen und Wannen ändern sich nur bei Größenänderung, malen
+   * aber den größten Teil der Fläche. Einmal in eine eigene Leinwand gezeichnet
+   * und danach kopiert, kostet das je Bild eine einzige Kopie statt hunderter
+   * Pfade. `invalidateStatic` verwirft sie, wenn sich der Inhalt doch ändert.
+   */
+  staticLayer(key, draw) {
+    const known = this.staticLayers.get(key);
+    if (known) return known;
+    // Jede Ebene ist eine vollständige Leinwand. Zwei genügen — eine je Zone,
+    // die eine hat —, und mehr als vier wären ein Speicherleck mit Aussicht:
+    // Ein Schlüssel, der sich je Phase ändert, legte sonst ein Dutzend an.
+    if (this.staticLayers.size >= 4) this.staticLayers.clear();
+    const ratio = Math.min(2, globalThis.devicePixelRatio || 1);
+    const canvas = typeof OffscreenCanvas === 'function'
+      ? new OffscreenCanvas(Math.max(1, Math.floor(this.width * ratio)), Math.max(1, Math.floor(this.height * ratio)))
+      : globalThis.document?.createElement?.('canvas');
+    if (!canvas) return null;
+    if (!(typeof OffscreenCanvas === 'function')) {
+      canvas.width = Math.max(1, Math.floor(this.width * ratio));
+      canvas.height = Math.max(1, Math.floor(this.height * ratio));
+    }
+    const ctx = canvas.getContext?.('2d');
+    if (!ctx?.setTransform) return null;
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    draw(ctx);
+    this.staticLayers.set(key, canvas);
+    return canvas;
+  }
+
+  invalidateStatic(key) {
+    if (key === undefined) this.staticLayers.clear();
+    else this.staticLayers.delete(key);
+  }
+
+  /** Detailgrad des laufenden Budgets: eins ist voll, null ist aus. */
+  get detail() {
+    return this.policy?.detail ?? 1;
+  }
+
+  /** Wie viele Partikel dieses Bild zeigen darf. */
+  get sparkLimit() {
+    return this.policy?.sparkLimit ?? 0;
+  }
+
+  /**
+   * Ausbrüche je Bild — die Bremse gegen den Schwarm.
+   *
+   * Eine neue Zwischenlösung ersetzt im Zweifel *jede* Zuordnung des Monats.
+   * Ohne Grenze zündeten dann zweiundsechzig Druckwellen gleichzeitig: teuer
+   * und, schlimmer, nichtssagend — ein Blitz überall ist kein Hinweis auf
+   * irgendetwas. Gezeigt werden die ersten, die restlichen Felder rasten still
+   * ein. Die Aussage bleibt richtig, die Kosten bleiben beschränkt.
+   */
+  burstBudget() {
+    return Math.max(1, Math.round(6 * this.detail));
   }
 
   step() {}
@@ -245,12 +425,54 @@ export class CanvasStage {
   }
 
   /**
-   * Setzt Glow-Radius und -Farbe am Kontext. Einzige Stelle, an der `shadowBlur`
-   * gesetzt wird — so bleibt die Regel „Glanz folgt der Farbe" durchsetzbar.
+   * Schein um eine Stelle — die billige Form.
+   *
+   * Bis v10.6 setzte diese Methode `shadowBlur`, die teuerste Einstellung des
+   * 2D-Kontexts, und zwar je Element und je Bild. Sie trägt jetzt ein
+   * vorgerendertes Plättchen additiv auf: gleiche Optik, ein Kopiervorgang.
+   * Die Regel „Glanz folgt der Farbe" bleibt unangetastet — Radius und Deckkraft
+   * kommen weiterhin aus `glowProfile`, nur die Ausführung ist eine andere.
+   */
+  glowAt(color, x, y, energy = 1, scale = 18) {
+    const profile = glowProfile(color, energy);
+    const radius = profile.radius * scale * 0.6;
+    this.glow.paint(this.context, color.h, x, y, radius, profile.alpha * this.detail);
+    return profile;
+  }
+
+  /**
+   * Schein entlang einer Strecke.
+   *
+   * Ein einzelnes Plättchen auf einem langen Balken sieht aus wie ein
+   * Leuchtfleck in dessen Mitte, nicht wie ein glühender Balken. Für gestreckte
+   * Formen werden deshalb mehrere Plättchen entlang der Achse gesetzt — zwei
+   * bis vier genügen, weil sie sich additiv überlagern und zu einem Band
+   * verschmelzen. Ihre Zahl folgt der Länge und dem Budget.
+   */
+  glowAlong(color, x0, y0, x1, y1, energy = 1, scale = 18) {
+    const profile = glowProfile(color, energy);
+    const radius = profile.radius * scale * 0.6;
+    const length = Math.hypot(x1 - x0, y1 - y0);
+    const steps = clamp(Math.round(length / Math.max(2, radius)), 1, Math.max(1, Math.round(4 * this.detail)));
+    // Die Deckkraft wird auf die Stützstellen verteilt: Vier Plättchen mit
+    // voller Stärke wären viermal so hell wie eines.
+    const strength = (profile.alpha * this.detail) / Math.sqrt(steps);
+    for (let step = 0; step < steps; step += 1) {
+      const t = steps === 1 ? 0.5 : step / (steps - 1);
+      this.glow.paint(this.context, color.h, x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, radius, strength);
+    }
+    return profile;
+  }
+
+  /**
+   * Der alte Weg über `shadowBlur`. Er bleibt für die wenigen Stellen, an denen
+   * eine *Form* leuchten muss und kein Punkt — dort ist ein Plättchen falsch.
+   * Bei knappem Budget wird er stillschweigend übersprungen.
    */
   applyGlow(color, energy, scale = 18) {
     const profile = glowProfile(color, energy);
-    this.context.shadowBlur = profile.radius * scale;
+    if (this.detail < 0.6) return profile;
+    this.context.shadowBlur = profile.radius * scale * this.detail;
     this.context.shadowColor = hsl(color, profile.alpha);
     return profile;
   }

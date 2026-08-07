@@ -29,6 +29,7 @@
 import {
   CanvasStage, SEVERITY, TAU, clamp, hsl, hueForStaff, nowMs
 } from './auto-plan-visual-kit.js?v=20260806.1';
+import { ease, hashNoise } from './auto-plan-visual-effects.js?v=20260806.1';
 
 /* Lesbarkeitsuntergrenzen. Unter diesen Werten wird ausgedünnt statt gestaucht. */
 const BASIN_MIN = 22;
@@ -154,8 +155,11 @@ export class AutoPlanCascade extends CanvasStage {
 
   spawnDrop(staffId) {
     if (this.reducedMotion) return;
-    if (this.drops.length >= DROP_LIMIT) this.drops.shift();
-    this.drops.push({ hue: hueForStaff(staffId), x: Math.random(), t: 0, speed: 0.7 + Math.random() * 0.6 });
+    // Die Obergrenze folgt dem Budget: Bei knapper Zeit zeigt der Strom
+    // weniger Tropfen, nie andere.
+    const limit = Math.max(8, Math.round(DROP_LIMIT * this.detail));
+    while (this.drops.length >= limit) this.drops.shift();
+    this.drops.push({ hue: hueForStaff(staffId), x: Math.random(), t: 0, speed: 0.7 + Math.random() * 0.6, splashed: false });
   }
 
   finish() {
@@ -296,21 +300,55 @@ export class AutoPlanCascade extends CanvasStage {
         const bandY = inner.y + inner.h - bandHeight;
         const bandWidth = Math.max(1.5, inner.w * stage.fill);
 
-        this.applyGlow(tone, state === 'frozen' ? 0.9 : 0.45 + 0.5 * stage.fill, 12);
         ctx.fillStyle = hsl(tone, state === 'broken' ? 0.5 : 0.34 + 0.3 * stage.fill);
         this.roundRect(inner.x, bandY, bandWidth, bandHeight, Math.min(2, bandHeight / 2));
         ctx.fill();
-        this.clearGlow();
+        // Ein Unterzug statt Plättchen: Die Wasserlinie ist über achthundert
+        // Pixel lang und wenige hoch. Punktförmiger Schein ergäbe darauf zwei
+        // Leuchtflecken; zwei weiche Rechtecke ergeben ein glühendes Band — und
+        // kosten zwei Füllungen statt eines Dutzends Kopien.
+        if (this.detail > 0.3) {
+          const halo = state === 'frozen' ? 0.16 : 0.1 + 0.1 * stage.fill;
+          for (const spread of [3, 1.4]) {
+            ctx.fillStyle = hsl({ ...tone, l: clamp(tone.l + 0.12, 0, 0.92) }, halo / spread);
+            this.roundRect(inner.x, bandY - spread, bandWidth, bandHeight + spread * 2, (bandHeight + spread * 2) / 2);
+            ctx.fill();
+          }
+        }
 
         // Oberkante Zielwert, Unterkante Schranke. Sie treffen sich genau dann,
-        // wenn die Stufe bewiesen ist.
-        ctx.strokeStyle = hsl(tone, 0.7);
+        // wenn die Stufe bewiesen ist. Solange sie sich nicht treffen, ist das
+        // Becken in Bewegung: Die Oberkante trägt eine flache Welle, die mit der
+        // Lücke abklingt. Ein bewiesenes Becken steht still — genau das ist die
+        // Aussage von „erstarrt".
+        ctx.strokeStyle = hsl(tone, 0.75);
         ctx.lineWidth = 1;
-        for (const edge of [bandY, bandY + bandHeight]) {
+        const restless = state === 'running' && !this.reducedMotion && this.detail > 0.4;
+        for (const [edge, waving] of [[bandY, restless], [bandY + bandHeight, false]]) {
           ctx.beginPath();
-          ctx.moveTo(inner.x, edge);
-          ctx.lineTo(inner.x + bandWidth, edge);
+          if (!waving) {
+            ctx.moveTo(inner.x, edge);
+            ctx.lineTo(inner.x + bandWidth, edge);
+          } else {
+            // Zwölf Stützstellen genügen für eine ruhige Welle; die Amplitude
+            // folgt der verbliebenen Ungewissheit.
+            const steps = 12;
+            const amplitude = Math.min(2.2, bandHeight * 0.35) * share;
+            for (let step = 0; step <= steps; step += 1) {
+              const t = step / steps;
+              const x = inner.x + bandWidth * t;
+              const y = edge + Math.sin(t * Math.PI * 3 + now / 260 + index) * amplitude;
+              if (step === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+            }
+          }
           ctx.stroke();
+        }
+
+        // Ein erstarrtes Becken bekommt einen wandernden Lichtgrat: die
+        // Kristallkante, die anzeigt, dass hier nichts mehr verhandelt wird.
+        if (state === 'frozen' && this.detail > 0.5 && !this.reducedMotion) {
+          const sweep = ((now / 2400 + index * 0.2) % 1);
+          this.glowAt(SEVERITY.proof, inner.x + inner.w * sweep, bandY, 0.7, 10);
         }
       }
 
@@ -372,18 +410,53 @@ export class AutoPlanCascade extends CanvasStage {
     this.roundRect(rect.x, rect.y, rect.w, rect.h, 4);
     ctx.fill();
 
-    for (const drop of this.drops) {
+    // Schweife bekommen nur die jüngsten Tropfen. Ältere sind ohnehin fast
+    // verblasst; ihre Spur kostete zwei Striche für nichts.
+    let trails = Math.round(24 * this.detail);
+    for (let position = this.drops.length - 1; position >= 0; position -= 1) {
+      const drop = this.drops[position];
       const tone = { h: drop.hue, s: 0.55, l: 0.52 };
       const x = rect.x + 4 + (rect.w - 8) * drop.x;
-      const y = rect.y + 3 + (rect.h - 6) * clamp(drop.t, 0, 1);
+      // Fallen heißt beschleunigen: Ein Tropfen mit gleichbleibender
+      // Geschwindigkeit sieht aus wie eine Perlenkette an einer Schnur.
+      const fall = ease.outCubic(clamp(drop.t, 0, 1) * 0.4 + Math.pow(clamp(drop.t, 0, 1), 2) * 0.6);
+      const y = rect.y + 3 + (rect.h - 6) * fall;
       const alpha = 0.85 * (1 - drop.t);
-      this.applyGlow(tone, 0.5, 8);
+
+      // Schweif: zwei kurze Striche mit abnehmender Deckkraft. Ein echter
+      // Verlauf sähe minimal weicher aus, kostet aber je Tropfen und Bild ein
+      // neues Verlaufsobjekt — bei neunzig Tropfen und dreißig Bildern in der
+      // Sekunde sind das zweitausendsiebenhundert Allokationen je Sekunde für
+      // einen Unterschied, den niemand sieht.
+      if (this.detail > 0.5 && trails > 0) {
+        trails -= 1;
+        const reach = rect.h * 0.3;
+        ctx.lineWidth = 1;
+        for (const [from, to, fade] of [[y - reach, y - reach * 0.5, 0.18], [y - reach * 0.5, y, 0.45]]) {
+          ctx.strokeStyle = hsl(tone, alpha * fade);
+          ctx.beginPath();
+          ctx.moveTo(x, Math.max(rect.y + 2, from));
+          ctx.lineTo(x, Math.max(rect.y + 2, to));
+          ctx.stroke();
+        }
+      }
+
       ctx.fillStyle = hsl(tone, alpha);
       ctx.beginPath();
       ctx.arc(x, y, 1.6, 0, TAU);
       ctx.fill();
-      this.clearGlow();
+      if (this.detail > 0.3) this.glowAt(tone, x, y, 0.5, 8);
+
+      // Aufschlag: Wer den Boden erreicht, schlägt einen Ring. Der Ring wird
+      // genau einmal je Tropfen ausgelöst.
+      if (!drop.splashed && drop.t > 0.92) {
+        drop.splashed = true;
+        // Klein halten: Ein Aufschlagring, der breiter ist als die Zone hoch,
+        // wird von ihr beschnitten und liest sich als Bogen, nicht als Spritzer.
+        this.ripples.emit({ x, y: rect.y + rect.h - 4, hue: drop.hue, grow: rect.h * 0.8, width: 1.2 });
+      }
     }
+    this.ripples.paint(ctx, Math.round(6 * this.detail));
 
     ctx.font = `600 9px system-ui, sans-serif`;
     ctx.textBaseline = 'middle';

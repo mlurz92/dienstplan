@@ -58,12 +58,27 @@ function stubContext() {
 
 function environment({ width = 900, height = 420 } = {}) {
   const originals = Object.fromEntries(
-    ['document', 'ResizeObserver', 'matchMedia', 'requestAnimationFrame', 'cancelAnimationFrame', 'getComputedStyle']
+    ['document', 'ResizeObserver', 'IntersectionObserver', 'matchMedia',
+      'requestAnimationFrame', 'cancelAnimationFrame', 'getComputedStyle']
       .map(key => [key, globalThis[key]])
   );
   const frames = [];
-  globalThis.document = { documentElement: { dataset: {} } };
-  globalThis.ResizeObserver = class { observe() {} disconnect() {} };
+  const listeners = new Map();
+  const observers = { resize: 0, intersection: 0 };
+  globalThis.document = {
+    documentElement: { dataset: {} },
+    visibilityState: 'visible',
+    addEventListener(type, handler) { listeners.set(type, handler); },
+    removeEventListener(type) { listeners.delete(type); }
+  };
+  globalThis.ResizeObserver = class {
+    observe() {}
+    disconnect() { observers.resize += 1; }
+  };
+  globalThis.IntersectionObserver = class {
+    observe() {}
+    disconnect() { observers.intersection += 1; }
+  };
   globalThis.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {} });
   globalThis.requestAnimationFrame = callback => frames.push(callback);
   globalThis.cancelAnimationFrame = () => {};
@@ -78,10 +93,23 @@ function environment({ width = 900, height = 420 } = {}) {
   return {
     canvas,
     context,
+    listeners,
+    observers,
+    /** Wie viele Bilder gerade angefordert sind. */
+    get pending() { return frames.length; },
     /** Führt die nächste angeforderte Bildschleife aus. */
     tick(now) {
       const callback = frames.shift();
       callback?.(now);
+    },
+    /** Versetzt das Fenster in den verdeckten Zustand und meldet es. */
+    hide() {
+      globalThis.document.visibilityState = 'hidden';
+      listeners.get('visibilitychange')?.();
+    },
+    show() {
+      globalThis.document.visibilityState = 'visible';
+      listeners.get('visibilitychange')?.();
     },
     restore() {
       for (const [key, value] of Object.entries(originals)) {
@@ -257,3 +285,89 @@ for (const { id: name } of RUN_VIEWS) {
     }
   });
 }
+
+/**
+ * Die Sparsamkeit der Ansichten ist eine Zusage, keine Absicht — also wird sie
+ * geprüft. Alle drei Bremsen sind im Unterbau verankert und gelten damit für
+ * jede Ansicht, die ihn benutzt; geprüft wird an der Voreinstellung.
+ */
+test('verdeckte Leinwand: die Schleife ruht und läuft danach wieder an', () => {
+  const world = environment();
+  try {
+    const view = createRunView(DEFAULT_RUN_VIEW, world.canvas, monthFixture(), {}).instance;
+    world.tick(16);
+    assert.ok(world.pending > 0, 'im sichtbaren Zustand wird weitergezeichnet');
+
+    world.hide();
+    // Der Zustandswechsel weckt einmal; dieses Bild erkennt die Verdeckung und
+    // fordert kein weiteres an.
+    while (world.pending) world.tick(200);
+    assert.equal(world.pending, 0, 'verdeckt wird kein Bild mehr angefordert');
+
+    world.show();
+    assert.ok(world.pending > 0, 'sichtbar läuft die Schleife wieder an');
+    view.stop();
+  } finally {
+    world.restore();
+  }
+});
+
+test('eine Meldung weckt die ruhende Schleife', () => {
+  // Ohne diesen Weg fröre die Ansicht in jeder ruhenden Betriebsart ein: Der
+  // Zustand änderte sich, aber niemand zeichnete ihn.
+  const world = environment();
+  try {
+    const view = createRunView(DEFAULT_RUN_VIEW, world.canvas, monthFixture(), {}).instance;
+    world.hide();
+    while (world.pending) world.tick(200);
+    assert.equal(world.pending, 0);
+
+    view.update({ phase: 'exact', progress: 0.5, message: 'weiter' });
+    assert.ok(world.pending > 0, 'die Meldung fordert ein Bild an');
+    view.stop();
+  } finally {
+    world.restore();
+  }
+});
+
+test('stop meldet Beobachter und Zuhörer vollständig ab', () => {
+  // Ein hängender Beobachter hielte die Ansicht nach dem Schließen des Dialogs
+  // am Leben — und mit ihr die Leinwand und ihre Vorräte.
+  const world = environment();
+  try {
+    const view = createRunView(DEFAULT_RUN_VIEW, world.canvas, monthFixture(), {}).instance;
+    assert.ok(world.listeners.has('visibilitychange'), 'die Sichtbarkeit wird beobachtet');
+    view.stop();
+    assert.equal(world.observers.resize, 1);
+    assert.equal(world.observers.intersection, 1);
+    assert.equal(world.listeners.has('visibilitychange'), false);
+    // Mehrfaches Anhalten ist Teil des Vertrags und darf nichts auslösen.
+    assert.doesNotThrow(() => view.stop());
+  } finally {
+    world.restore();
+  }
+});
+
+test('teure Bilder senken den Detailgrad, günstige heben ihn wieder', () => {
+  const world = environment();
+  try {
+    const view = createRunView(DEFAULT_RUN_VIEW, world.canvas, monthFixture(), {}).instance;
+    world.tick(16);
+    assert.equal(world.canvas.dataset.renderDetail, 'full');
+
+    // Eine anhaltend teure Bilddauer wird nicht behauptet, sondern gesetzt:
+    // Geprüft wird die Entscheidung, nicht die Messung.
+    view.averageFrameMs = 20;
+    world.tick(200);
+    assert.equal(world.canvas.dataset.renderDetail, 'constrained');
+    assert.ok(view.detail < 0.6, 'der Detailgrad ist zurückgenommen');
+    assert.ok(view.sparkLimit < 40, 'auch die Partikelzahl');
+
+    view.averageFrameMs = 1;
+    world.tick(400);
+    assert.equal(world.canvas.dataset.renderDetail, 'full');
+    view.stop();
+  } finally {
+    world.restore();
+  }
+});

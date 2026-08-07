@@ -31,6 +31,7 @@
 import {
   CanvasStage, SEVERITY, TAU, clamp, glowProfile, hsl, hueForStaff, nowMs
 } from './auto-plan-visual-kit.js?v=20260806.1';
+import { ease, hashNoise } from './auto-plan-visual-effects.js?v=20260806.1';
 
 // Die Strahlkraftfunktion war bis v10.5 hier zu Hause und ist Teil der
 // öffentlichen Fläche dieses Moduls geblieben.
@@ -77,7 +78,10 @@ export class AutoPlanCrystallizer extends CanvasStage {
           staffId: fixed || '',
           settle: fixed ? 1 : 0,
           candidates: fixed ? 0 : 6,
-          spark: 0
+          spark: 0,
+          // Die Druckwelle wird genau einmal je Entscheidung ausgelöst — beim
+          // Zeichnen, weil erst dort feststeht, wo die Zelle liegt.
+          burst: false
         });
       }
     }
@@ -145,7 +149,10 @@ export class AutoPlanCrystallizer extends CanvasStage {
   settle(key, staffId) {
     const cell = this.cellByKey.get(key);
     if (!cell || cell.fixed) return;
-    if (cell.staffId !== staffId) cell.spark = 1;
+    if (cell.staffId !== staffId) {
+      cell.spark = 1;
+      cell.burst = true;
+    }
     cell.staffId = staffId || '';
     cell.settle = Math.max(cell.settle, 0.02);
   }
@@ -225,6 +232,14 @@ export class AutoPlanCrystallizer extends CanvasStage {
     if (this.pulse > 0 && !this.reducedMotion) this.drawPulse(zones.field, now);
   }
 
+  /**
+   * Das Domänenfeld.
+   *
+   * Der unveränderliche Teil — Grundflächen und Wochenendtönung — liegt in einer
+   * Standebene und wird je Bild einmal kopiert. Bewegt wird nur, was sich
+   * wirklich ändert: einrastende Zuordnungen, flirrende Kandidatenmengen und
+   * die Druckwellen der letzten Entscheidungen.
+   */
   drawField(rect, color, now) {
     const ctx = this.context;
     const days = this.cells.length / 2;
@@ -233,41 +248,108 @@ export class AutoPlanCrystallizer extends CanvasStage {
     const cellHeight = rect.h / 2;
     const inset = Math.min(2.5, cellWidth * 0.12);
 
-    for (const cell of this.cells) {
-      const index = Math.floor(this.cells.indexOf(cell) / 2);
+    // Der Schlüssel trägt nur die Größe: Das Raster liegt in der Monatsfarbe,
+    // nicht in der Phasenfarbe. Sonst entstünde je Phase eine neue Vollleinwand,
+    // und die Phasenfarbe gehört ohnehin dem, was sich bewegt.
+    const base = this.accent;
+    const layer = this.staticLayer(`field|${Math.round(rect.w)}x${Math.round(rect.h)}`, target => {
+      for (let index = 0; index < this.cells.length; index += 1) {
+        const cell = this.cells[index];
+        const column = Math.floor(index / 2);
+        const row = cell.role === 'bd' ? 0 : 1;
+        const x = rect.x + column * cellWidth + inset;
+        const y = rect.y + row * cellHeight + inset;
+        const w = Math.max(1, cellWidth - inset * 2);
+        const h = Math.max(1, cellHeight - inset * 2);
+        const weekendTone = [0, 6].includes(cell.weekday) ? 0.16 : 0.08;
+        target.fillStyle = hsl({ ...base, l: clamp(base.l + 0.3, 0, 0.94) }, weekendTone);
+        target.beginPath();
+        if (typeof target.roundRect === 'function') target.roundRect(x, y, w, h, Math.min(3, w * 0.3));
+        else target.rect(x, y, w, h);
+        target.fill();
+      }
+    });
+    if (layer) ctx.drawImage(layer, 0, 0, this.width, this.height);
+
+    let bursts = this.burstBudget();
+    for (let index = 0; index < this.cells.length; index += 1) {
+      const cell = this.cells[index];
+      const column = Math.floor(index / 2);
       const row = cell.role === 'bd' ? 0 : 1;
-      const x = rect.x + index * cellWidth + inset;
+      const x = rect.x + column * cellWidth + inset;
       const y = rect.y + row * cellHeight + inset;
       const w = Math.max(1, cellWidth - inset * 2);
       const h = Math.max(1, cellHeight - inset * 2);
 
-      // Grundfläche: Wochenenden dunkler getönt, damit das Raster lesbar bleibt.
-      const weekendTone = [0, 6].includes(cell.weekday) ? 0.16 : 0.08;
-      ctx.fillStyle = hsl({ ...color, l: clamp(color.l + 0.3, 0, 0.94) }, weekendTone);
-      this.roundRect(x, y, w, h, Math.min(3, w * 0.3));
-      ctx.fill();
+      if (!layer) {
+        // Ohne Standebene — sehr alte Browser, kein Offscreen — wird die
+        // Grundfläche wie bisher je Bild gezeichnet.
+        const weekendTone = [0, 6].includes(cell.weekday) ? 0.16 : 0.08;
+        ctx.fillStyle = hsl({ ...color, l: clamp(color.l + 0.3, 0, 0.94) }, weekendTone);
+        this.roundRect(x, y, w, h, Math.min(3, w * 0.3));
+        ctx.fill();
+      }
 
       if (cell.staffId) {
-        const staffColor = { h: hueForStaff(cell.staffId), s: 0.55, l: cell.fixed ? 0.42 : 0.52 };
-        const energy = cell.fixed ? 0.25 : 0.4 + cell.spark * 1.6;
-        this.applyGlow(staffColor, energy, Math.min(14, cellWidth * 1.6));
-        ctx.fillStyle = hsl(staffColor, cell.fixed ? 0.55 : 0.35 + 0.55 * cell.settle);
-        const grow = cell.settle;
-        const gh = h * (0.35 + 0.65 * grow);
+        const hue = hueForStaff(cell.staffId);
+        const staffColor = { h: hue, s: 0.55, l: cell.fixed ? 0.42 : 0.52 };
+        // Das Einrasten schwingt einmal über: Der Balken schießt kurz über
+        // seine Endhöhe hinaus und setzt sich. Linear gewachsen wirkte er
+        // gezeichnet, nicht entschieden.
+        const grow = cell.fixed ? 1 : ease.outBack(cell.settle);
+        const gh = h * clamp(0.35 + 0.65 * grow, 0.05, 1.12);
+        ctx.fillStyle = hsl(staffColor, cell.fixed ? 0.55 : 0.35 + 0.55 * clamp(cell.settle, 0, 1));
         this.roundRect(x, y + (h - gh) / 2, w, gh, Math.min(3, w * 0.3));
         ctx.fill();
-        this.clearGlow();
-      } else if (!this.reducedMotion) {
+
+        // Schein als Plättchen statt als Weichzeichner — gleiche Optik, ein
+        // Kopiervorgang statt einer Zwischenfläche je Zelle.
+        if (this.detail > 0.3) {
+          // Der Schein folgt dem Balken über seine ganze Höhe, statt als Fleck
+          // in seiner Mitte zu sitzen.
+          const top = y + (h - gh) / 2;
+          this.glowAlong(staffColor, x + w / 2, top, x + w / 2, top + gh,
+            cell.fixed ? 0.25 : 0.4 + cell.spark * 1.6, Math.min(14, cellWidth * 1.6));
+        }
+
+        // Eine frische Entscheidung schlägt eine Welle und wirft Funken in
+        // Richtung ihrer Zeile. Beide stammen aus Vorräten, nicht aus `new`.
+        if (cell.burst) {
+          cell.burst = false;
+          if (bursts <= 0) continue;
+          bursts -= 1;
+          this.ripples.emit({ x: x + w / 2, y: y + h / 2, hue, grow: cellWidth * 6, width: 1.6 });
+          const sparks = Math.round(3 * this.detail);
+          for (let spark = 0; spark < sparks; spark += 1) {
+            this.particles.emit({
+              x: x + w / 2,
+              y: y + h / 2,
+              vx: hashNoise(index + spark, now / 700, 3) * cellWidth * 3,
+              vy: hashNoise(index * 3 + spark, now / 900, 3) * cellHeight * 1.2,
+              hue,
+              size: Math.max(2, cellWidth * 0.6),
+              decay: 2.2,
+              drag: 0.92
+            });
+          }
+        }
+      } else if (!this.reducedMotion && this.detail > 0.35) {
         // Unentschieden: die Kandidatenmenge flirrt als Fächer feiner Marken.
-        const marks = cell.candidates;
+        // Jede Marke driftet auf ihrer eigenen, wiederholbaren Bahn — echtes
+        // Rauschen würde in jedem Bild anders flackern.
+        const marks = Math.max(2, Math.round(cell.candidates * this.detail));
         for (let mark = 0; mark < marks; mark += 1) {
-          const t = (now / 900 + mark / marks + index * 0.13) % 1;
+          const t = (now / 900 + mark / marks + column * 0.13) % 1;
           const my = y + h * (0.2 + 0.6 * t);
+          const drift = hashNoise(index * 7 + mark, now / 1400, 1) * w * 0.16;
           ctx.fillStyle = hsl({ ...color, l: clamp(color.l + 0.2, 0, 0.9) }, 0.1 + 0.14 * Math.sin(t * Math.PI));
-          ctx.fillRect(x + w * 0.25, my, Math.max(1, w * 0.5), 1);
+          ctx.fillRect(x + w * 0.25 + drift, my, Math.max(1, w * 0.5), 1);
         }
       }
     }
+
+    this.ripples.paint(ctx, Math.round(8 * this.detail));
+    this.particles.paint(ctx, this.glow, this.sparkLimit, 0.5);
 
     // Rollenbeschriftung – klein, links, ohne das Raster zu überlagern.
     ctx.font = '600 9px system-ui, sans-serif';
