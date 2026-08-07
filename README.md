@@ -404,7 +404,7 @@ heller Sweep begleitet ihn. Der Direktor besitzt die sichtbare Farbe: Das
 Basistheme schreibt die Farbvariablen nicht, solange er geladen ist.
 
 **Sechs Farbsysteme** stehen zur Wahl: `spectrum` (Trend-Atlas, Standard),
-`rainbow`, `pastel` und `deep` als die drei Tonlagen des Farbkreises, `classic`
+`rainbow`, `pastel` und `deep` als die drei gesetzten Tonlagen des Farbkreises, `classic`
 (feste Monatspalette) und `neutral` (keine Einfärbung).
 
 Die Regenbogenfamilie (`js/color-rainbow.js`) ist der Gegenentwurf zum Atlas:
@@ -412,19 +412,30 @@ Der Januar beginnt beim Rot, und die zwölf Monate gehen der Reihe nach durch da
 Spektrum bis zum Magenta. Die Folge ist jahresunabhängig — derselbe Monat trägt
 in jedem Jahr dieselbe Farbe.
 
-| Tonlage | Charakter |
-| --- | --- |
-| `rainbow` | die klassischen Regenbogenfarben, volle sRGB-Werte |
-| `pastel` | dieselben zwölf Farbtöne, hell und zart |
-| `deep` | dieselben zwölf Farbtöne, satt und tief |
+| Tonlage | Charakter | Januar … Dezember |
+| --- | --- | --- |
+| `rainbow` | klassische Spektralfarben, volle sRGB-Werte | Rot, Zinnober, Orange, Gelb, Limette, Grün, Smaragd, Türkis, Blau, Indigo, Violett, Magenta |
+| `pastel` | zarte Töne mit wechselnder Helligkeit | Rosenquarz, Pfirsich, Sanddorn, Vanille, Pistazie, Minze, Seegras, Eisblau, Puderblau, Flieder, Malve, Altrosa |
+| `deep` | Edelsteintöne, satt und verschieden tief | Rubin, Karneol, Topas, Citrin, Peridot, Smaragd, Malachit, Petrol, Saphir, Lapislazuli, Amethyst, Fuchsit |
 
-Die Regenbogenfarben sind gesetzt und nicht gerechnet: Ein
-wahrnehmungsgleichmäßiger Kreis wäre gleichmäßiger im Schritt, kennt aber kein
-leuchtendes Gelb — bei fester Helligkeit wird daraus Gold. Hier hat die
-erwartete Farbe Vorrang vor dem gleichmäßigen Abstand. `pastel` und `deep`
-ändern nur Helligkeit und Buntheit, nie den Farbton; die Zuordnung „Monat →
-Farbe" bleibt über alle drei dieselbe. Token, Übergang und Plakette kommen aus
-demselben Weg wie beim Atlas; der Direktor fährt alle vier Systeme.
+**Alle drei sind gesetzt, nicht gerechnet.** Die erste Fassung leitete Pastell
+und Tiefton aus dem Regenbogen ab — gleicher Farbton, feste Helligkeit, feste
+Buntheit. Das Ergebnis war fahl und eintönig, aus zwei Gründen: sRGB trägt nicht
+jeden Farbton gleich weit (Gelb und Grün verlieren bei der Gamut-Anpassung
+Buntheit, Blau und Violett behalten sie, die Reihe fällt in der Mitte zusammen),
+und eine Reihe mit konstanter Helligkeit hat für das Auge keinen Rhythmus —
+zwölf gleich helle Töne wirken wie eine Farbe in zwölf Anläufen. Jetzt steht
+jede der 36 Farben einzeln da, nach den etablierten Palettenfamilien:
+Spektralfarben, Pastelltöne, Edelsteintöne.
+
+Zwei Zusagen gelten für jede Tonlage und werden geprüft: Der Farbton steigt von
+Januar bis Dezember streng an — der Kreis wird genau einmal vorwärts durchlaufen
+—, und je zwei Monate derselben Tonlage liegen wahrnehmbar auseinander
+(`MIN_FAMILY_DISTANCE`, gemessen in OkLab über *alle* Paare, nicht nur über
+Nachbarn). Genau diese zweite Zusage fehlte der ersten Fassung.
+
+Token, Übergang und Plakette kommen aus demselben Weg wie beim Atlas; der
+Direktor fährt alle vier Systeme.
 
 ### 5.2 Hell und Dunkel
 
@@ -699,7 +710,7 @@ Container-Abfragen dem tatsächlich verfügbaren Platz, nicht der Fensterbreite.
 | Gewicht des Gedächtnisses | Wirkung der Vorlast auf den Startwert |
 | Stabilität | Rang der Minimal-Perturbation in der Kaskade |
 | Bei Unlösbarkeit | melden, Korrekturmenge anzeigen oder anwenden |
-| Laufansicht | Kristallisation, Weberei, Kaskade, Prisma oder Orbit |
+| Laufansicht | Kristallisation, Weberei, Kaskade, Regenbogen-Prisma oder Orbit |
 
 Entfallen sind die neun `cpSat*Weight`-Gewichte, das nie umgesetzte
 Fairness-Profil, der beim portablen Build bedeutungslose Worker-Regler sowie
@@ -729,7 +740,7 @@ Anwendung.
 | Kristallisation | Wie fällt der Suchraum zusammen? (Voreinstellung) |
 | Weberei | Was steht am Ende im Plan — Person für Person, Tag für Tag? |
 | Kaskade | Wie arbeitet sich das Verfahren durch seine Rangfolge? |
-| Prisma | Woraufhin wird gerade gerechnet — welche Zielstufe leuchtet? |
+| Regenbogen-Prisma | Woraufhin wird gerade gerechnet — welche Zielstufe leuchtet? |
 | Orbit | Die frühere Ringdarstellung, unverändert erhalten |
 
 **Der Glanz folgt der Farbe.** Der Glow ist keine feste Größe: Wärme, Sättigung
@@ -893,7 +904,7 @@ und meldet Zielwert wie Schranke als null. Alle vier jüngeren Ansichten prüfen
 das ausdrücklich — bis v10.4 kristallisierte die Darstellung sonst sofort beim
 ersten Zwischenergebnis und stand die restliche Optimierung still.
 
-#### „Prisma"
+#### „Regenbogen-Prisma"
 
 Ein Strahl fällt von links auf ein Prisma und wird dort in die Zielstufen
 aufgefächert — je Stufe ein Spektralband, in Regenbogenreihenfolge von Rot bis

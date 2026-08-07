@@ -64,12 +64,12 @@ function dialogMarkup() {
             <label><span>Bewegung</span><small>„System“ folgt der Betriebssystem-Vorgabe; reduziert entfernt jede nicht notwendige Bewegung.</small>
               <select id="settingsMotion"><option value="system">Systemeinstellung</option><option value="reduced">Reduziert</option></select>
             </label>
-            <label><span>Monatsfarbsystem</span><small>Der Trend-Atlas gibt jedem Monat einen eigenen Kontrast; Regenbogen, Pastell und Tiefton führen die zwölf Monate jahresunabhängig durch das Spektrum; klassisch nutzt die feste Monatspalette, neutral verzichtet darauf.</small>
+            <label><span>Monatsfarbsystem</span><small>Der Trend-Atlas gibt jedem Monat einen eigenen Kontrast; Regenbogen, Pastell und Juwel führen die zwölf Monate jahresunabhängig durch das Spektrum; klassisch nutzt die feste Monatspalette, neutral verzichtet darauf.</small>
               <select id="settingsMonthColors">
                 <option value="spectrum">Trend-Atlas · empfohlen</option>
                 <option value="rainbow">Regenbogen · zwölf Monate im Spektrum</option>
                 <option value="pastel">Pastell · zarte Monatstöne</option>
-                <option value="deep">Tiefton · satte Monatstöne</option>
+                <option value="deep">Juwel · satte Edelsteintöne</option>
                 <option value="classic">Klassische Monatspalette</option>
                 <option value="neutral">Neutral, ohne Monatsfarbe</option>
               </select>

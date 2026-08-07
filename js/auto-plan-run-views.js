@@ -103,7 +103,7 @@ export const RUN_VIEWS = Object.freeze([
   }),
   Object.freeze({
     id: 'prism',
-    label: 'Prisma',
+    label: 'Regenbogen-Prisma',
     hint: 'zeigt den Lauf als Lichtstrahl, den ein Prisma in die Zielstufen auffächert — je Stufe ein Spektralband von Rot bis Violett',
     create: (canvas, monthData, context) => new AutoPlanPrism(canvas, monthData, context)
   }),

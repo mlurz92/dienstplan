@@ -24,7 +24,8 @@ export const DEFAULT_SETTINGS = Object.freeze({
     richTooltips: true,
     /**
      * Monatsfarbsystem. `spectrum` ist der Trend-Atlas des Color Directors,
-     * `rainbow`, `pastel` und `deep` sind die drei Tonlagen des Farbkreises,
+     * `rainbow`, `pastel` und `deep` sind die drei gesetzten Tonlagen des
+     * Farbkreises (Spektral-, Pastell- und Edelsteinfarben),
      * `classic` die feste Monatspalette, `neutral` schaltet die Einfärbung ab.
      */
     monthColors: 'spectrum',
