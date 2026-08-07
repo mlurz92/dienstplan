@@ -69,7 +69,8 @@ test('besetzter Samstag unterbricht die Kette (HG reicht)', () => {
 test('RBN am Samstag bedeutet nicht frei', () => {
   const state = stateWith();
   setAssignment(month(state, 2026, 8), FRIDAY, 'bd', 'lurz');
-  setAssignment(month(state, 2026, 8), SATURDAY, 'rbn1', 'lurz');
+  // Die RBN-Felder tragen Anzeigenamen, keine IDs – hier der Name von 'lurz'.
+  setAssignment(month(state, 2026, 8), SATURDAY, 'rbn1', 'Dr. Lurz');
   setAssignment(month(state, 2026, 8), SUNDAY, 'bd', 'lurz');
   const result = evalAt(state, FRIDAY, 'bd', 'lurz');
   assert.notEqual(result.meta.confirmationType, 'special');

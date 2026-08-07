@@ -7,7 +7,7 @@ import {
   MIN_NEIGHBOUR_DISTANCE, MIN_NEIGHBOUR_HUE, MIN_NEIGHBOUR_LIGHTNESS,
   MIN_ANNUAL_DISTANCE, MIN_RECENT_DISTANCE, NAME_COOLDOWN_MONTHS,
   VISUAL_MEMORY_MONTHS, HUE_SECTOR_MEMORY_MONTHS
-} from './color-atlas-data.js';
+} from './color-atlas-data.js?v=20260806.1';
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const positiveMod = (value, divisor) => ((value % divisor) + divisor) % divisor;
@@ -397,7 +397,8 @@ function buildCanonicalPalettes() {
 export const SPECTRUM_PALETTES = buildCanonicalPalettes();
 
 export function colorProfileForDate(year, month) {
-  const safeMonth = positiveMod(Number(month) - 1, 12) + 1;
+  const numericMonth = Math.trunc(Number(month));
+  const safeMonth = Number.isFinite(numericMonth) ? positiveMod(numericMonth - 1, 12) + 1 : 1;
   const safeYear = Number.isInteger(Number(year)) ? Number(year) : SPECTRUM_REFERENCE_YEAR;
   const cycleIndex = positiveMod(safeYear - SPECTRUM_REFERENCE_YEAR, SPECTRUM_CYCLE_YEARS);
   const canonical = SPECTRUM_PALETTES[cycleIndex * 12 + safeMonth - 1];

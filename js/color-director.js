@@ -1,11 +1,11 @@
 /**
  * Seasonal Spectrum Director — DOM integration and public facade.
  */
-import { SPECTRUM_DURATION_MS, VARIABLE_NAMES } from './color-atlas-data.js';
+import { SPECTRUM_DURATION_MS, VARIABLE_NAMES } from './color-atlas-data.js?v=20260806.1';
 import { colorProfileForDate, spectrumVariables, mixOklch } from './color-atlas-engine.js?v=20260806.1';
 import { RAINBOW_FAMILIES, rainbowProfileForDate } from './color-rainbow.js?v=20260806.1';
 
-export * from './color-atlas-data.js';
+export * from './color-atlas-data.js?v=20260806.1';
 export * from './color-atlas-engine.js?v=20260806.1';
 export * from './color-rainbow.js?v=20260806.1';
 
@@ -137,8 +137,20 @@ export function applySpectrumProfile(year, month, { animate = true, scheme = act
   const root = document.documentElement;
   const mode = directorMode();
   if (!mode) {
+    // Zurücktreten heißt auch: die eigenen !important-Variablen entfernen, sonst
+    // bliebe die Spektralfarbe auf dem Schirm stehen, bis der nächste
+    // Monatswechsel sie überschreibt. theme.js greift für classic/neutral selbst
+    // ein, der Director muss hier aber sauber aufräumen.
     delete root.dataset.colorDirector;
+    delete root.dataset.spectrumPalette;
+    delete root.dataset.spectrumKey;
+    delete root.dataset.spectrumMood;
+    delete root.dataset.spectrumMotion;
+    for (const name of VARIABLE_NAMES) root.style.removeProperty(name);
+    lastWritten.clear();
     activeKey = null;
+    activeSchemeKey = null;
+    animatingKey = null;
     return null;
   }
   const palette = paletteForMode(mode, year, month);
@@ -164,7 +176,7 @@ export function applySpectrumProfile(year, month, { animate = true, scheme = act
     if (label.title !== title) label.title = title;
   }
 
-  if (animate && animatingKey === palette.key && animationHandle !== null) return palette;
+  if (animate && animatingKey === palette.key && animationHandle !== null && !changed) return palette;
   if (animationHandle !== null && typeof cancelAnimationFrame === 'function') {
     cancelAnimationFrame(animationHandle);
     animationHandle = null;

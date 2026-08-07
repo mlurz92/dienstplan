@@ -1,8 +1,8 @@
-import { defaults, getOrInit, invalid, json, normalizeRbnNames, put, readJsonRequest, serverError } from '../_utils.js';
+import { defaults, getOrDefault, invalid, json, normalizeRbnNames, put, readJsonRequest, serverError } from '../_utils.js';
 
 export async function onRequestGet(context) {
   try {
-    const value = normalizeRbnNames(await getOrInit(context, 'app:rbn-names', defaults().rbnNames));
+    const value = normalizeRbnNames(await getOrDefault(context, 'app:rbn-names', defaults().rbnNames));
     return json({ ok: true, rbnNames: value });
   } catch (error) {
     return serverError(error);

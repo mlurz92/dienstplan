@@ -8,7 +8,7 @@
 
 const STORAGE_KEY = 'dienstplanrad:color-scheme:v1';
 const VALID = new Set(['light', 'dark']);
-const RELEASE = '20260804.1';
+const RELEASE = '20260806.1';
 const byId = id => document.getElementById(id);
 
 let mode = readStoredMode();

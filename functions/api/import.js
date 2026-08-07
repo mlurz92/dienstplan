@@ -1,4 +1,4 @@
-import { invalid, json, kv, normalizeBackupPayload, serverError } from '../_utils.js';
+import { invalid, json, kv, normalizeBackupPayload, readJsonRequest, serverError } from '../_utils.js';
 
 async function rollback(store, snapshots, writtenKeys) {
   const failures = [];
@@ -17,7 +17,7 @@ async function rollback(store, snapshots, writtenKeys) {
 export async function onRequestPost(context) {
   let payload;
   try {
-    payload = normalizeBackupPayload(await context.request.json(), { strict: true });
+    payload = normalizeBackupPayload(await readJsonRequest(context.request), { strict: true });
   } catch (error) {
     return invalid(error.message || 'Ungültiges JSON.');
   }
@@ -48,7 +48,7 @@ export async function onRequestPost(context) {
     return json({
       ok: false,
       error: rollbackFailures.length
-        ? `Serverimport fehlgeschlagen; Rücksetzung unvollständig: ${rollbackFailures.join(' | ')}`
+        ? `Serverimport fehlgeschlagen (${error.message}); Rücksetzung unvollständig: ${rollbackFailures.join(' | ')}`
         : `Serverimport fehlgeschlagen und wurde vollständig zurückgerollt: ${error.message}`
     }, 500);
   }

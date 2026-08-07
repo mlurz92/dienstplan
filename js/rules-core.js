@@ -157,11 +157,6 @@ export function getRoleProperties(person, dateIso) {
 
 export function dayIso(year, month, day) { return toIsoDate(year, month, day); }
 
-export function getAdjacentMonthData(state, delta) {
-  const anchor = new Date(state.currentYear, state.currentMonth - 1 + delta, 1);
-  return state.months.get(`${anchor.getFullYear()}-${String(anchor.getMonth() + 1).padStart(2, '0')}`);
-}
-
 export function monthForIso(state, dateIso) {
   return state.months.get(dateIso.slice(0, 7));
 }
@@ -205,6 +200,8 @@ export function setAbsence(monthData, staffId, dateIso, type, source = 'manual')
   } else {
     delete monthData.absences[staffId][dateIso];
     delete monthData.absenceSources[staffId][dateIso];
+    if (!Object.keys(monthData.absences[staffId]).length) delete monthData.absences[staffId];
+    if (!Object.keys(monthData.absenceSources[staffId]).length) delete monthData.absenceSources[staffId];
   }
 }
 
@@ -214,6 +211,7 @@ export function setPreference(monthData, staffId, dateIso, type) {
   monthData.preferences[staffId] ||= {};
   if (type) monthData.preferences[staffId][dateIso] = type;
   else delete monthData.preferences[staffId][dateIso];
+  if (!Object.keys(monthData.preferences[staffId]).length) delete monthData.preferences[staffId];
 }
 
 export function getOptions(monthData, staffId, dateIso) {
@@ -230,6 +228,7 @@ export function setOptions(monthData, staffId, dateIso, optionIds) {
   monthData.options[staffId] ||= {};
   if (clean.length) monthData.options[staffId][dateIso] = clean.join(',');
   else delete monthData.options[staffId][dateIso];
+  if (!Object.keys(monthData.options[staffId]).length) delete monthData.options[staffId];
 }
 export function toggleOption(monthData, staffId, dateIso, optionId) {
   const current = getOptions(monthData, staffId, dateIso);
@@ -430,14 +429,6 @@ export function isStaffActiveDuringMonth(person, year, month) {
   if (person.activeFrom && parseIso(person.activeFrom) > last) return false;
   if (person.activeUntil && parseIso(person.activeUntil) < first) return false;
   return true;
-}
-
-export function hasVacationInFollowingWeek(state, staffId, dateIso) {
-  const date = parseIso(dateIso);
-  const daysToMonday = ((8 - date.getDay()) % 7) || 7;
-  const monday = addDays(date, daysToMonday);
-  return Array.from({ length: 7 }, (_, index) => toLocalIso(addDays(monday, index)))
-    .some(iso => getAbsenceFromState(state, staffId, iso) === 'urlaub');
 }
 
 export function isPositivePreference(preference, role) {

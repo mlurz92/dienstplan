@@ -1267,7 +1267,7 @@ async function onFileImport(event) {
   // Ein Einzelblatt ohne Monatsangabe im Kopf landet sonst stillschweigend im
   // gerade angezeigten Monat.
   const monthless = imports.filter(item => item.usedFallbackMonth);
-  if (monthless.length && !confirm(`Für ${monthless.map(item => item.sheetName).join(', ')} wurde kein Monat gefunden.\n\nDiese Blätter dem angezeigten Monat ${MONTH_NAMES[state.currentMonth - 1]} zuordnen?`)) { reset(); return; }
+  if (monthless.length && !confirm(`Für ${monthless.map(item => `${item.sheetName} (${MONTH_NAMES[item.month - 1]} ${item.year})`).join(', ')} wurde kein Monat gefunden.\n\nDiese Blätter dem angezeigten Monat ${MONTH_NAMES[state.currentMonth - 1]} zuordnen?`)) { reset(); return; }
 
   // Vor dem Merge jeden Zielmonat laden. Andernfalls würde ein noch nie
   // geöffneter Monat aus einem leeren Gerüst entstehen und bestehende manuelle

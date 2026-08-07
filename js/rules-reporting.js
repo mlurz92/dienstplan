@@ -90,7 +90,9 @@ export function collectIssues(state, monthData, { evaluate = null } = {}) {
       }
 
       const evaluation = evaluateCandidateCached({ state, monthData, dateIso: iso, role, staffId });
-      if (evaluation.level === 'gray') {
+      // Grau ODER nicht wählbar bedeutet dieselbe Sache: Die Besetzung ist nicht
+      // zulässig und darf niemals als bestätigbare Ausnahme geführt werden.
+      if (evaluation.level === 'gray' || evaluation.canSelect === false) {
         issues.push({
           level: 'red',
           title: `${fmtGermanDate(iso)} · ${role.toUpperCase()} · nicht mehr zulässige Besetzung`,
@@ -139,7 +141,7 @@ export function collectIssues(state, monthData, { evaluate = null } = {}) {
     .sort((a, b) => {
       const severityDifference = severityRank[b.level] - severityRank[a.level];
       if (severityDifference) return severityDifference;
-      if (a.confirmed !== b.confirmed) return Number(a.confirmed) - Number(b.confirmed);
+      if (a.confirmed !== b.confirmed) return Number(Boolean(a.confirmed)) - Number(Boolean(b.confirmed));
       return a.title.localeCompare(b.title, 'de');
     });
 }

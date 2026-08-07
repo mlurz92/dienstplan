@@ -1,5 +1,5 @@
 import {
-  DEFAULT_SETTINGS, DEFAULT_STAFF, normalizeBackupPayload, normalizeMonthData,
+  DEFAULT_SETTINGS, DEFAULT_STAFF, isPlainRecord, normalizeBackupPayload, normalizeMonthData,
   normalizeRbnNames, normalizeSettings, normalizeStaffList
 } from '../js/defaults.js';
 
@@ -35,13 +35,15 @@ export function kv(context) {
   return store;
 }
 
-export async function getOrInit(context, key, fallbackFactory) {
+export async function getOrDefault(context, key, fallbackFactory) {
+  // Lesen legt bewusst nichts an (README §9.2): Ein Lesezugriff – auch das
+  // Vorladen und der Export – darf den KV-Speicher nicht verändern. Gespeichert
+  // wird erst beim Schreiben. Fällt das Lesen auf einen Schreibfehler (Quote,
+  // Read-only-Vorfall), darf die ganze Anwendung deshalb nicht abstürzen.
   const store = kv(context);
   const value = await store.get(key, 'json');
   if (value !== null) return value;
-  const fallback = typeof fallbackFactory === 'function' ? fallbackFactory() : fallbackFactory;
-  await store.put(key, JSON.stringify(fallback));
-  return fallback;
+  return typeof fallbackFactory === 'function' ? fallbackFactory() : fallbackFactory;
 }
 
 export async function put(context, key, value) {

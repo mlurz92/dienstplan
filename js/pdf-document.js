@@ -105,7 +105,13 @@ const num = value => {
 };
 
 const colorOps = (color, stroke) => {
-  const [r, g, b] = color;
+  // Kanäle am PDF-Rand festhalten: Farbmischungen können vorzeichenbehaftete
+  // oder überlaufende Werte erzeugen, und ein rg/RG-Operator außerhalb [0, 1]
+  // ist in der Praxis ungültig. Korrekte Farben bleiben unverändert.
+  const clampChannel = value => Math.min(255, Math.max(0, Number(value) || 0));
+  const r = clampChannel(color[0]);
+  const g = clampChannel(color[1]);
+  const b = clampChannel(color[2]);
   return `${num(r / 255)} ${num(g / 255)} ${num(b / 255)} ${stroke ? 'RG' : 'rg'}`;
 };
 

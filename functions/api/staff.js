@@ -1,8 +1,8 @@
-import { defaults, getOrInit, invalid, json, normalizeStaffList, put, readJsonRequest, serverError } from '../_utils.js';
+import { defaults, getOrDefault, invalid, json, normalizeStaffList, put, readJsonRequest, serverError } from '../_utils.js';
 
 export async function onRequestGet(context) {
   try {
-    const value = normalizeStaffList(await getOrInit(context, 'app:staff', defaults().staff));
+    const value = normalizeStaffList(await getOrDefault(context, 'app:staff', defaults().staff));
     return json({ ok: true, staff: value });
   } catch (error) {
     return serverError(error);

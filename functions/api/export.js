@@ -1,4 +1,4 @@
-import { defaults, ensureMonthShape, getOrInit, json, kv, normalizedBootstrap, serverError } from '../_utils.js';
+import { defaults, ensureMonthShape, getOrDefault, json, kv, normalizedBootstrap, serverError } from '../_utils.js';
 
 async function listAllMonthKeys(store) {
   const keys = [];
@@ -17,9 +17,9 @@ export async function onRequestGet(context) {
   try {
     const base = defaults();
     const [settings, staff, rbnNames] = await Promise.all([
-      getOrInit(context, 'app:settings', base.settings),
-      getOrInit(context, 'app:staff', base.staff),
-      getOrInit(context, 'app:rbn-names', base.rbnNames)
+      getOrDefault(context, 'app:settings', base.settings),
+      getOrDefault(context, 'app:staff', base.staff),
+      getOrDefault(context, 'app:rbn-names', base.rbnNames)
     ]);
     const store = kv(context);
     const keys = await listAllMonthKeys(store);
@@ -29,9 +29,16 @@ export async function onRequestGet(context) {
       const value = values[index];
       if (!value) return;
       const match = /^year:(\d{4}):month:(\d{2})$/.exec(key);
+      if (!match) return;
       const year = Number(match[1]);
       const month = Number(match[2]);
-      months.push([`${match[1]}-${match[2]}`, ensureMonthShape(year, month, value)]);
+      // Ein beschädigter oder außerhalb des Bereichs liegender Monatsschlüssel
+      // darf die Sicherung aller übrigen Monate nicht verhindern.
+      try {
+        months.push([`${match[1]}-${match[2]}`, ensureMonthShape(year, month, value)]);
+      } catch {
+        /* Monat überspringen, Rest der Sicherung bleibt erhalten */
+      }
     });
     return json({ ok: true, ...normalizedBootstrap({ settings, staff, rbnNames }), months });
   } catch (error) {

@@ -116,28 +116,35 @@ export function detectColumns(rows, { minRows = null, gap = null } = {}) {
   // Vorkommen wenig, bei einem dreizeiligen Auszug wäre dieselbe Schwelle das
   // Ende jeder Spaltenerkennung.
   const threshold = minRows ?? Math.max(1, Math.min(3, Math.round(rows.length * 0.15)));
+  // Die Kopfzeile trägt die Spaltennamen. Spalten, die im Monat nur spärlich
+  // besetzt sind (z. B. RBN), hätten sonst zu wenige Treffer für den
+  // Schwellenwert und fielen weg – der Wiederimport verlöre diese Werte
+  // vollständig. Jede Spalte, deren Anker in der Kopfzeile steht, bleibt deshalb
+  // erhalten, auch wenn sie im Körper kaum vorkommt.
+  const headerRow = rows.find(row => (row.items || []).some(item => {
+    const cell = collapseLetterSpacing(item.s || '').trim().toLowerCase();
+    return cell === 'bd' || cell === 'hg' || cell.includes('rbn');
+  }));
+  const headerCenters = new Set(headerRow ? headerRow.items.map(centerOf) : []);
   const centers = [];
-  for (const row of rows) for (const item of row.items) centers.push(centerOf(item));
+  for (const row of rows) for (const item of row.items) {
+    const center = centerOf(item);
+    centers.push({ center, header: headerCenters.has(center) });
+  }
   if (!centers.length) return [];
-  // Der Faktor ist gemessen, nicht geraten: Bei 0,45 der typischen Elementbreite
-  // trennen beide Vorlagen sauber — der eigene Ausdruck (Medianbreite 23) ebenso
-  // wie der Neuroradiologieplan (31). Größer, und die schmale Tagesspalte
-  // verschmilzt mit dem Wochentag; kleiner, und breite Namen zerfallen in zwei
-  // Spalten. Die Schranken halten den Wert auch bei ungewöhnlichen Schriftgraden
-  // im brauchbaren Bereich.
   const widths = rows.flatMap(row => row.items.map(item => Number(item.w) || 0)).filter(Boolean);
   const limit = gap ?? Math.min(16, Math.max(10, median(widths) * 0.45));
 
-  centers.sort((a, b) => a - b);
+  centers.sort((a, b) => a.center - b.center);
   const clusters = [[centers[0]]];
-  for (const center of centers.slice(1)) {
+  for (const cell of centers.slice(1)) {
     const current = clusters[clusters.length - 1];
-    if (center - current[current.length - 1] <= limit) current.push(center);
-    else clusters.push([center]);
+    if (cell.center - current[current.length - 1].center <= limit) current.push(cell);
+    else clusters.push([cell]);
   }
   return clusters
-    .filter(cluster => cluster.length >= threshold)
-    .map(cluster => cluster.reduce((sum, value) => sum + value, 0) / cluster.length);
+    .filter(cluster => cluster.length >= threshold || cluster.some(item => item.header))
+    .map(cluster => cluster.reduce((sum, item) => sum + item.center, 0) / cluster.length);
 }
 
 /**

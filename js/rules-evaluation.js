@@ -42,7 +42,11 @@ function createEvaluationCollector() {
 
   const push = (nextLevel, reason, { selection = 'normal' } = {}) => {
     if (nextLevel === 'gray') selection = 'blocked';
-    if (nextLevel !== 'gray' && severityRank[nextLevel] > severityRank[level]) level = nextLevel;
+    // Eine graue (strukturell unmögliche) Bewertung bleibt grau. Ohne den Schutz
+    // würde ein späteres rot das terminale Grau überschreiben – etwa eine Person,
+    // die wegen noch ausstehender Aktivierung nicht wählbar ist und zusätzlich
+    // Urlaub eingetragen hat.
+    if (nextLevel !== 'gray' && level !== 'gray' && severityRank[nextLevel] > severityRank[level]) level = nextLevel;
     if (nextLevel === 'gray') level = 'gray';
     if (SELECTION_PRIORITY[selection] > SELECTION_PRIORITY[selectionPolicy]) selectionPolicy = selection;
     add({ text: reason, kind: 'conflict', entryLevel: nextLevel, selection });
@@ -463,6 +467,15 @@ function evaluateCandidateInternal({ state, monthData, dateIso, role, staffId, i
     const nextIso = toLocalIso(addDays(date, 1));
     if (!absence && getAbsenceFromState(state, staffId, nextIso) === 'urlaub') {
       push('orange', 'BD unmittelbar vor Urlaubsbeginn');
+    }
+
+    // Spiegelbild zur HG-Seite (unten): Der Tag nach einem BD ist dienstfrei.
+    // Sonst hinge die Farbe an der Eingabereihenfolge – ein bereits stehender
+    // HG am Folgetag bliebe grün, obwohl die Paarung unzulässig ist. Samstag
+    // und Sonntag bleiben als Wochenendkopplung ausgenommen; der Freitag zählt
+    // hier nicht als Wochenende.
+    if (weekday !== 5 && weekday !== 6 && !absence && getAssignment(state, nextIso, 'hg') === staffId) {
+      push('red', 'BD am Vortag: Folgetag ist dienstfrei', { selection: 'blocked' });
     }
 
     const followingBlock = !absence ? followingWeekVacationBlock(state, staffId, dateIso) : null;

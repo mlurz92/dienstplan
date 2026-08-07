@@ -1,5 +1,5 @@
 import { evaluateCandidate as evaluateCandidateBase } from './rules-evaluation.js?v=20260806.1';
-import { addDays, getAssignment, parseIso, toLocalIso } from './rules-core.js?v=20260806.1';
+import { addDays, getAssignment, getStaffById, parseIso, toLocalIso } from './rules-core.js?v=20260806.1';
 
 export * from './rules-evaluation.js?v=20260806.1';
 
@@ -73,7 +73,15 @@ const GAP_LEGACY_REASONS = new Set([
 ]);
 
 function isStaffFreeOn(state, dateIso, staffId) {
-  return ['bd', 'hg', 'rbn1', 'rbn2'].every(role => getAssignment(state, dateIso, role) !== staffId);
+  // RBN-Felder tragen Anzeigenamen, keine Personal-IDs (js/rbn.js). Beides muss
+  // greifen: Eine eigene RBN am Samstag macht den Samstag nicht frei, auch wenn
+  // die Felder nicht mit der ID befüllt werden.
+  const rbnName = getStaffById(state.staff, staffId)?.name || '';
+  return ['bd', 'hg'].every(role => getAssignment(state, dateIso, role) !== staffId)
+    && ['rbn1', 'rbn2'].every(role => {
+      const value = getAssignment(state, dateIso, role);
+      return value !== staffId && (!rbnName || value !== rbnName);
+    });
 }
 
 /**

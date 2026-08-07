@@ -31,7 +31,10 @@ test('director updates run as one continuous transition instead of a hard write'
 });
 
 test('a running transition towards the same month is never restarted', () => {
-  assert.match(colorDirector, /if \(animate && animatingKey === palette\.key && animationHandle !== null\) return palette;/);
+  // Ein laufender Verlauf zum selben Monat wird nicht neu gestartet – es sei
+  // denn, sich hat sich dabei das Erscheinungsbild geändert (dann muss neu
+  // geschrieben werden, sonst bliebe die alte Tönung auf dem Schirm stehen).
+  assert.match(colorDirector, /if \(animate && animatingKey === palette\.key && animationHandle !== null && !changed\) return palette;/);
   assert.match(colorDirector, /animatingKey = palette\.key;/);
   assert.match(colorDirector, /animatingKey = null;/);
 });

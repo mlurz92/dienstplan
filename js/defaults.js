@@ -459,7 +459,6 @@ export function normalizeMonthData(year, month, payload) {
   const schemaVersion = Number(source.schemaVersion);
   return {
     ...base,
-    ...source,
     schemaVersion: Number.isInteger(schemaVersion) && schemaVersion > 0 ? schemaVersion : base.schemaVersion,
     year: normalizedYear,
     month: normalizedMonth,

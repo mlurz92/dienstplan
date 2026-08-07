@@ -125,7 +125,8 @@ export const RAINBOW_PALETTES = Object.freeze(Object.fromEntries(
 /** Die Monatsfarbe einer Tonlage — das Jahr spielt hier keine Rolle. */
 export function rainbowProfileForDate(year, month, family = 'rainbow') {
   const resolved = FAMILIES[family] ? family : 'rainbow';
-  const monthIndex = positiveMod(Math.trunc(Number(month)) - 1, 12);
+  const numericMonth = Math.trunc(Number(month));
+  const monthIndex = Number.isFinite(numericMonth) ? positiveMod(numericMonth - 1, 12) : 0;
   const safeYear = Number.isInteger(Number(year)) ? Number(year) : new Date().getFullYear();
   const palette = RAINBOW_PALETTES[resolved][monthIndex];
   return Object.freeze({
