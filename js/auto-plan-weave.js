@@ -36,6 +36,7 @@
 import {
   CanvasStage, SEVERITY, clamp, hsl, hueForStaff, nowMs
 } from './auto-plan-visual-kit.js?v=20260806.1';
+import { ease, hashNoise } from './auto-plan-visual-effects.js?v=20260806.1';
 
 /* Lesbarkeitsuntergrenzen. Unter diesen Werten wird ausgedünnt statt gestaucht:
    Eine Zeile, die man nicht lesen kann, ist keine Information, sondern Rauschen. */
@@ -106,7 +107,10 @@ export class AutoPlanWeaver extends CanvasStage {
           fixed: Boolean(fixed),
           staffId: fixed || '',
           settle: fixed ? 1 : 0,
-          spark: 0
+          spark: 0,
+          // Der Faserwurf wird einmal je Entscheidung ausgelöst — beim
+          // Zeichnen, weil erst dort feststeht, wo der Knoten sitzt.
+          burst: false
         });
       }
     }
@@ -180,6 +184,7 @@ export class AutoPlanWeaver extends CanvasStage {
     if (changed) {
       row.knots += 1;
       cell.spark = 1;
+      cell.burst = true;
       cell.settle = Math.max(cell.settle, 0.02);
       this.shuttle = { staffId, dateIso, life: 1 };
     }
@@ -291,6 +296,10 @@ export class AutoPlanWeaver extends CanvasStage {
     if (zones.names) this.withinZone(zones.names, () => this.drawNames(zones.names, color, rows, positions, rowHeight, hidden, hiddenY));
     if (zones.rail) this.withinZone(zones.rail, () => this.drawRail(zones.rail, block, color, rows, positions, rowHeight));
     this.drawSelvedge(zones.foot, color);
+    // Über den gewebten Teil wandert ein flacher Lichtschimmer — dieselbe
+    // Bewegung, die einen echten Stoff im Streiflicht zeigt. Ein Verlauf je
+    // Bild, unabhängig von der Zahl der Knoten.
+    if (!this.reducedMotion && this.detail > 0.5) this.drawSheen(block, color, now);
     if (this.seam > 0 && !this.reducedMotion) this.drawSeam(block);
   }
 
@@ -359,9 +368,14 @@ export class AutoPlanWeaver extends CanvasStage {
       ctx.stroke();
     }
 
+    // 3b. Fasern und Funken liegen zwischen Fäden und Knoten: Sie gehören
+    //     hinter den Stoff, nicht darüber.
+    this.particles.paint(ctx, this.glow, this.sparkLimit, 0.45);
+
     // 4. Knoten.
     const inset = Math.min(1.6, columnWidth * 0.14);
     const bandHeight = Math.max(2, rowHeight / 2 - 1);
+    let bursts = this.burstBudget();
     for (const cell of this.cells.values()) {
       if (!cell.staffId) continue;
       const y = positions.get(cell.staffId);
@@ -369,27 +383,56 @@ export class AutoPlanWeaver extends CanvasStage {
       const index = this.dayIndex.get(cell.dateIso);
       if (index === undefined) continue;
       const row = this.rows.get(cell.staffId);
-      const tone = { h: row?.hue ?? 0, s: 0.55, l: cell.fixed ? 0.42 : 0.52 };
-      const grow = cell.fixed ? 1 : cell.settle;
-      const width = Math.max(1.5, (columnWidth - inset * 2) * (0.4 + 0.6 * grow));
+      const hue = row?.hue ?? 0;
+      const tone = { h: hue, s: 0.55, l: cell.fixed ? 0.42 : 0.52 };
+      // Der Knoten schwingt beim Einweben einmal über: Er zieht sich fest,
+      // statt gleichmäßig zu wachsen.
+      const grow = cell.fixed ? 1 : ease.outBack(cell.settle);
+      const width = Math.max(1.5, (columnWidth - inset * 2) * clamp(0.4 + 0.6 * grow, 0.1, 1.1));
       const x = rect.x + (index + 0.5) * columnWidth - width / 2;
       const bandY = cell.role === 'bd' ? y + 0.5 : y + rowHeight / 2 + 0.5;
-      const height = Math.max(1.5, bandHeight * (0.45 + 0.55 * grow));
+      const height = Math.max(1.5, bandHeight * clamp(0.45 + 0.55 * grow, 0.1, 1.1));
       const top = bandY + (bandHeight - height) / 2;
 
-      this.applyGlow(tone, cell.fixed ? 0.22 : 0.36 + cell.spark * 1.5, Math.min(12, columnWidth * 1.5));
       this.roundRect(x, top, width, height, Math.min(2, width * 0.35));
       if (cell.role === 'bd') {
-        ctx.fillStyle = hsl(tone, cell.fixed ? 0.6 : 0.4 + 0.5 * grow);
+        ctx.fillStyle = hsl(tone, cell.fixed ? 0.6 : 0.4 + 0.5 * clamp(cell.settle, 0, 1));
         ctx.fill();
       } else {
         // Der Hintergrunddienst bleibt offen: derselbe Ton, nur als Umriss. So
         // sind beide Rollen ohne zweite Farbachse unterscheidbar.
-        ctx.strokeStyle = hsl(tone, cell.fixed ? 0.75 : 0.5 + 0.45 * grow);
+        ctx.strokeStyle = hsl(tone, cell.fixed ? 0.75 : 0.5 + 0.45 * clamp(cell.settle, 0, 1));
         ctx.lineWidth = Math.min(1.6, Math.max(0.8, height * 0.3));
         ctx.stroke();
       }
-      this.clearGlow();
+      // Schein bekommt, was gerade entschieden wurde. Ein Dauerleuchten auf
+      // allen sechzig Knoten kostet sechzig Kopien je Bild und sagt nichts —
+      // die Fläche des Stoffs trägt ihren Glanz ohnehin über den Schimmer.
+      if (cell.spark > 0.01 && this.detail > 0.3) {
+        this.glowAt(tone, x + width / 2, top + height / 2, 0.36 + cell.spark * 1.5,
+          Math.min(12, columnWidth * 1.5));
+      }
+
+      // Ein frisch gesetzter Knoten wirft kurz Fasern ab — die Bewegung, die
+      // das Auge zur jüngsten Entscheidung zieht.
+      if (cell.burst) {
+        cell.burst = false;
+        if (bursts <= 0) continue;
+        bursts -= 1;
+        const fibres = Math.round(3 * this.detail);
+        for (let fibre = 0; fibre < fibres; fibre += 1) {
+          this.particles.emit({
+            x: x + width / 2,
+            y: top + height / 2,
+            vx: hashNoise(index * 5 + fibre, now / 800, 3) * columnWidth * 2.5,
+            vy: hashNoise(index * 11 + fibre, now / 650, 3) * rowHeight * 1.5,
+            hue,
+            size: Math.max(2, columnWidth * 0.55),
+            decay: 2.4,
+            drag: 0.9
+          });
+        }
+      }
     }
 
     // 5. Schiffchen — die einzige schnelle Bewegung der Ansicht.
@@ -400,15 +443,41 @@ export class AutoPlanWeaver extends CanvasStage {
         const target = rect.x + (index + 0.5) * columnWidth;
         const travel = 1 - clamp(this.shuttle.life, 0, 1);
         const head = rect.x + (target - rect.x) * travel;
-        const tone = { h: this.rows.get(this.shuttle.staffId)?.hue ?? 0, s: 0.6, l: 0.58 };
-        this.applyGlow(tone, 1.1, 14);
-        ctx.strokeStyle = hsl(tone, 0.55 * this.shuttle.life);
+        const hue = this.rows.get(this.shuttle.staffId)?.hue ?? 0;
+        const tone = { h: hue, s: 0.6, l: 0.58 };
+        const middle = y + rowHeight / 2;
+
+        // Der Schweif ist ein Verlauf, kein Dutzend Einzelstriche: eine
+        // Zeichnung statt vieler, und weicher als jede Aneinanderreihung.
+        const tail = Math.max(rect.x, head - rect.w * 0.18);
+        if (ctx.createLinearGradient) {
+          const gradient = ctx.createLinearGradient(tail, middle, head, middle);
+          gradient.addColorStop(0, hsl(tone, 0));
+          gradient.addColorStop(1, hsl(tone, 0.75 * this.shuttle.life));
+          ctx.strokeStyle = gradient;
+        } else {
+          ctx.strokeStyle = hsl(tone, 0.55 * this.shuttle.life);
+        }
         ctx.lineWidth = Math.max(1, rowHeight * 0.2);
         ctx.beginPath();
-        ctx.moveTo(Math.max(rect.x, head - rect.w * 0.18), y + rowHeight / 2);
-        ctx.lineTo(head, y + rowHeight / 2);
+        ctx.moveTo(tail, middle);
+        ctx.lineTo(head, middle);
         ctx.stroke();
-        this.clearGlow();
+
+        // Der Kopf des Schiffchens leuchtet und streut Fasern nach hinten.
+        this.glowAt(tone, head, middle, 1.2 * this.shuttle.life, 16);
+        if (this.detail > 0.5 && this.particles.live < this.sparkLimit) {
+          this.particles.emit({
+            x: head,
+            y: middle,
+            vx: -rect.w * 0.12 * (0.4 + Math.abs(hashNoise(index, now / 500, 2))),
+            vy: hashNoise(index * 3, now / 400, 4) * rowHeight,
+            hue,
+            size: Math.max(2, rowHeight * 0.5),
+            decay: 2.8,
+            drag: 0.94
+          });
+        }
       }
     }
   }
@@ -484,6 +553,36 @@ export class AutoPlanWeaver extends CanvasStage {
       rect.x + 6,
       rect.y + rect.h / 2
     );
+  }
+
+  /**
+   * Der Schimmer.
+   *
+   * Er zeigt nichts an, sondern macht den Stoff als Fläche lesbar: Ohne ihn
+   * wirken Knoten und Fäden wie eine Tabelle, mit ihm wie Gewebe. Deshalb ist
+   * er das Erste, was bei knappem Budget entfällt.
+   */
+  drawSheen(rect, color, now) {
+    const ctx = this.context;
+    const span = Math.max(24, Math.round(rect.w * 0.28));
+    // Der Streifen wird einmal gezeichnet und danach nur verschoben. Ein
+    // Verlauf je Bild wäre eine Allokation und eine großflächige Füllung für
+    // eine Bewegung, die sich nie ändert.
+    const strip = this.staticLayer(`sheen|${span}|${Math.round(rect.h)}`, target => {
+      if (!target.createLinearGradient) return;
+      const gradient = target.createLinearGradient(0, 0, span * 2, 0);
+      gradient.addColorStop(0, hsl(color, 0));
+      gradient.addColorStop(0.5, hsl({ ...color, l: clamp(color.l + 0.4, 0, 0.98) }, 0.12));
+      gradient.addColorStop(1, hsl(color, 0));
+      target.fillStyle = gradient;
+      target.fillRect(0, 0, span * 2, Math.max(1, rect.h));
+    });
+    if (!strip) return;
+    const head = rect.x - span + ((now / 3600) % 1) * (rect.w + span * 2);
+    const alpha = ctx.globalAlpha;
+    ctx.globalAlpha = alpha * this.detail;
+    ctx.drawImage(strip, 0, 0, span * 2, Math.max(1, rect.h), head - span, rect.y, span * 2, rect.h);
+    ctx.globalAlpha = alpha;
   }
 
   /** Die Abschlusskante: ein heller Schuss, einmal, durch den ganzen Stoff. */

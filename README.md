@@ -724,6 +724,37 @@ Zonenschnitt und Textkürzung.
 Passen nicht alle Einträge, zeigt die Ansicht einen Ausschnitt und weist die
 Zahl der übrigen aus, statt die Zeilen ineinanderlaufen zu lassen.
 
+**Die Animation konkurriert nie mit dem Solver.** Drei Bremsen, alle im
+Unterbau und damit für jede Ansicht gleich:
+
+1. **Takt** — gezeichnet wird höchstens rund dreißigmal je Sekunde, nicht so
+   oft wie die Anzeige kann. Der Zustand läuft dabei weiter; nur das Zeigen ist
+   seltener. Der Unterschied ist unsichtbar, die Ersparnis die Hälfte.
+2. **Budget** — die gemessene Bilddauer entscheidet über Detailgrad und
+   Partikelzahl, über dieselbe reine Funktion (`auto-plan-animation-policy.js`),
+   die Orbit seit v7.5 verwendet. Wird es eng, zeigt die Ansicht *weniger* — nie
+   etwas anderes. Der Grad steht als `canvas.dataset.renderDetail` am Element.
+3. **Sichtbarkeit** — ist das Fenster verdeckt oder die Leinwand aus dem Bild
+   gescrollt, ruht die Schleife vollständig und wird von der nächsten Meldung
+   oder dem nächsten Sichtbarwerden geweckt. Eine Animation, die niemand sieht,
+   ist reine Wärme.
+
+**Billige Pracht.** Der Glanz kam bis v10.6 aus `shadowBlur` — der teuersten
+Einstellung des 2D-Kontexts, gesetzt je Element und je Bild. Er kommt jetzt aus
+vorgerenderten Verlaufsplättchen, additiv aufgetragen: gleiche Optik, ein
+Kopiervorgang statt einer Zwischenfläche. Dazu kommen feste Vorräte für Partikel
+und Ringe (kein `new` im Bild, also keine Aufräumpausen), zwischengespeicherte
+Standebenen für alles Unbewegte und ein Ausbruchsbudget: Ersetzt eine neue
+Zwischenlösung *jede* Zuordnung des Monats, zünden nicht zweiundsechzig
+Druckwellen gleichzeitig — ein Blitz überall ist kein Hinweis auf irgendetwas.
+
+Zwei Regeln haben sich dabei als Fallen erwiesen und stehen deshalb im Code:
+Punktförmiger Schein gehört nicht auf gestreckte Formen (auf einem achthundert
+Pixel langen Band ergibt er zwei Leuchtflecken statt eines glühenden Bandes —
+dort ist ein weicher Unterzug richtig), und kein Verlaufsobjekt gehört in den
+heißen Pfad (ein `createLinearGradient` je Tropfen und Bild sind bei neunzig
+Tropfen zweitausendsiebenhundert Allokationen in der Sekunde).
+
 **Eine Stelle je Ansicht.** Welche Ansichten es gibt, wie sie heißen, was sie
 zeigen und wie sie gebaut werden, steht in `js/auto-plan-run-views.js`. Auswahl
 im Studio, Erklärungstext und Erzeugung im Laufpfad lesen daraus; wer eine
@@ -748,8 +779,11 @@ interpoliert:
 
 1. **Domänenfeld** — ein Raster aus Tagen und Rollen. Jede Zelle trägt anfangs
    ihre Kandidatenmenge als Fächer. Trifft eine Entscheidung ein, fallen die
-   nicht gewählten Marken heraus und die gewählte rastet ein: Der Suchraum
-   fällt sichtbar zusammen.
+   nicht gewählten Marken heraus und die gewählte rastet mit einem
+   Überschwingen ein: Der Suchraum fällt sichtbar zusammen. Die noch offenen
+   Marken driften dabei auf wiederholbaren Bahnen — echtes Rauschen flackerte in
+   jedem Bild anders —, und jede frische Entscheidung schlägt eine Druckwelle
+   und wirft Funken.
 2. **Schranken-Schere** — der Zielwert der besten bekannten Lösung von oben, die
    bewiesene untere Schranke von unten. Die Fläche dazwischen ist genau das, was
    noch nicht bewiesen ist. Berühren sich beide, läuft **einmal** ein heller
@@ -791,7 +825,11 @@ Der Monat als Gewebe — genau die Tabelle, die am Ende im Dienstplan steht:
    wächst. Bis zur ersten Lastmeldung zählt der Stoff selbst.
 6. **Webkante unten** — Anteil der gewebten an allen Feldern des Monats.
 
-Ist die Optimalität bewiesen oder der Lauf fertig, läuft **einmal** die
+Ein frisch gesetzter Knoten zieht sich mit einem Überschwingen fest und wirft
+kurz Fasern ab; das Schiffchen zieht einen Kometenschweif hinter sich her; über
+den gewebten Teil wandert ein flacher Lichtschimmer, der den Stoff überhaupt
+erst als Fläche lesbar macht — und der als Erstes entfällt, wenn das Budget eng
+wird. Ist die Optimalität bewiesen oder der Lauf fertig, läuft **einmal** die
 Abschlusskante durch den Stoff: ein heller Schuss von oben nach unten.
 
 #### „Kaskade"
@@ -812,8 +850,13 @@ nächste unter der Auflage, die erste nicht mehr zu verschlechtern:
    auf; eine unlösbare Stufe bricht, eine am Zeitbudget gescheiterte bleibt
    offen.
 4. **Entscheidungsstrom** — jede erstmals gesehene Zuordnung fällt als Tropfen
-   in der Farbe ihrer Person. Die Dichte ist die tatsächliche
+   in der Farbe ihrer Person, beschleunigt dabei wie ein fallender Tropfen und
+   schlägt unten einen Ring. Die Dichte ist die tatsächliche
    Entscheidungsrate, kein Taktgeber.
+
+Die Oberkante des Bandes trägt eine flache Welle, deren Ausschlag mit der Lücke
+abklingt: Ein Becken in Bewegung verhandelt noch, ein erstarrtes steht still —
+und bekommt stattdessen einen wandernden Lichtgrat.
 
 Eine geschlossene Lücke gilt nur dann als Beweis, wenn überhaupt ein Ziel
 minimiert wird: Die vorgeschaltete Zulässigkeitssuche läuft ohne Zielfunktion
@@ -1139,6 +1182,13 @@ und den Ausdruck als gemessenes PDF — ein Monat, eine A4-Seite.
   Ersatzleinwand — samt der Randfälle, die im Browser sonst nur eine schwarze
   Fläche hinterlassen: winzige Leinwand, leerer Monat, Zwischenlösung vor dem
   Stufenplan, geschlossene Lücke ohne Zielfunktion, fehlender Leinwandkontext.
+- **Sparsamkeit.** Die drei Bremsen sind Zusagen, also geprüft:
+  `tests/auto-plan-run-views.test.js` verlangt, dass die Schleife bei verdeckter
+  Leinwand kein Bild mehr anfordert, von einer Meldung wieder anläuft, beim
+  Anhalten jeden Beobachter abmeldet und bei teuren Bildern den Detailgrad
+  zurücknimmt. `tests/auto-plan-visual-effects.test.js` hält die Vorräte auf
+  ihrer Kapazität fest — ein unbemerktes Wachstum fiele erst nach langer
+  Laufzeit als steigender Speicherverbrauch auf.
 - **Lesbarkeit.** `tests/e2e/dark-contrast.spec.js` und
   `tests/e2e/layout-contrast-v10-5.spec.js` messen jeden sichtbaren Textknoten
   gegen den *tatsächlich wirksamen* Hintergrund: halbtransparente Schichten
@@ -1183,7 +1233,8 @@ js/auto-planner-v8-5.js            Heuristik: Warmstart, Rückfallebene, Phasenv
 js/auto-planner-optimizer.js       Ruin-and-Recreate-Perfektion
 js/auto-plan-studio-*.js           Oberfläche des Studios, additiv geschichtet
 js/auto-plan-run-views.js          Registratur der Laufansichten: der geschriebene Vertrag
-js/auto-plan-visual-kit.js         Unterbau der Laufansichten: Farbwelt, Glow-Regel, Leinwand
+js/auto-plan-visual-kit.js         Unterbau der Laufansichten: Farbwelt, Budget, Leinwand
+js/auto-plan-visual-effects.js     Effektbausteine: Scheinplättchen, Partikel- und Ringvorrat
 js/auto-plan-crystallize.js        Laufansicht „Kristallisation": Zusammenfall des Suchraums
 js/auto-plan-weave.js              Laufansicht „Weberei": entstehender Plan als Gewebe
 js/auto-plan-cascade.js            Laufansicht „Kaskade": Zielstufen als Becken
